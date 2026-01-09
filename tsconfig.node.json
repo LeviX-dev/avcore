@@ -1,0 +1,41 @@
+
+{
+  "compilerOptions": {
+    "jsx": "react-jsx", // Ensure JSX is enabled for React
+    "composite": true,
+    "skipLibCheck": true,
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "allowSyntheticDefaultImports": true
+  },
+  "include": [
+    "vite.config.ts",
+    "src/**/*.ts",
+    "src/**/*.tsx"
+  ],
+  "exclude": [
+    "node_modules"
+  ]
+}
+
+
+
+
+
+
+
+
+
+
+// {
+//   "compilerOptions": {
+//     "composite": true,
+//     "skipLibCheck": true,
+//     "module": "ESNext",
+//     "moduleResolution": "bundler",
+//     "allowSyntheticDefaultImports": true
+//   },
+//   "include": ["vite.config.ts"]
+// }
+
+
