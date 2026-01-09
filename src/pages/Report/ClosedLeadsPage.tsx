@@ -44,7 +44,11 @@ import {
   faCalendar,
   faMapMarkerAlt,
   faInfoCircle,
-  faUser
+  faUser ,
+    faUsers,
+    faTasks,
+    faCalendarAlt,
+
 } from '@fortawesome/free-solid-svg-icons';
 import { BASE_URL } from '../../../public/config.js';
 import axios from 'axios';
@@ -82,6 +86,7 @@ interface ReassignmentRemark {
 }
 
 interface Lead {
+  area_name: string;
   master_id: number;
   name: string;
   number: string;
@@ -1306,307 +1311,684 @@ const fetchClosedLeads = async (): Promise<void> => {
     }
   };
 
-  // Detail modal render function
-  const renderDetailsModal = () => {
-    if (!selectedLeadDetails) return null;
 
-    return (
-      <div className="fixed inset-0 bg-black/60 flex justify-center items-center z-[9999] p-4 backdrop-blur-sm">
-        <div className="bg-white dark:bg-boxdark rounded-xl shadow-2xl w-full max-w-2xl max-h-[85vh] overflow-hidden border border-gray-200 dark:border-gray-800">
-          {/* Compact Header */}
-          <div className="sticky top-0 bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-gray-800 dark:to-gray-900 p-4 border-b border-gray-200 dark:border-gray-800">
-            <div className="flex justify-between items-start">
-              <div className="flex-1">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 bg-gradient-to-br from-green-500 to-emerald-600 rounded-lg flex items-center justify-center shadow-lg">
-                    <span className="text-white font-bold text-lg">
-                      {selectedLeadDetails.name?.charAt(0) || 'C'}
+  // Detail modal render function - Updated to match reference exactly
+const renderDetailsModal = () => {
+  if (!selectedLeadDetails) return null;
+
+  const isEmpty = (value) => {
+    return !value || 
+           value === '' || 
+           value === 'Not Available' || 
+           value === 'N/A' ||
+           value === 'null' ||
+           value === null ||
+           value === undefined ||
+           value === 'Not Found';
+  };
+
+  const formatValue = (value) => {
+    if (isEmpty(value)) return 'N/A';
+    return value;
+  };
+
+  // Function to check if a field exists and is not empty
+  const hasField = (fieldName) => {
+    return selectedLeadDetails[fieldName] && !isEmpty(selectedLeadDetails[fieldName]);
+  };
+
+  // Check for various contact numbers
+  const hasContactNumbers = 
+    hasField('ar_number') ||
+    hasField('ca_number') ||
+    hasField('e_number') ||
+    hasField('sm_number') ||
+    hasField('pop_number') ||
+    hasField('other_number') ||
+    hasField('architect_name') ||
+    hasField('alternate_number');
+
+  // Check for lead info
+  const hasLeadInfo = 
+    hasField('cat_name') ||
+    hasField('category_other') ||
+    hasField('reference_name') ||
+    hasField('reference_other') ||
+    hasField('area') ||
+    hasField('area_name');
+
+  // Check for project details
+  const hasProjectDetails = 
+    hasField('room_length') ||
+    hasField('room_width') ||
+    hasField('room_height') ||
+    hasField('p_type') ||
+    hasField('budget_range') ||
+    hasField('time_to_complete') ||
+    hasField('room_ready');
+
+  // Check for lead stages
+  const hasLeadStages = 
+    hasField('lead_stage') ||
+    hasField('current_stage') ||
+    hasField('lead_status') ||
+    hasField('status') ||
+    hasField('status_percentage') ||
+    hasField('latest_leadStage');
+
+  // Check for dates
+  const hasDates = 
+    hasField('assign_date') ||
+    hasField('followup_date') ||
+    hasField('site_visit_date') ||
+    hasField('demo_date');
+
+  // Check for assignment info
+  const hasAssignmentInfo = 
+    hasField('assigned_to') ||
+    hasField('telecaller_name') ||
+    hasField('latest_assignedTo') ||
+    hasField('reassigned_to') ||
+    hasField('assigned_user_name');
+
+  // Check for links
+  const hasLinks = 
+    hasField('document_location_link') ||
+    hasField('location_link');
+
+  // Check for remarks
+  const hasRemarks = 
+    hasField('quick_remark') ||
+    hasField('detailed_remark');
+
+  return (
+    <div className="fixed inset-0 bg-black/60 flex justify-center items-center z-[9999] p-4 backdrop-blur-sm">
+      <div className="bg-white dark:bg-boxdark rounded-xl shadow-2xl w-full max-w-2xl max-h-[85vh] overflow-hidden border border-gray-200 dark:border-gray-800">
+        {/* Compact Header */}
+        <div className="sticky top-0 bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-gray-800 dark:to-gray-900 p-4 border-b border-gray-200 dark:border-gray-800">
+          <div className="flex justify-between items-start">
+            <div className="flex-1">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 bg-gradient-to-br from-green-500 to-emerald-600 rounded-lg flex items-center justify-center shadow-lg">
+                  <span className="text-white font-bold text-lg">
+                    {selectedLeadDetails.name?.charAt(0) || 'C'}
+                  </span>
+                </div>
+                <div>
+                  <h2 className="text-xl font-bold text-black dark:text-white truncate max-w-xs">
+                    {formatValue(selectedLeadDetails.name)}
+                  </h2>
+                  <div className="flex items-center gap-3 text-xs text-gray-600 dark:text-gray-400 mt-1 flex-wrap">
+                    <span className="bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 px-2 py-0.5 rounded-full">
+                      Created: {formatValue(selectedLeadDetails.assign_date || selectedLeadDetails.created_at)}
                     </span>
-                  </div>
-                  <div>
-                    <h2 className="text-xl font-bold text-black dark:text-white truncate max-w-xs">
-                      {selectedLeadDetails.name}
-                    </h2>
-                    <div className="flex items-center gap-3 text-xs text-gray-600 dark:text-gray-400 mt-1 flex-wrap">
-                      <span className="bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 px-2 py-0.5 rounded-full">
-                        ID: {selectedLeadDetails.master_id}
-                      </span>
-                      <span>•</span>
-                      <span className="flex items-center gap-1">
-                        <FontAwesomeIcon icon={faCalendar} className="h-3 w-3" />
-                        {selectedLeadDetails.assign_date || selectedLeadDetails.created_at}
-                      </span>
-                    </div>
+                    {hasField('latest_assignedTo') && (
+                      <>
+                        <span>•</span>
+                        <span className="bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 px-2 py-0.5 rounded-full">
+                          Latest: {formatValue(selectedLeadDetails.latest_assignedTo || selectedLeadDetails.assigned_user_name)}
+                        </span>
+                      </>
+                    )}
                   </div>
                 </div>
               </div>
-              <button
-                onClick={() => {
-                  setShowDetailsModal(false);
-                  setSelectedLeadDetails(null);
-                }}
-                className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 text-xl p-1 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors"
-              >
-                ×
-              </button>
             </div>
+            <button
+              onClick={() => {
+                setShowDetailsModal(false);
+                setSelectedLeadDetails(null);
+              }}
+              className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 text-xl p-1 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors"
+            >
+              ×
+            </button>
           </div>
+        </div>
 
-          {/* Compact Content - Scrollable */}
-          <div className="overflow-y-auto max-h-[calc(85vh-140px)]">
-            <div className="p-4 space-y-4">
-              
-              {/* Contact Info */}
-              <div className="bg-gradient-to-r from-gray-50 to-gray-100 dark:from-gray-800/50 dark:to-gray-900/50 p-3 rounded-lg border border-gray-200 dark:border-gray-700">
-                <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2 flex items-center gap-2">
-                  <FontAwesomeIcon icon={faPhone} className="h-4 w-4 text-blue-500" />
-                  Contact Information
-                </h3>
-                <div className="grid grid-cols-2 gap-3 text-sm">
+        {/* Compact Content - Scrollable */}
+        <div className="overflow-y-auto max-h-[calc(85vh-140px)]">
+          <div className="p-4 space-y-4">
+            
+            {/* Contact Info - Always show if lead exists */}
+            <div className="bg-gradient-to-r from-gray-50 to-gray-100 dark:from-gray-800/50 dark:to-gray-900/50 p-3 rounded-lg border border-gray-200 dark:border-gray-700">
+              <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2 flex items-center gap-2">
+                <FontAwesomeIcon icon={faPhone} className="h-4 w-4 text-blue-500" />
+                Contact Information
+              </h3>
+              <div className="grid grid-cols-2 gap-3 text-sm">
+                {hasField('name') && (
+                  <div>
+                    <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">Name</div>
+                    <div className="font-medium text-black dark:text-white bg-white dark:bg-gray-800 px-2 py-1 rounded truncate">
+                      {formatValue(selectedLeadDetails.name)}
+                    </div>
+                  </div>
+                )}
+                {hasField('number') && (
                   <div>
                     <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">Phone</div>
                     <div className="font-medium text-black dark:text-white bg-white dark:bg-gray-800 px-2 py-1 rounded truncate">
-                      {selectedLeadDetails.number || 'N/A'}
+                      {formatValue(selectedLeadDetails.number)}
                     </div>
                   </div>
-                  <div>
-                    <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">Alternate Phone</div>
-                    <div className="font-medium text-black dark:text-white bg-white dark:bg-gray-800 px-2 py-1 rounded truncate">
-                      {selectedLeadDetails.alternate_number || 'N/A'}
-                    </div>
-                  </div>
+                )}
+                {hasField('email') && (
                   <div>
                     <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">Email</div>
                     <div className="font-medium text-black dark:text-white bg-white dark:bg-gray-800 px-2 py-1 rounded truncate">
-                      {selectedLeadDetails.email || 'N/A'}
+                      {formatValue(selectedLeadDetails.email)}
                     </div>
                   </div>
+                )}
+                {hasField('alternate_number') && (
+                  <div>
+                    <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">Alternate Phone</div>
+                    <div className="font-medium text-black dark:text-white bg-white dark:bg-gray-800 px-2 py-1 rounded truncate">
+                      {formatValue(selectedLeadDetails.alternate_number)}
+                    </div>
+                  </div>
+                )}
+                {hasField('address') && (
                   <div className="col-span-2">
                     <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">Address</div>
                     <div className="font-medium text-black dark:text-white bg-white dark:bg-gray-800 px-2 py-1 rounded truncate">
-                      {selectedLeadDetails.address || 'N/A'}
+                      {formatValue(selectedLeadDetails.address)}
                     </div>
                   </div>
+                )}
+                {hasField('city') && (
+                  <div>
+                    <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">City</div>
+                    <div className="font-medium text-black dark:text-white bg-white dark:bg-gray-800 px-2 py-1 rounded truncate">
+                      {formatValue(selectedLeadDetails.city)}
+                    </div>
+                  </div>
+                )}
+                {hasField('area') && (
+                  <div>
+                    <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">Area</div>
+                    <div className="font-medium text-black dark:text-white bg-white dark:bg-gray-800 px-2 py-1 rounded truncate">
+                      {formatValue(selectedLeadDetails.area || selectedLeadDetails.area_name)}
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Additional Contact Numbers - Only show if exists */}
+            {hasContactNumbers && (
+              <div className="bg-gradient-to-r from-indigo-50 to-purple-50 dark:from-indigo-900/20 dark:to-purple-900/20 p-3 rounded-lg border border-indigo-100 dark:border-indigo-800/30">
+                <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2 flex items-center gap-2">
+                  <FontAwesomeIcon icon={faUsers} className="h-4 w-4 text-indigo-500" />
+                  Additional Contacts
+                </h3>
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 text-sm">
+                  {hasField('architect_name') && (
+                    <div>
+                      <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">Architect</div>
+                      <div className="font-medium text-black dark:text-white truncate">
+                        {formatValue(selectedLeadDetails.architect_name)}
+                      </div>
+                    </div>
+                  )}
+                  {hasField('ar_number') && (
+                    <div>
+                      <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">Architect Number</div>
+                      <div className="font-medium text-black dark:text-white">
+                        {formatValue(selectedLeadDetails.ar_number)}
+                      </div>
+                    </div>
+                  )}
+                  {hasField('ca_number') && (
+                    <div>
+                      <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">CA Number</div>
+                      <div className="font-medium text-black dark:text-white">
+                        {formatValue(selectedLeadDetails.ca_number)}
+                      </div>
+                    </div>
+                  )}
+                  {hasField('e_number') && (
+                    <div>
+                      <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">Electrician</div>
+                      <div className="font-medium text-black dark:text-white">
+                        {formatValue(selectedLeadDetails.e_number)}
+                      </div>
+                    </div>
+                  )}
+                  {hasField('sm_number') && (
+                    <div>
+                      <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">Site Manager</div>
+                      <div className="font-medium text-black dark:text-white">
+                        {formatValue(selectedLeadDetails.sm_number)}
+                      </div>
+                    </div>
+                  )}
+                  {hasField('pop_number') && (
+                    <div>
+                      <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">POP Number</div>
+                      <div className="font-medium text-black dark:text-white">
+                        {formatValue(selectedLeadDetails.pop_number)}
+                      </div>
+                    </div>
+                  )}
+                  {hasField('other_number') && (
+                    <div>
+                      <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">Other Number</div>
+                      <div className="font-medium text-black dark:text-white">
+                        {formatValue(selectedLeadDetails.other_number)}
+                      </div>
+                    </div>
+                  )}
                 </div>
               </div>
+            )}
 
-              {/* Lead & Stage Info */}
-              <div className="grid grid-cols-2 gap-4">
-                {/* Lead Details */}
-                <div className="bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20 p-3 rounded-lg border border-blue-100 dark:border-blue-800/30">
-                  <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2 flex items-center gap-2">
-                    <FontAwesomeIcon icon={faInfoCircle} className="h-4 w-4 text-blue-500" />
-                    Lead Details
-                  </h3>
-                  <div className="space-y-2">
+            {/* Lead & Category Information - Only show if exists */}
+            {hasLeadInfo && (
+              <div className="bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20 p-3 rounded-lg border border-blue-100 dark:border-blue-800/30">
+                <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2 flex items-center gap-2">
+                  <FontAwesomeIcon icon={faInfoCircle} className="h-4 w-4 text-blue-500" />
+                  Lead Details
+                </h3>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  {hasField('cat_name') && (
                     <div>
                       <div className="text-xs text-gray-500 dark:text-gray-400">Category</div>
                       <div className="font-medium text-black dark:text-white truncate">
-                        {selectedLeadDetails.cat_name || selectedLeadDetails.category_other || 'N/A'}
+                        {formatValue(selectedLeadDetails.cat_name)}
+                        {hasField('category_other') && (
+                          <span className="text-xs text-blue-600 dark:text-blue-400 ml-2">
+                            ({formatValue(selectedLeadDetails.category_other)})
+                          </span>
+                        )}
                       </div>
                     </div>
+                  )}
+                  {hasField('reference_name') && (
                     <div>
                       <div className="text-xs text-gray-500 dark:text-gray-400">Reference</div>
                       <div className="font-medium text-black dark:text-white truncate">
-                        {selectedLeadDetails.reference_name || selectedLeadDetails.reference_other || 'N/A'}
+                        {formatValue(selectedLeadDetails.reference_name)}
+                        {hasField('reference_other') && (
+                          <span className="text-xs text-blue-600 dark:text-blue-400 ml-2">
+                            ({formatValue(selectedLeadDetails.reference_other)})
+                          </span>
+                        )}
                       </div>
                     </div>
+                  )}
+                  {hasField('area') && (
                     <div>
                       <div className="text-xs text-gray-500 dark:text-gray-400">Area</div>
                       <div className="font-medium text-black dark:text-white truncate">
-                        {selectedLeadDetails.area || 'N/A'}
+                        {formatValue(selectedLeadDetails.area || selectedLeadDetails.area_name)}
                       </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* Stage & Assignment - Only show if exists */}
+            {(hasLeadStages || hasAssignmentInfo) && (
+              <div className="grid grid-cols-2 gap-4">
+                {/* Lead Stages */}
+                {hasLeadStages && (
+                  <div className="bg-gradient-to-r from-purple-50 to-pink-50 dark:from-purple-900/20 dark:to-pink-900/20 p-3 rounded-lg border border-purple-100 dark:border-purple-800/30">
+                    <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2 flex items-center gap-2">
+                      <FontAwesomeIcon icon={faUser} className="h-4 w-4 text-purple-500" />
+                      Lead Stages
+                    </h3>
+                    <div className="space-y-2">
+                      {hasField('lead_stage') && (
+                        <div>
+                          <div className="text-xs text-gray-500 dark:text-gray-400">Lead Stage</div>
+                          <div className="font-medium text-black dark:text-white">
+                            {formatValue(selectedLeadDetails.lead_stage)}
+                          </div>
+                        </div>
+                      )}
+                      {hasField('current_stage') && (
+                        <div>
+                          <div className="text-xs text-gray-500 dark:text-gray-400">Current Stage</div>
+                          <div className="font-medium text-black dark:text-white">
+                            {formatValue(selectedLeadDetails.current_stage)}
+                          </div>
+                        </div>
+                      )}
+                      {hasField('latest_leadStage') && (
+                        <div>
+                          <div className="text-xs text-gray-500 dark:text-gray-400">Latest Lead Stage</div>
+                          <div className="font-medium text-black dark:text-white">
+                            {formatValue(selectedLeadDetails.latest_leadStage)}
+                          </div>
+                        </div>
+                      )}
+                      {hasField('status_percentage') && (
+                        <div>
+                          <div className="text-xs text-gray-500 dark:text-gray-400">Progress</div>
+                          <div className="mt-0.5">
+                            <BatteryStatus
+                              stage={selectedLeadDetails.lead_stage || selectedLeadDetails.latest_leadStage}
+                              status_percentage={selectedLeadDetails.status_percentage}
+                              is_drop_stage={selectedLeadDetails.is_drop_stage}
+                              previous_stage={selectedLeadDetails.previous_stage}
+                            />
+                          </div>
+                        </div>
+                      )}
                     </div>
                   </div>
-                </div>
+                )}
 
-                {/* Stage & Assignment */}
-                <div className="bg-gradient-to-r from-purple-50 to-pink-50 dark:from-purple-900/20 dark:to-pink-900/20 p-3 rounded-lg border border-purple-100 dark:border-purple-800/30">
-                  <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2 flex items-center gap-2">
-                    <FontAwesomeIcon icon={faUser} className="h-4 w-4 text-purple-500" />
-                    Stage & Assignment
-                  </h3>
-                  <div className="space-y-2"> 
+                {/* Assignment Info */}
+                {hasAssignmentInfo && (
+                  <div className="bg-gradient-to-r from-teal-50 to-cyan-50 dark:from-teal-900/20 dark:to-cyan-900/20 p-3 rounded-lg border border-teal-100 dark:border-teal-800/30">
+                    <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2 flex items-center gap-2">
+                      <FontAwesomeIcon icon={faTasks} className="h-4 w-4 text-teal-500" />
+                      Assignment
+                    </h3>
+                    <div className="space-y-2">
+                      {hasField('assigned_to') && (
+                        <div>
+                          <div className="text-xs text-gray-500 dark:text-gray-400">Assigned To</div>
+                          <div className="font-medium text-black dark:text-white truncate">
+                            {formatValue(selectedLeadDetails.assigned_to)}
+                          </div>
+                        </div>
+                      )}
+                      {hasField('telecaller_name') && (
+                        <div>
+                          <div className="text-xs text-gray-500 dark:text-gray-400">Telecaller</div>
+                          <div className="font-medium text-black dark:text-white truncate">
+                            {formatValue(selectedLeadDetails.telecaller_name || selectedLeadDetails.assigned_user_name)}
+                          </div>
+                        </div>
+                      )}
+                      {hasField('latest_assignedTo') && (
+                        <div>
+                          <div className="text-xs text-gray-500 dark:text-gray-400">Latest Assigned To</div>
+                          <div className="font-medium text-black dark:text-white truncate">
+                            {formatValue(selectedLeadDetails.latest_assignedTo || selectedLeadDetails.assigned_user_name)}
+                          </div>
+                        </div>
+                      )}
+                      {hasField('reassigned_to') && (
+                        <div>
+                          <div className="text-xs text-gray-500 dark:text-gray-400">Reassigned To</div>
+                          <div className="font-medium text-black dark:text-white truncate">
+                            {formatValue(selectedLeadDetails.reassigned_to)}
+                          </div>
+                        </div>
+                      )}
+                      {hasField('status') && (
+                        <div>
+                          <div className="text-xs text-gray-500 dark:text-gray-400">Status</div>
+                          <div className={`font-medium ${
+                            selectedLeadDetails.status === 'Assigned' ? 'text-green-600 dark:text-green-400' :
+                            selectedLeadDetails.status === 'Unassigned' ? 'text-red-600 dark:text-red-400' :
+                            'text-blue-600 dark:text-blue-400'
+                          }`}>
+                            {formatValue(selectedLeadDetails.status)}
+                          </div>
+                        </div>
+                      )}
+                      {hasField('lead_status') && (
+                        <div>
+                          <div className="text-xs text-gray-500 dark:text-gray-400">Lead Status</div>
+                          <div className={`font-medium ${
+                            selectedLeadDetails.lead_status === 'Active' ? 'text-green-600 dark:text-green-400' :
+                            'text-gray-600 dark:text-gray-400'
+                          }`}>
+                            {formatValue(selectedLeadDetails.lead_status)}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Dates Information - Only show if exists */}
+            {hasDates && (
+              <div className="bg-gradient-to-r from-emerald-50 to-teal-50 dark:from-emerald-900/20 dark:to-teal-900/20 p-3 rounded-lg border border-emerald-100 dark:border-emerald-800/30">
+                <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2 flex items-center gap-2">
+                  <FontAwesomeIcon icon={faCalendarAlt} className="h-4 w-4 text-emerald-500" />
+                  Dates
+                </h3>
+                <div className="grid grid-cols-2 gap-3 text-sm">
+                  {hasField('assign_date') && (
                     <div>
-                      <div className="text-xs text-gray-500 dark:text-gray-400">Current Stage</div>
+                      <div className="text-xs text-gray-500 dark:text-gray-400">Entry Date</div>
                       <div className="font-medium text-black dark:text-white">
-                        {selectedLeadDetails.lead_stage || 'Closed Deal'}
+                        {formatValue(selectedLeadDetails.assign_date)}
                       </div>
                     </div>
+                  )}
+                  {hasField('followup_date') && (
                     <div>
-                      <div className="text-xs text-gray-500 dark:text-gray-400">Assigned To</div>
+                      <div className="text-xs text-gray-500 dark:text-gray-400">Follow-up Date</div>
+                      <div className={`font-medium ${
+                        selectedLeadDetails.followup_date && new Date(selectedLeadDetails.followup_date) < new Date()
+                          ? 'text-red-600 dark:text-red-400'
+                          : 'text-green-600 dark:text-green-400'
+                      }`}>
+                        {formatValue(selectedLeadDetails.followup_date)}
+                      </div>
+                    </div>
+                  )}
+                  {hasField('site_visit_date') && (
+                    <div>
+                      <div className="text-xs text-gray-500 dark:text-gray-400">Site Visit</div>
+                      <div className="font-medium text-black dark:text-white">
+                        {formatValue(selectedLeadDetails.site_visit_date)}
+                      </div>
+                    </div>
+                  )}
+                  {hasField('demo_date') && (
+                    <div>
+                      <div className="text-xs text-gray-500 dark:text-gray-400">Demo Date</div>
+                      <div className="font-medium text-black dark:text-white">
+                        {formatValue(selectedLeadDetails.demo_date)}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* Project Details - Only show if exists */}
+            {hasProjectDetails && (
+              <div className="bg-gradient-to-r from-amber-50 to-yellow-50 dark:from-amber-900/20 dark:to-yellow-900/20 p-3 rounded-lg border border-amber-100 dark:border-amber-800/30">
+                <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2 flex items-center gap-2">
+                  <FontAwesomeIcon icon={faFile} className="h-4 w-4 text-amber-500" />
+                  Project Details
+                </h3>
+                <div className="grid grid-cols-2 gap-3 text-sm">
+                  {(hasField('room_length') || hasField('room_width')) && (
+                    <div>
+                      <div className="text-xs text-gray-500 dark:text-gray-400">Room Size</div>
+                      <div className="font-medium text-black dark:text-white">
+                        {formatValue(selectedLeadDetails.room_length)} × {formatValue(selectedLeadDetails.room_width)}
+                        {hasField('room_height') && ` × ${formatValue(selectedLeadDetails.room_height)}`}
+                      </div>
+                    </div>
+                  )}
+                  {hasField('p_type') && (
+                    <div>
+                      <div className="text-xs text-gray-500 dark:text-gray-400">Type</div>
                       <div className="font-medium text-black dark:text-white truncate">
-                        {selectedLeadDetails.assigned_to || selectedLeadDetails.telecaller_name || selectedLeadDetails.latest_assignedTo || 'Unassigned'}
+                        {formatValue(selectedLeadDetails.p_type)}
                       </div>
                     </div>
+                  )}
+                  {hasField('budget_range') && (
                     <div>
-                      <div className="text-xs text-gray-500 dark:text-gray-400">Call Status</div>
+                      <div className="text-xs text-gray-500 dark:text-gray-400">Budget Range</div>
                       <div className="font-medium text-black dark:text-white">
+                        {formatValue(selectedLeadDetails.budget_range)}
+                      </div>
+                    </div>
+                  )}
+                  {hasField('time_to_complete') && selectedLeadDetails.time_to_complete !== "Not Available" && (
+                    <div>
+                      <div className="text-xs text-gray-500 dark:text-gray-400">Time to Complete</div>
+                      <div className="font-medium text-black dark:text-white">
+                        {formatValue(selectedLeadDetails.time_to_complete)}
+                      </div>
+                    </div>
+                  )}
+                  {hasField('room_ready') && (
+                    <div>
+                      <div className="text-xs text-gray-500 dark:text-gray-400">Room Ready</div>
+                      <div className="font-medium text-black dark:text-white">
+                        {formatValue(selectedLeadDetails.room_ready)}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* Links - Only show if exists */}
+            {hasLinks && (
+              <div className="bg-gradient-to-r from-blue-50 to-cyan-50 dark:from-blue-900/20 dark:to-cyan-900/20 p-3 rounded-lg border border-blue-100 dark:border-blue-800/30">
+                <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2 flex items-center gap-2">
+                  <FontAwesomeIcon icon={faMapMarkerAlt} className="h-4 w-4 text-blue-500" />
+                  Links
+                </h3>
+                <div className="space-y-2">
+                  {hasField('document_location_link') && (
+                    <a
+                      href={selectedLeadDetails.document_location_link}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-2 px-3 py-2 text-sm bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 rounded-lg hover:bg-blue-200 dark:hover:bg-blue-800/50 transition-colors border border-blue-200 dark:border-blue-700"
+                    >
+                      <FontAwesomeIcon icon={faFile} className="h-3 w-3" />
+                      Document Location Link
+                    </a>
+                  )}
+                  {hasField('location_link') && selectedLeadDetails.location_link !== 'Not Available' && (
+                    <a
+                      href={selectedLeadDetails.location_link}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-2 px-3 py-2 text-sm bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 rounded-lg hover:bg-green-200 dark:hover:bg-green-800/50 transition-colors border border-green-200 dark:border-green-700"
+                    >
+                      <FontAwesomeIcon icon={faMapMarkerAlt} className="h-3 w-3" />
+                      Location Link
+                    </a>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* Remarks - Only show if exists */}
+            {hasRemarks && (
+              <div className="bg-gradient-to-r from-gray-50 to-slate-50 dark:from-gray-800/50 dark:to-slate-900/50 p-3 rounded-lg border border-gray-200 dark:border-gray-700">
+                <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2 flex items-center gap-2">
+                  <FontAwesomeIcon icon={faInfoCircle} className="h-4 w-4 text-gray-500" />
+                  Remarks
+                </h3>
+                <div className="text-sm">
+                  {hasField('quick_remark') && (
+                    <div className="mb-2">
+                      <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">Quick Remark</div>
+                      <div className="font-medium text-black dark:text-white bg-white dark:bg-gray-800 p-2 rounded border border-gray-200 dark:border-gray-700">
                         <span className={`px-2 py-1 rounded-full text-xs ${
                           selectedLeadDetails.quick_remark === "Interested" ? "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300" :
                           selectedLeadDetails.quick_remark === "Not Interested" ? "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300" :
                           selectedLeadDetails.quick_remark === "Not Reachable" ? "bg-gray-100 text-gray-800 dark:bg-gray-900/30 dark:text-gray-300" :
                           "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300"
                         }`}>
-                          {selectedLeadDetails.quick_remark || 'N/A'}
+                          {formatValue(selectedLeadDetails.quick_remark)}
                         </span>
                       </div>
                     </div>
-                  </div>
-                </div>
-              </div>
-
-              {/* Dates */}
-              <div className="grid grid-cols-2 gap-4">
-                <div className="bg-gradient-to-r from-green-50 to-emerald-50 dark:from-green-900/20 dark:to-emerald-900/20 p-3 rounded-lg border border-green-100 dark:border-green-800/30">
-                  <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2 flex items-center gap-2">
-                    <FontAwesomeIcon icon={faCalendar} className="h-4 w-4 text-green-500" />
-                    Entry Date
-                  </h3>
-                  <div className="font-medium text-lg text-black dark:text-white text-center">
-                    {selectedLeadDetails.assign_date || selectedLeadDetails.created_at || 'N/A'}
-                  </div>
-                </div>
-                
-                <div className="bg-gradient-to-r from-orange-50 to-amber-50 dark:from-orange-900/20 dark:to-amber-900/20 p-3 rounded-lg border border-orange-100 dark:border-orange-800/30">
-                  <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2 flex items-center gap-2">
-                    <FontAwesomeIcon icon={faCalendar} className="h-4 w-4 text-orange-500" />
-                    Follow-up Date
-                  </h3>
-                  <div className={`font-medium text-lg text-center ${
-                    selectedLeadDetails.followup_date && new Date(selectedLeadDetails.followup_date) < new Date()
-                      ? 'text-red-600 dark:text-red-400'
-                      : 'text-green-600 dark:text-green-400'
-                  }`}>
-                    {selectedLeadDetails.followup_date || 'N/A'}
-                  </div>
-                </div>
-              </div>
-
-              {/* City & Location */}
-              {selectedLeadDetails.city && (
-                <div className="bg-gradient-to-r from-teal-50 to-cyan-50 dark:from-teal-900/20 dark:to-cyan-900/20 p-3 rounded-lg border border-teal-100 dark:border-teal-800/30">
-                  <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2 flex items-center gap-2">
-                    <FontAwesomeIcon icon={faMapMarkerAlt} className="h-4 w-4 text-teal-500" />
-                    Location
-                  </h3>
-                  <div className="text-sm">
-                    <div className="flex justify-between items-center">
-                      <div>
-                        <div className="text-xs text-gray-500 dark:text-gray-400">City</div>
-                        <div className="font-medium text-black dark:text-white">
-                          {selectedLeadDetails.city}
-                        </div>
+                  )}
+                  {hasField('detailed_remark') && (
+                    <div>
+                      <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">Detailed Remark</div>
+                      <div className="text-black dark:text-white bg-white dark:bg-gray-800 p-2 rounded border border-gray-200 dark:border-gray-700 whitespace-pre-line">
+                        {formatValue(selectedLeadDetails.detailed_remark)}
                       </div>
-                      {selectedLeadDetails.location_link && selectedLeadDetails.location_link !== 'Not Available' && (
-                        <a
-                          href={selectedLeadDetails.location_link}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="text-xs text-blue-600 dark:text-blue-400 hover:underline flex items-center gap-1"
-                        >
-                          <FontAwesomeIcon icon={faMapMarkerAlt} className="h-3 w-3" />
-                          View on Map
-                        </a>
-                      )}
                     </div>
-                  </div>
+                  )}
                 </div>
-              )}
+              </div>
+            )}
 
-              {/* Remarks */}
-              {(selectedLeadDetails.detailed_remark || selectedLeadDetails.quick_remark) && (
-                <div className="bg-gradient-to-r from-gray-50 to-slate-50 dark:from-gray-800/50 dark:to-slate-900/50 p-3 rounded-lg border border-gray-200 dark:border-gray-700">
-                  <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2 flex items-center gap-2">
-                    <FontAwesomeIcon icon={faInfoCircle} className="h-4 w-4 text-gray-500" />
-                    Remarks
-                  </h3>
-                  <div className="text-sm text-black dark:text-white bg-white dark:bg-gray-900 p-3 rounded border border-gray-200 dark:border-gray-700 max-h-32 overflow-y-auto">
-                    {selectedLeadDetails.detailed_remark || selectedLeadDetails.quick_remark}
-                  </div>
-                </div>
-              )}
-
-              {/* Project Details (if any) */}
-              {(selectedLeadDetails.room_length || selectedLeadDetails.p_type || selectedLeadDetails.budget_range) && (
-                <div className="bg-gradient-to-r from-amber-50 to-yellow-50 dark:from-amber-900/20 dark:to-yellow-900/20 p-3 rounded-lg border border-amber-100 dark:border-amber-800/30">
-                  <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2 flex items-center gap-2">
-                    <FontAwesomeIcon icon={faFile} className="h-4 w-4 text-amber-500" />
-                    Project Details
-                  </h3>
-                  <div className="grid grid-cols-2 gap-3 text-sm">
-                    {selectedLeadDetails.room_length && (
-                      <div>
-                        <div className="text-xs text-gray-500 dark:text-gray-400">Room Size</div>
-                        <div className="font-medium text-black dark:text-white">
-                          {selectedLeadDetails.room_length} × {selectedLeadDetails.room_width || 'N/A'}
-                        </div>
-                      </div>
-                    )}
-                    {selectedLeadDetails.p_type && (
-                      <div>
-                        <div className="text-xs text-gray-500 dark:text-gray-400">Type</div>
-                        <div className="font-medium text-black dark:text-white truncate">
-                          {selectedLeadDetails.p_type}
-                        </div>
-                      </div>
-                    )}
-                    {selectedLeadDetails.budget_range && (
-                      <div className="col-span-2">
-                        <div className="text-xs text-gray-500 dark:text-gray-400">Budget Range</div>
-                        <div className="font-medium text-black dark:text-white">
-                          {selectedLeadDetails.budget_range}
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              )}
-
-              {/* Reassignment History */}
-              {selectedLeadDetails.reassignment_remarks && 
-                Array.isArray(selectedLeadDetails.reassignment_remarks) && 
-                selectedLeadDetails.reassignment_remarks.length > 0 && (
-                <div className="mt-4">
-                  <h3 className="text-sm font-semibold mb-3 dark:text-white flex items-center gap-2">
-                    <FontAwesomeIcon icon={faUser} className="h-4 w-4 text-yellow-500" />
-                    Reassignments ({selectedLeadDetails.reassignment_remarks.length})
-                  </h3>
-                  
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                    {selectedLeadDetails.reassignment_remarks.slice(0, 4).map((remarkObj, index) => (
-                      <div key={index} className="p-3 bg-white dark:bg-gray-800 rounded-lg shadow-sm border dark:border-gray-700">
-                        <div className="flex justify-between items-start">
-                          <div>
-                            <div className="font-medium text-sm mb-1">
-                              <span className="text-blue-600">{remarkObj.name || 'Unknown'}</span>
-                              <span className="mx-2 text-gray-400">→</span>
-                              <span className="text-green-600">{remarkObj.assignedTo || 'Unknown'}</span>
+            {/* Reassignment History - Only show if exists */}
+            {selectedLeadDetails.reassignment_remarks && 
+              Array.isArray(selectedLeadDetails.reassignment_remarks) && 
+              selectedLeadDetails.reassignment_remarks.length > 0 && (
+              <div className="mt-4">
+                <h3 className="text-sm font-semibold mb-3 dark:text-white flex items-center gap-2">
+                  <FontAwesomeIcon icon={faUser} className="h-4 w-4 text-yellow-500" />
+                  Reassignments ({selectedLeadDetails.reassignment_remarks.length})
+                </h3>
+                
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  {(() => {
+                    const remarks = selectedLeadDetails.reassignment_remarks;
+                    if (remarks.length > 0 && typeof remarks[0] === 'object' && 'remark' in remarks[0]) {
+                      // Array of objects (full reassignment data)
+                      return remarks.slice(0, 4).map((remarkObj, index) => (
+                        <div key={index} className="p-3 bg-white dark:bg-gray-800 rounded-lg shadow-sm border dark:border-gray-700">
+                          <div className="flex justify-between items-start">
+                            <div>
+                              <div className="font-medium text-sm mb-1">
+                                <span className="text-blue-600">{remarkObj.name || 'Unknown'}</span>
+                                <span className="mx-2 text-gray-400">→</span>
+                                <span className="text-green-600">{remarkObj.assignedTo || 'Unknown'}</span>
+                              </div>
+                              <div className="text-xs text-gray-500 mb-1">
+                                {remarkObj.created_at} • {remarkObj.leadStage || 'Closed Deal'}
+                              </div>
                             </div>
-                            <div className="text-xs text-gray-500 mb-1">
-                              {remarkObj.created_at} • {remarkObj.leadStage || 'Closed Deal'}
+                            <span className="text-xs bg-gray-100 dark:bg-gray-700 px-2 py-1 rounded">#{index + 1}</span>
+                          </div>
+                          
+                          {remarkObj.remark && (
+                            <div className="text-sm text-gray-700 dark:text-gray-300 mt-2 pt-2 border-t">
+                              {remarkObj.remark}
                             </div>
-                          </div>
-                          <span className="text-xs bg-gray-100 dark:bg-gray-700 px-2 py-1 rounded">#{index + 1}</span>
+                          )}
                         </div>
-                        
-                        {remarkObj.remark && (
-                          <div className="text-sm text-gray-700 dark:text-gray-300 mt-2 pt-2 border-t">
-                            {remarkObj.remark}
+                      ));
+                    } else if (remarks.length > 0 && typeof remarks[0] === 'string') {
+                      // Array of strings (legacy format)
+                      return (remarks as string[]).slice(0, 4).map((remark, index) => (
+                        <div key={index} className="p-3 bg-white dark:bg-gray-800 rounded-lg shadow-sm border dark:border-gray-700">
+                          <div className="flex justify-between items-start">
+                            <div>
+                              <div className="font-medium text-sm mb-1">
+                                <span className="text-gray-700 dark:text-gray-300">Remark #{index + 1}</span>
+                              </div>
+                            </div>
+                            <span className="text-xs bg-gray-100 dark:bg-gray-700 px-2 py-1 rounded">#{index + 1}</span>
                           </div>
-                        )}
-                      </div>
-                    ))}
-                  </div>
+                          
+                          <div className="text-sm text-gray-700 dark:text-gray-300 mt-2">
+                            {remark}
+                          </div>
+                        </div>
+                      ));
+                    }
+                    return null;
+                  })()}
                 </div>
-              )}
-
-            </div>
+              </div>
+            )}
           </div>
         </div>
       </div>
-    );
-  };
+    </div>
+  );
+};
 
   // Combined Documents/Upload Modal
   const renderDocsModal = () => {
@@ -2287,10 +2669,185 @@ const fetchClosedLeads = async (): Promise<void> => {
       />
     </th>
           
-          <th className="py-5 px-4">
-            <div className="text-xs font-extrabold uppercase tracking-wider text-gray-700 dark:text-gray-300">
-              Actions
+                     {/* Entry Date Column with Filter */}
+          <th className="py-5 px-4 relative">
+            <div ref={entryDateRef} className="flex items-center justify-between gap-2">
+              <span className="text-xs font-extrabold uppercase tracking-wider text-gray-700 dark:text-gray-300">
+                Entry Date
+              </span>
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  e.preventDefault();
+                  closeAllDropdowns();
+                  setShowEntryDateCalendar(!showEntryDateCalendar);
+                }}
+                className="text-gray-500 hover:text-blue-600 dark:text-gray-400 dark:hover:text-blue-400 focus:outline-none transition-colors"
+              >
+                <FontAwesomeIcon 
+                  icon={faChevronDown} 
+                  className={`h-3 w-3 transition-transform duration-200 ${showEntryDateCalendar ? 'rotate-180' : ''}`}
+                />
+              </button>
             </div>
+            
+            {/* Entry Date Calendar Dropdown */}
+            {showEntryDateCalendar && (
+              <div className="absolute top-full left-0 mt-1 z-50 bg-white dark:bg-boxdark border border-gray-300 dark:border-gray-700 rounded-lg shadow-lg p-4 min-w-[250px]">
+                <div className="flex justify-between items-center mb-3">
+                  <span className="font-semibold text-sm dark:text-white">Select Entry Date Range</span>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setSelectedEntryFromDate('');
+                      setSelectedEntryToDate('');
+                      applyFilters();
+                      setShowEntryDateCalendar(false);
+                    }}
+                    className="text-xs font-medium text-blue-600 hover:text-blue-800 dark:text-blue-400 transition-colors"
+                  >
+                    Clear
+                  </button>
+                </div>
+                
+                <div className="space-y-3">
+                  <div>
+                    <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">
+                      From Date
+                    </label>
+                    <input
+                      type="date"
+                      value={selectedEntryFromDate}
+                      onChange={(e) => {
+                        e.stopPropagation();
+                        setSelectedEntryFromDate(e.target.value);
+                      }}
+                      onClick={(e) => e.stopPropagation()}
+                      className="w-full p-2 border border-gray-300 dark:border-gray-600 rounded-lg text-sm font-medium dark:bg-form-input dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    />
+                  </div>
+                  
+                  <div>
+                    <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">
+                      To Date
+                    </label>
+                    <input
+                      type="date"
+                      value={selectedEntryToDate}
+                      onChange={(e) => {
+                        e.stopPropagation();
+                        setSelectedEntryToDate(e.target.value);
+                      }}
+                      onClick={(e) => e.stopPropagation()}
+                      className="w-full p-2 border border-gray-300 dark:border-gray-600 rounded-lg text-sm font-medium dark:bg-form-input dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    />
+                  </div>
+                </div>
+                
+                <div className="mt-4">
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      applyFilters();
+                      setShowEntryDateCalendar(false);
+                    }}
+                    className="w-full py-2.5 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white text-sm font-semibold rounded-lg transition-all duration-200 shadow-md hover:shadow-lg"
+                  >
+                    Apply Filter
+                  </button>
+                </div>
+              </div>
+            )}
+          </th>
+          
+          {/* FollowUp Date Column with Filter */}
+          <th className="py-5 px-4 relative">
+            <div ref={followupDateRef} className="flex items-center justify-between gap-2">
+              <span className="text-xs font-extrabold uppercase tracking-wider text-gray-700 dark:text-gray-300">
+                FollowUp Date
+              </span>
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  closeAllDropdowns();
+                  setShowFollowupDateCalendar(!showFollowupDateCalendar);
+                }}
+                className="text-gray-500 hover:text-blue-600 dark:text-gray-400 dark:hover:text-blue-400 focus:outline-none transition-colors"
+              >
+                <FontAwesomeIcon 
+                  icon={faChevronDown} 
+                  className={`h-3 w-3 transition-transform duration-200 ${showFollowupDateCalendar ? 'rotate-180' : ''}`}
+                />
+              </button>
+            </div>
+            
+            {/* FollowUp Date Calendar Dropdown */}
+            {showFollowupDateCalendar && (
+              <div className="absolute top-full left-0 mt-1 z-50 bg-white dark:bg-boxdark border border-gray-300 dark:border-gray-700 rounded-lg shadow-lg p-4 min-w-[250px]">
+                <div className="flex justify-between items-center mb-3">
+                  <span className="font-semibold text-sm dark:text-white">Select Followup Date Range</span>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setSelectedFollowupFromDate('');
+                      setSelectedFollowupToDate('');
+                      applyFilters();
+                      setShowFollowupDateCalendar(false);
+                    }}
+                    className="text-xs font-medium text-blue-600 hover:text-blue-800 dark:text-blue-400 transition-colors"
+                  >
+                    Clear
+                  </button>
+                </div>
+                
+                <div className="space-y-3">
+                  <div>
+                    <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">
+                      From Date
+                    </label>
+                    <input
+                      type="date"
+                      value={selectedFollowupFromDate}
+                      onChange={(e) => {
+                        e.stopPropagation();
+                        setSelectedFollowupFromDate(e.target.value);
+                      }}
+                      onClick={(e) => e.stopPropagation()}
+                      className="w-full p-2 border border-gray-300 dark:border-gray-600 rounded-lg text-sm font-medium dark:bg-form-input dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    />
+                  </div>
+                  
+                  <div>
+                    <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">
+                      To Date
+                    </label>
+                    <input
+                      type="date"
+                      value={selectedFollowupToDate}
+                      onChange={(e) => {
+                        e.stopPropagation();
+                        setSelectedFollowupToDate(e.target.value);
+                      }}
+                      onClick={(e) => e.stopPropagation()}
+                      className="w-full p-2 border border-gray-300 dark:border-gray-600 rounded-lg text-sm font-medium dark:bg-form-input dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    />
+                  </div>
+                </div>
+                
+                <div className="mt-4">
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      applyFilters();
+                      setShowFollowupDateCalendar(false);
+                    }}
+                    className="w-full py-2.5 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white text-sm font-semibold rounded-lg transition-all duration-200 shadow-md hover:shadow-lg"
+                  >
+                    Apply Filter
+                  </button>
+                </div>
+              </div>
+            )}
           </th>
 
 
@@ -2614,186 +3171,7 @@ const fetchClosedLeads = async (): Promise<void> => {
             )}
           </th> 
 
-              {/* Entry Date Column with Filter */}
-          <th className="py-5 px-4 relative">
-            <div ref={entryDateRef} className="flex items-center justify-between gap-2">
-              <span className="text-xs font-extrabold uppercase tracking-wider text-gray-700 dark:text-gray-300">
-                Entry Date
-              </span>
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  e.preventDefault();
-                  closeAllDropdowns();
-                  setShowEntryDateCalendar(!showEntryDateCalendar);
-                }}
-                className="text-gray-500 hover:text-blue-600 dark:text-gray-400 dark:hover:text-blue-400 focus:outline-none transition-colors"
-              >
-                <FontAwesomeIcon 
-                  icon={faChevronDown} 
-                  className={`h-3 w-3 transition-transform duration-200 ${showEntryDateCalendar ? 'rotate-180' : ''}`}
-                />
-              </button>
-            </div>
-            
-            {/* Entry Date Calendar Dropdown */}
-            {showEntryDateCalendar && (
-              <div className="absolute top-full left-0 mt-1 z-50 bg-white dark:bg-boxdark border border-gray-300 dark:border-gray-700 rounded-lg shadow-lg p-4 min-w-[250px]">
-                <div className="flex justify-between items-center mb-3">
-                  <span className="font-semibold text-sm dark:text-white">Select Entry Date Range</span>
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setSelectedEntryFromDate('');
-                      setSelectedEntryToDate('');
-                      applyFilters();
-                      setShowEntryDateCalendar(false);
-                    }}
-                    className="text-xs font-medium text-blue-600 hover:text-blue-800 dark:text-blue-400 transition-colors"
-                  >
-                    Clear
-                  </button>
-                </div>
-                
-                <div className="space-y-3">
-                  <div>
-                    <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">
-                      From Date
-                    </label>
-                    <input
-                      type="date"
-                      value={selectedEntryFromDate}
-                      onChange={(e) => {
-                        e.stopPropagation();
-                        setSelectedEntryFromDate(e.target.value);
-                      }}
-                      onClick={(e) => e.stopPropagation()}
-                      className="w-full p-2 border border-gray-300 dark:border-gray-600 rounded-lg text-sm font-medium dark:bg-form-input dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    />
-                  </div>
-                  
-                  <div>
-                    <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">
-                      To Date
-                    </label>
-                    <input
-                      type="date"
-                      value={selectedEntryToDate}
-                      onChange={(e) => {
-                        e.stopPropagation();
-                        setSelectedEntryToDate(e.target.value);
-                      }}
-                      onClick={(e) => e.stopPropagation()}
-                      className="w-full p-2 border border-gray-300 dark:border-gray-600 rounded-lg text-sm font-medium dark:bg-form-input dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    />
-                  </div>
-                </div>
-                
-                <div className="mt-4">
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      applyFilters();
-                      setShowEntryDateCalendar(false);
-                    }}
-                    className="w-full py-2.5 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white text-sm font-semibold rounded-lg transition-all duration-200 shadow-md hover:shadow-lg"
-                  >
-                    Apply Filter
-                  </button>
-                </div>
-              </div>
-            )}
-          </th>
-          
-          {/* FollowUp Date Column with Filter */}
-          <th className="py-5 px-4 relative">
-            <div ref={followupDateRef} className="flex items-center justify-between gap-2">
-              <span className="text-xs font-extrabold uppercase tracking-wider text-gray-700 dark:text-gray-300">
-                FollowUp Date
-              </span>
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  closeAllDropdowns();
-                  setShowFollowupDateCalendar(!showFollowupDateCalendar);
-                }}
-                className="text-gray-500 hover:text-blue-600 dark:text-gray-400 dark:hover:text-blue-400 focus:outline-none transition-colors"
-              >
-                <FontAwesomeIcon 
-                  icon={faChevronDown} 
-                  className={`h-3 w-3 transition-transform duration-200 ${showFollowupDateCalendar ? 'rotate-180' : ''}`}
-                />
-              </button>
-            </div>
-            
-            {/* FollowUp Date Calendar Dropdown */}
-            {showFollowupDateCalendar && (
-              <div className="absolute top-full left-0 mt-1 z-50 bg-white dark:bg-boxdark border border-gray-300 dark:border-gray-700 rounded-lg shadow-lg p-4 min-w-[250px]">
-                <div className="flex justify-between items-center mb-3">
-                  <span className="font-semibold text-sm dark:text-white">Select Followup Date Range</span>
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setSelectedFollowupFromDate('');
-                      setSelectedFollowupToDate('');
-                      applyFilters();
-                      setShowFollowupDateCalendar(false);
-                    }}
-                    className="text-xs font-medium text-blue-600 hover:text-blue-800 dark:text-blue-400 transition-colors"
-                  >
-                    Clear
-                  </button>
-                </div>
-                
-                <div className="space-y-3">
-                  <div>
-                    <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">
-                      From Date
-                    </label>
-                    <input
-                      type="date"
-                      value={selectedFollowupFromDate}
-                      onChange={(e) => {
-                        e.stopPropagation();
-                        setSelectedFollowupFromDate(e.target.value);
-                      }}
-                      onClick={(e) => e.stopPropagation()}
-                      className="w-full p-2 border border-gray-300 dark:border-gray-600 rounded-lg text-sm font-medium dark:bg-form-input dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    />
-                  </div>
-                  
-                  <div>
-                    <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">
-                      To Date
-                    </label>
-                    <input
-                      type="date"
-                      value={selectedFollowupToDate}
-                      onChange={(e) => {
-                        e.stopPropagation();
-                        setSelectedFollowupToDate(e.target.value);
-                      }}
-                      onClick={(e) => e.stopPropagation()}
-                      className="w-full p-2 border border-gray-300 dark:border-gray-600 rounded-lg text-sm font-medium dark:bg-form-input dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    />
-                  </div>
-                </div>
-                
-                <div className="mt-4">
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      applyFilters();
-                      setShowFollowupDateCalendar(false);
-                    }}
-                    className="w-full py-2.5 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white text-sm font-semibold rounded-lg transition-all duration-200 shadow-md hover:shadow-lg"
-                  >
-                    Apply Filter
-                  </button>
-                </div>
-              </div>
-            )}
-          </th>
+
           
              <th className="py-5 px-4">
             <div className="text-xs font-extrabold uppercase tracking-wider text-gray-700 dark:text-gray-300">
@@ -2801,6 +3179,13 @@ const fetchClosedLeads = async (): Promise<void> => {
             </div>
           </th>
           
+
+             <th className="py-5 px-4">
+            <div className="text-xs font-extrabold uppercase tracking-wider text-gray-700 dark:text-gray-300">
+              Actions
+            </div>
+          </th>
+
         </tr>
       </thead>
 
@@ -2832,67 +3217,29 @@ const fetchClosedLeads = async (): Promise<void> => {
       </td>
 
 
-         
-         {/* Action Buttons */}
-<td className="py-4 px-4">
-  <div className="flex justify-center gap-1">
-    
-    {/* Eye/View Details Button */}
-    <ActionButton
-      onClick={() => {
-        setSelectedLeadDetails(lead);
-        setShowDetailsModal(true);
-      }}
-      title="View Details"
-      variant="view"
-      className="w-8 h-8 hover:scale-105 transition-transform"
-    >
-      <FontAwesomeIcon icon={faEye} className="text-xs" />
-    </ActionButton>
+                         {/* Entry Date */}
+            <td className="py-4 px-4">
+              <div className="font-semibold text-sm bg-gradient-to-r from-blue-50 to-blue-100 dark:from-blue-900/20 dark:to-blue-800/10 text-blue-800 dark:text-blue-300 px-3 py-1.5 rounded-lg border border-blue-100 dark:border-blue-800/30 shadow-sm">
+                {lead.assign_date
+                  ? new Date(lead.assign_date).toLocaleDateString("en-GB")
+                  : "—"}
+              </div>
+            </td>
 
-    {/* Call Button */}
-    <ActionButton
-      onClick={() =>
-        handleEdit({ 
-          ...lead, 
-          master_id: lead.master_id,
-          assigned_to:
-            lead.assigned_to ||
-            lead.telecaller_name ||
-            lead.latest_assignedTo ||
-            ''
-        })
-      }
-      title="Make Call"
-      variant="call"
-      className="w-8 h-8 hover:scale-105 transition-transform"
-    >
-      <FontAwesomeIcon icon={faPhone} className="text-xs" />
-    </ActionButton>
-
-    {/* Edit Button */}
-    <ActionButton
-      onClick={() => handleEditClick(lead)}
-      title="Edit"
-      variant="edit"
-      className="w-8 h-8 hover:scale-105 transition-transform"
-    >
-      <FontAwesomeIcon icon={faEdit} className="text-xs" />
-    </ActionButton>
-
-    {/* Documents Button */}
-    <ActionButton
-      onClick={() => handleFileIconClick(lead)}
-      title="Upload/View Files"
-      variant="document"
-      badgeCount={lead.document_count}
-      className="w-8 h-8 hover:scale-105 transition-transform relative"
-    >
-      <FontAwesomeIcon icon={faFileUpload} className="text-xs" />
-    </ActionButton>
-
-  </div>
-</td>
+            {/* FollowUp Date */}
+            <td className="py-4 px-4">
+              <div
+                className={`inline-flex items-center px-3 py-1.5 rounded-lg font-semibold text-sm border shadow-sm ${
+                  lead.followup_date && new Date(lead.followup_date) < new Date()
+                    ? 'bg-gradient-to-r from-red-50 to-red-100 dark:from-red-900/20 dark:to-red-800/10 text-red-800 dark:text-red-300 border-red-200 dark:border-red-800/30'
+                    : 'bg-gradient-to-r from-green-50 to-green-100 dark:from-green-900/20 dark:to-green-800/10 text-green-800 dark:text-green-300 border-green-200 dark:border-green-800/30'
+                }`}
+              >
+                {lead.followup_date
+                  ? new Date(lead.followup_date).toLocaleDateString("en-GB")
+                  : "—"}
+              </div>
+            </td>
 
 
 
@@ -2962,29 +3309,7 @@ const fetchClosedLeads = async (): Promise<void> => {
               </div>
             </td> 
 
-                {/* Entry Date */}
-            <td className="py-4 px-4">
-              <div className="font-semibold text-sm bg-gradient-to-r from-blue-50 to-blue-100 dark:from-blue-900/20 dark:to-blue-800/10 text-blue-800 dark:text-blue-300 px-3 py-1.5 rounded-lg border border-blue-100 dark:border-blue-800/30 shadow-sm">
-                {lead.assign_date
-                  ? new Date(lead.assign_date).toLocaleDateString("en-GB")
-                  : "—"}
-              </div>
-            </td>
 
-            {/* FollowUp Date */}
-            <td className="py-4 px-4">
-              <div
-                className={`inline-flex items-center px-3 py-1.5 rounded-lg font-semibold text-sm border shadow-sm ${
-                  lead.followup_date && new Date(lead.followup_date) < new Date()
-                    ? 'bg-gradient-to-r from-red-50 to-red-100 dark:from-red-900/20 dark:to-red-800/10 text-red-800 dark:text-red-300 border-red-200 dark:border-red-800/30'
-                    : 'bg-gradient-to-r from-green-50 to-green-100 dark:from-green-900/20 dark:to-green-800/10 text-green-800 dark:text-green-300 border-green-200 dark:border-green-800/30'
-                }`}
-              >
-                {lead.followup_date
-                  ? new Date(lead.followup_date).toLocaleDateString("en-GB")
-                  : "—"}
-              </div>
-            </td>
 
    {/* Remark */}
             <td className="py-4 px-4">
@@ -3009,7 +3334,71 @@ const fetchClosedLeads = async (): Promise<void> => {
                 {lead.detailed_remark?.substring(0, 20) || lead.quick_remark?.substring(0, 20) || "—"}
                 {(lead.detailed_remark && lead.detailed_remark.length > 20) || (lead.quick_remark && lead.quick_remark.length > 20) ? "..." : ""}
               </span>
-            </td>
+            </td> 
+
+
+                     {/* Action Buttons */}
+<td className="py-4 px-4">
+  <div className="flex justify-center gap-1">
+    
+    {/* Eye/View Details Button */}
+    <ActionButton
+      onClick={() => {
+        setSelectedLeadDetails(lead);
+        setShowDetailsModal(true);
+      }}
+      title="View Details"
+      variant="view"
+      className="w-8 h-8 hover:scale-105 transition-transform"
+    >
+      <FontAwesomeIcon icon={faEye} className="text-xs" />
+    </ActionButton>
+
+    {/* Call Button */}
+    <ActionButton
+      onClick={() =>
+        handleEdit({ 
+          ...lead, 
+          master_id: lead.master_id,
+          assigned_to:
+            lead.assigned_to ||
+            lead.telecaller_name ||
+            lead.latest_assignedTo ||
+            ''
+        })
+      }
+      title="Make Call"
+      variant="call"
+      className="w-8 h-8 hover:scale-105 transition-transform"
+    >
+      <FontAwesomeIcon icon={faPhone} className="text-xs" />
+    </ActionButton>
+
+    {/* Edit Button */}
+    <ActionButton
+      onClick={() => handleEditClick(lead)}
+      title="Edit"
+      variant="edit"
+      className="w-8 h-8 hover:scale-105 transition-transform"
+    >
+      <FontAwesomeIcon icon={faEdit} className="text-xs" />
+    </ActionButton>
+
+    {/* Documents Button */}
+    <ActionButton
+      onClick={() => handleFileIconClick(lead)}
+      title="Upload/View Files"
+      variant="document"
+      badgeCount={lead.document_count}
+      className="w-8 h-8 hover:scale-105 transition-transform relative"
+    >
+      <FontAwesomeIcon icon={faFileUpload} className="text-xs" />
+    </ActionButton>
+
+  </div>
+</td>
+
+
 
           </tr>
         ))}

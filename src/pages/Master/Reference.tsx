@@ -65,7 +65,7 @@ const Reference = () => {
 
   return (
     <div>
-      <Breadcrumb pageName="Manage References" />
+      <Breadcrumb pageName="Manage Sources" />
 
       {/* Top Controls */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-4">

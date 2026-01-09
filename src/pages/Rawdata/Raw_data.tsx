@@ -3035,14 +3035,63 @@ const renderDetailsModal = () => {
               />
             </th>
 
-            {/* Actions Column */}
-            <th className="py-5 px-4">
-              <div className="text-xs font-extrabold uppercase tracking-wider text-gray-700 dark:text-gray-300">
-                Actions
+           
+                        {/* Entry Date Column */}
+            <th className="py-5 px-4 relative">
+              <div
+                ref={entryDateRef}
+                className="flex items-center justify-between gap-2"
+              >
+                <span className="text-xs font-extrabold uppercase tracking-wider text-gray-700 dark:text-gray-300">
+                  Entry Date
+                </span>
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    e.preventDefault();
+                    closeAllDropdowns();
+                    setShowEntryDateCalendar(!showEntryDateCalendar);
+                  }}
+                  className="text-gray-500 hover:text-blue-600 dark:text-gray-400 dark:hover:text-blue-400 focus:outline-none transition-colors"
+                >
+                  <FontAwesomeIcon
+                    icon={faChevronDown}
+                    className={`h-3 w-3 transition-transform duration-200 ${
+                      showEntryDateCalendar ? 'rotate-180' : ''
+                    }`}
+                  />
+                </button>
               </div>
+              {/* Calendar dropdown remains unchanged */}
             </th>
 
-           
+            {/* FollowUp Date Column */}
+            <th className="py-5 px-4 relative">
+              <div
+                ref={followupDateRef}
+                className="flex items-center justify-between gap-2"
+              >
+                <span className="text-xs font-extrabold uppercase tracking-wider text-gray-700 dark:text-gray-300">
+                  FollowUp Date
+                </span>
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    closeAllDropdowns();
+                    setShowFollowupDateCalendar(!showFollowupDateCalendar);
+                  }}
+                  className="text-gray-500 hover:text-blue-600 dark:text-gray-400 dark:hover:text-blue-400 focus:outline-none transition-colors"
+                >
+                  <FontAwesomeIcon
+                    icon={faChevronDown}
+                    className={`h-3 w-3 transition-transform duration-200 ${
+                      showFollowupDateCalendar ? 'rotate-180' : ''
+                    }`}
+                  />
+                </button>
+              </div>
+              {/* Calendar dropdown remains unchanged */}
+            </th>
 
             {/* Name Column */}
             <th className="py-5 px-4">
@@ -3151,62 +3200,7 @@ const renderDetailsModal = () => {
               {/* Stage filter dropdown remains unchanged */}
             </th>
 
-             {/* Entry Date Column */}
-            <th className="py-5 px-4 relative">
-              <div
-                ref={entryDateRef}
-                className="flex items-center justify-between gap-2"
-              >
-                <span className="text-xs font-extrabold uppercase tracking-wider text-gray-700 dark:text-gray-300">
-                  Entry Date
-                </span>
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    e.preventDefault();
-                    closeAllDropdowns();
-                    setShowEntryDateCalendar(!showEntryDateCalendar);
-                  }}
-                  className="text-gray-500 hover:text-blue-600 dark:text-gray-400 dark:hover:text-blue-400 focus:outline-none transition-colors"
-                >
-                  <FontAwesomeIcon
-                    icon={faChevronDown}
-                    className={`h-3 w-3 transition-transform duration-200 ${
-                      showEntryDateCalendar ? 'rotate-180' : ''
-                    }`}
-                  />
-                </button>
-              </div>
-              {/* Calendar dropdown remains unchanged */}
-            </th>
 
-            {/* FollowUp Date Column */}
-            <th className="py-5 px-4 relative">
-              <div
-                ref={followupDateRef}
-                className="flex items-center justify-between gap-2"
-              >
-                <span className="text-xs font-extrabold uppercase tracking-wider text-gray-700 dark:text-gray-300">
-                  FollowUp Date
-                </span>
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    closeAllDropdowns();
-                    setShowFollowupDateCalendar(!showFollowupDateCalendar);
-                  }}
-                  className="text-gray-500 hover:text-blue-600 dark:text-gray-400 dark:hover:text-blue-400 focus:outline-none transition-colors"
-                >
-                  <FontAwesomeIcon
-                    icon={faChevronDown}
-                    className={`h-3 w-3 transition-transform duration-200 ${
-                      showFollowupDateCalendar ? 'rotate-180' : ''
-                    }`}
-                  />
-                </button>
-              </div>
-              {/* Calendar dropdown remains unchanged */}
-            </th>
 
   {/* Remark Column */}
             <th className="py-5 px-4">
@@ -3214,6 +3208,14 @@ const renderDetailsModal = () => {
                 Remark
               </div>
             </th>
+
+ {/* Actions Column */}
+            <th className="py-5 px-4">
+              <div className="text-xs font-extrabold uppercase tracking-wider text-gray-700 dark:text-gray-300">
+                Actions
+              </div>
+            </th>
+
 
 
           </tr>
@@ -3235,40 +3237,25 @@ const renderDetailsModal = () => {
                 />
               </td>
 
-              {/* Action Buttons */}
-        <td className="py-4 px-4">
-  <div className="flex justify-center gap-1"> {/* Reduced gap */}
-    <ActionButton
-      onClick={() => {
-        setSelectedClientDetails(client);
-        setShowDetailsModal(true);
-      }}
-      title="View Details"
-      variant="view"
-      className="w-8 h-8 hover:scale-105 transition-transform"
-    >
-      <FontAwesomeIcon icon={faEye} className="text-xs" />
-    </ActionButton>
+               {/* Entry Date */}
+              <td className="py-4 px-4">
+                <div className="font-semibold text-sm bg-gradient-to-r from-blue-50 to-blue-100 dark:from-blue-900/20 dark:to-blue-800/10 px-3 py-1.5 rounded-lg text-blue-800 dark:text-blue-300 border border-blue-100 dark:border-blue-800/30 shadow-sm">
+                  {client.assign_date}
+                </div>
+              </td>
 
-    <ActionButton
-      onClick={() => handleEditClick(client)}
-      title="Edit"
-      variant="edit"
-      className="w-8 h-8 hover:scale-105 transition-transform"
-    >
-      <FontAwesomeIcon icon={faEdit} className="text-xs" />
-    </ActionButton>
-
-    <ActionButton
-      onClick={() => handleSingleDelete(client.id)}
-      title="Delete"
-      variant="delete"
-      className="w-8 h-8 hover:scale-105 transition-transform"
-    >
-      <FontAwesomeIcon icon={faTrash} className="text-xs" />
-    </ActionButton>
-  </div>
-</td>
+              {/* FollowUp Date */}
+              <td className="py-4 px-4">
+                <div
+                  className={`inline-flex items-center px-3 py-1.5 rounded-lg font-semibold text-sm border shadow-sm ${
+                    new Date(client.followup_date) < new Date()
+                      ? 'bg-gradient-to-r from-red-50 to-red-100 dark:from-red-900/20 dark:to-red-800/10 text-red-800 dark:text-red-300 border-red-200 dark:border-red-800/30'
+                      : 'bg-gradient-to-r from-green-50 to-green-100 dark:from-green-900/20 dark:to-green-800/10 text-green-800 dark:text-green-300 border-green-200 dark:border-green-800/30'
+                  }`}
+                >
+                  {client.followup_date}
+                </div>
+              </td>
              
 
               {/* Name */}
@@ -3334,25 +3321,7 @@ const renderDetailsModal = () => {
                 </div>
               </td> 
 
-               {/* Entry Date */}
-              <td className="py-4 px-4">
-                <div className="font-semibold text-sm bg-gradient-to-r from-blue-50 to-blue-100 dark:from-blue-900/20 dark:to-blue-800/10 px-3 py-1.5 rounded-lg text-blue-800 dark:text-blue-300 border border-blue-100 dark:border-blue-800/30 shadow-sm">
-                  {client.assign_date}
-                </div>
-              </td>
 
-              {/* FollowUp Date */}
-              <td className="py-4 px-4">
-                <div
-                  className={`inline-flex items-center px-3 py-1.5 rounded-lg font-semibold text-sm border shadow-sm ${
-                    new Date(client.followup_date) < new Date()
-                      ? 'bg-gradient-to-r from-red-50 to-red-100 dark:from-red-900/20 dark:to-red-800/10 text-red-800 dark:text-red-300 border-red-200 dark:border-red-800/30'
-                      : 'bg-gradient-to-r from-green-50 to-green-100 dark:from-green-900/20 dark:to-green-800/10 text-green-800 dark:text-green-300 border-green-200 dark:border-green-800/30'
-                  }`}
-                >
-                  {client.followup_date}
-                </div>
-              </td>
 
   {/* Remark */}
               <td className="py-4 px-4">
@@ -3371,7 +3340,42 @@ const renderDetailsModal = () => {
                     More
                   </button>
                 </div>
-              </td>
+              </td> 
+
+                            {/* Action Buttons */}
+        <td className="py-4 px-4">
+  <div className="flex justify-center gap-1"> {/* Reduced gap */}
+    <ActionButton
+      onClick={() => {
+        setSelectedClientDetails(client);
+        setShowDetailsModal(true);
+      }}
+      title="View Details"
+      variant="view"
+      className="w-8 h-8 hover:scale-105 transition-transform"
+    >
+      <FontAwesomeIcon icon={faEye} className="text-xs" />
+    </ActionButton>
+
+    <ActionButton
+      onClick={() => handleEditClick(client)}
+      title="Edit"
+      variant="edit"
+      className="w-8 h-8 hover:scale-105 transition-transform"
+    >
+      <FontAwesomeIcon icon={faEdit} className="text-xs" />
+    </ActionButton>
+
+    <ActionButton
+      onClick={() => handleSingleDelete(client.id)}
+      title="Delete"
+      variant="delete"
+      className="w-8 h-8 hover:scale-105 transition-transform"
+    >
+      <FontAwesomeIcon icon={faTrash} className="text-xs" />
+    </ActionButton>
+  </div>
+</td>
               
             </tr>
           ))}
