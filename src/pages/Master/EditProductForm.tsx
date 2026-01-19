@@ -9,7 +9,10 @@ import {
   faCube,
   faDollarSign,
   faImage,
-  faChevronRight
+  faChevronRight,
+  faTrash,
+  faSave,
+  faLayerGroup
 } from '@fortawesome/free-solid-svg-icons';
 
 interface Model {
@@ -31,7 +34,13 @@ interface ProductType {
   product_type_id: number;
   product_type_name: string;
   quotation_type?: string;
+  cat_id: number;
   brands: Brand[];
+}
+
+interface Category {
+  cat_id: number;
+  cat_name: string;
 }
 
 interface EditProductFormProps {
@@ -48,10 +57,18 @@ const EditProductForm = ({ productType, onClose, onSuccess }: EditProductFormPro
   const [showCustomInput, setShowCustomInput] = useState(quotationType === 'Other');
   const [loading, setLoading] = useState(false);
   const [expandedBrands, setExpandedBrands] = useState<number[]>([]);
+  const [categories, setCategories] = useState<Category[]>([]);
+  const [catId, setCatId] = useState<number>(productType.cat_id);
 
   useEffect(() => {
     setExpandedBrands(brands.map((_, index) => index));
+    fetchCategories();
   }, [brands.length]);
+
+  const fetchCategories = async () => {
+    const res = await axios.get(`${BASE_URL}api/category`);
+    setCategories(res.data);
+  };
 
   const handleQuotationChange = (value: string) => {
     setQuotationType(value);
@@ -62,6 +79,27 @@ const EditProductForm = ({ productType, onClose, onSuccess }: EditProductFormPro
     setExpandedBrands(prev =>
       prev.includes(index) ? prev.filter(i => i !== index) : [...prev, index]
     );
+  };
+
+  const handleAddBrand = () => {
+    const newBrand: Brand = {
+      brand_name: '',
+      models: [{ model_no: '', description: '', price: '', image: null }]
+    };
+    setBrands([...brands, newBrand]);
+    setExpandedBrands([...expandedBrands, brands.length]);
+  };
+
+  const handleBrandChange = (index: number, value: string) => {
+    const updated = [...brands];
+    updated[index].brand_name = value;
+    setBrands(updated);
+  };
+
+  const handleAddModel = (brandIndex: number) => {
+    const updated = [...brands];
+    updated[brandIndex].models.push({ model_no: '', description: '', price: '', image: null });
+    setBrands(updated);
   };
 
   const handleModelChange = (
@@ -75,6 +113,25 @@ const EditProductForm = ({ productType, onClose, onSuccess }: EditProductFormPro
     setBrands(updated);
   };
 
+  const handleRemoveBrand = (index: number) => {
+    if (window.confirm('Are you sure you want to remove this brand and all its models?')) {
+      const updated = [...brands];
+      updated.splice(index, 1);
+      setBrands(updated);
+      setExpandedBrands(expandedBrands.filter(i => i !== index).map(i => i > index ? i - 1 : i));
+    }
+  };
+
+  const handleRemoveModel = (brandIndex: number, modelIndex: number) => {
+    const updated = [...brands];
+    if (updated[brandIndex].models.length > 1) {
+      updated[brandIndex].models.splice(modelIndex, 1);
+      setBrands(updated);
+    } else {
+      alert('At least one model is required per brand');
+    }
+  };
+
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
     setLoading(true);
@@ -82,6 +139,8 @@ const EditProductForm = ({ productType, onClose, onSuccess }: EditProductFormPro
       const formData = new FormData();
       formData.append('product_type_name', productTypeName);
       formData.append('quotation_type', quotationType);
+      formData.append('cat_id', String(catId));
+      
       if (quotationType === 'Other' && customQuotationType) {
         formData.append('other_quotation_type', customQuotationType);
       }
@@ -109,16 +168,19 @@ const EditProductForm = ({ productType, onClose, onSuccess }: EditProductFormPro
         });
       });
 
-      const res = await axios.put(
+      const response = await axios.put(
         `${BASE_URL}api/product/${productType.product_type_id}`,
         formData,
         { headers: { 'Content-Type': 'multipart/form-data' }, withCredentials: true }
       );
 
-      if (res.data.success) {
-        alert(res.data.message || 'Product updated successfully!');
+      if (response.data.success) {
+        alert(response.data.message || 'Product updated successfully!');
         onSuccess();
       }
+    } catch (err: any) {
+      console.error(err);
+      alert(err?.response?.data?.error || 'Failed to update product.');
     } finally {
       setLoading(false);
     }
@@ -144,6 +206,26 @@ const EditProductForm = ({ productType, onClose, onSuccess }: EditProductFormPro
 
             {/* Basic Info */}
             <div className="bg-blue-50 border rounded-lg p-4 space-y-3">
+              {/* Category Dropdown */}
+              <div className="flex flex-col gap-2">
+                <label className="text-sm font-medium text-gray-700">
+                  Product Category
+                </label>
+                <select
+                  value={catId}
+                  onChange={(e) => setCatId(Number(e.target.value))}
+                  className="w-full border border-gray-300 rounded-lg py-2 px-2 text-sm"
+                >
+                  <option value="">Select Category</option>
+                  {categories.map(cat => (
+                    <option key={cat.cat_id} value={cat.cat_id}>
+                      {cat.cat_name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Quotation Type Dropdown */}
               <div>
                 <label className="text-sm font-medium">Product Category Type</label>
                 <select
@@ -168,6 +250,7 @@ const EditProductForm = ({ productType, onClose, onSuccess }: EditProductFormPro
                 )}
               </div>
 
+              {/* Product Type Name (Read-only) */}
               <div>
                 <label className="text-sm font-medium">Product Type Name</label>
                 <input
@@ -178,94 +261,165 @@ const EditProductForm = ({ productType, onClose, onSuccess }: EditProductFormPro
               </div>
             </div>
 
-            {/* Brands */}
-            {brands.map((brand, bIndex) => (
-              <div key={bIndex} className="border rounded-lg overflow-hidden">
-                <div
-                  className="bg-gray-50 px-3 py-2 flex justify-between items-center cursor-pointer"
-                  onClick={() => toggleBrandExpansion(bIndex)}
+            {/* Brands Section */}
+            <div className="space-y-3">
+              <div className="flex justify-between items-center">
+                <h3 className="text-gray-800 font-semibold text-lg flex items-center gap-2">
+                  <FontAwesomeIcon icon={faTag} className="text-green-600" />
+                  Brands & Models
+                </h3>
+                <button
+                  type="button"
+                  onClick={handleAddBrand}
+                  className="px-3 py-1 bg-green-600 text-white rounded text-sm hover:bg-green-700 flex items-center gap-1"
                 >
-                  <div className="flex items-center gap-2">
-                    <FontAwesomeIcon
-                      icon={faChevronRight}
-                      className={`transition-transform ${expandedBrands.includes(bIndex) ? 'rotate-90' : ''}`}
-                    />
-                    <span className="font-semibold text-sm">{brand.brand_name}</span>
-                  </div>
-                  <span className="text-xs">{brand.models.length} model(s)</span>
-                </div>
-
-                {expandedBrands.includes(bIndex) && (
-                  <div className="p-3 space-y-3">
-                    {brand.models.map((model, mIndex) => (
-                      <div
-                        key={mIndex}
-                        className="grid grid-cols-1 sm:grid-cols-12 gap-2 items-center"
-                      >
-                        <input
-                          value={model.model_no}
-                          onChange={(e) =>
-                            handleModelChange(bIndex, mIndex, 'model_no', e.target.value)
-                          }
-                          placeholder="Model No"
-                          className="sm:col-span-3 border rounded px-2 py-1 text-sm"
-                        />
-                        <input
-                          value={model.description}
-                          onChange={(e) =>
-                            handleModelChange(bIndex, mIndex, 'description', e.target.value)
-                          }
-                          placeholder="Description"
-                          className="sm:col-span-4 border rounded px-2 py-1 text-sm"
-                        />
-                        <input
-                          type="number"
-                          value={model.price}
-                          onChange={(e) =>
-                            handleModelChange(bIndex, mIndex, 'price', e.target.value)
-                          }
-                          placeholder="Price"
-                          className="sm:col-span-2 border rounded px-2 py-1 text-sm"
-                        />
-
-                        <label className="sm:col-span-3 flex items-center gap-2 border rounded px-2 py-1 text-sm cursor-pointer">
-                          <FontAwesomeIcon icon={faImage} />
-                          <span className="truncate">
-                            {model.image ? model.image.name : 'Upload'}
-                          </span>
-                          <input
-                            type="file"
-                            className="hidden"
-                            onChange={(e) =>
-                              handleModelChange(
-                                bIndex,
-                                mIndex,
-                                'image',
-                                e.target.files?.[0] || null
-                              )
-                            }
-                          />
-                        </label>
-                      </div>
-                    ))}
-                  </div>
-                )}
+                  <FontAwesomeIcon icon={faPlus} className="text-xs" /> Add Brand
+                </button>
               </div>
-            ))}
+
+              {brands.map((brand, bIndex) => (
+                <div key={bIndex} className="border border-gray-200 rounded-lg overflow-hidden ml-4">
+                  {/* Brand Header */}
+                  <div
+                    className="bg-gray-50 px-3 py-2 cursor-pointer flex justify-between items-center border-b"
+                    onClick={() => toggleBrandExpansion(bIndex)}
+                  >
+                    <div className="flex items-center gap-2">
+                      <FontAwesomeIcon
+                        icon={faChevronRight}
+                        className={`text-gray-500 transition-transform ${expandedBrands.includes(bIndex) ? 'rotate-90' : ''}`}
+                      />
+                      <div className="flex items-center gap-2">
+                        <FontAwesomeIcon icon={faTag} className="text-green-600" />
+                        <input
+                          type="text"
+                          value={brand.brand_name}
+                          onChange={(e) => handleBrandChange(bIndex, e.target.value)}
+                          placeholder="Brand name"
+                          className="bg-transparent text-sm font-semibold text-gray-800 px-1 py-1 rounded border"
+                          onClick={(e) => e.stopPropagation()}
+                        />
+                      </div>
+                      <span className="text-xs text-gray-500 ml-2">{brand.models.length} model(s)</span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleRemoveBrand(bIndex);
+                      }}
+                      className="p-1 text-red-600 hover:bg-red-50 rounded"
+                    >
+                      <FontAwesomeIcon icon={faTrash} className="text-sm" />
+                    </button>
+                  </div>
+
+                  {/* Models */}
+                  {expandedBrands.includes(bIndex) && (
+                    <div className="pl-6 pr-3 py-3 bg-gray-50 space-y-2">
+                      {brand.models.map((model, mIndex) => (
+                        <div key={mIndex} className="border border-gray-200 rounded p-2 grid grid-cols-1 sm:grid-cols-12 gap-2 items-center">
+                          <input
+                            type="text"
+                            value={model.model_no}
+                            onChange={(e) => handleModelChange(bIndex, mIndex, 'model_no', e.target.value)}
+                            placeholder="Model No"
+                            className="sm:col-span-3 border rounded px-2 py-1 text-sm"
+                            required
+                          />
+                          <input
+                            type="text"
+                            value={model.description}
+                            onChange={(e) => handleModelChange(bIndex, mIndex, 'description', e.target.value)}
+                            placeholder="Description"
+                            className="sm:col-span-4 border rounded px-2 py-1 text-sm"
+                          />
+                          <div className="relative sm:col-span-2">
+                            <div className="absolute inset-y-0 left-0 pl-1 flex items-center pointer-events-none">
+                              <FontAwesomeIcon icon={faDollarSign} className="text-gray-400 text-xs" />
+                            </div>
+                            <input
+                              type="number"
+                              value={model.price}
+                              onChange={(e) => handleModelChange(bIndex, mIndex, 'price', e.target.value)}
+                              placeholder="0.00"
+                              className="pl-6 w-full border rounded px-2 py-1 text-sm"
+                              min="0"
+                              step="0.01"
+                              required
+                            />
+                          </div>
+                          <label className="sm:col-span-3 flex items-center gap-1 border border-gray-300 rounded px-2 py-1 text-sm cursor-pointer hover:bg-gray-50">
+                            <FontAwesomeIcon icon={faImage} className="text-gray-400 text-xs" />
+                            <span className="truncate">
+                              {model.image ? model.image.name : model.image_path ? 'Change' : 'Choose'}
+                            </span>
+                            <input
+                              type="file"
+                              onChange={(e) => handleModelChange(bIndex, mIndex, 'image', e.target.files?.[0] || null)}
+                              className="hidden"
+                              accept="image/*"
+                            />
+                          </label>
+                          {model.image_path && (
+                            <img
+                              src={`${BASE_URL}${model.image_path.replace(/^\//, '')}`}
+                              alt="Current"
+                              className="h-6 w-6 object-cover rounded sm:col-span-1"
+                              onError={(e) => { e.currentTarget.src = 'https://via.placeholder.com/24'; }}
+                            />
+                          )}
+                          <button
+                            type="button"
+                            onClick={() => handleRemoveModel(bIndex, mIndex)}
+                            className="sm:col-span-2 p-1 text-red-600 hover:bg-red-50 rounded text-sm flex items-center justify-center gap-1"
+                          >
+                            <FontAwesomeIcon icon={faTrash} />
+                            <span className="hidden sm:inline">Remove</span>
+                          </button>
+                        </div>
+                      ))}
+                      
+                      <button
+                        type="button"
+                        onClick={() => handleAddModel(bIndex)}
+                        className="px-3 py-1 bg-blue-600 text-white rounded text-sm hover:bg-blue-700 flex items-center gap-1"
+                      >
+                        <FontAwesomeIcon icon={faPlus} className="text-xs" /> Add Model
+                      </button>
+                    </div>
+                  )}
+                </div>
+              ))}
+
+              {brands.length === 0 && (
+                <div className="text-center py-6 border-2 border-dashed border-gray-300 rounded-lg">
+                  <FontAwesomeIcon icon={faTag} className="text-gray-300 text-2xl mb-1" />
+                  <p className="text-gray-500 text-sm mb-1">No brands yet</p>
+                  <button
+                    type="button"
+                    onClick={handleAddBrand}
+                    className="px-3 py-1 bg-green-600 text-white rounded text-sm hover:bg-green-700 flex items-center gap-1 mx-auto"
+                  >
+                    <FontAwesomeIcon icon={faPlus} className="text-xs" /> Add First Brand
+                  </button>
+                </div>
+              )}
+            </div>
 
             {/* Footer */}
             <div className="flex flex-col sm:flex-row justify-end gap-2">
               <button
                 type="button"
                 onClick={onClose}
-                className="px-4 py-2 border rounded text-sm"
+                className="px-4 py-2 border border-gray-300 text-gray-700 rounded hover:bg-gray-50 text-sm"
               >
                 Cancel
               </button>
               <button
                 type="submit"
                 disabled={loading}
-                className="px-4 py-2 bg-blue-600 text-white rounded text-sm"
+                className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 text-sm flex items-center gap-1 disabled:opacity-50"
               >
                 {loading ? 'Updating...' : 'Update'}
               </button>

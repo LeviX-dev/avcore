@@ -48,7 +48,7 @@ import {
     faUsers,
     faTasks,
     faCalendarAlt,
-
+  faTrashAlt, // Add this
 } from '@fortawesome/free-solid-svg-icons';
 import { BASE_URL } from '../../../public/config.js';
 import axios from 'axios';
@@ -158,23 +158,23 @@ interface Lead {
   document_location_link?: string | null;
 }
 
-interface DocumentData {
-  images: Array<{
-    url: string;
-    link?: string | null;
-    remark?: string | null;
-  }>;
-  documents: Array<{
-    url: string;
-    link?: string | null;
-    remark?: string | null;
-  }>;
-  videos: Array<{
-    url: string;
-    link?: string | null;
-    remark?: string | null;
-  }>;
+
+// Update the DocumentData interface
+interface DocItem {
+  doc_id: number; // Add this
+  url: string;
+  link?: string | null;
+  remark?: string | null;
+  document_type?: string; // Optional
 }
+
+interface DocumentData {
+  images: DocItem[];
+  documents: DocItem[];
+  videos: DocItem[];
+}
+
+
 
 interface ReassignmentHistory {
   id: number;
@@ -241,8 +241,10 @@ const ActionButton = ({
   );
 };
 
-// BatteryStatus Component
-const BatteryStatus: React.FC<{ 
+
+
+// ProgressStatus Component - Compact with smaller percentage
+const ProgressStatus: React.FC<{ 
   stage: string; 
   status_percentage?: number;
   is_drop_stage?: boolean;
@@ -252,42 +254,59 @@ const BatteryStatus: React.FC<{
   const cleanStage = stage ? stage.trim() : '';
   const percentage = status_percentage;
   
-  const getBatteryColor = (percent: number) => {
-    if (percent <= 20) return 'bg-gradient-to-r from-red-500 to-red-600';
-    if (percent <= 50) return 'bg-gradient-to-r from-yellow-500 to-yellow-600';
-    if (percent <= 80) return 'bg-gradient-to-r from-blue-500 to-blue-600';
-    return 'bg-gradient-to-r from-green-500 to-green-600';
-  };
-
-  const getTextColor = (_percent?: number) => {
-    return 'text-black dark:text-white';
+  // Get progress bar color based on exact stage-to-color mapping
+  const getProgressColor = (stage: string) => {
+    const stageLower = stage.toLowerCase().trim();
+    
+    // Exact mapping from color table
+    if (stageLower.includes('fresh')) return 'bg-[#FFFFFF] border border-gray-300';
+    if (stageLower.includes('cold')) return 'bg-[#A9A9A9]';
+    if (stageLower.includes('on hold')) return 'bg-[#FDFD96]';
+    if (stageLower.includes('positive')) return 'bg-[#ADD8E6]';
+    if (stageLower.includes('pre site')) return 'bg-[#E0B0FF]';
+    if (stageLower.includes('past site') || stageLower.includes('post site')) return 'bg-[#593E67]';
+    if (stageLower.includes('demo')) return 'bg-[#FFB6C1]';
+    if (stageLower.includes('quote pending')) return 'bg-[#FFA500]';
+    if (stageLower.includes('quote followup')) return 'bg-[#A52A2A]';
+    if (stageLower.includes('projection')) return 'bg-[#90EE90]';
+    if (stageLower.includes('drop')) return 'bg-[#FF0000]';
+    if (stageLower.includes('closed')) return 'bg-[#006400]';
+    
+    // Fallback
+    return 'bg-[#A9A9A9]';
   };
 
   return (
-    <div className="flex flex-col items-center justify-center">
-      <div className="relative w-16 h-5 border border-gray-300 dark:border-gray-700 rounded-lg flex items-center p-0.5 bg-gray-50 dark:bg-gray-800">
-        <div 
-          className={`h-3 rounded-md ${getBatteryColor(percentage)} transition-all duration-300`}
-          style={{ width: `${Math.max(10, percentage)}%` }}
-        />
-        <div className="absolute -right-1 top-1/2 transform -translate-y-1/2 w-1 h-2 bg-gray-400 dark:bg-gray-600 rounded-r" />
-        <span className={`absolute inset-0 flex items-center justify-center text-[10px] font-bold z-10 ${getTextColor()}`}>
-          {is_drop_stage ? `❌ ${percentage}%` : `${percentage}%`}
-        </span>
+    <div className="flex flex-col items-center w-16">
+      {/* Percentage Display - Medium size */}
+      <div className="text-sm font-bold text-gray-900 dark:text-white mb-0.5">
+        {percentage}%
       </div>
-      <div className="text-[10px] mt-0.5 text-gray-500 dark:text-gray-400 truncate max-w-[70px] text-center">
-        <div className="truncate" title={cleanStage || 'N/A'}>
-          {cleanStage || 'N/A'}
+      
+      {/* Progress Bar Container - Very thin */}
+      <div className="w-full h-1.5 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden mb-0.5">
+        {/* Progress Fill with exact color */}
+        <div 
+          className={`h-full rounded-full ${getProgressColor(cleanStage)} transition-all duration-300`}
+          style={{ width: `${percentage}%` }}
+        />
+      </div>
+      
+      {/* Stage Name - Smaller text */}
+      <div className="w-full text-center">
+        <div className="text-[10px] font-medium text-gray-700 dark:text-gray-300 truncate">
+          {is_drop_stage ? previous_stage || cleanStage : cleanStage || 'N/A'}
         </div>
-        {is_drop_stage && previous_stage && (
-          <div className="text-[8px] text-gray-400 italic" title={`Was previously: ${previous_stage}`}>
-            (was {previous_stage})
+        {is_drop_stage && (
+          <div className="text-[8px] text-red-500 font-medium mt-0.5">
+            DROPPED
           </div>
         )}
       </div>
     </div>
   );
 };
+
 
 // Pagination Component
 const Pagination: React.FC<{
@@ -487,7 +506,18 @@ const ClosedLeadsPage: React.FC = () => {
     images: [], 
     documents: [], 
     videos: [] 
-  });
+  }); 
+
+
+  const [openRemark, setOpenRemark] = useState(null);
+
+const handleShowRemark = (text) => {
+  if (!text) return;
+  setOpenRemark(text);
+};
+
+
+
   const [showDocsPopup, setShowDocsPopup] = useState(false);
   const [uploadFiles, setUploadFiles] = useState<File[]>([]);
   const [uploadType, setUploadType] = useState<'image' | 'documents' | 'video'>('documents');
@@ -1096,57 +1126,59 @@ const fetchClosedLeads = async (): Promise<void> => {
     setShowEditPopup(false);
   };
 
-  // File upload/view functionality
-  const handleFileIconClick = async (lead: Lead) => {
-    setDocsClient(lead);
-    
-    // Reset form fields
-    setFollowupDate("");
-    setSelectedUsers([]);
-    setLeadStage("");
-    setLocationLink("");
-    setRemark("");
+const handleFileIconClick = async (lead: Lead) => {
+  setDocsClient(lead);
+  
+  // Reset form fields
+  setFollowupDate("");
+  setSelectedUsers([]);
+  setLeadStage("");
+  setLocationLink("");
+  setRemark("");
 
-    try {
-      const response = await axios.get(
-        `${BASE_URL}api/documents/${lead.master_id}`,
-        { withCredentials: true }
-      );
+  try {
+    const response = await axios.get(
+      `${BASE_URL}api/documents/${lead.master_id}`,
+      { withCredentials: true }
+    );
 
-      const images: Array<{url: string; link?: string | null; remark?: string | null}> = [];
-      const documents: Array<{url: string; link?: string | null; remark?: string | null}> = [];
-      const videos: Array<{url: string; link?: string | null; remark?: string | null}> = [];
+    const images: DocItem[] = [];
+    const documents: DocItem[] = [];
+    const videos: DocItem[] = [];
 
-      response.data.documents.forEach((doc: any) => {
-        let filePath = doc.document_path;
-        filePath = filePath.replace(/^server\//, '').replace(/\\/g, '/');
-        if (!filePath.startsWith('uploads/')) filePath = `uploads/${filePath}`;
-        
-        const fullUrl = `${BASE_URL}${filePath}`;
-        
-        const docObj = {
-          url: fullUrl,
-          link: doc.location_link,
-          remark: doc.remark
-        };
-
-        if (doc.document_type === 'image') {
-          images.push(docObj);
-        } else if (doc.document_type === 'video') {
-          videos.push(docObj);
-        } else {
-          documents.push(docObj);
-        }
-      });
+    response.data.documents.forEach((doc: any) => {
+      let filePath = doc.document_path;
+      filePath = filePath.replace(/^server\//, '').replace(/\\/g, '/');
+      if (!filePath.startsWith('uploads/')) filePath = `uploads/${filePath}`;
       
-      setDocsData({ images, documents, videos });
-    } catch (error) {
-      console.error('Error fetching documents:', error);
-      setDocsData({ images: [], documents: [], videos: [] });
-    }
+      const fullUrl = `${BASE_URL}${filePath}`;
+      
+      const docObj: DocItem = {
+        doc_id: doc.doc_id, // Add this
+        url: fullUrl,
+        link: doc.location_link,
+        remark: doc.remark,
+        document_type: doc.document_type
+      };
+
+      if (doc.document_type === 'image') {
+        images.push(docObj);
+      } else if (doc.document_type === 'video') {
+        videos.push(docObj);
+      } else {
+        documents.push(docObj);
+      }
+    });
     
-    setShowDocsPopup(true);
-  };
+    setDocsData({ images, documents, videos });
+  } catch (error) {
+    console.error('Error fetching documents:', error);
+    setDocsData({ images: [], documents: [], videos: [] });
+  }
+  
+  setShowDocsPopup(true);
+};
+
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
@@ -1238,27 +1270,32 @@ const fetchClosedLeads = async (): Promise<void> => {
         { withCredentials: true }
       );
 
-      const processFilePath = (filePath: string) => {
-        filePath = filePath.replace(/^server\//, '').replace(/\\/g, '/');
-        if (!filePath.startsWith('uploads/')) filePath = `uploads/${filePath}`;
-        return `${BASE_URL}${filePath}`;
-      };
 
-      const images = [];
-      const documents = [];
-      const videos = [];
+      // Inside handleUploadSubmit function, update the document processing:
+const processFilePath = (filePath: string) => {
+  filePath = filePath.replace(/^server\//, '').replace(/\\/g, '/');
+  if (!filePath.startsWith('uploads/')) filePath = `uploads/${filePath}`;
+  return `${BASE_URL}${filePath}`;
+};
 
-      refreshResponse.data.documents.forEach((doc: any) => {
-        const docObj = {
-          url: processFilePath(doc.document_path),
-          link: doc.location_link,
-          remark: doc.remark
-        };
+const images: DocItem[] = [];
+const documents: DocItem[] = [];
+const videos: DocItem[] = [];
 
-        if (doc.document_type === "image") images.push(docObj);
-        else if (doc.document_type === "video") videos.push(docObj);
-        else documents.push(docObj);
-      });
+refreshResponse.data.documents.forEach((doc: any) => {
+  const docObj: DocItem = {
+    doc_id: doc.doc_id, // Add this
+    url: processFilePath(doc.document_path),
+    link: doc.location_link,
+    remark: doc.remark,
+    document_type: doc.document_type
+  };
+
+  if (doc.document_type === "image") images.push(docObj);
+  else if (doc.document_type === "video") videos.push(docObj);
+  else documents.push(docObj);
+});
+
 
       // Update state
       setDocsData({ images, documents, videos });
@@ -1310,6 +1347,64 @@ const fetchClosedLeads = async (): Promise<void> => {
         return <FontAwesomeIcon icon={faFile} className="text-gray-500" />;
     }
   };
+
+
+  // Add this function to your ClosedLeadsPage component (after all state declarations)
+const handleDeleteDocument = async (docId: number) => {
+  if (!window.confirm('Are you sure you want to delete this document? This action cannot be undone.')) {
+    return;
+  }
+
+  try {
+    const response = await axios.delete(
+      `${BASE_URL}api/document/${docId}`,
+      { withCredentials: true }
+    );
+
+    if (response.data.success) {
+      alert('✅ Document deleted successfully!');
+      
+      // Refresh the document list
+      if (docsClient) {
+        const refreshResponse = await axios.get(
+          `${BASE_URL}api/documents/${docsClient.master_id}`,
+          { withCredentials: true }
+        );
+
+        const processFilePath = (filePath: string) => {
+          filePath = filePath.replace(/^server\//, '').replace(/\\/g, '/');
+          if (!filePath.startsWith('uploads/')) filePath = `uploads/${filePath}`;
+          return `${BASE_URL}${filePath}`;
+        };
+
+        const images: DocItem[] = [];
+        const documents: DocItem[] = [];
+        const videos: DocItem[] = [];
+
+        refreshResponse.data.documents.forEach((doc: any) => {
+          const docObj: DocItem = {
+            doc_id: doc.doc_id, // Add this
+            url: processFilePath(doc.document_path),
+            link: doc.location_link,
+            remark: doc.remark,
+            document_type: doc.document_type
+          };
+
+          if (doc.document_type === "image") images.push(docObj);
+          else if (doc.document_type === "video") videos.push(docObj);
+          else documents.push(docObj);
+        });
+
+        setDocsData({ images, documents, videos });
+      }
+    } else {
+      alert('❌ Failed to delete document');
+    }
+  } catch (error) {
+    console.error('Error deleting document:', error);
+    alert('❌ Error deleting document. Please try again.');
+  }
+};
 
 
   // Detail modal render function - Updated to match reference exactly
@@ -1665,19 +1760,21 @@ const renderDetailsModal = () => {
                           </div>
                         </div>
                       )}
-                      {hasField('status_percentage') && (
-                        <div>
-                          <div className="text-xs text-gray-500 dark:text-gray-400">Progress</div>
-                          <div className="mt-0.5">
-                            <BatteryStatus
-                              stage={selectedLeadDetails.lead_stage || selectedLeadDetails.latest_leadStage}
-                              status_percentage={selectedLeadDetails.status_percentage}
-                              is_drop_stage={selectedLeadDetails.is_drop_stage}
-                              previous_stage={selectedLeadDetails.previous_stage}
-                            />
-                          </div>
-                        </div>
-                      )}
+
+                          {hasField('status_percentage') && (
+  <div>
+    <div className="text-xs text-gray-500 dark:text-gray-400">Progress</div>
+    <div className="mt-0.5">
+      <ProgressStatus
+        stage={selectedLeadDetails.lead_stage || selectedLeadDetails.latest_leadStage}
+        status_percentage={selectedLeadDetails.status_percentage}
+        is_drop_stage={selectedLeadDetails.is_drop_stage}
+        previous_stage={selectedLeadDetails.previous_stage}
+      />
+    </div>
+  </div>
+)}
+
                     </div>
                   </div>
                 )}
@@ -2309,114 +2406,144 @@ const renderDetailsModal = () => {
 
             {/* Right Column - Gallery View */}
             <div className="lg:col-span-2 space-y-8">
-              {/* Images Section */}
-              {docsData.images.length > 0 && (
-                <section>
-                  <h3 className="text-sm font-bold uppercase tracking-widest text-gray-400 mb-4 flex items-center gap-2">
-                    <FontAwesomeIcon icon={faImages} className="text-purple-500" /> Images
-                  </h3>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    {docsData.images.map((doc, index) => (
-                      <div key={index} className="group bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl overflow-hidden hover:shadow-xl transition-all">
-                        <div className="aspect-video bg-gray-100 dark:bg-black/20 relative">
-                          <img src={doc.url} alt="img" className="w-full h-full object-cover" />
-                          <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-3">
-                            <a href={doc.url} target="_blank" rel="noopener noreferrer" className="p-2 bg-white rounded-full text-blue-600 hover:scale-110 transition-transform">
-                              <FontAwesomeIcon icon={faEye} />
-                            </a>
-                            <a href={doc.url} download className="p-2 bg-white rounded-full text-green-600 hover:scale-110 transition-transform">
-                              <FontAwesomeIcon icon={faDownload} />
-                            </a>
-                          </div>
-                        </div>
-                        <div className="p-3">
-                          <p className="text-xs font-medium truncate dark:text-gray-200 mb-2">{doc.url.split('/').pop()}</p>
-                          <div className="space-y-2">
-                            {doc.link && (
-                              <a href={doc.link} target="_blank" rel="noopener noreferrer" className="block text-[11px] text-blue-500 hover:underline truncate bg-blue-50 dark:bg-blue-900/30 p-1.5 rounded">
-                                🔗 {doc.link}
-                              </a>
-                            )}
-                            {doc.remark && (
-                              <p className="text-[11px] text-gray-500 dark:text-gray-400 italic bg-gray-50 dark:bg-gray-700/50 p-1.5 rounded">
-                                💬 {doc.remark}
-                              </p>
-                            )}
-                          </div>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </section>
+            {/* Images Section */}
+{docsData.images.length > 0 && (
+  <section>
+    <h3 className="text-sm font-bold uppercase tracking-widest text-gray-400 mb-4 flex items-center gap-2">
+      <FontAwesomeIcon icon={faImages} className="text-purple-500" /> Images
+    </h3>
+    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+      {docsData.images.map((doc, index) => (
+        <div key={index} className="group bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl overflow-hidden hover:shadow-xl transition-all">
+          <div className="aspect-video bg-gray-100 dark:bg-black/20 relative">
+            <img src={doc.url} alt="img" className="w-full h-full object-cover" />
+            <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-3">
+              <a href={doc.url} target="_blank" rel="noopener noreferrer" className="p-2 bg-white rounded-full text-blue-600 hover:scale-110 transition-transform" title="View">
+                <FontAwesomeIcon icon={faEye} />
+              </a>
+              <a href={doc.url} download className="p-2 bg-white rounded-full text-green-600 hover:scale-110 transition-transform" title="Download">
+                <FontAwesomeIcon icon={faDownload} />
+              </a>
+              <button 
+                onClick={() => handleDeleteDocument(doc.doc_id)}
+                className="p-2 bg-white rounded-full text-red-600 hover:scale-110 transition-transform" 
+                title="Delete"
+              >
+                <FontAwesomeIcon icon={faTimes} />
+              </button>
+            </div>
+          </div>
+          <div className="p-3">
+            <p className="text-xs font-medium truncate dark:text-gray-200 mb-2">{doc.url.split('/').pop()}</p>
+            <div className="space-y-2">
+              {doc.link && (
+                <a href={doc.link} target="_blank" rel="noopener noreferrer" className="block text-[11px] text-blue-500 hover:underline truncate bg-blue-50 dark:bg-blue-900/30 p-1.5 rounded">
+                  🔗 {doc.link}
+                </a>
               )}
+              {doc.remark && (
+                <p className="text-[11px] text-gray-500 dark:text-gray-400 italic bg-gray-50 dark:bg-gray-700/50 p-1.5 rounded">
+                  💬 {doc.remark}
+                </p>
+              )}
+            </div>
+          </div>
+        </div>
+      ))}
+    </div>
+  </section>
+)}
 
-              {/* Documents Section */}
-              {docsData.documents.length > 0 && (
-                <section>
-                  <h3 className="text-sm font-bold uppercase tracking-widest text-gray-400 mb-4 flex items-center gap-2">
-                    <FontAwesomeIcon icon={faFile} className="text-blue-500" /> Documents
-                  </h3>
-                  <div className="space-y-3">
-                    {docsData.documents.map((doc, index) => (
-                      <div key={index} className="p-4 bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 hover:border-blue-400 transition-colors">
-                        <div className="flex items-start justify-between gap-4">
-                          <div className="flex items-start gap-3 flex-1">
-                            <div className="text-2xl mt-1">{getFileIcon(doc.url)}</div>
-                            <div className="flex-1 min-w-0">
-                              <p className="font-semibold text-sm dark:text-white truncate">{doc.url.split('/').pop()}</p>
-                              {doc.remark && <p className="text-xs text-gray-500 mt-1">Remark: <span className="italic">{doc.remark}</span></p>}
-                              {doc.link && (
-                                <a href={doc.link} target="_blank" rel="noopener noreferrer" className="inline-block mt-2 text-xs text-blue-600 dark:text-blue-400 font-bold hover:underline">
-                                  <FontAwesomeIcon icon={faEye} className="mr-1" /> View Location Link
-                                </a>
-                              )}
-                            </div>
-                          </div>
-                          <div className="flex gap-2">
-                            <a href={doc.url} target="_blank" rel="noopener noreferrer" className="p-2 text-gray-400 hover:text-blue-500">
-                              <FontAwesomeIcon icon={faEye} />
-                            </a>
-                            <a href={doc.url} download className="p-2 text-gray-400 hover:text-green-500">
-                              <FontAwesomeIcon icon={faDownload} />
-                            </a>
-                          </div>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </section>
-              )}
 
-              {/* Videos Section */}
-              {docsData.videos.length > 0 && (
-                <section>
-                  <h3 className="text-sm font-bold uppercase tracking-widest text-gray-400 mb-4 flex items-center gap-2">
-                    <FontAwesomeIcon icon={faVideo} className="text-red-500" /> Videos
-                  </h3>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    {docsData.videos.map((doc, index) => (
-                      <div key={index} className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl overflow-hidden">
-                        <video controls className="w-full h-40 bg-black">
-                          <source src={doc.url} type="video/mp4" />
-                        </video>
-                        <div className="p-3">
-                          <p className="text-xs font-bold truncate dark:text-gray-200 mb-2">{doc.url.split('/').pop()}</p>
-                          {doc.link && (
-                            <a href={doc.link} target="_blank" rel="noopener noreferrer" className="block text-[11px] text-blue-500 hover:underline mb-2 truncate">
-                              🔗 Map/Source Link
-                            </a>
-                          )}
-                          {doc.remark && (
-                            <p className="text-[11px] text-gray-500 italic border-t border-gray-100 dark:border-gray-700 pt-2 mt-1">
-                              {doc.remark}
-                            </p>
-                          )}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </section>
-              )}
+
+            {/* Documents Section */}
+{docsData.documents.length > 0 && (
+  <section>
+    <h3 className="text-sm font-bold uppercase tracking-widest text-gray-400 mb-4 flex items-center gap-2">
+      <FontAwesomeIcon icon={faFile} className="text-blue-500" /> Documents
+    </h3>
+    <div className="space-y-3">
+      {docsData.documents.map((doc, index) => (
+        <div key={index} className="p-4 bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 hover:border-blue-400 transition-colors">
+          <div className="flex items-start justify-between gap-4">
+            <div className="flex items-start gap-3 flex-1">
+              <div className="text-2xl mt-1">{getFileIcon(doc.url)}</div>
+              <div className="flex-1 min-w-0">
+                <p className="font-semibold text-sm dark:text-white truncate">{doc.url.split('/').pop()}</p>
+                {doc.remark && <p className="text-xs text-gray-500 mt-1">Remark: <span className="italic">{doc.remark}</span></p>}
+                {doc.link && (
+                  <a href={doc.link} target="_blank" rel="noopener noreferrer" className="inline-block mt-2 text-xs text-blue-600 dark:text-blue-400 font-bold hover:underline">
+                    <FontAwesomeIcon icon={faEye} className="mr-1" /> View Location Link
+                  </a>
+                )}
+              </div>
+            </div>
+            <div className="flex gap-2">
+              <a href={doc.url} target="_blank" rel="noopener noreferrer" className="p-2 text-gray-400 hover:text-blue-500" title="View">
+                <FontAwesomeIcon icon={faEye} />
+              </a>
+              <a href={doc.url} download className="p-2 text-gray-400 hover:text-green-500" title="Download">
+                <FontAwesomeIcon icon={faDownload} />
+              </a>
+              <button 
+                onClick={() => handleDeleteDocument(doc.doc_id)}
+                className="p-2 text-gray-400 hover:text-red-500" 
+                title="Delete"
+              >
+                <FontAwesomeIcon icon={faTimes} />
+              </button>
+            </div>
+          </div>
+        </div>
+      ))}
+    </div>
+  </section>
+)}
+
+            {/* Videos Section */}
+{docsData.videos.length > 0 && (
+  <section>
+    <h3 className="text-sm font-bold uppercase tracking-widest text-gray-400 mb-4 flex items-center gap-2">
+      <FontAwesomeIcon icon={faVideo} className="text-red-500" /> Videos
+    </h3>
+    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+      {docsData.videos.map((doc, index) => (
+        <div key={index} className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl overflow-hidden">
+          <video controls className="w-full h-40 bg-black">
+            <source src={doc.url} type="video/mp4" />
+          </video>
+          <div className="p-3">
+            <div className="flex justify-between items-start mb-2">
+              <p className="text-xs font-bold truncate dark:text-gray-200">{doc.url.split('/').pop()}</p>
+              <div className="flex gap-2">
+                <a href={doc.url} download className="p-1 text-gray-400 hover:text-green-500" title="Download">
+                  <FontAwesomeIcon icon={faDownload} className="text-xs" />
+                </a>
+                <button 
+                  onClick={() => handleDeleteDocument(doc.doc_id)}
+                  className="p-1 text-gray-400 hover:text-red-500" 
+                  title="Delete"
+                >
+                  <FontAwesomeIcon icon={faTimes} className="text-xs" />
+                </button>
+              </div>
+            </div>
+            {doc.link && (
+              <a href={doc.link} target="_blank" rel="noopener noreferrer" className="block text-[11px] text-blue-500 hover:underline mb-2 truncate">
+                🔗 Map/Source Link
+              </a>
+            )}
+            {doc.remark && (
+              <p className="text-[11px] text-gray-500 italic border-t border-gray-100 dark:border-gray-700 pt-2 mt-1">
+                {doc.remark}
+              </p>
+            )}
+          </div>
+        </div>
+      ))}
+    </div>
+  </section>
+)}
 
               {/* Empty State */}
               {docsData.images.length === 0 && docsData.documents.length === 0 && docsData.videos.length === 0 && (
@@ -3243,12 +3370,29 @@ const renderDetailsModal = () => {
 
 
 
-            {/* Client Name */}
-            <td className="py-4 px-4">
-              <div className="text-sm font-bold text-gray-900 dark:text-white">
-                {lead.name}
-              </div>
-            </td>
+          {/* Client Name - Now with enhanced styling */}
+<td className="py-4 px-4">
+  <div 
+    onClick={() => {
+      setSelectedLeadDetails(lead);
+      setShowDetailsModal(true);
+    }}
+    className="group cursor-pointer"
+  >
+    <div className="text-sm font-bold text-gray-900 dark:text-gray-100 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors duration-200">
+      {lead.name}
+    </div>
+    <div className="mt-1 flex items-center">
+      <div className="w-full h-px bg-gradient-to-r from-gray-300 to-gray-100 dark:from-gray-600 dark:to-gray-800 group-hover:from-blue-400 group-hover:to-blue-200 dark:group-hover:from-blue-500 dark:group-hover:to-blue-300 transition-all duration-300"></div>
+      <div className="ml-2 opacity-0 group-hover:opacity-100 transform translate-x-2 group-hover:translate-x-0 transition-all duration-300">
+        <FontAwesomeIcon 
+          icon={faEye} 
+          className="text-xs text-gray-400 group-hover:text-blue-500 dark:group-hover:text-blue-400" 
+        />
+      </div>
+    </div>
+  </div>
+</td>
 
             {/* Contact */}
             <td className="py-4 px-4">
@@ -3285,15 +3429,14 @@ const renderDetailsModal = () => {
 
         
 
-            {/* Battery Status */}
-            <td className="py-4 px-2">
-              <BatteryStatus 
-                stage={lead.lead_stage}
-                status_percentage={lead.status_percentage}
-                is_drop_stage={lead.is_drop_stage}
-                previous_stage={lead.previous_stage}
-              />
-            </td>
+<td className="py-4 px-2">
+  <ProgressStatus 
+    stage={lead.lead_stage}
+    status_percentage={lead.status_percentage}
+    is_drop_stage={lead.is_drop_stage}
+    previous_stage={lead.previous_stage}
+  />
+</td>
 
             {/* Assigned User */}
             <td className="py-4 px-4">
@@ -3311,49 +3454,41 @@ const renderDetailsModal = () => {
 
 
 
-   {/* Remark */}
-            <td className="py-4 px-4">
-              <span
-                className={`inline-flex rounded-full py-1.5 px-3.5 text-sm font-semibold border shadow-sm
-                  ${
-                    lead.quick_remark === "Interested"
-                      ? "bg-gradient-to-r from-green-50 to-green-100 dark:from-green-900/30 dark:to-green-800/20 text-green-800 dark:text-green-300 border-green-200 dark:border-green-700/30"
-                      : lead.quick_remark === "Not Interested"
-                      ? "bg-gradient-to-r from-red-50 to-red-100 dark:from-red-900/30 dark:to-red-800/20 text-red-800 dark:text-red-300 border-red-200 dark:border-red-700/30"
-                      : lead.quick_remark === "Not Received"
-                      ? "bg-gradient-to-r from-yellow-50 to-yellow-100 dark:from-yellow-900/30 dark:to-yellow-800/20 text-yellow-800 dark:text-yellow-300 border-yellow-200 dark:border-yellow-700/30"
-                      : lead.quick_remark === "Call Cut"
-                      ? "bg-gradient-to-r from-orange-50 to-orange-100 dark:from-orange-900/30 dark:to-orange-800/20 text-orange-800 dark:text-orange-300 border-orange-200 dark:border-orange-700/30"
-                      : lead.quick_remark === "Not Reachable"
-                      ? "bg-gradient-to-r from-gray-50 to-gray-100 dark:from-gray-800/30 dark:to-gray-700/20 text-gray-800 dark:text-gray-300 border-gray-200 dark:border-gray-600/30"
-                      : lead.quick_remark === "Busy"
-                      ? "bg-gradient-to-r from-purple-50 to-purple-100 dark:from-purple-900/30 dark:to-purple-800/20 text-purple-800 dark:text-purple-300 border-purple-200 dark:border-purple-700/30"
-                      : "bg-gradient-to-r from-slate-50 to-slate-100 dark:from-slate-800/30 dark:to-slate-700/20 text-slate-800 dark:text-slate-300 border-slate-200 dark:border-slate-600/30"
-                  }`}
-              >
-                {lead.detailed_remark?.substring(0, 20) || lead.quick_remark?.substring(0, 20) || "—"}
-                {(lead.detailed_remark && lead.detailed_remark.length > 20) || (lead.quick_remark && lead.quick_remark.length > 20) ? "..." : ""}
-              </span>
-            </td> 
+{/* Remark */}
+<td className="py-4 px-4">
+  <span
+    onClick={() => handleShowRemark(lead.detailed_remark || lead.quick_remark)}
+    title="Click to view full remark"
+    className={`inline-flex cursor-pointer rounded-full py-1.5 px-3.5 text-sm font-semibold border shadow-sm truncate max-w-[220px]
+      ${
+        lead.quick_remark === "Interested"
+          ? "bg-gradient-to-r from-green-50 to-green-100 dark:from-green-900/30 dark:to-green-800/20 text-green-800 dark:text-green-300 border-green-200 dark:border-green-700/30"
+          : lead.quick_remark === "Not Interested"
+          ? "bg-gradient-to-r from-red-50 to-red-100 dark:from-red-900/30 dark:to-red-800/20 text-red-800 dark:text-red-300 border-red-200 dark:border-red-700/30"
+          : lead.quick_remark === "Not Received"
+          ? "bg-gradient-to-r from-yellow-50 to-yellow-100 dark:from-yellow-900/30 dark:to-yellow-800/20 text-yellow-800 dark:text-yellow-300 border-yellow-200 dark:border-yellow-700/30"
+          : lead.quick_remark === "Call Cut"
+          ? "bg-gradient-to-r from-orange-50 to-orange-100 dark:from-orange-900/30 dark:to-orange-800/20 text-orange-800 dark:text-orange-300 border-orange-200 dark:border-orange-700/30"
+          : lead.quick_remark === "Not Reachable"
+          ? "bg-gradient-to-r from-gray-50 to-gray-100 dark:from-gray-800/30 dark:to-gray-700/20 text-gray-800 dark:text-gray-300 border-gray-200 dark:border-gray-600/30"
+          : lead.quick_remark === "Busy"
+          ? "bg-gradient-to-r from-purple-50 to-purple-100 dark:from-purple-900/30 dark:to-purple-800/20 text-purple-800 dark:text-purple-300 border-purple-200 dark:border-purple-700/30"
+          : "bg-gradient-to-r from-slate-50 to-slate-100 dark:from-slate-800/30 dark:to-slate-700/20 text-slate-800 dark:text-slate-300 border-slate-200 dark:border-slate-600/30"
+      }`}
+  >
+    {lead.detailed_remark?.substring(0, 20) || lead.quick_remark?.substring(0, 20) || "—"}
+    {(lead.detailed_remark && lead.detailed_remark.length > 20) || 
+     (lead.quick_remark && lead.quick_remark.length > 20) ? "..." : ""}
+  </span>
+</td>
+ 
 
 
                      {/* Action Buttons */}
 <td className="py-4 px-4">
   <div className="flex justify-center gap-1">
     
-    {/* Eye/View Details Button */}
-    <ActionButton
-      onClick={() => {
-        setSelectedLeadDetails(lead);
-        setShowDetailsModal(true);
-      }}
-      title="View Details"
-      variant="view"
-      className="w-8 h-8 hover:scale-105 transition-transform"
-    >
-      <FontAwesomeIcon icon={faEye} className="text-xs" />
-    </ActionButton>
-
+  
     {/* Call Button */}
     <ActionButton
       onClick={() =>
@@ -3455,148 +3590,145 @@ const renderDetailsModal = () => {
         </div>
       )} 
 
+      
       {/* Reassign Popup Modal */}
 {showAssignPopup && (
   <div className="fixed inset-0 z-[9999] bg-black/70 flex justify-center items-center">
-    <div className="bg-white p-6 rounded-lg shadow-lg w-1/2 max-h-[80vh] overflow-y-auto border-2 dark:border-strokedark dark:bg-boxdark">
-      {/* Header */}
-      <div className="flex justify-between items-center border-b-2 pb-2 mb-3 dark:border-strokedark">
-        <h2 className="text-2xl font-bold dark:text-white text-black">
+    <div className="bg-white dark:bg-boxdark p-3 rounded-lg shadow-lg w-full max-w-2xl max-h-[80vh] overflow-y-auto border dark:border-strokedark">
+
+      {/* HEADER */}
+      <div className="flex items-center justify-between border-b pb-3 mb-4 dark:border-strokedark">
+        <h2 className="text-lg font-semibold text-black dark:text-white">
           Assign Selected Records ({selectedMasterIds.length})
         </h2>
         <button
           onClick={() => setShowAssignPopup(false)}
-          className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 text-xl"
+          className="text-xl text-gray-500 hover:text-red-500 dark:text-gray-400 dark:hover:text-gray-200"
         >
           ×
         </button>
       </div>
 
-      {/* Show selected records summary */}
-      <div className="mb-4 p-3 bg-gray-50 dark:bg-gray-800 rounded">
-        <h3 className="font-medium mb-2 dark:text-white text-black">
-          Selected Records:{' '}
-          <span className="text-blue-600">{selectedMasterIds.length}</span>
-        </h3>
-        <div className="max-h-32 overflow-y-auto">
-          {filteredLeads
-            .filter((lead) => selectedMasterIds.includes(lead.master_id))
-            .slice(0, 10)
-            .map((lead) => (
-              <div key={lead.master_id} className="flex items-center gap-2 p-1 text-sm">
-                <span className="font-medium">{lead.name}</span>
-                <span className="text-gray-500">(ID: {lead.master_id})</span>
-                <span className="text-gray-500">- {lead.number}</span>
+      {/* SELECTED RECORDS (COMPACT) */}
+      <div className="mb-3 p-2 bg-gray-50 dark:bg-gray-800 rounded text-sm">
+        <span className="font-medium dark:text-white text-black">
+          Selected Records:
+        </span>{' '}
+        <span className="text-blue-600 font-semibold">
+          {selectedMasterIds.length}
+        </span>
+        {filteredLeads && filteredLeads.length > 0 && (
+          <div className="mt-2 max-h-32 overflow-y-auto">
+            {filteredLeads
+              .filter((lead) => selectedMasterIds.includes(lead.master_id))
+              .slice(0, 10)
+              .map((lead) => (
+                <div key={lead.master_id} className="flex items-center gap-2 p-1 text-sm">
+                  <span className="font-medium">{lead.name}</span>
+                  <span className="text-gray-500">(ID: {lead.master_id})</span>
+                  <span className="text-gray-500">- {lead.number}</span>
+                </div>
+              ))}
+            {selectedMasterIds.length > 10 && (
+              <div className="text-gray-500 text-sm italic p-1">
+                ... and {selectedMasterIds.length - 10} more records
               </div>
-            ))}
-          {selectedMasterIds.length > 10 && (
-            <div className="text-gray-500 text-sm italic p-1">
-              ... and {selectedMasterIds.length - 10} more records
-            </div>
-          )}
-        </div>
+            )}
+          </div>
+        )}
       </div>
 
-      {/* Form */}
-      <form onSubmit={async (e) => {
-        e.preventDefault();
+      {/* FORM */}
+      <form
+        onSubmit={async (e) => {
+          e.preventDefault();
 
-        if (!assignData.assignedTo.length || !assignData.leadStage) {
-          alert('Please select at least one user and a lead stage');
-          return;
-        }
-
-        try {
-          const assignments = [];
-
-          selectedMasterIds.forEach((masterId) => {
-            assignData.assignedTo.forEach((user) => {
-              assignments.push({
-                master_id: masterId,
-                assignedTo: user,
-                leadStage: assignData.leadStage,
-                remark: assignData.remark,
-                reassignment_date: assignData.reassignmentDate,
-              });
-            });
-          });
-
-          // Send all assignments
-          const responses = await Promise.all(
-            assignments.map((assignment) =>
-              fetch(`${BASE_URL}api/add`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                credentials: 'include',
-                body: JSON.stringify(assignment),
-              }),
-            ),
-          );
-
-          const results = await Promise.all(responses.map((r) => r.json()));
-
-          let totalInserted = 0;
-          let skippedDetails: string[] = [];
-
-          results.forEach((result) => {
-            if (result.success) {
-              if (result.inserted?.length) totalInserted += result.inserted.length;
-              if (result.skipped?.length) {
-                result.skipped.forEach((s) => {
-                  skippedDetails.push(
-                    `"${s.finalName}" for stage "${assignData.leadStage}"`,
-                  );
-                });
-              }
-            } else {
-              skippedDetails.push(result.message || 'Unknown error');
-            }
-          });
-
-          if (totalInserted > 0) {
-            alert(
-              `✅ ${totalInserted} reassignment(s) created successfully!` +
-                (skippedDetails.length > 0
-                  ? `\n⚠ Skipped duplicates:\n- ${skippedDetails.join('\n- ')}`
-                  : ''),
-            );
-          } else if (skippedDetails.length > 0) {
-            alert(
-              `⚠ All assignments were skipped as duplicates:\n- ${skippedDetails.join(
-                '\n- ',
-              )}`,
-            );
+          if (!assignData.assignedTo.length || !assignData.leadStage) {
+            alert('Please select at least one user and a lead stage');
+            return;
           }
 
-          // Reset
-          setAssignData({
-            assignedTo: [],
-            leadStage: '',
-            remark: '',
-            reassignmentDate: new Date().toISOString().split('T')[0],
-          });
-          setSelectedMasterIds([]);
-          setSelectedClients([]);
-          setShowAssignPopup(false);
-          fetchClosedLeads(); // Refresh data
-        } catch (error) {
-          console.error('Network error:', error);
-          alert('❌ Something went wrong while submitting reassignments');
-        }
-      }}>
-        {/* Assign To - CHECKBOXES */}
-        <div className="mb-4">
-          <div className="flex justify-between items-center mb-3">
-            <label className="block font-medium dark:text-white text-black">
+          try {
+            const assignments = [];
+
+            selectedMasterIds.forEach((masterId) => {
+              assignData.assignedTo.forEach((user) => {
+                assignments.push({
+                  master_id: masterId,
+                  assignedTo: user,
+                  leadStage: assignData.leadStage,
+                  remark: assignData.remark,
+                  reassignment_date: assignData.reassignmentDate,
+                });
+              });
+            });
+
+            const responses = await Promise.all(
+              assignments.map((assignment) =>
+                fetch(`${BASE_URL}api/add`, {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  credentials: 'include',
+                  body: JSON.stringify(assignment),
+                }),
+              ),
+            );
+
+            const results = await Promise.all(responses.map((r) => r.json()));
+
+            let totalInserted = 0;
+            let skippedDetails = [];
+
+            results.forEach((result) => {
+              if (result.success) {
+                if (result.inserted?.length) totalInserted += result.inserted.length;
+                if (result.skipped?.length) {
+                  result.skipped.forEach((s) => {
+                    skippedDetails.push(
+                      `"${s.finalName}" for stage "${assignData.leadStage}"`,
+                    );
+                  });
+                }
+              } else {
+                skippedDetails.push(result.message || 'Unknown error');
+              }
+            });
+
+            alert(
+              `✅ ${totalInserted} assignment(s) created` +
+                (skippedDetails.length
+                  ? `\n⚠ Skipped:\n- ${skippedDetails.join('\n- ')}`
+                  : ''),
+            );
+
+            setAssignData({
+              assignedTo: [],
+              leadStage: '',
+              remark: '',
+              reassignmentDate: new Date().toISOString().split('T')[0],
+            });
+            setSelectedMasterIds([]);
+            setSelectedClients([]);
+            setShowAssignPopup(false);
+            fetchClosedLeads();
+          } catch (err) {
+            alert('❌ Submission failed');
+          }
+        }}
+        className="space-y-4"
+      >
+
+        {/* ASSIGN TO */}
+        <div>
+          <div className="flex justify-between items-center mb-2">
+            <label className="block font-semibold text-green-600 dark:text-green-400 mb-2">
               Assign To
             </label>
             <div className="flex gap-2">
               <button
                 type="button"
                 onClick={() => {
-                  const allUsers = users.map(
-                    (user) => `${user.name} (${user.role})`,
-                  );
+                  const allUsers = users.map((user) => user.name);
                   setAssignData({
                     ...assignData,
                     assignedTo: allUsers,
@@ -3621,143 +3753,130 @@ const renderDetailsModal = () => {
             </div>
           </div>
 
-          {/* User List */}
-          <div className="max-h-48 overflow-y-auto border-2 rounded p-3 dark:border-form-strokedark dark:bg-form-input">
+          <div className="border rounded p-2 max-h-48 overflow-y-auto dark:border-form-strokedark dark:bg-form-input">
             {users.length === 0 ? (
               <div className="text-center py-4 text-gray-500 dark:text-gray-400">
                 No users available
               </div>
             ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-2">
                 {users.map((user) => {
-                  const userValue = user.name;
-                  const isSelected = assignData.assignedTo.includes(userValue);
+                  const checked = assignData.assignedTo.includes(user.name);
 
                   return (
-                    <div
+                    <label
                       key={user.id}
-                      className={`flex items-center p-2 rounded cursor-pointer transition-colors ${
-                        isSelected
+                      className={`flex gap-2 p-2 rounded cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800 ${
+                        checked
                           ? 'bg-blue-50 dark:bg-blue-900/30 border border-blue-200 dark:border-blue-700'
-                          : 'hover:bg-gray-50 dark:hover:bg-gray-800'
+                          : ''
                       }`}
-                      onClick={() => {
-                        if (isSelected) {
-                          setAssignData({
-                            ...assignData,
-                            assignedTo: assignData.assignedTo.filter(
-                              (u) => u !== userValue,
-                            ),
-                          });
-                        } else {
-                          setAssignData({
-                            ...assignData,
-                            assignedTo: [...assignData.assignedTo, userValue],
-                          });
-                        }
-                      }}
                     >
                       <input
                         type="checkbox"
-                        id={`user-${user.id}`}
-                        checked={isSelected}
-                        onChange={(e) => {
-                          if (e.target.checked) {
-                            setAssignData({
-                              ...assignData,
-                              assignedTo: [...assignData.assignedTo, userValue],
-                            });
-                          } else {
-                            setAssignData({
-                              ...assignData,
-                              assignedTo: assignData.assignedTo.filter(
-                                (u) => u !== userValue,
-                              ),
-                            });
-                          }
-                        }}
-                        className="h-4 w-4 text-blue-600 rounded focus:ring-blue-500 dark:focus:ring-blue-600 dark:ring-offset-gray-800"
+                        checked={checked}
+                        onChange={() =>
+                          setAssignData({
+                            ...assignData,
+                            assignedTo: checked
+                              ? assignData.assignedTo.filter(
+                                  (u) => u !== user.name,
+                                )
+                              : [...assignData.assignedTo, user.name],
+                          })
+                        }
+                        className="h-4 w-4 text-blue-600 rounded focus:ring-blue-500 dark:focus:ring-blue-600"
                       />
-                      <label
-                        htmlFor={`user-${user.id}`}
-                        className="ml-2 cursor-pointer dark:text-white text-black flex-1"
-                      >
-                        <div className="font-medium">{user.name}</div>
-                        <div className="text-xs text-gray-500 dark:text-gray-400">
+                      <div className="text-xs flex-1">
+                        <div className="font-medium text-black dark:text-white">
+                          {user.name}
+                        </div>
+                        <div className="text-gray-500 dark:text-gray-400">
                           {user.role}
                         </div>
-                      </label>
-                      <div className="text-xs px-2 py-1 rounded bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300">
+                      </div>
+                      <div className="text-xs px-1.5 py-0.5 rounded bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300">
                         {user.id}
                       </div>
-                    </div>
+                    </label>
                   );
                 })}
               </div>
             )}
           </div>
 
-          {/* Count */}
-          <div className="mt-2 text-sm text-blue-600 dark:text-blue-400">
-            ✅ Selected: <strong>{assignData.assignedTo.length}</strong> user(s)
-          </div>
+          <p className="text-sm text-blue-600 dark:text-blue-400 mt-1">
+            Selected: {assignData.assignedTo.length}
+          </p>
         </div>
 
-        {/* Lead Stage Dropdown */}
-        <div className="mb-4">
-          <label className="block mb-1 font-medium dark:text-white text-black">
-            Lead Stage *
-          </label>
-          <select
-            name="leadStage"
-            value={assignData.leadStage}
-            onChange={(e) => setAssignData({...assignData, leadStage: e.target.value})}
-            required
-            className="border-2 p-2 w-full rounded dark:border-form-strokedark dark:bg-form-input dark:text-white text-black"
-          >
-            <option value="">Select Lead Stage</option>
-            {leadStages.map((stage, index) => (
-              <option key={index} value={stage}>
-                {stage}
-              </option>
-            ))}
-          </select>
-        </div>
 
-        {/* Reassignment Date */}
-        <div className="mb-4">
-          <label className="block mb-1 font-medium dark:text-white text-black">
-            Followup Date *
-          </label>
-          <div className="flex items-center gap-3">
-            <input
-              type="date"
-              name="reassignmentDate"
-              value={assignData.reassignmentDate || ''}
-              onChange={(e) => setAssignData({...assignData, reassignmentDate: e.target.value})}
-              required
-              className="border-2 p-2 rounded dark:border-form-strokedark dark:bg-form-input dark:text-white text-black flex-1"
-              min="2020-01-01"
-              max="2030-12-31"
-            />
-            <button
-              type="button"
-              onClick={() => {
-                setAssignData({
-                  ...assignData,
-                  reassignmentDate: new Date().toISOString().split('T')[0],
-                });
-              }}
-              className="px-3 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 text-sm whitespace-nowrap"
-            >
-              Set to Today
-            </button>
-          </div>
-        </div>
+              {/* LEAD DETAILS */}
+<div>
+  <label className="block font-semibold text-green-600 dark:text-green-400 mb-2">
+    Lead Details
+  </label>
 
-        {/* Remark */}
-        <div className="mb-4">
-          <label className="block mb-1 font-medium dark:text-white text-black">
+  {/* Single line layout */}
+  <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3">
+    {/* Lead Stage */}
+    <select
+      name="leadStage"
+      value={assignData.leadStage}
+      onChange={(e) =>
+        setAssignData({ ...assignData, leadStage: e.target.value })
+      }
+      required
+      className="border rounded p-2 w-full sm:w-[45%]
+                 dark:border-form-strokedark dark:bg-form-input 
+                 dark:text-white text-black"
+    >
+      <option value="">Select Lead Stage</option>
+      {leadStages.map((stage, index) => (
+        <option key={index} value={stage}>
+          {stage}
+        </option>
+      ))}
+    </select>
+
+    {/* Followup Date */}
+    <input
+      type="date"
+      name="reassignmentDate"
+      value={assignData.reassignmentDate || ''}
+      onChange={(e) =>
+        setAssignData({ ...assignData, reassignmentDate: e.target.value })
+      }
+      required
+      className="border rounded p-2 w-full sm:w-[30%]
+                 dark:border-form-strokedark dark:bg-form-input 
+                 dark:text-white text-black"
+      min="2020-01-01"
+      max="2030-12-31"
+    />
+
+    {/* Today Button */}
+    <button
+      type="button"
+      onClick={() => {
+        setAssignData({
+          ...assignData,
+          reassignmentDate: new Date().toISOString().split('T')[0],
+        });
+      }}
+      className="w-full sm:w-auto px-4 py-2 bg-blue-600 
+                 text-white rounded hover:bg-blue-700 
+                 text-sm whitespace-nowrap"
+    >
+      Today
+    </button>
+  </div>
+</div>
+
+
+        {/* REMARK */}
+        <div>
+          <label className="block font-medium dark:text-white text-black mb-1">
             Remark (Optional)
           </label>
           <textarea
@@ -3765,37 +3884,64 @@ const renderDetailsModal = () => {
             value={assignData.remark}
             onChange={(e) => setAssignData({...assignData, remark: e.target.value})}
             placeholder="Enter Remark"
-            className="w-full border-2 rounded px-2 py-1 dark:border-form-strokedark dark:bg-form-input dark:text-white text-black"
             rows={3}
+            className="w-full border rounded p-2 dark:border-form-strokedark dark:bg-form-input dark:text-white text-black"
           />
         </div>
 
-        {/* Buttons */}
-        <div className="flex justify-end gap-3 mt-6 pt-4 border-t dark:border-strokedark">
+        {/* ACTION BUTTONS */}
+        <div className="flex justify-end gap-3 pt-4 border-t dark:border-strokedark">
           <button
             type="button"
             onClick={() => setShowAssignPopup(false)}
-            className="px-6 py-2.5 rounded-lg font-medium border-2 border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
+            className="px-4 py-2 rounded border text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800"
           >
             Cancel
           </button>
+
           <button
             type="submit"
-            className="px-6 py-2.5 rounded-lg font-medium bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 text-white shadow-lg hover:shadow-xl transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-            disabled={!assignData.assignedTo.length || !assignData.leadStage || !assignData.reassignmentDate}
+            disabled={
+              !assignData.assignedTo.length ||
+              !assignData.leadStage ||
+              !assignData.reassignmentDate
+            }
+            className="px-5 py-2 rounded bg-green-600 text-white hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center"
           >
-            <div className="flex items-center">
-              <svg className="w-5 h-5 mr-2" fill="currentColor" viewBox="0 0 20 20">
-                <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-              </svg>
-              Create {selectedMasterIds.length * assignData.assignedTo.length} Assignments
-            </div>
+            <svg className="w-5 h-5 mr-2" fill="currentColor" viewBox="0 0 20 20">
+              <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+            </svg>
+            Create {selectedMasterIds.length * assignData.assignedTo.length} Assignments
           </button>
         </div>
       </form>
     </div>
   </div>
 )}
+
+
+  {openRemark && (
+  <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
+    <div className="bg-white dark:bg-gray-900 p-5 rounded-lg shadow-lg max-w-lg w-full">
+      <h2 className="text-lg font-bold mb-3 text-gray-800 dark:text-gray-200">
+        Full Remark
+      </h2>
+
+      <p className="text-gray-800 dark:text-gray-300 whitespace-pre-line">
+        {openRemark}
+      </p>
+
+      <button
+        className="mt-4 bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded"
+        onClick={() => setOpenRemark(null)}
+      >
+        Close
+      </button>
+    </div>
+  </div>
+)}
+
+
 
     </div>
   );

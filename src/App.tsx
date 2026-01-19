@@ -48,7 +48,13 @@ import UpcomingFollowupsPage from './pages/Report/UpcomingFollowupsPage';
 import { PermissionProvider } from './context/PermissionContext';
 import ProtectedRoute from './components/ProtectedRoute';
 import AdminRolePermission from './components/Sidebar/AdminRolePermission';
-import EmployeeReportsPage from './pages/Report/EmployeeReportsPage';
+import EmployeeReportsPage from './pages/Report/EmployeeReportsPage'; 
+import EmployeeAssignedCountReport from './pages/Report/EmployeeAssignedCountReport';
+import KitManagement from './pages/Master/KitManagement';
+import AddKitForm from './pages/Master/AddKit';
+import AddQuotation from './pages/Rawdata/AddQuotation';
+import ViewQuotation from './pages/Rawdata/ViewQuotation';
+import QuotationPending from './pages/Rawdata/QuotationPending';
 
 function App() {
   const [loading, setLoading] = useState<boolean>(true);
@@ -237,6 +243,30 @@ function App() {
               }
             />
 
+<Route
+              path="/quatation-pending"
+              element={
+                <ProtectedRoute menuKey="quotationpending">
+                  <DefaultLayout userRole={userRole}>
+                    <PageTitle title="quatation-pending" />
+                    <QuotationPending />
+                  </DefaultLayout>
+                </ProtectedRoute>
+              }
+            />
+
+              <Route
+              path="/quotation/add/:master_id"
+              element={
+                <ProtectedRoute menuKey="quotationpending">
+                  <DefaultLayout userRole={userRole}>
+                    <PageTitle title="quatation-pending" />
+                    <AddQuotation />
+                  </DefaultLayout>
+                </ProtectedRoute>
+              }
+            />
+            
             <Route
               path="/master-data"
               element={
@@ -455,6 +485,61 @@ function App() {
                 </ProtectedRoute>
               }
             />
+
+<Route
+              path="/master/kit"
+              element={
+                <ProtectedRoute menuKey="master.kit">
+                  <DefaultLayout userRole={userRole}>
+                    <PageTitle title="Kit Management" />
+                    {/* <TodaysTodoPage /> */}
+                    <KitManagement />
+                  </DefaultLayout>
+                </ProtectedRoute>
+              }
+            />
+
+            <Route
+              path="/master/add-kit"
+              element={
+                <ProtectedRoute menuKey="master.kit">
+                  <DefaultLayout userRole={userRole}>
+                    <PageTitle title="Kit Management" />
+                    {/* <TodaysTodoPage /> */}
+                    <AddKitForm />
+                  </DefaultLayout>
+                </ProtectedRoute>
+              }
+            />
+
+
+            <Route
+              path="/lead/view/:master_id"
+              element={
+                <ProtectedRoute menuKey="quotationpending">
+                  <DefaultLayout userRole={userRole}>
+                    <PageTitle title="quatation-pending" />
+                    <ViewQuotation />
+                  </DefaultLayout>
+                </ProtectedRoute>
+              }
+            />
+            
+
+              <Route
+  path="/employee-assigned-count-report"
+  element={
+    <ProtectedRoute menuKey="report.employee_assigned">
+      <DefaultLayout userRole={userRole}>
+        <PageTitle title="Emp Assignment Count" />
+        <EmployeeAssignedCountReport />
+      </DefaultLayout>
+    </ProtectedRoute>
+  }
+/>
+
+
+
           </>
         ) : (
           <Route path="*" element={<Navigate to="/signin" />} />

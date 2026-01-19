@@ -130,8 +130,8 @@ const Reference = () => {
       )}
 
       {/* Table */}
-      <div className="max-w-full mt-2 overflow-x-auto rounded-sm border border-stroke bg-white shadow-default dark:border-strokedark dark:bg-boxdark">
-        <table className="w-full table-auto min-w-[700px]">
+       <div className="overflow-x-auto rounded-sm border border-stroke bg-white shadow-default dark:border-strokedark dark:bg-boxdark">
+<table className="w-full table-auto sm:min-w-[600px]">
           <thead>
             <tr className="bg-gray-200 text-left dark:bg-meta-4">
               <th className="py-4 px-4 font-medium text-black dark:text-white xl:pl-11">

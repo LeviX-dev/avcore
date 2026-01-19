@@ -285,8 +285,20 @@ const InsertDataModal: React.FC<InsertDataModalProps> = ({
   };
 
 
-  const handleAddSingleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
+const handleAddSingleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
   event.preventDefault();
+
+  // Basic validation
+  if (!singleFormData.name || !singleFormData.number || !singleFormData.cat_id || !singleFormData.reference_id) {
+    alert('Please fill all required fields: Name, Contact, Category, and Sources');
+    return;
+  }
+
+  // Contact number validation
+  if (singleFormData.number.length !== 10) {
+    alert('Contact number must be 10 digits');
+    return;
+  }
 
   try {
     // 🔹 pick FIRST assigned user only (backend supports one)
@@ -304,12 +316,12 @@ const InsertDataModal: React.FC<InsertDataModalProps> = ({
       reference_id: singleFormData.reference_id,
 
       // Optional basic
-      email: singleFormData.email || null,
-      address: singleFormData.address || null,
-      area_id: singleFormData.area_id || null,
-      alternate_number: singleFormData.alternate_number || null,
-      city: singleFormData.city || null,
-      location_link: singleFormData.location_link || null,
+      email: singleFormData.email || "",
+      address: singleFormData.address || "",
+      area_id: singleFormData.area_id || "",
+      alternate_number: singleFormData.alternate_number || "",
+      city: singleFormData.city || "",
+      location_link: singleFormData.location_link || "",
 
       // Room / project
       room_length: singleFormData.room_length || null,
@@ -327,13 +339,13 @@ const InsertDataModal: React.FC<InsertDataModalProps> = ({
       assign_date: singleFormData.assign_date || null,
 
       // Numbers
-      ar_number: singleFormData.ar_number || null,
-      architect_name: singleFormData.architect_name || null,
-      ca_number: singleFormData.ca_number || null,
-      e_number: singleFormData.e_number || null,
-      sm_number: singleFormData.sm_number || null,
-      pop_number: singleFormData.pop_number || null,
-      other_number: singleFormData.other_number || null,
+      ar_number: singleFormData.ar_number || "",
+      architect_name: singleFormData.architect_name || "",
+      ca_number: singleFormData.ca_number || "",
+      e_number: singleFormData.e_number || "",
+      sm_number: singleFormData.sm_number || "",
+      pop_number: singleFormData.pop_number || "",
+      other_number: singleFormData.other_number || "",
 
       // Lead info
       lead_stage: singleFormData.lead_stage || "Fresh Lead",
@@ -409,21 +421,30 @@ const InsertDataModal: React.FC<InsertDataModalProps> = ({
     }
   } catch (err: any) {
     console.error("❌ API Error:", err);
+    console.error("Error response:", err.response);
 
-    const backendMessage = err.response?.data?.message || "Failed to add data.";
-    const duplicates = err.response?.data?.duplicates || [];
-
-    if (duplicates.length > 0) {
-      setShowAddPopup(false);
-      setDuplicateEntries(duplicates);
+    // 🔥 HANDLE DUPLICATE CONTACT ERROR
+    if (err.response?.status === 409) {
+      const duplicateData = err.response.data;
+      
+      // Show duplicate modal
+      setDuplicateEntries([{
+        name: singleFormData.name,
+        number: singleFormData.number,
+        existingId: duplicateData.duplicate?.master_id,
+        existingName: duplicateData.duplicate?.name,
+        reason: "Contact number already exists"
+      }]);
       setShowDuplicateModal(true);
-    } else {
-      alert(`Error: ${backendMessage}`);
+      setShowAddPopup(false); // Close the add popup
+      return;
     }
+
+    // Handle other errors
+    const backendMessage = err.response?.data?.message || "Failed to add data.";
+    alert(`Error: ${backendMessage}`);
   }
 };
-
-
 
 
   if (!showAddPopup) return null;

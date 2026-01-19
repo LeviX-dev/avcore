@@ -4,6 +4,10 @@ import db from "../database/db.js";
 import path from 'path';
 import fs from 'fs';
 
+import { fileURLToPath } from 'url'; // Add this import
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 
 // export const importRawData = async (req, res) => {
@@ -1709,8 +1713,20 @@ export const getCompleteRawData = async (req, res) => {
 
 
 
+
+const normalizeName = (name = "") =>
+  name
+    .toString()
+    .trim()
+    .replace(/\s+/g, " ")
+    .toLowerCase();
+
+
+
 export const importRawData = async (req, res) => {
   try {
+    console.log('📥 Import request received');
+    
     if (!req.session.user) {
       return res.status(401).json({ message: "Unauthorized. Please log in." });
     }
@@ -1721,30 +1737,54 @@ export const importRawData = async (req, res) => {
     }
 
     const created_by_user = req.session.user.id;
+    console.log('👤 User ID:', created_by_user);
 
     const workbook = XLSX.read(file.buffer, { type: "buffer" });
     const sheetName = workbook.SheetNames[0];
     const excelRows = XLSX.utils.sheet_to_json(workbook.Sheets[sheetName]);
 
+    console.log('📊 Excel rows:', excelRows.length);
+
     if (!excelRows || excelRows.length === 0) {
       return res.status(400).json({ message: "Excel file is empty!" });
     }
 
+    // 🔥 DEBUG: Log first few rows
+    console.log('First 2 rows sample:', excelRows.slice(0, 2));
+
     const cleanNumber = (num) => {
       if (!num) return "";
+      console.log('Cleaning number:', num);
       let x = String(num).replace(/\D/g, "");
       if (x.startsWith("91") && x.length > 10) x = x.slice(2);
-      return x.slice(-10);
+      const result = x.slice(-10);
+      console.log('Cleaned to:', result);
+      return result;
     };
 
     const parseExcelDate = (value) => {
       if (!value) return null;
+      console.log('Parsing date:', value);
+      
+      // Handle Excel serial numbers
       if (!isNaN(value)) {
-        const d = XLSX.SSF.parse_date_code(value);
-        return new Date(d.y, d.m - 1, d.d);
+        console.log('Excel serial number detected:', value);
+        try {
+          const d = XLSX.SSF.parse_date_code(value);
+          const date = new Date(d.y, d.m - 1, d.d);
+          console.log('Parsed serial to date:', date);
+          return date;
+        } catch (err) {
+          console.error('Error parsing Excel date:', err);
+          return null;
+        }
       }
+      
+      // Handle string dates
       const parsed = new Date(value);
-      return isNaN(parsed.getTime()) ? null : parsed;
+      const isValid = !isNaN(parsed.getTime());
+      console.log('String date parsed:', parsed, 'Valid:', isValid);
+      return isValid ? parsed : null;
     };
 
     const columnMap = {
@@ -1758,117 +1798,555 @@ export const importRawData = async (req, res) => {
       "Stage": "lead_stage"
     };
 
-    for (let excelRow of excelRows) {
+    let successCount = 0;
+    let duplicateEntries = [];
+    let errorEntries = [];
+
+    console.log('🔍 Starting row processing...');
+
+    for (let i = 0; i < excelRows.length; i++) {
+      const excelRow = excelRows[i];
+      const rowNumber = i + 1;
+      console.log(`\n--- Processing Row ${rowNumber} ---`);
+      console.log('Raw row:', excelRow);
+
       let mapped = {};
 
       Object.keys(excelRow).forEach((col) => {
         const mappedCol = columnMap[col];
-        if (mappedCol) mapped[mappedCol] = excelRow[col];
+        if (mappedCol) {
+          mapped[mappedCol] = excelRow[col];
+          console.log(`Mapped "${col}" -> "${mappedCol}": ${excelRow[col]}`);
+        } else {
+          console.log(`⚠️ Column "${col}" not in mapping`);
+        }
       });
 
-      if (!mapped.name || !mapped.number) continue;
+      console.log('Mapped data:', mapped);
+
+      // Check for required fields
+      if (!mapped.name || !mapped.number) {
+        const errorMsg = !mapped.name && !mapped.number 
+          ? "Missing both name and contact number" 
+          : !mapped.name 
+            ? "Missing name" 
+            : "Missing contact number";
+        
+        console.log(`❌ Row ${rowNumber}: ${errorMsg}`);
+        
+        errorEntries.push({
+          row: rowNumber,
+          name: mapped.name || 'N/A',
+          number: mapped.number || 'N/A',
+          reason: errorMsg
+        });
+        continue;
+      }
 
       const cleanedMobile = cleanNumber(mapped.number);
+      console.log(`Cleaned mobile for "${mapped.name}": ${cleanedMobile}`);
+
       if (cleanedMobile.length !== 10) {
-        return res.status(400).json({
-          message: `Invalid mobile number '${mapped.number}'`,
-          cleaned: cleanedMobile
+        console.log(`❌ Row ${rowNumber}: Invalid mobile number length: ${cleanedMobile}`);
+        
+        errorEntries.push({
+          row: rowNumber,
+          name: mapped.name,
+          number: mapped.number,
+          reason: `Invalid mobile number (${cleanedMobile}) - must be 10 digits`
         });
+        continue;
       }
 
       if (!mapped.assigned_to) {
-        return res.status(400).json({ message: "User (Telecaller) is required" });
-      }
-
-      const [userCheck] = await db.query(
-        `SELECT user_id FROM users WHERE name=? AND role='tele_caller' LIMIT 1`,
-        [mapped.assigned_to.trim()]
-      );
-
-      if (userCheck.length === 0) {
-        return res.status(400).json({
-          message: `Telecaller '${mapped.assigned_to}' not found or not tele_caller`
+        console.log(`❌ Row ${rowNumber}: Missing telecaller name`);
+        
+        errorEntries.push({
+          row: rowNumber,
+          name: mapped.name,
+          number: cleanedMobile,
+          reason: "Telecaller name is required"
         });
+        continue;
       }
+
+      console.log(`🔍 Checking telecaller: "${mapped.assigned_to.trim()}"`);
+      
+
+      const rawAssignedName = mapped.assigned_to;
+const assignedName = normalizeName(rawAssignedName);
+
+
+const [userCheck] = await db.query(
+  `SELECT user_id, role, name
+   FROM users
+   WHERE LOWER(TRIM(REPLACE(name, '  ', ' '))) = ?
+   AND role IN (${TELECALLER_ROLES.map(() => '?').join(',')})
+   AND status = 'active'
+   LIMIT 1`,
+  [assignedName, ...TELECALLER_ROLES]
+);
+
+
+
+
+
+      console.log('Telecaller query result:', userCheck);
+
+     
+      if (userCheck.length === 0) {
+  const cleanedInput = normalizeName(mapped.assigned_to)
+    .replace(/\b\w/g, c => c.toUpperCase());
+
+  errorEntries.push({
+    row: rowNumber,
+    name: mapped.name,
+    number: cleanedMobile,
+    reason: `User name mismatch or inactive user. Please check spelling & extra spaces. (Excel: "${mapped.assigned_to}")`
+  });
+  continue;
+}
+
+
 
       const assigned_to_user_id = userCheck[0].user_id;
+      console.log(`✅ Telecaller found: ID ${assigned_to_user_id}`);
 
+      // Check for duplicate contact
+      console.log(`🔍 Checking duplicate for number: ${cleanedMobile}`);
+      
+      const [existingContact] = await db.query(
+        `SELECT master_id, name FROM raw_data WHERE number = ? LIMIT 1`,
+        [cleanedMobile]
+      );
+
+      console.log('Duplicate check result:', existingContact);
+
+      if (existingContact.length > 0) {
+        console.log(`⚠️ Row ${rowNumber}: Duplicate found for number ${cleanedMobile}`);
+        
+        duplicateEntries.push({
+          row: rowNumber,
+          name: mapped.name,
+          number: cleanedMobile,
+          existingName: existingContact[0].name,
+          existingId: existingContact[0].master_id,
+          reason: "Contact number already exists"
+        });
+        continue;
+      }
+
+      // Parse dates
       const assignDate = parseExcelDate(mapped.assign_date) || new Date();
       const followDate = parseExcelDate(mapped.followup_date);
+      
+      console.log(`📅 Dates - Assign: ${assignDate}, Followup: ${followDate}`);
 
-      // INSERT INTO assignments
-      const [assignRes] = await db.query(
-        `INSERT INTO assignments 
-        (created_by_user, mode, assign_date, assigned_to, assigned_to_user_id, lead_count)
-        VALUES (?, ?, ?, ?, ?, ?)`,
-        [
-          created_by_user,
-          "call",
-          assignDate,
-          mapped.assigned_to,
-          assigned_to_user_id,
-          1
-        ]
-      );
+      try {
+        console.log(`📝 Inserting into assignments...`);
+        
+        // INSERT INTO assignments
+        const [assignRes] = await db.query(
+          `INSERT INTO assignments 
+          (created_by_user, mode, assign_date, assigned_to, assigned_to_user_id, lead_count)
+          VALUES (?, ?, ?, ?, ?, ?)`,
+          [
+            created_by_user,
+            "call",
+            assignDate,
+            mapped.assigned_to,
+            assigned_to_user_id,
+            1
+          ]
+        );
 
-      const assign_id = assignRes.insertId;
+        const assign_id = assignRes.insertId;
+        console.log(`✅ Assignment created: ID ${assign_id}`);
 
-      // INSERT INTO raw_data
-      const [rawInsert] = await db.query(
-        `INSERT INTO raw_data 
-        (name, number, city, detailed_remark, lead_stage, followup_date, status, created_by_user, assign_id)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-        [
-          mapped.name,
-          cleanedMobile,
-          mapped.city || "",
-          mapped.remark ?? null,
-          mapped.lead_stage ?? null,
-          followDate,
-          "Assigned",
-          created_by_user,
-          assign_id
-        ]
-      );
+        // INSERT INTO raw_data
+        console.log(`📝 Inserting into raw_data...`);
+        
+        const [rawInsert] = await db.query(
+          `INSERT INTO raw_data 
+          (name, number, city, detailed_remark, lead_stage, followup_date, status, created_by_user, assign_id)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          [
+            mapped.name,
+            cleanedMobile,
+            mapped.city || "",
+            mapped.remark ?? null,
+            mapped.lead_stage ?? null,
+            followDate,
+            "Assigned",
+            created_by_user,
+            assign_id
+          ]
+        );
 
-      const master_id = rawInsert.insertId;
+        const master_id = rawInsert.insertId;
+        console.log(`✅ Raw data created: Master ID ${master_id}`);
 
-      // 🔥 INSERT INTO reassignment WITH created_by_user
-      await db.query(
-        `INSERT INTO reassignment 
-          (
+        // INSERT INTO reassignment
+        console.log(`📝 Inserting into reassignment...`);
+        
+        await db.query(
+          `INSERT INTO reassignment 
+            (
+              assign_id,
+              master_id,
+              created_by_user,
+              assignedTo,
+              leadStage,
+              remark,
+              reassignment_date
+            )
+           VALUES (?, ?, ?, ?, ?, ?, ?)`,
+          [
             assign_id,
             master_id,
-            created_by_user,
-            assignedTo,
-            leadStage,
-            remark,
-            reassignment_date
-          )
-         VALUES (?, ?, ?, ?, ?, ?, ?)`,
-        [
-          assign_id,
-          master_id,
-          created_by_user,                       // 👈 ADDED HERE
-          mapped.assigned_to,
-          mapped.lead_stage || "Not Available",
-          mapped.remark ?? null,
-          followDate || new Date()
-        ]
-      );
+            created_by_user,                       
+            mapped.assigned_to,
+            mapped.lead_stage || "Not Available",
+            mapped.remark ?? null,
+            followDate || new Date()
+          ]
+        );
+
+        console.log(`✅ Row ${rowNumber} fully processed!`);
+        successCount++;
+      } catch (dbError) {
+        console.error(`❌ Database error in row ${rowNumber}:`, dbError);
+        
+        errorEntries.push({
+          row: rowNumber,
+          name: mapped.name,
+          number: cleanedMobile,
+          reason: `Database error: ${dbError.message}`
+        });
+      }
     }
 
+    console.log('\n📊 FINAL RESULTS:');
+    console.log(`- Total rows: ${excelRows.length}`);
+    console.log(`- Success: ${successCount}`);
+    console.log(`- Duplicates: ${duplicateEntries.length}`);
+    console.log(`- Errors: ${errorEntries.length}`);
+    console.log('First few errors:', errorEntries.slice(0, 3));
+    console.log('First few duplicates:', duplicateEntries.slice(0, 3));
+
+    // 🔥 RETURN DETAILED RESPONSE
     res.status(200).json({
-      message: "Excel imported successfully!",
+      message: `Import completed. Success: ${successCount}, Duplicates: ${duplicateEntries.length}, Errors: ${errorEntries.length}`,
       status: "success",
+      summary: {
+        total: excelRows.length,
+        success: successCount,
+        duplicates: duplicateEntries.length,
+        errors: errorEntries.length
+      },
+      duplicates: duplicateEntries,
+      errors: errorEntries
     });
 
   } catch (error) {
     console.error("❌ Import error:", error);
-    res.status(500).json({ message: "Server error while importing data." });
+    res.status(500).json({ 
+      message: "Server error while importing data.",
+      error: error.message 
+    });
   }
 };
 
+
+
+export const addSingleRawData = async (req, res) => {
+  try {
+    // ----------------------------------
+    // AUTH CHECK
+    // ----------------------------------
+    if (!req.session?.user) {
+      return res.status(401).json({ message: "Unauthorized" });
+    }
+
+    const created_by_user = req.session.user.id;
+
+    // ----------------------------------
+    // INPUTS (DB-SAFE DEFAULTS)
+    // ----------------------------------
+    const {
+      name,
+      number,
+      cat_id,
+      reference_id,
+      email = "",
+      address = "",
+      area_id = "",
+      city = null,
+      lead_stage = "Fresh Lead",
+      quick_remark = null,
+      detailed_remark = null,
+      assigned_to_user_id = null,
+      followup_date = null,
+      assign_date = null,
+      
+      // ADD THESE NEW FIELDS
+      category_other,
+      reference_other,
+      
+      // Optional other fields that might come from frontend
+      alternate_number = null,
+      location_link = null,
+      room_length = null,
+      room_width = null,
+      room_height = null,
+      p_type = null,
+      budget_range = null,
+      current_stage = null,
+      time_to_complete = null,
+      site_visit_date = null,
+      demo_date = null,
+      ar_number = null,
+      architect_name = null,
+      ca_number = null,
+      e_number = null,
+      sm_number = null,
+      pop_number = null,
+      other_number = null
+    } = req.body;
+
+    // ----------------------------------
+    // VALIDATION
+    // ----------------------------------
+    if (!name || !number || !cat_id || !reference_id) {
+      return res.status(400).json({
+        message: "Name, Contact, Category & Reference are required"
+      });
+    }
+
+    // ----------------------------------
+    // DUPLICATE CONTACT CHECK
+    // ----------------------------------
+    const [existingContact] = await db.query(
+      `SELECT master_id, name FROM raw_data WHERE number = ? LIMIT 1`,
+      [number]
+    );
+
+    if (existingContact.length > 0) {
+      return res.status(409).json({
+        success: false,
+        message: "Contact number already exists in the system",
+        duplicate: {
+          master_id: existingContact[0].master_id,
+          name: existingContact[0].name,
+          contact: number
+        }
+      });
+    }
+
+    // ----------------------------------
+    // GET ASSIGNED USER
+    // ----------------------------------
+
+    const assignedUserId = assigned_to_user_id || created_by_user;
+let assignedUserName = "Unknown";
+
+// 🔐 Validate assigned user role
+const [userRow] = await db.execute(
+  `SELECT name, role 
+   FROM users 
+   WHERE user_id = ?
+   AND role IN (${TELECALLER_ROLES.map(() => '?').join(',')})
+   LIMIT 1`,
+  [assignedUserId, ...TELECALLER_ROLES]
+);
+
+if (!userRow.length) {
+  return res.status(400).json({
+    success: false,
+    message: "Assigned user not found or role not allowed for lead assignment"
+  });
+}
+
+assignedUserName = userRow[0].name;
+
+
+
+    // ----------------------------------
+    // ASSIGNMENT INSERT
+    // ----------------------------------
+    const assignDateToUse = assign_date ? new Date(assign_date) : new Date();
+
+    const [assignRes] = await db.execute(
+      `INSERT INTO assignments
+       (created_by_user, mode, assign_date, assigned_to, assigned_to_user_id, lead_count, assign_type)
+       VALUES (?, 'call', ?, ?, ?, 1, 'manual')`,
+      [
+        created_by_user,
+        assignDateToUse,
+        assignedUserName,
+        assignedUserId
+      ]
+    );
+
+    const assign_id = assignRes.insertId;
+
+    // ----------------------------------
+    // RAW DATA INSERT (DB SAFE)
+    // ----------------------------------
+    const [rawRes] = await db.execute(
+      `INSERT INTO raw_data (
+        name,
+        number,
+        alternate_number,
+        email,
+        address,
+        area_id,
+        cat_id,
+        reference_id,
+        status,
+        lead_status,
+        assign_id,
+        created_by_user,
+        city,
+        location_link,
+        room_length,
+        room_width,
+        room_height,
+        p_type,
+        budget_range,
+        current_stage,
+        time_to_complete,
+        site_visit_date,
+        demo_date,
+        ar_number,
+        architect_name,
+        ca_number,
+        e_number,
+        sm_number,
+        pop_number,
+        other_number,
+        lead_stage,
+        quick_remark,
+        detailed_remark,
+        followup_date
+      )
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'Assigned', 'Inactive', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [
+        name,
+        number,
+        alternate_number,
+        email || "",
+        address || "",
+        area_id || "",
+        cat_id,
+        reference_id,
+        assign_id,
+        created_by_user,
+        city,
+        location_link,
+        room_length ? parseFloat(room_length) : null,
+        room_width ? parseFloat(room_width) : null,
+        room_height ? parseFloat(room_height) : null,
+        p_type,
+        budget_range,
+        current_stage,
+        time_to_complete,
+        site_visit_date,
+        demo_date,
+        ar_number,
+        architect_name,
+        ca_number,
+        e_number,
+        sm_number,
+        pop_number,
+        other_number,
+        lead_stage,
+        quick_remark,
+        detailed_remark,
+        followup_date
+      ]
+    );
+
+    const master_id = rawRes.insertId;
+
+    // ------------------------------------------------
+    // STEP: Handle Other Inputs - SAME LOGIC AS updateRawData
+    // ------------------------------------------------
+    
+    // For Category Other
+    if (category_other !== undefined && category_other && category_other.trim() !== '') {
+      // Insert into raw_data_other_inputs for category
+      await db.execute(
+        `INSERT INTO raw_data_other_inputs 
+         (master_id, cat_id, input_text, created_at) 
+         VALUES (?, ?, ?, NOW())`,
+        [master_id, cat_id, category_other]
+      );
+    }
+    // Note: No need to delete for new records since they don't exist yet
+
+    // For Reference Other
+    if (reference_other !== undefined && reference_other && reference_other.trim() !== '') {
+      // Insert into raw_data_other_inputs for reference
+      await db.execute(
+        `INSERT INTO raw_data_other_inputs 
+         (master_id, reference_id, input_text, created_at) 
+         VALUES (?, ?, ?, NOW())`,
+        [master_id, reference_id, reference_other]
+      );
+    }
+    // Note: No need to delete for new records since they don't exist yet
+
+    // ----------------------------------
+    // INITIAL REASSIGNMENT
+    // ----------------------------------
+    const reassignmentDate = followup_date ? new Date(followup_date) : new Date();
+
+    await db.execute(
+      `INSERT INTO reassignment (
+        assign_id,
+        master_id,
+        created_by_user,
+        assignedTo,
+        leadStage,
+        remark,
+        reassignment_date,
+        created_at
+      )
+      VALUES (?, ?, ?, ?, ?, ?, ?, NOW())`,
+      [
+        assign_id,
+        master_id,
+        created_by_user,
+        assignedUserName,
+        lead_stage,
+        detailed_remark,
+        reassignmentDate
+      ]
+    );
+
+    // ----------------------------------
+    // RESPONSE
+    // ----------------------------------
+    return res.status(200).json({
+      success: true,
+      message: "Lead created successfully",
+      master_id,
+      assign_id,
+      assigned_to: assignedUserName,
+      category_other_saved: category_other !== undefined,
+      reference_other_saved: reference_other !== undefined
+    });
+
+  } catch (err) {
+    console.error("❌ addSingleRawData error:", err);
+    return res.status(500).json({
+      success: false,
+      message: "Server error",
+      error: err.message
+    });
+  }
+};
 
 export const updateRawData = async (req, res) => {
   try {
@@ -1937,7 +2415,9 @@ export const updateRawData = async (req, res) => {
       quick_remark,
       status, 
       lead_status,
-      followup_date
+      followup_date ,
+        detailed_remark,  // ← ADD THIS LINE
+
     };
 
     const updateFields = [];
@@ -2139,12 +2619,15 @@ export const updateRawData = async (req, res) => {
           : new Date();
 
       // Determine the remark to use
-      let finalRemark = '';
-      if (detailed_remark && detailed_remark.trim() !== '') {
-        finalRemark = detailed_remark;
-      } else if (reassignmentReason === 'leadStage_changed') {
-        finalRemark = `Lead stage changed to ${leadStage || lead_stage}`;
-      }
+     let finalRemark = '';
+if (detailed_remark && detailed_remark.trim() !== '') {
+  finalRemark = detailed_remark;
+} else if (quick_remark && quick_remark.trim() !== '') {
+  // If detailed_remark is empty but quick_remark is selected, use quick_remark
+  finalRemark = quick_remark;
+} else if (reassignmentReason === 'leadStage_changed') {
+  finalRemark = `Lead stage changed to ${leadStage || lead_stage}`;
+}
 
       // Determine the lead stage to use
       let finalLeadStage = leadStage || lead_stage || previousAssignment?.leadStage || null;
@@ -2253,311 +2736,60 @@ export const updateRawData = async (req, res) => {
 };
 
 
-export const addSingleRawData = async (req, res) => {
-  try {
-    // ----------------------------------
-    // AUTH CHECK
-    // ----------------------------------
-    if (!req.session?.user) {
-      return res.status(401).json({ message: "Unauthorized" });
-    }
 
-    const created_by_user = req.session.user.id;
 
-    // ----------------------------------
-    // INPUTS (DB-SAFE DEFAULTS)
-    // ----------------------------------
-    const {
-      name,
-      number,
-      cat_id,
-      reference_id,
-      email = "",
-      address = "",
-      area_id = "",
-      city = null,
-      lead_stage = "Fresh Lead",
-      quick_remark = null,
-      detailed_remark = null,
-      assigned_to_user_id = null,
-      followup_date = null,
-      assign_date = null,
-      
-      // ADD THESE NEW FIELDS
-      category_other,
-      reference_other,
-      
-      // Optional other fields that might come from frontend
-      alternate_number = null,
-      location_link = null,
-      room_length = null,
-      room_width = null,
-      room_height = null,
-      p_type = null,
-      budget_range = null,
-      current_stage = null,
-      time_to_complete = null,
-      site_visit_date = null,
-      demo_date = null,
-      ar_number = null,
-      architect_name = null,
-      ca_number = null,
-      e_number = null,
-      sm_number = null,
-      pop_number = null,
-      other_number = null
-    } = req.body;
+// ✅ MIME → EXTENSION MAP (FIXES jpeg issue)
+const mimeExtensionMap = {
+  'image/jpeg': '.jpeg',
+  'image/jpg': '.jpg',
+  'image/pjpeg': '.jpeg', // Add alternative JPEG MIME types
+  'image/png': '.png',
+  'image/webp': '.webp',
+  'image/gif': '.gif',
+  'image/bmp': '.bmp',
+  'image/svg+xml': '.svg',
 
-    // ----------------------------------
-    // VALIDATION
-    // ----------------------------------
-    if (!name || !number || !cat_id || !reference_id) {
-      return res.status(400).json({
-        message: "Name, Contact, Category & Reference are required"
-      });
-    }
+  'video/mp4': '.mp4',
+  'video/quicktime': '.mov',
+  'video/x-msvideo': '.avi',
+  'video/x-matroska': '.mkv',
+  'video/webm': '.webm',
+  'video/3gpp': '.3gp',
 
-    // ----------------------------------
-    // GET ASSIGNED USER
-    // ----------------------------------
-    const assignedUserId = assigned_to_user_id || created_by_user;
-    let assignedUserName = "Unknown";
-
-    const [userRow] = await db.execute(
-      "SELECT name FROM users WHERE user_id = ? LIMIT 1",
-      [assignedUserId]
-    );
-
-    if (userRow.length) {
-      assignedUserName = userRow[0].name;
-    }
-
-    // ----------------------------------
-    // ASSIGNMENT INSERT
-    // ----------------------------------
-    const assignDateToUse = assign_date ? new Date(assign_date) : new Date();
-
-    const [assignRes] = await db.execute(
-      `INSERT INTO assignments
-       (created_by_user, mode, assign_date, assigned_to, assigned_to_user_id, lead_count, assign_type)
-       VALUES (?, 'call', ?, ?, ?, 1, 'manual')`,
-      [
-        created_by_user,
-        assignDateToUse,
-        assignedUserName,
-        assignedUserId
-      ]
-    );
-
-    const assign_id = assignRes.insertId;
-
-    // ----------------------------------
-    // RAW DATA INSERT (DB SAFE)
-    // ----------------------------------
-    const [rawRes] = await db.execute(
-      `INSERT INTO raw_data (
-        name,
-        number,
-        alternate_number,
-        email,
-        address,
-        area_id,
-        cat_id,
-        reference_id,
-        status,
-        lead_status,
-        assign_id,
-        created_by_user,
-        city,
-        location_link,
-        room_length,
-        room_width,
-        room_height,
-        p_type,
-        budget_range,
-        current_stage,
-        time_to_complete,
-        site_visit_date,
-        demo_date,
-        ar_number,
-        architect_name,
-        ca_number,
-        e_number,
-        sm_number,
-        pop_number,
-        other_number,
-        lead_stage,
-        quick_remark,
-        detailed_remark,
-        followup_date
-      )
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'Assigned', 'Inactive', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      [
-        name,
-        number,
-        alternate_number,
-        email || "",
-        address || "",
-        area_id || "",
-        cat_id,
-        reference_id,
-        assign_id,
-        created_by_user,
-        city,
-        location_link,
-        room_length ? parseFloat(room_length) : null,
-        room_width ? parseFloat(room_width) : null,
-        room_height ? parseFloat(room_height) : null,
-        p_type,
-        budget_range,
-        current_stage,
-        time_to_complete,
-        site_visit_date,
-        demo_date,
-        ar_number,
-        architect_name,
-        ca_number,
-        e_number,
-        sm_number,
-        pop_number,
-        other_number,
-        lead_stage,
-        quick_remark,
-        detailed_remark,
-        followup_date
-      ]
-    );
-
-    const master_id = rawRes.insertId;
-
-    // ------------------------------------------------
-    // STEP: Handle Other Inputs - SAME LOGIC AS updateRawData
-    // ------------------------------------------------
-    
-    // For Category Other
-    if (category_other !== undefined && category_other && category_other.trim() !== '') {
-      // Insert into raw_data_other_inputs for category
-      await db.execute(
-        `INSERT INTO raw_data_other_inputs 
-         (master_id, cat_id, input_text, created_at) 
-         VALUES (?, ?, ?, NOW())`,
-        [master_id, cat_id, category_other]
-      );
-    }
-    // Note: No need to delete for new records since they don't exist yet
-
-    // For Reference Other
-    if (reference_other !== undefined && reference_other && reference_other.trim() !== '') {
-      // Insert into raw_data_other_inputs for reference
-      await db.execute(
-        `INSERT INTO raw_data_other_inputs 
-         (master_id, reference_id, input_text, created_at) 
-         VALUES (?, ?, ?, NOW())`,
-        [master_id, reference_id, reference_other]
-      );
-    }
-    // Note: No need to delete for new records since they don't exist yet
-
-    // ----------------------------------
-    // INITIAL REASSIGNMENT
-    // ----------------------------------
-    const reassignmentDate = followup_date ? new Date(followup_date) : new Date();
-
-    await db.execute(
-      `INSERT INTO reassignment (
-        assign_id,
-        master_id,
-        created_by_user,
-        assignedTo,
-        leadStage,
-        remark,
-        reassignment_date,
-        created_at
-      )
-      VALUES (?, ?, ?, ?, ?, ?, ?, NOW())`,
-      [
-        assign_id,
-        master_id,
-        created_by_user,
-        assignedUserName,
-        lead_stage,
-        detailed_remark,
-        reassignmentDate
-      ]
-    );
-
-    // ----------------------------------
-    // RESPONSE
-    // ----------------------------------
-    return res.status(200).json({
-      success: true,
-      message: "Lead created successfully",
-      master_id,
-      assign_id,
-      assigned_to: assignedUserName,
-      category_other_saved: category_other !== undefined,
-      reference_other_saved: reference_other !== undefined
-    });
-
-  } catch (err) {
-    console.error("❌ addSingleRawData error:", err);
-    return res.status(500).json({
-      success: false,
-      message: "Server error",
-      error: err.message
-    });
-  }
+  'application/pdf': '.pdf',
+  'application/msword': '.doc',
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.document': '.docx',
+  'application/vnd.ms-excel': '.xls',
+  'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': '.xlsx',
+  'application/vnd.ms-powerpoint': '.ppt',
+  'application/vnd.openxmlformats-officedocument.presentationml.presentation': '.pptx',
+  'application/zip': '.zip',
+  'application/x-rar-compressed': '.rar',
+  'text/plain': '.txt',
+  'text/csv': '.csv',
 };
+
+
 
 export const uploadDocuments = async (req, res) => {
   try {
     const { master_id } = req.params;
 
-    // ✅ NEW — safely read created_by_user (no behavior change)
-    const created_by_user = req.session?.user?.id || null;
-
     if (!master_id) {
-      return res.status(400).json({ message: "master_id is required" });
+      return res.status(400).json({ message: 'master_id is required' });
     }
 
     if (!req.files || !req.files.files) {
-      return res.status(400).json({ message: "No files uploaded" });
+      return res.status(400).json({ message: 'No files uploaded' });
     }
 
     const {
       location_link,
       remark,
       detailed_remark,
-      assignedTo,
-      leadStage,
-      lead_stage,
-      followup_date,
-      assign_date,
-      reassignment_date,
       reassignment_remark,
       new_remark
     } = req.body;
-
-    console.log("📝 uploadDocuments REQUEST BODY:", {
-      master_id,
-      assignedTo,
-      leadStage,
-      lead_stage,
-      followup_date,
-      detailed_remark,
-      location_link,
-      remark,
-      reassignment_remark,
-      new_remark
-    });
-    
-    console.log("📋 All request body keys:", Object.keys(req.body));
-    console.log("📦 assignedTo type:", typeof assignedTo, "value:", assignedTo);
-    
-    if (req.body['assignedTo[]']) {
-      console.log("🔍 Found assignedTo[]:", req.body['assignedTo[]']);
-      console.log("🔍 assignedTo[] type:", typeof req.body['assignedTo[]']);
-    }
 
     const finalRemark =
       detailed_remark ||
@@ -2570,55 +2802,65 @@ export const uploadDocuments = async (req, res) => {
       ? req.files.files
       : [req.files.files];
 
-    const allowedExtensions = [
-      ".pdf", ".jpg", ".jpeg", ".png", ".dwg",
-      ".mp4", ".mov", ".avi", ".mkv"
-    ];
-
     const docValues = [];
     const uploadedDocs = [];
 
     for (const file of filesArray) {
-      const ext = path.extname(file.name).toLowerCase();
+      // ✅ REAL ORIGINAL NAME
+      const originalName = file.name;
 
-      if (!allowedExtensions.includes(ext)) {
-        return res.status(400).json({
-          message: `File type not allowed: ${file.name}`
-        });
-      }
+      // ✅ EXTENSION FROM MIME TYPE (NOT filename)
+      const safeExt =
+        mimeExtensionMap[file.mimetype] ||
+        path.extname(originalName).toLowerCase() ||
+        '.bin';
 
-      const fileType =
-        [".jpg", ".jpeg", ".png"].includes(ext)
-          ? "image"
-          : [".mp4", ".mov", ".avi", ".mkv"].includes(ext)
-          ? "video"
-          : "document";
+      // ✅ CLEAN BASE NAME
+      const baseName = path
+        .basename(originalName, path.extname(originalName))
+        .replace(/[^a-zA-Z0-9]/g, '_');
 
-      const uploadDir = path.join("uploads", fileType);
+      // ✅ FINAL SAFE FILE NAME
+      const fileName = `${master_id}_${Date.now()}_${baseName}${safeExt}`;
+
+      // ✅ FILE TYPE
+      const fileType = file.mimetype.startsWith('image/')
+        ? 'image'
+        : file.mimetype.startsWith('video/')
+        ? 'video'
+        : 'document';
+
+      // ✅ UPLOAD DIRECTORY
+      const uploadDir = path.join('uploads', fileType);
       if (!fs.existsSync(uploadDir)) {
         fs.mkdirSync(uploadDir, { recursive: true });
       }
 
-      const fileName = `${master_id}_${Date.now()}_${file.name}`;
+      // ✅ SAVE FILE
       const savePath = path.join(uploadDir, fileName);
       await file.mv(savePath);
 
-      const dbPath = savePath.replace(/\\/g, "/");
+      // ✅ PATH FOR DB
+      const dbPath = path.join(fileType, fileName).replace(/\\/g, '/');
 
+      // ✅ DB VALUES - Match your table columns exactly
       docValues.push([
-        master_id,
-        dbPath,
-        fileType,
-        location_link || null,
-        remark || null
+        master_id,           // master_id (varchar)
+        dbPath,              // document_path
+        fileType,            // document_type
+        location_link || null, // location_link
+        finalRemark          // remark
+        // Note: uploaded_at is automatic (TIMESTAMP DEFAULT CURRENT_TIMESTAMP)
       ]);
 
       uploadedDocs.push({
         document_path: dbPath,
-        document_type: fileType
+        document_type: fileType,
+        original_name: originalName
       });
     }
 
+    // ✅ BULK INSERT - Match your table columns
     await db.query(
       `INSERT INTO documents
        (master_id, document_path, document_type, location_link, remark)
@@ -2626,186 +2868,119 @@ export const uploadDocuments = async (req, res) => {
       [docValues]
     );
 
-    const rawUpdates = [];
-    const rawValues = [];
-
-    if (followup_date) {
-      rawUpdates.push("followup_date = ?");
-      rawValues.push(followup_date);
-    }
-
-    const finalLeadStage = leadStage || lead_stage;
-    if (finalLeadStage) {
-      rawUpdates.push("lead_stage = ?");
-      rawValues.push(finalLeadStage);
-    }
-
-    if (finalRemark) {
-      rawUpdates.push("detailed_remark = ?");
-      rawValues.push(finalRemark);
-    }
-
-    if (rawUpdates.length) {
-      rawValues.push(master_id);
-      await db.execute(
-        `UPDATE raw_data SET ${rawUpdates.join(", ")} WHERE master_id = ?`,
-        rawValues
-      );
-    }
-
-    let finalAssignId = null;
-
-    const [rawRow] = await db.execute(
-      "SELECT assign_id FROM raw_data WHERE master_id = ?",
-      [master_id]
-    );
-
-    finalAssignId = rawRow.length ? rawRow[0].assign_id : null;
-
-    if (!finalAssignId) {
-      const [newAssign] = await db.execute(
-        "INSERT INTO assignments (assign_date) VALUES (NOW())"
-      );
-
-      finalAssignId = newAssign.insertId;
-
-      await db.execute(
-        "UPDATE raw_data SET assign_id = ? WHERE master_id = ?",
-        [finalAssignId, master_id]
-      );
-    }
-
-    let assignedToArray = [];
-
-    if (req.body['assignedTo[]']) {
-      if (Array.isArray(req.body['assignedTo[]'])) {
-        assignedToArray = req.body['assignedTo[]'].map(u => String(u).trim()).filter(u => u !== '');
-      } else if (typeof req.body['assignedTo[]'] === 'string' && req.body['assignedTo[]'].trim() !== '') {
-        const str = req.body['assignedTo[]'].trim();
-        assignedToArray = str.includes(',')
-          ? str.split(',').map(u => u.trim()).filter(u => u !== '')
-          : [str];
-      }
-    } else if (assignedTo) {
-      if (Array.isArray(assignedTo)) {
-        assignedToArray = assignedTo.map(u => String(u).trim()).filter(u => u !== '');
-      } else if (typeof assignedTo === 'string' && assignedTo.trim() !== '') {
-        assignedToArray = assignedTo.includes(',')
-          ? assignedTo.split(',').map(u => u.trim()).filter(u => u !== '')
-          : [assignedTo.trim()];
-      }
-    }
-
-    const inserted = [];
-    const skipped = [];
-
-    if (assignedToArray.length > 0 && finalLeadStage) {
-      let reassDate = new Date();
-      if (reassignment_date) reassDate = new Date(reassignment_date);
-      else if (followup_date) reassDate = new Date(followup_date);
-
-      for (const user of assignedToArray) {
-        let finalUserName = user;
-        let userId = null;
-
-        if (!isNaN(user) && Number.isInteger(Number(user)) && user !== '') {
-          userId = parseInt(user);
-          try {
-            const [uRow] = await db.execute(
-              "SELECT name, user_id FROM users WHERE user_id = ?",
-              [userId]
-            );
-            if (uRow.length) finalUserName = uRow[0].name;
-          } catch {}
-        }
-
-        try {
-          const [exists] = await db.execute(
-            `SELECT id FROM reassignment
-             WHERE master_id = ?
-               AND assignedTo = ?
-               AND leadStage = ?`,
-            [master_id, finalUserName, finalLeadStage]
-          );
-
-          if (exists.length > 0) {
-            skipped.push({
-              assignedTo: finalUserName,
-              leadStage: finalLeadStage,
-              userId,
-              reason: "Duplicate assignment"
-            });
-            continue;
-          }
-
-          // ✅ ONLY CHANGE IS HERE → add created_by_user
-          const [ins] = await db.execute(
-            `INSERT INTO reassignment
-             (assign_id, master_id, created_by_user, assignedTo, leadStage, remark, reassignment_date, created_at)
-             VALUES (?, ?, ?, ?, ?, ?, ?, NOW())`,
-            [
-              finalAssignId,
-              master_id,
-              created_by_user,   // 👈 NEW FIELD
-              finalUserName,
-              finalLeadStage,
-              finalRemark,
-              reassDate
-            ]
-          );
-
-          inserted.push({
-            id: ins.insertId,
-            assignedTo: finalUserName,
-            leadStage: finalLeadStage,
-            userId,
-            reassignment_date: reassDate
-          });
-
-        } catch (insertError) {
-          console.error(insertError);
-        }
-      }
-    }
-
-    if (assign_date) {
-      await db.execute(
-        "UPDATE assignments SET assign_date = ? WHERE assign_id = ?",
-        [assign_date, finalAssignId]
-      );
-    }
-
-    let updatedRawData = null;
-    try {
-      const [updatedData] = await db.execute(
-        "SELECT lead_stage, followup_date, assigned_to, detailed_remark FROM raw_data WHERE master_id = ?",
-        [master_id]
-      );
-      if (updatedData.length) updatedRawData = updatedData[0];
-    } catch {}
-
     return res.status(200).json({
       success: true,
-      message: inserted.length > 0 
-        ? "Documents uploaded and reassignments processed successfully" 
-        : "Documents uploaded successfully",
-      documents: uploadedDocs,
-      raw_data_updated: rawUpdates.length > 0,
-      assign_id: finalAssignId,
-      inserted_reassignments: inserted,
-      skipped_reassignments: skipped,
-      updated_raw_data: updatedRawData
+      message: 'Documents uploaded successfully',
+      documents: uploadedDocs
     });
 
   } catch (error) {
-    console.error("❌ uploadDocuments error:", error);
+    console.error('❌ uploadDocuments error:', error);
     return res.status(500).json({
       success: false,
-      message: "Server error during upload",
+      message: 'Server error during upload',
       error: error.message
     });
   }
 };
+
+
+
+
+export const deleteDocument = async (req, res) => {
+  try {
+    const { doc_id } = req.params; // Correct parameter name from route
+    const created_by_user = req.session?.user?.id || null;
+
+    if (!doc_id) {
+      return res.status(400).json({ message: "doc_id is required" });
+    }
+
+    // First, fetch the document details to get the file path
+    const [documentRows] = await db.query(
+      `SELECT document_path FROM documents WHERE doc_id = ?`,
+      [doc_id]
+    );
+
+    if (documentRows.length === 0) {
+      return res.status(404).json({ message: "Document not found" });
+    }
+
+    const documentPath = documentRows[0].document_path;
+
+    // Delete the physical file from the filesystem
+    // Note: Make sure documentPath is relative to your server root
+    const fullPath = path.join(__dirname, '..', documentPath);
+    
+    if (fs.existsSync(fullPath)) {
+      fs.unlinkSync(fullPath);
+      console.log(`🗑️ Deleted file: ${fullPath}`);
+    } else {
+      console.log(`⚠️ File not found at: ${fullPath}`);
+    }
+
+    // Delete the record from the database
+    await db.query(
+      `DELETE FROM documents WHERE doc_id = ?`,
+      [doc_id]
+    );
+
+    return res.status(200).json({
+      success: true,
+      message: "Document deleted successfully"
+    });
+
+  } catch (error) {
+    console.error("❌ deleteDocument error:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Server error during deletion",
+      error: error.message
+    });
+  }
+};
+
+
+
+export const getDocumentsByMasterId = async (req, res) => {
+  try {
+    const { master_id } = req.params;
+
+    if (!master_id) {
+      return res.status(400).json({ message: "master_id is required" });
+    }
+
+    // Updated query to include doc_id, location_link, and remark
+    const query = `
+      SELECT doc_id, document_path, document_type, location_link, remark, uploaded_at 
+      FROM documents 
+      WHERE master_id = ?
+      ORDER BY uploaded_at DESC
+    `;
+    
+    const [rows] = await db.query(query, [master_id]);
+
+    // Return structured response
+    return res.status(200).json({
+      master_id,
+      documents: rows.map(row => ({
+        doc_id: row.doc_id,
+        document_path: row.document_path, 
+        document_type: row.document_type, // 'image' or 'documents' or 'video'
+        location_link: row.location_link,
+        remark: row.remark,
+        uploaded_at: row.uploaded_at
+      }))
+    });
+  } catch (error) {
+    console.error("❌ Get Documents Error:", error);
+    return res.status(500).json({
+      message: "Server error while fetching documents",
+      error: error.message
+    });
+  }
+};
+
 
 
 export const addReassignment = async (req, res) => {
@@ -3114,36 +3289,207 @@ export const addBulkReassignment = async (req, res) => {
 
 
 
+// export const deleteClient = async (req, res) => {
+//   const { master_id } = req.params;
+//   const connection = await db.getConnection();
+
+//   try {
+//     await connection.beginTransaction();
+
+//     // 1. get assign_id before deleting raw_data
+//     const [[lead]] = await connection.query(
+//       'SELECT assign_id FROM raw_data WHERE master_id = ?',
+//       [master_id]
+//     );
+
+//     const assign_id = lead?.assign_id;
+
+//     // 2. delete child table records
+//     await connection.query(
+//       'DELETE FROM raw_data_other_inputs WHERE master_id = ?',
+//       [master_id]
+//     );
+
+//     await connection.query(
+//       'DELETE FROM reassignment WHERE master_id = ?',
+//       [master_id]
+//     );
+
+//     // 3. delete main lead
+//     await connection.query(
+//       'DELETE FROM raw_data WHERE master_id = ?',
+//       [master_id]
+//     );
+
+//     // 4. delete assignment ONLY if no other leads use it
+//     if (assign_id) {
+//       const [[count]] = await connection.query(
+//         'SELECT COUNT(*) AS total FROM raw_data WHERE assign_id = ?',
+//         [assign_id]
+//       );
+
+//       if (count.total === 0) {
+//         await connection.query(
+//           'DELETE FROM assignments WHERE assign_id = ?',
+//           [assign_id]
+//         );
+//       }
+//     }
+
+//     await connection.commit();
+//     res.json({ message: 'Lead and related assignment deleted successfully' });
+
+//   } catch (err) {
+//     await connection.rollback();
+//     console.error(err);
+//     res.status(500).json({ message: 'Error deleting lead data' });
+//   } finally {
+//     connection.release();
+//   }
+// };
+
+
+
 export const deleteClient = async (req, res) => {
-  const { master_id } = req.params;
-
-  try {
-    await db.query('DELETE FROM raw_data WHERE master_id = ?', [master_id]);
-    res.json({ message: 'Client deleted successfully' });
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ message: 'Error deleting client' });
-  }
-};
-
-
-// delete raw datat entries from raw data table
-export const deleteMultipleClients = async (req, res) => {
-  const { ids } = req.body; // Corrected: use req.body, not req.params
+  const { ids } = req.body; // array of master_id
 
   if (!Array.isArray(ids) || ids.length === 0) {
     return res.status(400).json({ message: 'No client IDs provided' });
   }
 
+  const connection = await db.getConnection();
+
   try {
-    const placeholders = ids.map(() => '?').join(',');
-    await db.query(`DELETE FROM raw_data WHERE master_id IN (${placeholders})`, ids);
-    res.json({ message: 'Selected entries deleted successfully' });
+    await connection.beginTransaction();
+
+    for (const master_id of ids) {
+
+      // 1️⃣ Get assign_id (same as deleteClient)
+      const [[lead]] = await connection.query(
+        'SELECT assign_id FROM raw_data WHERE master_id = ?',
+        [master_id]
+      );
+
+      if (!lead) continue; // skip if not found
+
+      const assign_id = lead.assign_id;
+
+      // 2️⃣ Delete child table records
+      await connection.query(
+        'DELETE FROM raw_data_other_inputs WHERE master_id = ?',
+        [master_id]
+      );
+
+      await connection.query(
+        'DELETE FROM reassignment WHERE master_id = ?',
+        [master_id]
+      );
+
+      // 3️⃣ Delete main lead
+      await connection.query(
+        'DELETE FROM raw_data WHERE master_id = ?',
+        [master_id]
+      );
+
+      // 4️⃣ Delete assignment ONLY if unused (same logic)
+      if (assign_id) {
+        const [[count]] = await connection.query(
+          'SELECT COUNT(*) AS total FROM raw_data WHERE assign_id = ?',
+          [assign_id]
+        );
+
+        if (count.total === 0) {
+          await connection.query(
+            'DELETE FROM assignments WHERE assign_id = ?',
+            [assign_id]
+          );
+        }
+      }
+    }
+
+    await connection.commit();
+    res.json({ message: 'Selected leads deleted successfully (single-delete logic)' });
+
   } catch (err) {
+    await connection.rollback();
     console.error(err);
-    res.status(500).json({ message: 'Error deleting the selected entries' });
+    res.status(500).json({ message: 'Error deleting selected leads' });
+  } finally {
+    connection.release();
   }
 };
+
+
+export const deleteMultipleClients = async (req, res) => {
+  const { ids } = req.body; // array of master_id
+
+  if (!Array.isArray(ids) || ids.length === 0) {
+    return res.status(400).json({ message: 'No client IDs provided' });
+  }
+
+  const connection = await db.getConnection();
+
+  try {
+    await connection.beginTransaction();
+
+    // 1. get all assign_ids related to selected master_ids
+    const [rows] = await connection.query(
+      `SELECT DISTINCT assign_id 
+       FROM raw_data 
+       WHERE master_id IN (${ids.map(() => '?').join(',')})
+       AND assign_id IS NOT NULL`,
+      ids
+    );
+
+    const assignIds = rows.map(r => r.assign_id);
+
+    // 2. delete child table records
+    await connection.query(
+      `DELETE FROM raw_data_other_inputs 
+       WHERE master_id IN (${ids.map(() => '?').join(',')})`,
+      ids
+    );
+
+    await connection.query(
+      `DELETE FROM reassignment 
+       WHERE master_id IN (${ids.map(() => '?').join(',')})`,
+      ids
+    );
+
+    // 3. delete main raw data
+    await connection.query(
+      `DELETE FROM raw_data 
+       WHERE master_id IN (${ids.map(() => '?').join(',')})`,
+      ids
+    );
+
+    // 4. cleanup assignments (only unused ones)
+    for (const assign_id of assignIds) {
+      const [[count]] = await connection.query(
+        'SELECT COUNT(*) AS total FROM raw_data WHERE assign_id = ?',
+        [assign_id]
+      );
+
+      if (count.total === 0) {
+        await connection.query(
+          'DELETE FROM assignments WHERE assign_id = ?',
+          [assign_id]
+        );
+      }
+    }
+
+    await connection.commit();
+    res.json({ message: 'Selected leads deleted successfully' });
+
+  } catch (err) {
+    await connection.rollback();
+    console.error(err);
+    res.status(500).json({ message: 'Error deleting selected leads' });
+  } finally {
+    connection.release();
+  }
+};
+
 
 
 
@@ -3747,46 +4093,6 @@ export const deleteMultipleClients = async (req, res) => {
 
 
 
-export const getDocumentsByMasterId = async (req, res) => {
-  try {
-    const { master_id } = req.params;
-
-    if (!master_id) {
-      return res.status(400).json({ message: "master_id is required" });
-    }
-
-    // Updated query to include doc_id, location_link, and remark
-    const query = `
-      SELECT doc_id, document_path, document_type, location_link, remark, uploaded_at 
-      FROM documents 
-      WHERE master_id = ?
-      ORDER BY uploaded_at DESC
-    `;
-    
-    const [rows] = await db.query(query, [master_id]);
-
-    // Return structured response
-    return res.status(200).json({
-      master_id,
-      documents: rows.map(row => ({
-        doc_id: row.doc_id,
-        document_path: row.document_path, 
-        document_type: row.document_type, // 'image' or 'documents' or 'video'
-        location_link: row.location_link,
-        remark: row.remark,
-        uploaded_at: row.uploaded_at
-      }))
-    });
-  } catch (error) {
-    console.error("❌ Get Documents Error:", error);
-    return res.status(500).json({
-      message: "Server error while fetching documents",
-      error: error.message
-    });
-  }
-};
-
-
 
 export const getLeadStage = async (req, res) => {
   try {
@@ -3835,199 +4141,6 @@ export const getQuickRemark = async (req, res) => {
 };
 
 
-
-export const getInactiveLeadDetails = async (req, res) => {
-  try {
-    if (!req.session.user) {
-      return res.status(401).json({ message: "Unauthorized: No session" });
-    }
-
-    const { id: userId, role } = req.session.user;
-
-    let query = `
-      SELECT 
-        rd.master_id,
-        rd.name,
-        rd.city,
-        rd.number AS contact,
-
-        -- Assignment
-        asg.assign_date,
-        asg.assigned_to AS assign_user,
-
-        -- Call Status
-        COALESCE(rd.quick_remark, 'Not Available') AS call_status,
-
-        -- Final Telecaller Remark OR Raw Detailed Remark
-        COALESCE(
-            (SELECT tct.tc_remark 
-             FROM tele_caller_table tct 
-             WHERE tct.master_id = rd.master_id 
-             ORDER BY tct.tct_id DESC LIMIT 1),
-             rd.detailed_remark,
-             'Not Available'
-        ) AS remark
-
-      FROM raw_data rd
-      INNER JOIN assignments asg ON rd.assign_id = asg.assign_id
-    `;
-
-    const conditions = [`rd.lead_status = 'Inactive'`];
-    const params = [];
-
-    // Telecaller sees only their assigned leads
-    if (role === "tele_caller") {
-      conditions.push(`asg.assigned_to_user_id = ?`);
-      params.push(userId);
-    }
-
-    if (conditions.length > 0) {
-      query += ` WHERE ` + conditions.join(" AND ");
-    }
-
-    query += ` ORDER BY rd.master_id DESC`;
-
-    const [rows] = await db.query(query, params);
-
-    res.status(200).json(rows);
-
-  } catch (error) {
-    console.error("❌ Error in getInactiveLeadDetails:", error);
-    res.status(500).json({ message: "Failed to fetch data" });
-  }
-};
-
-
-
-// export const addReassignment = async (req, res) => {
-//   try {
-//     console.log("📥 Incoming Request Body:", req.body);
-
-//     const { master_id, assignedTo, leadStage, remark, assign_id, reassignment_date } = req.body;
-
-//     if (!master_id || !assignedTo || !leadStage || !assign_id) {
-//       return res.status(400).json({ message: "Missing required fields" });
-//     }
-
-//     const assignedToArray = Array.isArray(assignedTo) ? assignedTo : [assignedTo];
-
-//     // ⭐ CLEAN NAME: remove role written inside parentheses
-//     const cleanName = (str) => str.replace(/\s*\(.*?\)\s*/g, "").trim();
-
-//     // ⭐ Convert input date → MySQL DATETIME (YYYY-MM-DD HH:mm:ss)
-//     const toMySQLDateTime = (date) => {
-//       const d = new Date(date);
-//       if (isNaN(d.getTime())) return null;
-//       const pad = (n) => (n < 10 ? "0" + n : n);
-//       return (
-//         d.getFullYear() +
-//         "-" +
-//         pad(d.getMonth() + 1) +
-//         "-" +
-//         pad(d.getDate()) +
-//         " " +
-//         pad(d.getHours()) +
-//         ":" +
-//         pad(d.getMinutes()) +
-//         ":" +
-//         pad(d.getSeconds())
-//       );
-//     };
-
-//     // ⭐ Use reassignment date or today
-//     const formattedDate =
-//       toMySQLDateTime(reassignment_date) || toMySQLDateTime(new Date());
-
-//     console.log("📅 Using Datetime for BOTH tables:", formattedDate);
-
-//     // -----------------------------------------------------
-//     // 1️⃣ UPDATE raw_data.followup_date + lead_stage
-//     // -----------------------------------------------------
-//     await db.query(
-//       `UPDATE raw_data 
-//        SET lead_stage = ?, followup_date = ?
-//        WHERE master_id = ?`,
-//       [leadStage, formattedDate, master_id]
-//     );
-//     console.log("🔄 raw_data lead_stage & followup_date updated →", leadStage, formattedDate);
-
-//     // -----------------------------------------------------
-//     // 2️⃣ PROCESS MULTIPLE ASSIGNEES
-//     // -----------------------------------------------------
-//     const insertPromises = assignedToArray.map(async (assignee) => {
-//       const finalName = cleanName(assignee);
-
-//       // -----------------------------------------------------
-//       // 3️⃣ CHECK DUPLICATE
-//       // -----------------------------------------------------
-//       const [duplicate] = await db.query(
-//         `SELECT id 
-//          FROM reassignment
-//          WHERE master_id = ? AND assignedTo = ? AND leadStage = ?`,
-//         [master_id, finalName, leadStage]
-//       );
-
-//       if (duplicate.length > 0) {
-//         console.log("⚠ Duplicate found, skipping insert:", finalName);
-//         return { skipped: true, finalName, message: `Duplicate: Lead already assigned to ${finalName}` };
-//       }
-
-//       // -----------------------------------------------------
-//       // 4️⃣ INSERT INTO REASSIGNMENT TABLE
-//       // -----------------------------------------------------
-//       const [insertRes] = await db.query(
-//         `INSERT INTO reassignment 
-//           (assign_id, master_id, assignedTo, leadStage, remark, reassignment_date, created_at)
-//          VALUES (?, ?, ?, ?, ?, ?, NOW())`,
-//         [
-//           assign_id,
-//           master_id,
-//           finalName,
-//           leadStage,
-//           remark || "",
-//           formattedDate, // ✅ Same as raw_data.followup_date
-//         ]
-//       );
-
-//       console.log("✅ Inserted reassignment:", finalName, formattedDate);
-//       return { skipped: false, finalName, insertId: insertRes.insertId };
-//     });
-
-//     const results = await Promise.all(insertPromises);
-
-//     res.status(200).json({
-//       success: true,
-//       message: "Reassignment processed",
-//       updated_lead_stage: leadStage,
-//       inserted: results.filter(r => !r.skipped),
-//       skipped: results.filter(r => r.skipped),
-//       total_inserted: results.filter(r => !r.skipped).length,
-//       total_skipped: results.filter(r => r.skipped).length,
-//       followup_date_used: formattedDate,
-//     });
-
-//   } catch (error) {
-//     console.error("❌ addReassignment Error:", error);
-//     res.status(500).json({
-//       success: false,
-//       message: "Failed to save reassignment",
-//       error: error.message,
-//     });
-//   }
-// };
-
-
-
-
-
-
-// New bulk assignment endpoint
-
-
-
-
-
-// 📜 FETCH REASSIGNMENT HISTORY
 
 export const getReassignmentByMaster = async (req, res) => {
   try {
@@ -4496,6 +4609,228 @@ export const getClosedLeadsFullData = async (req, res) => {
 
 
 
+// export const getMissedAssignedFullData = async (req, res) => {
+//   try {
+//     if (!req.session.user) {
+//       return res.status(401).json({ message: "Unauthorized: No session" });
+//     }
+
+//     const { id: userId, role } = req.session.user;
+//     const today = new Date().toISOString().slice(0, 10);
+
+//     /* ================= CURRENT USER ================= */
+//     const [userResult] = await db.query(
+//       "SELECT name FROM users WHERE user_id = ?",
+//       [userId]
+//     );
+//     const currentUserName = userResult[0]?.name || '';
+
+//     /* ================= MAIN QUERY ================= */
+//     let query = `
+//       SELECT 
+//         rd.master_id,
+
+//         -- MAIN RAW DATA
+//         IFNULL(rd.name, 'Not Available') AS name,
+//         IFNULL(rd.number, 'Not Available') AS number,
+//         IFNULL(rd.alternate_number, 'Not Available') AS alternate_number,
+//         IFNULL(rd.email, 'Not Available') AS email,
+//         IFNULL(rd.address, 'Not Available') AS address,
+//         IFNULL(rd.city, 'Not Available') AS city,
+//         IFNULL(rd.status, 'Not Available') AS status,
+//         IFNULL(rd.lead_status, 'Not Available') AS lead_status,
+//         IFNULL(rd.lead_stage, 'Not Available') AS lead_stage,
+//         IFNULL(rd.current_stage, 'Not Available') AS current_stage,
+//         IFNULL(rd.created_by_user, 'Not Available') AS created_by_user,
+//         IFNULL(rd.assign_id, 'Not Available') AS assign_id,
+//         IFNULL(rd.followup_date, 'Not Available') AS followup_date,
+
+//         -- IDS
+//         IFNULL(rd.cat_id, 'Not Available') AS cat_id,
+//         IFNULL(rd.reference_id, 'Not Available') AS reference_id,
+//         IFNULL(rd.area_id, 'Not Available') AS area_id,
+
+//         -- DIMENSIONS
+//         IFNULL(rd.room_length, 'Not Available') AS room_length,
+//         IFNULL(rd.room_width, 'Not Available') AS room_width,
+//         IFNULL(rd.room_height, 'Not Available') AS room_height,
+
+//         -- EXTRA DETAILS
+//         IFNULL(rd.location_link, 'Not Available') AS location_link,
+//         IFNULL(rd.p_type, 'Not Available') AS p_type,
+//         IFNULL(rd.budget_range, 'Not Available') AS budget_range,
+//         IFNULL(rd.time_to_complete, 'Not Available') AS time_to_complete,
+//         IFNULL(rd.site_visit_date, 'Not Available') AS site_visit_date,
+//         IFNULL(rd.demo_date, 'Not Available') AS demo_date,
+
+//         -- ACTIVITY
+//         IFNULL(rd.lead_activity, 0) AS lead_activity,
+
+//         -- NUMBERS
+//         IFNULL(rd.ar_number, 'Not Available') AS ar_number,
+//         IFNULL(rd.architect_name, 'Not Available') AS architect_name,
+//         IFNULL(rd.ca_number, 'Not Available') AS ca_number,
+//         IFNULL(rd.e_number, 'Not Available') AS e_number,
+//         IFNULL(rd.sm_number, 'Not Available') AS sm_number,
+//         IFNULL(rd.pop_number, 'Not Available') AS pop_number,
+//         IFNULL(rd.other_number, 'Not Available') AS other_number,
+
+//         -- REMARKS
+//         IFNULL(rd.quick_remark, 'Not Available') AS quick_remark,
+//         IFNULL(rd.detailed_remark, 'Not Available') AS detailed_remark,
+
+//         -- AREA / CATEGORY / REFERENCE
+//         IFNULL(a.area_name, 'Not Available') AS area_name,
+//         IFNULL(c.cat_name, 'Not Available') AS cat_name,
+//         IFNULL(ref.reference_name, 'Not Available') AS reference_name,
+
+//         -- ASSIGN DATE
+//         IFNULL(DATE(asg.assign_date), 'Not Available') AS assign_date,
+
+//         -- LATEST REASSIGNMENT
+//         lr.id AS reassignment_id,
+//         lr.reassignment_date,
+//         lr.assignedTo AS reassigned_to,
+//         lr.remark AS reassignment_remark,
+//         lr.leadStage AS reassignment_lead_stage,
+
+//         -- USER
+//         IFNULL(u.name, 'Not Available') AS telecaller_name,
+//         u.user_id AS assigned_to_user_id,
+
+//         -- CALL / PRODUCT
+//         MAX(tct.tc_remark) AS call_remark,
+//         MAX(tct.tc_call_duration) AS call_duration,
+//         GROUP_CONCAT(p.product_name) AS products,
+
+//         -- ✅ NEW: DOCUMENT LOCATION LINK
+//         MAX(d.location_link) AS document_location_link
+
+//       FROM raw_data rd
+
+//       LEFT JOIN area a ON rd.area_id = a.area_id
+//       LEFT JOIN category c ON rd.cat_id = c.cat_id
+//       LEFT JOIN reference ref ON rd.reference_id = ref.reference_id
+//       LEFT JOIN assignments asg ON rd.assign_id = asg.assign_id
+
+//       LEFT JOIN (
+//         SELECT r1.*, ROW_NUMBER() OVER (PARTITION BY master_id ORDER BY id DESC) rn
+//         FROM reassignment r1
+//       ) lr ON rd.master_id = lr.master_id AND lr.rn = 1
+
+//       LEFT JOIN users u ON lr.assignedTo = u.name
+//       LEFT JOIN tele_caller_table tct ON rd.master_id = tct.master_id
+//       LEFT JOIN product_mapping pm ON rd.master_id = pm.master_id
+//       LEFT JOIN product p ON p.product_id = pm.product_id
+
+//       -- ✅ NEW: DOCUMENTS JOIN
+//       LEFT JOIN documents d ON d.master_id = rd.master_id
+
+//       WHERE rd.followup_date < ?
+//     `;
+
+//     const params = [today];
+
+//     /* ================= ROLE FILTER ================= */
+//     if (isTelecallerLike(role)) {
+//       query += ` AND lr.assignedTo = ?`;
+//       params.push(currentUserName);
+//     } else if (isAdminLike(role)) {
+//       // no filter
+//     } else if (!isManagementLike(role)) {
+//       query += ` AND lr.assignedTo = ?`;
+//       params.push(currentUserName);
+//     }
+
+//     query += ` GROUP BY rd.master_id ORDER BY rd.followup_date ASC`;
+
+//     const [rows] = await db.query(query, params);
+
+//     /* ================= OTHER INPUTS ================= */
+//     const masterIds = rows.map(r => r.master_id);
+//     let otherInputsRows = [];
+
+//     if (masterIds.length) {
+//       const [otherInputs] = await db.query(
+//         `SELECT master_id, cat_id, reference_id, input_text
+//          FROM raw_data_other_inputs
+//          WHERE master_id IN (?)
+//          ORDER BY created_at DESC`,
+//         [masterIds]
+//       );
+//       otherInputsRows = otherInputs;
+//     }
+
+//     /* ================= REASSIGNMENT HISTORY ================= */
+//     let reassignmentRows = [];
+//     if (masterIds.length) {
+//       const [reassignments] = await db.query(
+//         `SELECT rm.*, u.name, u.role
+//          FROM reassignment rm
+//          LEFT JOIN users u ON u.user_id = rm.created_by_user
+//          WHERE rm.master_id IN (?)
+//          ORDER BY rm.reassignment_date DESC, rm.created_at DESC`,
+//         [masterIds]
+//       );
+//       reassignmentRows = reassignments;
+//     }
+
+//     /* ================= FINAL MAP ================= */
+//     const formattedRows = rows.map(row => {
+//       const rowCatId = parseInt(row.cat_id);
+//       const rowRefId = parseInt(row.reference_id);
+
+//       const categoryOther =
+//         otherInputsRows.find(
+//           oi => oi.master_id === row.master_id && oi.cat_id === rowCatId
+//         )?.input_text || '';
+
+//       const referenceOther =
+//         otherInputsRows.find(
+//           oi => oi.master_id === row.master_id && oi.reference_id === rowRefId
+//         )?.input_text || '';
+
+//       const reassignments = reassignmentRows
+//         .filter(r => r.master_id === row.master_id)
+//         .map(r => ({
+//           remark: r.remark || '',
+//           assignedTo: r.assignedTo || '',
+//           leadStage: r.leadStage || '',
+//           created_by_user: r.created_by_user || '',
+//           created_at: r.created_at
+//             ? new Date(r.created_at).toLocaleString('en-GB')
+//             : '',
+//           reassignment_date: r.reassignment_date
+//             ? new Date(r.reassignment_date).toLocaleString('en-GB')
+//             : '',
+//           name: r.name || '',
+//           role: r.role || ''
+//         }));
+
+//       return {
+//         ...row,
+//         category_other: categoryOther,
+//         reference_other: referenceOther,
+//         reassignment_remarks: reassignments,
+//         latest_assignedTo: reassignments[0]?.assignedTo || '',
+//         latest_leadStage: reassignments[0]?.leadStage || '',
+//         assign_date: row.assign_date
+//       };
+//     });
+
+//     return res.status(200).json({
+//       success: true,
+//       total: formattedRows.length,
+//       missedLeads: formattedRows
+//     });
+
+//   } catch (error) {
+//     console.error("❌ Error in getMissedAssignedFullData:", error);
+//     res.status(500).json({ message: "Failed to fetch missed follow-up data" });
+//   }
+// };
+
+
 export const getMissedAssignedFullData = async (req, res) => {
   try {
     if (!req.session.user) {
@@ -4590,7 +4925,7 @@ export const getMissedAssignedFullData = async (req, res) => {
         MAX(tct.tc_call_duration) AS call_duration,
         GROUP_CONCAT(p.product_name) AS products,
 
-        -- ✅ NEW: DOCUMENT LOCATION LINK
+        -- DOCUMENT LOCATION
         MAX(d.location_link) AS document_location_link
 
       FROM raw_data rd
@@ -4609,11 +4944,10 @@ export const getMissedAssignedFullData = async (req, res) => {
       LEFT JOIN tele_caller_table tct ON rd.master_id = tct.master_id
       LEFT JOIN product_mapping pm ON rd.master_id = pm.master_id
       LEFT JOIN product p ON p.product_id = pm.product_id
-
-      -- ✅ NEW: DOCUMENTS JOIN
       LEFT JOIN documents d ON d.master_id = rd.master_id
 
       WHERE rd.followup_date < ?
+      AND rd.lead_stage NOT IN ('Drop','Closed Deal')
     `;
 
     const params = [today];
@@ -4719,6 +5053,220 @@ export const getMissedAssignedFullData = async (req, res) => {
 
 
 
+// export const getTodaysAssignedLeadsFullData = async (req, res) => {
+//   try {
+//     if (!req.session.user) {
+//       return res.status(401).json({ message: "Unauthorized: No session" });
+//     }
+
+//     const { id: userId, role } = req.session.user;
+
+//     /* ================= CURRENT USER ================= */
+//     const [userResult] = await db.query(
+//       "SELECT name FROM users WHERE user_id = ?",
+//       [userId]
+//     );
+//     const currentUserName = userResult[0]?.name || '';
+
+//     /* ================= MAIN QUERY ================= */
+//     let query = `
+//       SELECT 
+//         rd.master_id,
+
+//         -- MAIN RAW DATA
+//         IFNULL(rd.name, 'Not Available') AS name,
+//         IFNULL(rd.number, 'Not Available') AS number,
+//         IFNULL(rd.alternate_number, 'Not Available') AS alternate_number,
+//         IFNULL(rd.email, 'Not Available') AS email,
+//         IFNULL(rd.address, 'Not Available') AS address,
+//         IFNULL(rd.city, 'Not Available') AS city,
+//         IFNULL(rd.status, 'Not Available') AS status,
+//         IFNULL(rd.lead_status, 'Not Available') AS lead_status,
+//         IFNULL(rd.lead_stage, 'Not Available') AS lead_stage,
+//         IFNULL(rd.current_stage, 'Not Available') AS current_stage,
+//         IFNULL(rd.created_by_user, 'Not Available') AS created_by_user,
+//         IFNULL(rd.assign_id, 'Not Available') AS assign_id,
+//         IFNULL(rd.followup_date, 'Not Available') AS followup_date,
+
+//         -- IDS
+//         IFNULL(rd.cat_id, 'Not Available') AS cat_id,
+//         IFNULL(rd.reference_id, 'Not Available') AS reference_id,
+//         IFNULL(rd.area_id, 'Not Available') AS area_id,
+
+//         -- DIMENSIONS
+//         IFNULL(rd.room_length, 'Not Available') AS room_length,
+//         IFNULL(rd.room_width, 'Not Available') AS room_width,
+//         IFNULL(rd.room_height, 'Not Available') AS room_height,
+
+//         -- EXTRA DETAILS
+//         IFNULL(rd.location_link, 'Not Available') AS location_link,
+//         IFNULL(rd.p_type, 'Not Available') AS p_type,
+//         IFNULL(rd.budget_range, 'Not Available') AS budget_range,
+//         IFNULL(rd.time_to_complete, 'Not Available') AS time_to_complete,
+//         IFNULL(rd.site_visit_date, 'Not Available') AS site_visit_date,
+//         IFNULL(rd.demo_date, 'Not Available') AS demo_date,
+
+//         -- ACTIVITY
+//         IFNULL(rd.lead_activity, 0) AS lead_activity, 
+
+//         -- NUMBERS
+//         IFNULL(rd.ar_number, 'Not Available') AS ar_number,
+//         IFNULL(rd.architect_name, 'Not Available') AS architect_name,
+//         IFNULL(rd.ca_number, 'Not Available') AS ca_number,
+//         IFNULL(rd.e_number, 'Not Available') AS e_number,
+//         IFNULL(rd.sm_number, 'Not Available') AS sm_number,
+//         IFNULL(rd.pop_number, 'Not Available') AS pop_number,
+//         IFNULL(rd.other_number, 'Not Available') AS other_number,
+
+//         -- REMARKS
+//         IFNULL(rd.quick_remark, 'Not Available') AS quick_remark,
+//         IFNULL(rd.detailed_remark, 'Not Available') AS detailed_remark,
+
+//         -- AREA / CATEGORY / REFERENCE
+//         IFNULL(a.area_name, 'Not Available') AS area_name,
+//         IFNULL(c.cat_name, 'Not Available') AS cat_name,
+//         IFNULL(ref.reference_name, 'Not Available') AS reference_name,
+
+//         -- ASSIGN DATE
+//         IFNULL(DATE(asg.assign_date), 'Not Available') AS assign_date,
+
+//         -- LATEST REASSIGNMENT
+//         lr.id AS reassignment_id,
+//         lr.reassignment_date,
+//         lr.assignedTo AS reassigned_to,
+//         lr.remark AS reassignment_remark,
+//         lr.leadStage AS reassignment_lead_stage,
+
+//         -- USER
+//         IFNULL(u.name, 'Not Available') AS telecaller_name,
+//         u.user_id AS assigned_to_user_id,
+
+//         -- ✅ NEW: DOCUMENT LOCATION LINK
+//         MAX(d.location_link) AS document_location_link
+
+//       FROM raw_data rd
+//       LEFT JOIN area a ON rd.area_id = a.area_id
+//       LEFT JOIN category c ON rd.cat_id = c.cat_id
+//       LEFT JOIN reference ref ON rd.reference_id = ref.reference_id
+//       LEFT JOIN assignments asg ON rd.assign_id = asg.assign_id
+
+//       -- LATEST REASSIGNMENT
+//       LEFT JOIN (
+//         SELECT r1.*, ROW_NUMBER() OVER (PARTITION BY master_id ORDER BY id DESC) rn
+//         FROM reassignment r1
+//       ) lr ON rd.master_id = lr.master_id AND lr.rn = 1
+
+//       LEFT JOIN users u ON lr.assignedTo = u.name
+
+//       -- ✅ NEW: DOCUMENTS JOIN
+//       LEFT JOIN documents d ON d.master_id = rd.master_id
+//     `;
+
+//     const params = [];
+
+//     /* ================= TODAY CONDITION ================= */
+//     query += `
+//       WHERE (
+//         rd.followup_date = CURDATE()
+//         OR DATE(lr.reassignment_date) = CURDATE()
+//       )
+//     `;
+
+//     /* ================= ROLE FILTER ================= */
+//     if (isTelecallerLike(role)) {
+//       query += ` AND lr.assignedTo = ?`;
+//       params.push(currentUserName);
+//     } else if (isAdminLike(role)) {
+//       query += ` AND rd.status IN ('Assigned', 'Not Interested')`;
+//     } else if (!isManagementLike(role)) {
+//       query += ` AND lr.assignedTo = ?`;
+//       params.push(currentUserName);
+//     }
+
+//     query += ` GROUP BY rd.master_id ORDER BY rd.followup_date ASC`;
+
+//     const [rows] = await db.query(query, params);
+
+//     if (!rows.length) {
+//       return res.status(200).json({ success: true, total: 0, leads: [] });
+//     }
+
+//     /* ================= MASTER IDS ================= */
+//     const masterIds = rows.map(r => r.master_id);
+
+//     /* ================= OTHER INPUTS ================= */
+//     const [otherInputs] = await db.query(
+//       `SELECT master_id, cat_id, reference_id, input_text
+//        FROM raw_data_other_inputs
+//        WHERE master_id IN (?)
+//        ORDER BY created_at DESC`,
+//       [masterIds]
+//     );
+
+//     /* ================= REASSIGNMENT HISTORY ================= */
+//     const [reassignments] = await db.query(
+//       `SELECT rm.*, u.name, u.role
+//        FROM reassignment rm
+//        LEFT JOIN users u ON u.user_id = rm.created_by_user
+//        WHERE rm.master_id IN (?)
+//        ORDER BY rm.reassignment_date DESC, rm.created_at DESC`,
+//       [masterIds]
+//     );
+
+//     /* ================= FINAL MAP ================= */
+//     const finalResult = rows.map(row => {
+//       const rowCatId = parseInt(row.cat_id);
+//       const rowRefId = parseInt(row.reference_id);
+
+//       const category_other =
+//         otherInputs.find(
+//           oi => oi.master_id === row.master_id && oi.cat_id === rowCatId
+//         )?.input_text || '';
+
+//       const reference_other =
+//         otherInputs.find(
+//           oi => oi.master_id === row.master_id && oi.reference_id === rowRefId
+//         )?.input_text || '';
+
+//       const reassignment_remarks = reassignments
+//         .filter(r => r.master_id === row.master_id)
+//         .map(r => ({
+//           remark: r.remark || '',
+//           assignedTo: r.assignedTo || '',
+//           leadStage: r.leadStage || '',
+//           created_at: r.created_at
+//             ? new Date(r.created_at).toLocaleString('en-GB')
+//             : '',
+//           reassignment_date: r.reassignment_date
+//             ? new Date(r.reassignment_date).toLocaleString('en-GB')
+//             : '',
+//           name: r.name || '',
+//           role: r.role || ''
+//         }));
+
+//       return {
+//         ...row,
+//         category_other,
+//         reference_other,
+//         reassignment_remarks,
+//         latest_assignedTo: reassignment_remarks[0]?.assignedTo || '',
+//         latest_leadStage: reassignment_remarks[0]?.leadStage || ''
+//       };
+//     });
+
+//     return res.status(200).json({
+//       success: true,
+//       total: finalResult.length,
+//       leads: finalResult
+//     });
+
+//   } catch (error) {
+//     console.error("❌ Error in getTodaysAssignedLeadsFullData:", error);
+//     res.status(500).json({ message: "Failed to fetch today's leads" });
+//   }
+// };
+
+
 export const getTodaysAssignedLeadsFullData = async (req, res) => {
   try {
     if (!req.session.user) {
@@ -4807,7 +5355,7 @@ export const getTodaysAssignedLeadsFullData = async (req, res) => {
         IFNULL(u.name, 'Not Available') AS telecaller_name,
         u.user_id AS assigned_to_user_id,
 
-        -- ✅ NEW: DOCUMENT LOCATION LINK
+        -- DOCUMENT LOCATION
         MAX(d.location_link) AS document_location_link
 
       FROM raw_data rd
@@ -4816,15 +5364,12 @@ export const getTodaysAssignedLeadsFullData = async (req, res) => {
       LEFT JOIN reference ref ON rd.reference_id = ref.reference_id
       LEFT JOIN assignments asg ON rd.assign_id = asg.assign_id
 
-      -- LATEST REASSIGNMENT
       LEFT JOIN (
         SELECT r1.*, ROW_NUMBER() OVER (PARTITION BY master_id ORDER BY id DESC) rn
         FROM reassignment r1
       ) lr ON rd.master_id = lr.master_id AND lr.rn = 1
 
       LEFT JOIN users u ON lr.assignedTo = u.name
-
-      -- ✅ NEW: DOCUMENTS JOIN
       LEFT JOIN documents d ON d.master_id = rd.master_id
     `;
 
@@ -4836,6 +5381,7 @@ export const getTodaysAssignedLeadsFullData = async (req, res) => {
         rd.followup_date = CURDATE()
         OR DATE(lr.reassignment_date) = CURDATE()
       )
+      AND rd.lead_stage NOT IN ('Drop','Closed Deal')
     `;
 
     /* ================= ROLE FILTER ================= */
@@ -4933,7 +5479,219 @@ export const getTodaysAssignedLeadsFullData = async (req, res) => {
 };
 
 
+// export const getUpcomingAssignedFullData = async (req, res) => {
+//   try {
+//     if (!req.session.user) {
+//       return res.status(401).json({ message: "Unauthorized: No session" });
+//     }
 
+//     const { id: userId, role } = req.session.user;
+
+//     /* ================= CURRENT USER ================= */
+//     const [userResult] = await db.query(
+//       "SELECT name FROM users WHERE user_id = ?",
+//       [userId]
+//     );
+//     const currentUserName = userResult[0]?.name || '';
+
+//     /* ================= MAIN QUERY ================= */
+//     let query = `
+//       SELECT 
+//         rd.master_id,
+
+//         -- MAIN RAW DATA
+//         IFNULL(rd.name, 'Not Available') AS name,
+//         IFNULL(rd.number, 'Not Available') AS number,
+//         IFNULL(rd.alternate_number, 'Not Available') AS alternate_number,
+//         IFNULL(rd.email, 'Not Available') AS email,
+//         IFNULL(rd.address, 'Not Available') AS address,
+//         IFNULL(rd.city, 'Not Available') AS city,
+//         IFNULL(rd.status, 'Not Available') AS status,
+//         IFNULL(rd.lead_status, 'Not Available') AS lead_status,
+//         IFNULL(rd.lead_stage, 'Not Available') AS lead_stage,
+//         IFNULL(rd.current_stage, 'Not Available') AS current_stage,
+//         IFNULL(rd.created_by_user, 'Not Available') AS created_by_user,
+//         IFNULL(rd.assign_id, 'Not Available') AS assign_id,
+//         IFNULL(rd.followup_date, 'Not Available') AS followup_date,
+
+//         -- IDS
+//         IFNULL(rd.cat_id, 'Not Available') AS cat_id,
+//         IFNULL(rd.reference_id, 'Not Available') AS reference_id,
+//         IFNULL(rd.area_id, 'Not Available') AS area_id,
+
+//         -- DIMENSIONS
+//         IFNULL(rd.room_length, 'Not Available') AS room_length,
+//         IFNULL(rd.room_width, 'Not Available') AS room_width,
+//         IFNULL(rd.room_height, 'Not Available') AS room_height,
+
+//         -- EXTRA DETAILS
+//         IFNULL(rd.location_link, 'Not Available') AS location_link,
+//         IFNULL(rd.p_type, 'Not Available') AS p_type,
+//         IFNULL(rd.budget_range, 'Not Available') AS budget_range,
+//         IFNULL(rd.time_to_complete, 'Not Available') AS time_to_complete,
+//         IFNULL(rd.site_visit_date, 'Not Available') AS site_visit_date,
+//         IFNULL(rd.demo_date, 'Not Available') AS demo_date,
+
+//         -- ACTIVITY
+//         IFNULL(rd.lead_activity, 0) AS lead_activity,
+
+//         -- NUMBERS
+//         IFNULL(rd.ar_number, 'Not Available') AS ar_number,
+//         IFNULL(rd.architect_name, 'Not Available') AS architect_name,
+//         IFNULL(rd.ca_number, 'Not Available') AS ca_number,
+//         IFNULL(rd.e_number, 'Not Available') AS e_number,
+//         IFNULL(rd.sm_number, 'Not Available') AS sm_number,
+//         IFNULL(rd.pop_number, 'Not Available') AS pop_number,
+//         IFNULL(rd.other_number, 'Not Available') AS other_number,
+
+//         -- REMARKS
+//         IFNULL(rd.quick_remark, 'Not Available') AS quick_remark,
+//         IFNULL(rd.detailed_remark, 'Not Available') AS detailed_remark,
+
+//         -- AREA / CATEGORY / REFERENCE
+//         IFNULL(a.area_name, 'Not Available') AS area_name,
+//         IFNULL(c.cat_name, 'Not Available') AS cat_name,
+//         IFNULL(ref.reference_name, 'Not Available') AS reference_name,
+
+//         -- ASSIGN DATE
+//         IFNULL(DATE(asg.assign_date), 'Not Available') AS assign_date,
+
+//         -- LATEST REASSIGNMENT
+//         lr.id AS reassignment_id,
+//         lr.reassignment_date,
+//         lr.assignedTo AS reassigned_to,
+//         lr.remark AS reassignment_remark,
+//         lr.leadStage AS reassignment_lead_stage,
+
+//         -- USER
+//         IFNULL(u.name, 'Not Available') AS telecaller_name,
+//         u.user_id AS assigned_to_user_id,
+
+//         -- ✅ NEW: DOCUMENT LOCATION LINK
+//         MAX(d.location_link) AS document_location_link
+
+//       FROM raw_data rd
+
+//       LEFT JOIN area a ON rd.area_id = a.area_id
+//       LEFT JOIN category c ON rd.cat_id = c.cat_id
+//       LEFT JOIN reference ref ON rd.reference_id = ref.reference_id
+//       LEFT JOIN assignments asg ON rd.assign_id = asg.assign_id
+
+//       -- LATEST REASSIGNMENT
+//       LEFT JOIN (
+//         SELECT r1.*, ROW_NUMBER() OVER (PARTITION BY master_id ORDER BY id DESC) rn
+//         FROM reassignment r1
+//       ) lr ON rd.master_id = lr.master_id AND lr.rn = 1
+
+//       LEFT JOIN users u ON lr.assignedTo = u.name
+
+//       -- ✅ NEW: DOCUMENTS JOIN
+//       LEFT JOIN documents d ON d.master_id = rd.master_id
+//     `;
+
+//     const params = [];
+
+//     /* ================= UPCOMING CONDITION ================= */
+//     query += `
+//       WHERE (
+//         rd.followup_date > CURDATE()
+//         OR DATE(lr.reassignment_date) > CURDATE()
+//       )
+//     `;
+
+//     /* ================= ROLE FILTER ================= */
+//     if (isTelecallerLike(role)) {
+//       query += ` AND lr.assignedTo = ?`;
+//       params.push(currentUserName);
+//     } else if (isAdminLike(role)) {
+//       query += ` AND rd.status IN ('Assigned', 'Not Interested')`;
+//     } else if (!isManagementLike(role)) {
+//       query += ` AND lr.assignedTo = ?`;
+//       params.push(currentUserName);
+//     }
+
+//     query += ` GROUP BY rd.master_id ORDER BY rd.followup_date ASC`;
+
+//     const [rows] = await db.query(query, params);
+
+//     if (!rows.length) {
+//       return res.status(200).json({ success: true, total: 0, upcomingLeads: [] });
+//     }
+
+//     /* ================= MASTER IDS ================= */
+//     const masterIds = rows.map(r => r.master_id);
+
+//     /* ================= OTHER INPUTS ================= */
+//     const [otherInputs] = await db.query(
+//       `SELECT master_id, cat_id, reference_id, input_text
+//        FROM raw_data_other_inputs
+//        WHERE master_id IN (?)
+//        ORDER BY created_at DESC`,
+//       [masterIds]
+//     );
+
+//     /* ================= REASSIGNMENT HISTORY ================= */
+//     const [reassignments] = await db.query(
+//       `SELECT rm.*, u.name, u.role
+//        FROM reassignment rm
+//        LEFT JOIN users u ON u.user_id = rm.created_by_user
+//        WHERE rm.master_id IN (?)
+//        ORDER BY rm.reassignment_date DESC, rm.created_at DESC`,
+//       [masterIds]
+//     );
+
+//     /* ================= FINAL MAP ================= */
+//     const finalResult = rows.map(row => {
+//       const rowCatId = parseInt(row.cat_id);
+//       const rowRefId = parseInt(row.reference_id);
+
+//       const category_other =
+//         otherInputs.find(
+//           oi => oi.master_id === row.master_id && oi.cat_id === rowCatId
+//         )?.input_text || '';
+
+//       const reference_other =
+//         otherInputs.find(
+//           oi => oi.master_id === row.master_id && oi.reference_id === rowRefId
+//         )?.input_text || '';
+
+//       const reassignment_remarks = reassignments
+//         .filter(r => r.master_id === row.master_id)
+//         .map(r => ({
+//           remark: r.remark || '',
+//           assignedTo: r.assignedTo || '',
+//           leadStage: r.leadStage || '',
+//           created_at: r.created_at
+//             ? new Date(r.created_at).toLocaleString('en-GB')
+//             : '',
+//           reassignment_date: r.reassignment_date
+//             ? new Date(r.reassignment_date).toLocaleString('en-GB')
+//             : '',
+//           name: r.name || '',
+//           role: r.role || ''
+//         }));
+
+//       return {
+//         ...row,
+//         category_other,
+//         reference_other,
+//         reassignment_remarks,
+//         latest_assignedTo: reassignment_remarks[0]?.assignedTo || '',
+//         latest_leadStage: reassignment_remarks[0]?.leadStage || ''
+//       };
+//     });
+
+//     return res.status(200).json({
+//       success: true,
+//       total: finalResult.length,
+//       upcomingLeads: finalResult
+//     });
+
+//   } catch (error) {
+//     console.error("❌ Error in getUpcomingAssignedFullData:", error);
+//     res.status(500).json({ message: "Failed to fetch upcoming leads" });
+//   }
+// };
 
 
 export const getUpcomingAssignedFullData = async (req, res) => {
@@ -5024,7 +5782,7 @@ export const getUpcomingAssignedFullData = async (req, res) => {
         IFNULL(u.name, 'Not Available') AS telecaller_name,
         u.user_id AS assigned_to_user_id,
 
-        -- ✅ NEW: DOCUMENT LOCATION LINK
+        -- DOCUMENT LOCATION
         MAX(d.location_link) AS document_location_link
 
       FROM raw_data rd
@@ -5034,15 +5792,12 @@ export const getUpcomingAssignedFullData = async (req, res) => {
       LEFT JOIN reference ref ON rd.reference_id = ref.reference_id
       LEFT JOIN assignments asg ON rd.assign_id = asg.assign_id
 
-      -- LATEST REASSIGNMENT
       LEFT JOIN (
         SELECT r1.*, ROW_NUMBER() OVER (PARTITION BY master_id ORDER BY id DESC) rn
         FROM reassignment r1
       ) lr ON rd.master_id = lr.master_id AND lr.rn = 1
 
       LEFT JOIN users u ON lr.assignedTo = u.name
-
-      -- ✅ NEW: DOCUMENTS JOIN
       LEFT JOIN documents d ON d.master_id = rd.master_id
     `;
 
@@ -5054,6 +5809,7 @@ export const getUpcomingAssignedFullData = async (req, res) => {
         rd.followup_date > CURDATE()
         OR DATE(lr.reassignment_date) > CURDATE()
       )
+      AND rd.lead_stage NOT IN ('Drop','Closed Deal')
     `;
 
     /* ================= ROLE FILTER ================= */
@@ -5152,8 +5908,6 @@ export const getUpcomingAssignedFullData = async (req, res) => {
 
 
 
-
-
 export const getEmployeeLeadWorkReport = async (req, res) => {
   try {
     if (!req.session?.user) {
@@ -5249,3 +6003,447 @@ export const getEmployeeLeadWorkReport = async (req, res) => {
 };
 
 
+
+export const getInactiveLeadDetails = async (req, res) => {
+  try {
+    if (!req.session.user) {
+      return res.status(401).json({ message: "Unauthorized: No session" });
+    }
+
+    const { id: userId, role } = req.session.user;
+
+    let query = `
+      SELECT 
+        rd.master_id,
+        rd.name,
+        rd.city,
+        rd.number AS contact,
+
+        -- Assignment
+        asg.assign_date,
+        asg.assigned_to AS assign_user,
+
+        -- Call Status
+        COALESCE(rd.quick_remark, 'Not Available') AS call_status,
+
+        -- Final Telecaller Remark OR Raw Detailed Remark
+        COALESCE(
+            (SELECT tct.tc_remark 
+             FROM tele_caller_table tct 
+             WHERE tct.master_id = rd.master_id 
+             ORDER BY tct.tct_id DESC LIMIT 1),
+             rd.detailed_remark,
+             'Not Available'
+        ) AS remark
+
+      FROM raw_data rd
+      INNER JOIN assignments asg ON rd.assign_id = asg.assign_id
+    `;
+
+    const conditions = [`rd.lead_status = 'Inactive'`];
+    const params = [];
+
+    // Telecaller sees only their assigned leads
+    if (role === "tele_caller") {
+      conditions.push(`asg.assigned_to_user_id = ?`);
+      params.push(userId);
+    }
+
+    if (conditions.length > 0) {
+      query += ` WHERE ` + conditions.join(" AND ");
+    }
+
+    query += ` ORDER BY rd.master_id DESC`;
+
+    const [rows] = await db.query(query, params);
+
+    res.status(200).json(rows);
+
+  } catch (error) {
+    console.error("❌ Error in getInactiveLeadDetails:", error);
+    res.status(500).json({ message: "Failed to fetch data" });
+  }
+};
+
+
+
+export const getEmployeeWiseAssignedLeadCount = async (req, res) => {
+  try {
+    if (!req.session.user) {
+      return res.status(401).json({ message: "Unauthorized" });
+    }
+
+    const { role } = req.session.user;
+
+    if (!isAdminLike(role) && !isManagementLike(role)) {
+      return res.status(403).json({ message: "Access denied" });
+    }
+
+    // 🔹 Latest reassignment per lead
+    const [latestReassignments] = await db.query(`
+      SELECT master_id, MAX(id) AS latest_id
+      FROM reassignment
+      GROUP BY master_id
+    `);
+
+    if (latestReassignments.length === 0) {
+      return res.status(200).json({
+        success: true,
+        totalEmployees: 0,
+        data: []
+      });
+    }
+
+    const latestIds = latestReassignments.map(r => r.latest_id);
+
+    const query = `
+      SELECT 
+        u.name AS employee_name,
+        u.role,
+
+        -- ✅ EXISTING COUNTS (UNCHANGED)
+        COUNT(DISTINCT rd.master_id) AS total_assigned,
+
+        COUNT(DISTINCT CASE 
+          WHEN rd.followup_date = CURDATE()
+            OR DATE(re.reassignment_date) = CURDATE()
+          THEN rd.master_id
+        END) AS today_assigned,
+
+        COUNT(DISTINCT CASE 
+          WHEN rd.followup_date > CURDATE()
+            OR DATE(re.reassignment_date) > CURDATE()
+          THEN rd.master_id
+        END) AS upcoming_assigned,
+
+        COUNT(DISTINCT CASE 
+          WHEN rd.followup_date < CURDATE()
+          THEN rd.master_id
+        END) AS missed_assigned,
+
+        COUNT(DISTINCT CASE 
+          WHEN rd.lead_stage = 'Drop'
+          THEN rd.master_id
+        END) AS drop_count,
+
+        COUNT(DISTINCT CASE 
+          WHEN rd.lead_stage = 'Closed Deal'
+          THEN rd.master_id
+        END) AS closed_count,
+
+        -- 🆕 Lead stage details (MariaDB compatible)
+        CONCAT(
+          '[',
+          GROUP_CONCAT(
+            DISTINCT JSON_OBJECT(
+              'master_id', rd.master_id,
+              'lead_name', rd.name,
+              'current_stage', rd.lead_stage,
+              'stage_history', (
+                SELECT CONCAT(
+                  '[',
+                  GROUP_CONCAT(
+                    JSON_OBJECT(
+                      'stage', rs.leadStage,
+                      'assignedTo', rs.assignedTo,
+                      'remark', rs.remark,
+                      'date', rs.reassignment_date
+                    )
+                    ORDER BY rs.id
+                  ),
+                  ']'
+                )
+                FROM reassignment rs
+                WHERE rs.master_id = rd.master_id
+              )
+            )
+          ),
+          ']'
+        ) AS lead_details
+
+      FROM reassignment re
+      INNER JOIN raw_data rd ON rd.master_id = re.master_id
+      INNER JOIN users u ON u.name = re.assignedTo
+      WHERE re.id IN (?)
+      GROUP BY u.name, u.role
+      ORDER BY total_assigned DESC
+    `;
+
+    const [rows] = await db.query(query, [latestIds]);
+
+    res.status(200).json({
+      success: true,
+      totalEmployees: rows.length,
+      data: rows
+    });
+
+  } catch (error) {
+    console.error("❌ Employee-wise lead count error:", error);
+    res.status(500).json({
+      message: "Failed to fetch employee-wise assigned lead counts"
+    });
+  }
+};
+
+
+
+
+
+
+
+// export const addReassignment = async (req, res) => {
+//   try {
+//     console.log("📥 Incoming Request Body:", req.body);
+
+//     const { master_id, assignedTo, leadStage, remark, assign_id, reassignment_date } = req.body;
+
+//     if (!master_id || !assignedTo || !leadStage || !assign_id) {
+//       return res.status(400).json({ message: "Missing required fields" });
+//     }
+
+//     const assignedToArray = Array.isArray(assignedTo) ? assignedTo : [assignedTo];
+
+//     // ⭐ CLEAN NAME: remove role written inside parentheses
+//     const cleanName = (str) => str.replace(/\s*\(.*?\)\s*/g, "").trim();
+
+//     // ⭐ Convert input date → MySQL DATETIME (YYYY-MM-DD HH:mm:ss)
+//     const toMySQLDateTime = (date) => {
+//       const d = new Date(date);
+//       if (isNaN(d.getTime())) return null;
+//       const pad = (n) => (n < 10 ? "0" + n : n);
+//       return (
+//         d.getFullYear() +
+//         "-" +
+//         pad(d.getMonth() + 1) +
+//         "-" +
+//         pad(d.getDate()) +
+//         " " +
+//         pad(d.getHours()) +
+//         ":" +
+//         pad(d.getMinutes()) +
+//         ":" +
+//         pad(d.getSeconds())
+//       );
+//     };
+
+//     // ⭐ Use reassignment date or today
+//     const formattedDate =
+//       toMySQLDateTime(reassignment_date) || toMySQLDateTime(new Date());
+
+//     console.log("📅 Using Datetime for BOTH tables:", formattedDate);
+
+//     // -----------------------------------------------------
+//     // 1️⃣ UPDATE raw_data.followup_date + lead_stage
+//     // -----------------------------------------------------
+//     await db.query(
+//       `UPDATE raw_data 
+//        SET lead_stage = ?, followup_date = ?
+//        WHERE master_id = ?`,
+//       [leadStage, formattedDate, master_id]
+//     );
+//     console.log("🔄 raw_data lead_stage & followup_date updated →", leadStage, formattedDate);
+
+//     // -----------------------------------------------------
+//     // 2️⃣ PROCESS MULTIPLE ASSIGNEES
+//     // -----------------------------------------------------
+//     const insertPromises = assignedToArray.map(async (assignee) => {
+//       const finalName = cleanName(assignee);
+
+//       // -----------------------------------------------------
+//       // 3️⃣ CHECK DUPLICATE
+//       // -----------------------------------------------------
+//       const [duplicate] = await db.query(
+//         `SELECT id 
+//          FROM reassignment
+//          WHERE master_id = ? AND assignedTo = ? AND leadStage = ?`,
+//         [master_id, finalName, leadStage]
+//       );
+
+//       if (duplicate.length > 0) {
+//         console.log("⚠ Duplicate found, skipping insert:", finalName);
+//         return { skipped: true, finalName, message: `Duplicate: Lead already assigned to ${finalName}` };
+//       }
+
+//       // -----------------------------------------------------
+//       // 4️⃣ INSERT INTO REASSIGNMENT TABLE
+//       // -----------------------------------------------------
+//       const [insertRes] = await db.query(
+//         `INSERT INTO reassignment 
+//           (assign_id, master_id, assignedTo, leadStage, remark, reassignment_date, created_at)
+//          VALUES (?, ?, ?, ?, ?, ?, NOW())`,
+//         [
+//           assign_id,
+//           master_id,
+//           finalName,
+//           leadStage,
+//           remark || "",
+//           formattedDate, // ✅ Same as raw_data.followup_date
+//         ]
+//       );
+
+//       console.log("✅ Inserted reassignment:", finalName, formattedDate);
+//       return { skipped: false, finalName, insertId: insertRes.insertId };
+//     });
+
+//     const results = await Promise.all(insertPromises);
+
+//     res.status(200).json({
+//       success: true,
+//       message: "Reassignment processed",
+//       updated_lead_stage: leadStage,
+//       inserted: results.filter(r => !r.skipped),
+//       skipped: results.filter(r => r.skipped),
+//       total_inserted: results.filter(r => !r.skipped).length,
+//       total_skipped: results.filter(r => r.skipped).length,
+//       followup_date_used: formattedDate,
+//     });
+
+//   } catch (error) {
+//     console.error("❌ addReassignment Error:", error);
+//     res.status(500).json({
+//       success: false,
+//       message: "Failed to save reassignment",
+//       error: error.message,
+//     });
+//   }
+// };
+
+
+
+
+
+
+// New bulk assignment endpoint
+
+
+
+
+
+// 📜 FETCH REASSIGNMENT HISTORY
+
+
+
+
+export const getQuotationPendingLeads = async (req, res) => {
+  try {
+    const query = `
+      SELECT 
+        rd.master_id,
+        IFNULL(rd.name, 'Not Available') AS name,
+        IFNULL(rd.number, 'Not Available') AS number,
+        IFNULL(rd.email, 'Not Available') AS email,
+        IFNULL(rd.address, 'Not Available') AS address,
+        IFNULL(rd.city, 'Not Available') AS city,
+        IFNULL(rd.status, 'Not Available') AS status,
+        IFNULL(rd.lead_status, 'Not Available') AS lead_status,
+        IFNULL(rd.lead_stage, 'Not Available') AS lead_stage,  
+        IFNULL(rd.current_stage, 'Not Available') AS current_stage,
+        IFNULL(rd.created_by_user, 'Not Available') AS created_by_user,
+        IFNULL(rd.assign_id, 'Not Available') AS assign_id,
+        IFNULL(rd.followup_date, 'Not Available') AS followup_date,
+        IFNULL(rd.cat_id, 'Not Available') AS cat_id,
+        IFNULL(rd.reference_id, 'Not Available') AS reference_id,
+        IFNULL(rd.area_id, 'Not Available') AS area_id,
+        IFNULL(rd.room_length, 'Not Available') AS room_length,
+        IFNULL(rd.room_width, 'Not Available') AS room_width,
+        IFNULL(rd.room_height, 'Not Available') AS room_height,
+        IFNULL(rd.location_link, 'Not Available') AS location_link,
+        IFNULL(rd.p_type, 'Not Available') AS p_type,
+        IFNULL(rd.budget_range, 'Not Available') AS budget_range,
+
+        -- ❌ rd.room_ready does NOT exist in DB
+        -- ✅ safe fallback (no DB change)
+        'Not Available' AS room_ready,
+
+        IFNULL(rd.time_to_complete, 'Not Available') AS time_to_complete,
+        IFNULL(rd.site_visit_date, 'Not Available') AS site_visit_date,
+        IFNULL(rd.demo_date, 'Not Available') AS demo_date,
+        IFNULL(rd.lead_activity, 0) AS lead_activity,
+        IFNULL(rd.ar_number, 'Not Available') AS ar_number,
+        IFNULL(rd.ca_number, 'Not Available') AS ca_number,
+        IFNULL(rd.e_number, 'Not Available') AS e_number,
+        IFNULL(rd.sm_number, 'Not Available') AS sm_number,
+        IFNULL(rd.pop_number, 'Not Available') AS pop_number,
+        IFNULL(rd.other_number, 'Not Available') AS other_number,
+        IFNULL(rd.quick_remark, 'Not Available') AS quick_remark,
+        IFNULL(rd.detailed_remark, 'Not Available') AS detailed_remark,
+
+        IFNULL(a.area_name, 'Not Available') AS area_name,
+        IFNULL(c.cat_name, 'Not Available') AS cat_name,
+        IFNULL(r.reference_name, 'Not Available') AS reference_name,
+
+        IFNULL(asg.assign_date, 'Not Available') AS assign_date,
+        IFNULL(asg.target_date, 'Not Available') AS target_date,
+        IFNULL(asg.mode, 'Not Available') AS mode,
+        IFNULL(asg.remark, 'Not Available') AS assignment_remark,
+        IFNULL(asg.assigned_to, 'Not Available') AS assigned_to,
+        IFNULL(asg.assigned_to_user_id, 'Not Available') AS assigned_to_user_id,
+        IFNULL(asg.assign_type, 'Not Available') AS assign_type,
+
+        CASE WHEN q.qt_id IS NOT NULL THEN 1 ELSE 0 END AS created_flag
+
+      FROM raw_data rd
+      LEFT JOIN area a ON rd.area_id = a.area_id
+      LEFT JOIN category c ON rd.cat_id = c.cat_id
+      LEFT JOIN reference r ON rd.reference_id = r.reference_id
+      LEFT JOIN assignments asg ON rd.assign_id = asg.assign_id
+      LEFT JOIN quotation q ON rd.master_id = q.master_id
+      WHERE rd.lead_stage = 'Quotation Pending'
+      ORDER BY rd.master_id DESC
+    `;
+
+    const [rows] = await db.query(query);
+
+    const masterIds = rows.map(r => r.master_id);
+    let reassignmentRows = [];
+
+    if (masterIds.length > 0) {
+      const [reassignments] = await db.query(
+        `
+        SELECT 
+          rm.*, 
+          u.name, 
+          u.role
+        FROM reassignment rm
+        LEFT JOIN users u ON u.user_id = rm.created_by_user
+        WHERE rm.master_id IN (?)
+        ORDER BY rm.reassignment_date DESC, rm.created_at DESC
+        `,
+        [masterIds]
+      );
+      reassignmentRows = reassignments;
+    }
+
+    const formattedRows = rows.map(row => {
+      const reassignments = reassignmentRows
+        .filter(r => r.master_id === row.master_id)
+        .map(r => ({
+          remark: r.remark || '',
+          assignedTo: r.assignedTo || '',
+          leadStage: r.leadStage || '',
+          created_by_user: r.created_by_user || '',
+          created_at: r.created_at
+            ? new Date(r.created_at).toLocaleString('en-GB')
+            : '',
+          reassignment_date: r.reassignment_date
+            ? new Date(r.reassignment_date).toLocaleString('en-GB')
+            : '',
+          name: r.name || '',
+          role: r.role || ''
+        }));
+
+      return {
+        ...row,
+        reassignment_remarks: reassignments,
+        latest_assignedTo: reassignments.length ? reassignments[0].assignedTo : '',
+        latest_leadStage: reassignments.length ? reassignments[0].leadStage : ''
+      };
+    });
+
+    return res.status(200).json(formattedRows);
+
+  } catch (error) {
+    console.error("❌ Error fetching Quotation Pending leads:", error);
+    return res.status(500).json({ error: "Failed to fetch quotation pending leads" });
+  }
+};

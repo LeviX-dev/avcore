@@ -141,6 +141,71 @@ export const getAssignedLeadCount = async (req, res) => {
 };
 
 
+// export const getTodaysAssignedLeads = async (req, res) => {
+//   try {
+//     if (!req.session.user) {
+//       return res.status(401).json({ message: "Unauthorized" });
+//     }
+
+//     const { id: userId, role } = req.session.user;
+
+//     // Get current user's name for filtering
+//     const [userResult] = await db.query(
+//       "SELECT name FROM users WHERE user_id = ?",
+//       [userId]
+//     );
+//     const currentUserName = userResult[0]?.name || '';
+
+//     // Get latest reassignments for all leads
+//     const [latestReassignments] = await db.query(`
+//       SELECT 
+//         master_id,
+//         MAX(id) as latest_id
+//       FROM reassignment
+//       GROUP BY master_id
+//     `);
+
+//     const latestReassignmentIds = latestReassignments.map(r => r.latest_id);
+
+//     let query = `
+//       SELECT COUNT(DISTINCT rd.master_id) AS total_count
+//       FROM raw_data rd
+//       LEFT JOIN reassignment re ON rd.master_id = re.master_id
+//       WHERE re.id IN (?)
+//       AND (rd.followup_date = CURDATE() OR DATE(re.reassignment_date) = CURDATE())
+//     `;
+
+//     const params = [latestReassignmentIds];
+
+//     // -----------------------------------
+//     // ⭐ ROLE FILTERING
+//     // -----------------------------------
+//     if (isTelecallerLike(role)) {
+//       query += ` AND re.assignedTo = ?`;
+//       params.push(currentUserName);
+//     }
+//     else if (isAdminLike(role) || isManagementLike(role)) {
+//       // Admin/Management see all
+//     }
+//     else {
+//       query += ` AND re.assignedTo = ?`;
+//       params.push(currentUserName);
+//     }
+
+//     const [rows] = await db.query(query, params);
+
+//     res.status(200).json({
+//       success: true,
+//       total: rows[0]?.total_count || 0
+//     });
+
+//   } catch (err) {
+//     console.error("❌ Error:", err);
+//     res.status(500).json({ message: "Failed to fetch count" });
+//   }
+// };
+
+
 export const getTodaysAssignedLeads = async (req, res) => {
   try {
     if (!req.session.user) {
@@ -149,18 +214,14 @@ export const getTodaysAssignedLeads = async (req, res) => {
 
     const { id: userId, role } = req.session.user;
 
-    // Get current user's name for filtering
     const [userResult] = await db.query(
       "SELECT name FROM users WHERE user_id = ?",
       [userId]
     );
     const currentUserName = userResult[0]?.name || '';
 
-    // Get latest reassignments for all leads
     const [latestReassignments] = await db.query(`
-      SELECT 
-        master_id,
-        MAX(id) as latest_id
+      SELECT master_id, MAX(id) as latest_id
       FROM reassignment
       GROUP BY master_id
     `);
@@ -172,22 +233,13 @@ export const getTodaysAssignedLeads = async (req, res) => {
       FROM raw_data rd
       LEFT JOIN reassignment re ON rd.master_id = re.master_id
       WHERE re.id IN (?)
+      AND rd.lead_stage NOT IN ('Drop','Closed Deal')
       AND (rd.followup_date = CURDATE() OR DATE(re.reassignment_date) = CURDATE())
     `;
 
     const params = [latestReassignmentIds];
 
-    // -----------------------------------
-    // ⭐ ROLE FILTERING
-    // -----------------------------------
     if (isTelecallerLike(role)) {
-      query += ` AND re.assignedTo = ?`;
-      params.push(currentUserName);
-    }
-    else if (isAdminLike(role) || isManagementLike(role)) {
-      // Admin/Management see all
-    }
-    else {
       query += ` AND re.assignedTo = ?`;
       params.push(currentUserName);
     }
@@ -206,6 +258,71 @@ export const getTodaysAssignedLeads = async (req, res) => {
 };
 
 
+// export const getUpcomingAssignedCount = async (req, res) => {
+//   try {
+//     if (!req.session.user) {
+//       return res.status(401).json({ message: "Unauthorized" });
+//     }
+
+//     const { id: userId, role } = req.session.user;
+
+//     // Get current user's name for filtering
+//     const [userResult] = await db.query(
+//       "SELECT name FROM users WHERE user_id = ?",
+//       [userId]
+//     );
+//     const currentUserName = userResult[0]?.name || '';
+
+//     // Get latest reassignments for all leads
+//     const [latestReassignments] = await db.query(`
+//       SELECT 
+//         master_id,
+//         MAX(id) as latest_id
+//       FROM reassignment
+//       GROUP BY master_id
+//     `);
+
+//     const latestReassignmentIds = latestReassignments.map(r => r.latest_id);
+
+//     let query = `
+//       SELECT COUNT(DISTINCT rd.master_id) AS total_count
+//       FROM raw_data rd
+//       LEFT JOIN reassignment re ON rd.master_id = re.master_id
+//       WHERE re.id IN (?)
+//       AND (rd.followup_date > CURDATE() OR DATE(re.reassignment_date) > CURDATE())
+//     `;
+
+//     const params = [latestReassignmentIds];
+
+//     // -----------------------------------
+//     // ⭐ ROLE FILTERING
+//     // -----------------------------------
+//     if (isTelecallerLike(role)) {
+//       query += ` AND re.assignedTo = ?`;
+//       params.push(currentUserName);
+//     }
+//     else if (isAdminLike(role) || isManagementLike(role)) {
+//       // Admin/Management see all
+//     }
+//     else {
+//       query += ` AND re.assignedTo = ?`;
+//       params.push(currentUserName);
+//     }
+
+//     const [rows] = await db.query(query, params);
+
+//     res.status(200).json({
+//       success: true,
+//       upcoming: rows[0]?.total_count || 0
+//     });
+
+//   } catch (error) {
+//     console.error("❌ Error in getUpcomingAssignedCount:", error);
+//     res.status(500).json({ message: "Failed to fetch upcoming assigned count" });
+//   }
+// };
+
+
 export const getUpcomingAssignedCount = async (req, res) => {
   try {
     if (!req.session.user) {
@@ -214,18 +331,14 @@ export const getUpcomingAssignedCount = async (req, res) => {
 
     const { id: userId, role } = req.session.user;
 
-    // Get current user's name for filtering
     const [userResult] = await db.query(
       "SELECT name FROM users WHERE user_id = ?",
       [userId]
     );
     const currentUserName = userResult[0]?.name || '';
 
-    // Get latest reassignments for all leads
     const [latestReassignments] = await db.query(`
-      SELECT 
-        master_id,
-        MAX(id) as latest_id
+      SELECT master_id, MAX(id) as latest_id
       FROM reassignment
       GROUP BY master_id
     `);
@@ -237,22 +350,13 @@ export const getUpcomingAssignedCount = async (req, res) => {
       FROM raw_data rd
       LEFT JOIN reassignment re ON rd.master_id = re.master_id
       WHERE re.id IN (?)
+      AND rd.lead_stage NOT IN ('Drop','Closed Deal')
       AND (rd.followup_date > CURDATE() OR DATE(re.reassignment_date) > CURDATE())
     `;
 
     const params = [latestReassignmentIds];
 
-    // -----------------------------------
-    // ⭐ ROLE FILTERING
-    // -----------------------------------
     if (isTelecallerLike(role)) {
-      query += ` AND re.assignedTo = ?`;
-      params.push(currentUserName);
-    }
-    else if (isAdminLike(role) || isManagementLike(role)) {
-      // Admin/Management see all
-    }
-    else {
       query += ` AND re.assignedTo = ?`;
       params.push(currentUserName);
     }
@@ -271,6 +375,74 @@ export const getUpcomingAssignedCount = async (req, res) => {
 };
 
 
+
+
+// export const getMissedAssignedCount = async (req, res) => {
+//   try {
+//     if (!req.session.user) {
+//       return res.status(401).json({ message: "Unauthorized: No session" });
+//     }
+
+//     const { id: userId, role } = req.session.user;
+
+//     // Get current user's name for filtering
+//     const [userResult] = await db.query(
+//       "SELECT name FROM users WHERE user_id = ?",
+//       [userId]
+//     );
+//     const currentUserName = userResult[0]?.name || '';
+
+//     // Get latest reassignments for all leads
+//     const [latestReassignments] = await db.query(`
+//       SELECT 
+//         master_id,
+//         MAX(id) as latest_id
+//       FROM reassignment
+//       GROUP BY master_id
+//     `);
+
+//     const latestReassignmentIds = latestReassignments.map(r => r.latest_id);
+//     const today = new Date().toISOString().slice(0, 10); // YYYY-MM-DD
+
+//     let query = `
+//       SELECT COUNT(DISTINCT rd.master_id) AS total_count
+//       FROM raw_data rd
+//       LEFT JOIN reassignment re ON rd.master_id = re.master_id
+//       WHERE re.id IN (?)
+//       AND rd.followup_date < ?
+//     `;
+
+//     const params = [latestReassignmentIds, today];
+
+//     // ---------------------------------------
+//     // ⭐ ROLE FILTERING
+//     // ---------------------------------------
+//     if (isTelecallerLike(role)) {
+//       query += ` AND re.assignedTo = ?`;
+//       params.push(currentUserName);
+//     }
+//     else if (isAdminLike(role) || isManagementLike(role)) {
+//       // Admin/Management see all
+//     }
+//     else {
+//       query += ` AND re.assignedTo = ?`;
+//       params.push(currentUserName);
+//     }
+
+//     const [rows] = await db.query(query, params);
+
+//     res.status(200).json({
+//       success: true,
+//       missed: rows[0]?.total_count || 0
+//     });
+
+//   } catch (error) {
+//     console.error("❌ Error in getMissedAssignedCount:", error);
+//     res.status(500).json({ message: "Failed to fetch missed assigned count" });
+//   }
+// };
+
+
 export const getMissedAssignedCount = async (req, res) => {
   try {
     if (!req.session.user) {
@@ -279,46 +451,33 @@ export const getMissedAssignedCount = async (req, res) => {
 
     const { id: userId, role } = req.session.user;
 
-    // Get current user's name for filtering
     const [userResult] = await db.query(
       "SELECT name FROM users WHERE user_id = ?",
       [userId]
     );
     const currentUserName = userResult[0]?.name || '';
 
-    // Get latest reassignments for all leads
     const [latestReassignments] = await db.query(`
-      SELECT 
-        master_id,
-        MAX(id) as latest_id
+      SELECT master_id, MAX(id) as latest_id
       FROM reassignment
       GROUP BY master_id
     `);
 
     const latestReassignmentIds = latestReassignments.map(r => r.latest_id);
-    const today = new Date().toISOString().slice(0, 10); // YYYY-MM-DD
+    const today = new Date().toISOString().slice(0, 10);
 
     let query = `
       SELECT COUNT(DISTINCT rd.master_id) AS total_count
       FROM raw_data rd
       LEFT JOIN reassignment re ON rd.master_id = re.master_id
       WHERE re.id IN (?)
+      AND rd.lead_stage NOT IN ('Drop','Closed Deal')
       AND rd.followup_date < ?
     `;
 
     const params = [latestReassignmentIds, today];
 
-    // ---------------------------------------
-    // ⭐ ROLE FILTERING
-    // ---------------------------------------
     if (isTelecallerLike(role)) {
-      query += ` AND re.assignedTo = ?`;
-      params.push(currentUserName);
-    }
-    else if (isAdminLike(role) || isManagementLike(role)) {
-      // Admin/Management see all
-    }
-    else {
       query += ` AND re.assignedTo = ?`;
       params.push(currentUserName);
     }
@@ -335,6 +494,8 @@ export const getMissedAssignedCount = async (req, res) => {
     res.status(500).json({ message: "Failed to fetch missed assigned count" });
   }
 };
+
+
 
 
 export const getDropLeads = async (req, res) => {

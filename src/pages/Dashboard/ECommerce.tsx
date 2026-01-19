@@ -72,6 +72,25 @@ const ECommerce: React.FC = () => {
 const totalLeadsForCard = totalLeads;
 
 
+const leadStageColors: Record<string, string> = {
+  'Fresh Lead': '#E5E7EB',        // light gray (VISIBLE)
+  'Cold Lead': '#9CA3AF',
+  'On Hold': '#FDE68A',
+  'Positive Lead': '#93C5FD',
+  'Pre Site Visit': '#C4B5FD',
+  'Post Site Visit': '#6D28D9',
+  'Demo': '#F9A8D4',
+  'Quotation Pending': '#F59E0B',
+  'Quotation Follow-up': '#92400E',
+  'Projection List': '#86EFAC',
+  'Drop': '#EF4444',
+  'Closed Deal': '#166534',
+  'Others': '#CBD5E1',
+};
+
+
+
+
 
   // Function to filter out zero values if needed
   const filterChartData = (data: Record<string, number> | null, showZero: boolean) => {
@@ -239,30 +258,63 @@ setBudgetRangeChartData(budgetData.summary || {});
 
 
 
-  const chartSeries = [
-    {
-      name: "Leads",
-      data: chartData ? Object.values(chartData).map(Number) : [],
-    },
-  ];
+ const ALL_LEAD_STAGES = Object.keys(leadStageColors);
 
-  const chartOptions: ApexCharts.ApexOptions = {
-    chart: {
-      type: "bar" as const,
-      toolbar: { show: false },
-    },
-    xaxis: {
-      categories: chartData ? Object.keys(chartData) : [],
-    },
-    plotOptions: {
-      bar: {
-        borderRadius: 6,
-        horizontal: false,
+const normalizedLeadChartData = ALL_LEAD_STAGES.map(stage => [
+  stage,
+  chartData?.[stage] ?? 0,
+] as [string, number]);
+
+
+
+const chartSeries = [
+  {
+    name: 'Leads',
+    data: normalizedLeadChartData.map(([_, value]) => value),
+  },
+];
+
+
+const chartOptions: ApexCharts.ApexOptions = {
+  chart: {
+    type: 'bar',
+    toolbar: { show: false },
+  },
+  xaxis: {
+    categories: normalizedLeadChartData.map(([stage]) => stage),
+    labels: {
+      rotate: -45,
+      style: {
+        fontSize: '11px',
       },
     },
-    dataLabels: { enabled: false },
-    colors: ['#3B82F6'],
-  };
+  },
+  plotOptions: {
+    bar: {
+      borderRadius: 6,
+      distributed: true,
+      columnWidth: '55%',
+    },
+  },
+  dataLabels: {
+    enabled: true,
+    formatter: (val: number) => val.toString(), // show 0 also
+    style: {
+      fontSize: '12px',
+      fontWeight: 'bold',
+      colors: ['#000'],
+    },
+  },
+  colors: normalizedLeadChartData.map(
+    ([stage]) => leadStageColors[stage] || '#3B82F6'
+  ),
+  tooltip: {
+    y: {
+      formatter: (val: number) => `${val} leads`,
+    },
+  },
+};
+
 
   // Bar chart builder for categories/references
   const buildBarSeries = (data: Record<string, number> | null) => [
@@ -449,16 +501,7 @@ const adminOnlyCards = [
           onClick: handleGoToCategory,
           clickable: true,
         },
-        {
-          title: 'Products',
-          value: totalProducts,
-          icon: Package,
-          color: 'text-amber-500',
-          bgGradient: 'from-amber-500/10 to-amber-600/5',
-          borderColor: 'border-amber-200/50',
-          onClick: handleGoToProducts,
-          clickable: true,
-        },
+     
         {
           title: 'Campaigns',
           value: totalCampaigns,
@@ -521,8 +564,6 @@ const cardData = isAdminOrSubAdmin
       // 8️⃣ Categories
       adminOnlyCards.find(c => c.title === 'Categories'),
 
-      // 9️⃣ Products
-      adminOnlyCards.find(c => c.title === 'Products'),
 
       // 🔟 Campaigns
       adminOnlyCards.find(c => c.title === 'Campaigns'),

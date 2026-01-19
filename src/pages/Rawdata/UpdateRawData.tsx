@@ -111,7 +111,26 @@ const UpdateRawData: React.FC<UpdateDataModalProps> = ({
   const [quickRemarks, setQuickRemarks] = useState([]);
   const [users, setUsers] = useState([]);
   const [filteredUsers, setFilteredUsers] = useState([]);
-  const [searchTerm, setSearchTerm] = useState('');
+  const [searchTerm, setSearchTerm] = useState(''); 
+
+  const [toast, setToast] = useState<{
+  type: 'success' | 'error' | 'warning';
+  message: string;
+} | null>(null);
+
+const showToast = (
+  message: string,
+  type: 'success' | 'error' | 'warning' = 'success',
+  duration = 9000
+) => {
+  setToast({ message, type });
+
+  setTimeout(() => {
+    setToast(null);
+  }, duration);
+};
+
+
 
   useEffect(() => {
     const fetchUsers = async () => {
@@ -302,7 +321,7 @@ useEffect(() => {
           alertMsg += `\n\n📊 Summary: ${(data.inserted?.length || 0) + (data.skipped?.length || 0)} total reassignment attempts.`;
         }
 
-        alert(alertMsg);
+showToast(alertMsg, 'success', 2000);
 
         fetchRawData(); // Refresh the table
         return { success: true };
@@ -342,7 +361,7 @@ useEffect(() => {
         errorMessage = `❌ Error: ${error.message}`;
       }
 
-      alert(errorMessage);
+showToast(errorMessage, 'error', 5000);
       return {
         success: false,
         message: errorMessage,
@@ -417,14 +436,17 @@ useEffect(() => {
     }
 
     // Auto-copy quick_remark to detailed_remark when quick_remark is selected
-    if (name === 'quick_remark' && value && !editingClient.detailed_remark) {
-      setEditingClient({
-        ...editingClient,
-        [name]: processedValue,
-        detailed_remark: value,
-      });
-      return;
-    }
+     
+    // Auto-copy quick_remark to detailed_remark when quick_remark is selected
+if (name === 'quick_remark' && value) {
+  setEditingClient({
+    ...editingClient,
+    [name]: processedValue,
+    detailed_remark: value, // ALWAYS copy, even if detailed_remark already has content
+  });
+  return;
+}
+
 
     setEditingClient({
       ...editingClient,
@@ -531,9 +553,12 @@ useEffect(() => {
         <form onSubmit={async (e) => {
           e.preventDefault();
           const result = await handleUpdateClient(editingClient);
-          if (result.success) {
-            closeEditPopup();
-          }
+if (result.success) {
+  setTimeout(() => {
+    closeEditPopup();
+  }, 2200); // slightly more than toast duration
+}
+
         }}>
           {/* Required Fields Section */}
           <div>
@@ -1044,126 +1069,168 @@ useEffect(() => {
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
 
+              
               {/* Reassign To - MULTI SELECT with Checkboxes, Search, and 5 Columns */}
-              <div className="md:col-span-3">
-                <label className="block mb-1 text-base font-semibold text-green-700 dark:text-green-600">
-                  Reassign To
-                </label>
+<div className="md:col-span-3">
+  <label className="block mb-1 text-base font-semibold text-green-700 dark:text-green-600">
+    Reassign To
+  </label>
 
-                {/* Search Box */}
-                <div className="mb-2">
-                  <div className="relative">
-                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                      <svg className="h-4 w-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                      </svg>
-                    </div>
-                    <input
-                      type="text"
-                      value={searchTerm}
-                      onChange={(e) => setSearchTerm(e.target.value)}
-                      className="w-full pl-9 pr-8 py-2 border border-gray-300 dark:border-gray-600 rounded text-sm dark:bg-form-input dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                      placeholder="Search users by name or role..."
-                    />
-                    {searchTerm && (
-                      <button
-                        type="button"
-                        onClick={() => setSearchTerm('')}
-                        className="absolute inset-y-0 right-0 pr-2 flex items-center text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
-                      >
-                        <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                        </svg>
-                      </button>
-                    )}
-                  </div>
-                  {searchTerm && (
-                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                      Showing {filteredUsers.length} of {users.length} users
-                    </p>
-                  )}
+  {/* Search Box */}
+  <div className="mb-2">
+    <div className="relative">
+      <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+        <svg className="h-4 w-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+        </svg>
+      </div>
+      <input
+        type="text"
+        value={searchTerm}
+        onChange={(e) => setSearchTerm(e.target.value)}
+        className="w-full pl-9 pr-8 py-2 border border-gray-300 dark:border-gray-600 rounded text-sm dark:bg-form-input dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+        placeholder="Search users by name or role..."
+      />
+      {searchTerm && (
+        <button
+          type="button"
+          onClick={() => setSearchTerm('')}
+          className="absolute inset-y-0 right-0 pr-2 flex items-center text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
+        >
+          <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+          </svg>
+        </button>
+      )}
+    </div>
+    {searchTerm && (
+      <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+        Showing {filteredUsers.length} of {users.length} users
+      </p>
+    )}
+  </div>
+
+  {/* Checkbox Selection Area - 5 Columns */}
+  <div className="border border-gray-300 dark:border-gray-600 rounded p-3 max-h-60 overflow-y-auto">
+    {/* Select All Filtered Button */}
+    <div className="mb-2 pb-2 border-b dark:border-gray-700 flex justify-between items-center">
+      <div>
+        <button
+          type="button"
+          onClick={handleSelectAllFiltered}
+          className="text-xs px-3 py-1.5 bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300 rounded hover:bg-blue-200 dark:hover:bg-blue-800 transition-colors whitespace-nowrap"
+        >
+          {filteredUsers.length > 0 &&
+            filteredUsers.every(user =>
+              Array.isArray(editingClient.assigned_to) &&
+              editingClient.assigned_to.includes(user.user_id)
+            )
+            ? 'Deselect All Filtered'
+            : 'Select All Filtered'}
+        </button>
+      </div>
+      <span className="text-xs text-gray-500 dark:text-gray-400">
+        {Array.isArray(editingClient.assigned_to) ? editingClient.assigned_to.length : 0} selected
+      </span>
+    </div>
+
+    {/* Users List - 5 Columns */}
+    {filteredUsers.length > 0 ? (
+      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
+        {filteredUsers.map((user) => {
+          // Helper function to format role display
+          const formatRoleForDisplay = (role: string) => {
+            if (!role) return 'No role';
+            if (role.length > 18) return role.substring(0, 16) + '...';
+            return role;
+          };
+
+          const isSelected = Array.isArray(editingClient.assigned_to) &&
+            editingClient.assigned_to.includes(user.user_id);
+          
+          return (
+            <div
+              key={user.user_id}
+              className={`flex items-start p-2 rounded transition-colors min-w-[120px] ${
+                isSelected
+                  ? 'bg-blue-50 dark:bg-blue-900/30 border border-blue-200 dark:border-blue-700'
+                  : 'border border-transparent hover:bg-gray-50 dark:hover:bg-gray-800 hover:border-gray-200 dark:hover:border-gray-700'
+              }`}
+            >
+              <input
+                type="checkbox"
+                id={`user-${user.user_id}`}
+                checked={isSelected}
+                onChange={() => handleUserCheckboxChange(user.user_id, user.name)}
+                className="h-4 w-4 text-blue-600 rounded focus:ring-blue-500 focus:ring-offset-0 mt-1 flex-shrink-0"
+              />
+              <label
+                htmlFor={`user-${user.user_id}`}
+                className="ml-2 text-sm text-gray-700 dark:text-gray-300 cursor-pointer flex-1 min-w-0"
+              >
+                <div 
+                  className="font-medium truncate mb-0.5"
+                  title={user.name}
+                >
+                  {user.name}
                 </div>
-
-                {/* Checkbox Selection Area - 5 Columns */}
-                <div className="border border-gray-300 dark:border-gray-600 rounded p-3 max-h-60 overflow-y-auto">
-                  {/* Select All Filtered Button */}
-                  <div className="mb-2 pb-2 border-b dark:border-gray-700">
-                    <button
-                      type="button"
-                      onClick={handleSelectAllFiltered}
-                      className="text-xs px-3 py-1.5 bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300 rounded hover:bg-blue-200 dark:hover:bg-blue-800 transition-colors"
-                    >
-                      {filteredUsers.length > 0 &&
-                        filteredUsers.every(user =>
-                          Array.isArray(editingClient.assigned_to) &&
-                          editingClient.assigned_to.includes(user.user_id)
-                        )
-                        ? 'Deselect All Filtered'
-                        : 'Select All Filtered'}
-                    </button>
-                    <span className="text-xs text-gray-500 dark:text-gray-400 ml-2">
-                      {Array.isArray(editingClient.assigned_to) ? editingClient.assigned_to.length : 0} selected
-                    </span>
-                  </div>
-
-                  {/* Users List - 5 Columns */}
-                  {filteredUsers.length > 0 ? (
-                    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-2">
-                      {filteredUsers.map((user) => {
-                        const isSelected = Array.isArray(editingClient.assigned_to) &&
-                          editingClient.assigned_to.includes(user.user_id);
-                        return (
-                          <div
-                            key={user.user_id}
-                            className={`flex items-start p-2 rounded transition-colors ${isSelected
-                                ? 'bg-blue-50 dark:bg-blue-900/30 border border-blue-200 dark:border-blue-700'
-                                : 'border border-transparent hover:bg-gray-50 dark:hover:bg-gray-800 hover:border-gray-200 dark:hover:border-gray-700'
-                              }`}
-                          >
-                            <input
-                              type="checkbox"
-                              id={`user-${user.user_id}`}
-                              checked={isSelected}
-                              onChange={() => handleUserCheckboxChange(user.user_id, user.name)}
-                              className="h-4 w-4 text-blue-600 rounded focus:ring-blue-500 focus:ring-offset-0 mt-1"
-                            />
-                            <label
-                              htmlFor={`user-${user.user_id}`}
-                              className="ml-2 text-sm text-gray-700 dark:text-gray-300 cursor-pointer flex-1"
-                            >
-                              <div className="font-medium line-clamp-1">{user.name}</div>
-                              <div className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
-                                {user.role || 'No role'}
-                              </div>
-                            </label>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  ) : (
-                    <div className="text-center py-4 text-gray-500 dark:text-gray-400">
-                      <div className="text-2xl mb-2">🔍</div>
-                      <p className="text-sm">No users found</p>
-                      <p className="text-xs mt-1">Try a different search term</p>
-                    </div>
-                  )}
+                <div 
+                  className="text-xs text-gray-500 dark:text-gray-400 truncate w-full"
+                  title={user.role || 'No role'}
+                >
+                  {formatRoleForDisplay(user.role || 'No role')}
                 </div>
+              </label>
+            </div>
+          );
+        })}
+      </div>
+    ) : (
+      <div className="text-center py-4 text-gray-500 dark:text-gray-400">
+        <div className="text-2xl mb-2">🔍</div>
+        <p className="text-sm">No users found</p>
+        <p className="text-xs mt-1">Try a different search term</p>
+      </div>
+    )}
+  </div>
 
-                {/* Selected Users Preview */}
-                {Array.isArray(editingClient.assigned_to) && editingClient.assigned_to.length > 0 && (
-                  <div className="mt-2 p-2 bg-blue-50 dark:bg-blue-900/30 rounded border border-blue-200 dark:border-blue-800">
-                    <div className="text-xs text-blue-700 dark:text-blue-300 mb-1 font-medium">
-                      Selected Users ({editingClient.assigned_to.length}):
-                    </div>
-                    <div className="text-xs text-gray-600 dark:text-gray-400">
-                      {editingClient.assigned_to.map(userId => {
-                        const user = users.find(u => u.user_id === userId);
-                        return user ? `${user.name}${user.role ? ` (${user.role})` : ''}` : userId;
-                      }).join(', ')}
-                    </div>
-                  </div>
-                )}
-              </div>
+  {/* Selected Users Preview */}
+  {Array.isArray(editingClient.assigned_to) && editingClient.assigned_to.length > 0 && (
+    <div className="mt-2 p-2 bg-blue-50 dark:bg-blue-900/30 rounded border border-blue-200 dark:border-blue-800">
+      <div className="text-xs text-blue-700 dark:text-blue-300 mb-1 font-medium">
+        Selected Users ({editingClient.assigned_to.length}):
+      </div>
+      <div className="text-xs text-gray-600 dark:text-gray-400 flex flex-wrap gap-1">
+        {editingClient.assigned_to.map(userId => {
+          const user = users.find(u => u.user_id === userId);
+          if (!user) return null;
+          
+          const displayText = `${user.name}${user.role ? ` (${user.role})` : ''}`;
+          
+          return (
+            <span 
+              key={userId}
+              className="inline-flex items-center gap-1 px-2 py-1 bg-blue-100 dark:bg-blue-900/50 rounded text-blue-800 dark:text-blue-300 border border-blue-200 dark:border-blue-700 max-w-[160px]"
+            >
+              <span className="truncate" title={displayText}>
+                {displayText}
+              </span>
+              <button
+                type="button"
+                onClick={() => handleUserCheckboxChange(userId, user.name)}
+                className="text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300 text-xs font-bold flex-shrink-0"
+                aria-label={`Remove ${user.name}`}
+              >
+                ×
+              </button>
+            </span>
+          );
+        })}
+      </div>
+    </div>
+  )}
+</div>
+
 
               {/* Follow-up Date */}
               <div className="md:col-span-1 mt-4">
@@ -1366,7 +1433,27 @@ useEffect(() => {
             </button>
           </div>
         </form>
-      </div>
+      </div> 
+
+   {toast && (
+  <div className="fixed inset-0 z-50 flex items-center justify-center pointer-events-none">
+    <div
+      className={`max-w-sm rounded-lg px-5 py-3 shadow-lg text-sm whitespace-pre-line animate-fade-in
+        pointer-events-auto
+        ${
+          toast.type === 'success'
+            ? 'bg-green-100 text-green-800 border border-green-300'
+            : toast.type === 'error'
+            ? 'bg-red-100 text-red-800 border border-red-300'
+            : 'bg-yellow-100 text-yellow-800 border border-yellow-300'
+        }`}
+    >
+      {toast.message}
+    </div>
+  </div>
+)}
+
+
     </div>
   );
 };

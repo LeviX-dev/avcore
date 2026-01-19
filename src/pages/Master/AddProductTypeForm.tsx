@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import axios from "axios";
 import { BASE_URL } from "../../../public/config.js";
 
@@ -6,6 +6,12 @@ interface AddProductTypeFormProps {
   onClose: () => void;
   onSuccess: () => void;
 }
+
+interface Category {
+  cat_id: number;
+  cat_name: string;
+}
+
 
 const AddProductTypeForm: React.FC<AddProductTypeFormProps> = ({ onClose, onSuccess }) => {
   const [formData, setFormData] = useState({
@@ -26,6 +32,24 @@ const AddProductTypeForm: React.FC<AddProductTypeFormProps> = ({ onClose, onSucc
     "Other",
   ];
 
+
+  const [categories, setCategories] = useState<Category[]>([]);
+const [catId, setCatId] = useState<number | "">("");
+useEffect(() => {
+  fetchCategories();
+}, []);
+
+const fetchCategories = async () => {
+  try {
+    const res = await axios.get(`${BASE_URL}api/category`);
+    setCategories(res.data);
+  } catch (err) {
+    console.error("Failed to fetch categories");
+  }
+};
+
+
+
   const handleQuotationTypeChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     const value = e.target.value;
     setQuotationType(value);
@@ -38,15 +62,13 @@ const AddProductTypeForm: React.FC<AddProductTypeFormProps> = ({ onClose, onSucc
   };
 
   const validateForm = (): boolean => {
-    if (!quotationType) {
-      setError("Quotation Type is required");
-      return false;
-    }
 
-    if (quotationType === "Other" && !customQuotationType.trim()) {
-      setError("Please enter custom quotation type");
-      return false;
-    }
+    if (!catId) {
+  setError("Category is required");
+  return false;
+}
+
+
 
     if (!formData.product_type_name.trim()) {
       setError("Product Type Name is required");
@@ -67,8 +89,7 @@ const AddProductTypeForm: React.FC<AddProductTypeFormProps> = ({ onClose, onSucc
       
       const requestData = {
         product_type_name: formData.product_type_name.trim(),
-        quotation_type: quotationType,
-        other_quotation_type: quotationType === "Other" ? customQuotationType : undefined
+     cat_id: catId
       };
 
       const response = await axios.post(`${BASE_URL}api/product/type`, requestData);
@@ -118,22 +139,23 @@ const AddProductTypeForm: React.FC<AddProductTypeFormProps> = ({ onClose, onSucc
           )}
 
           <div>
-            <label className="text-sm font-medium text-gray-700">
-              Products Category Type *
-            </label>
-            <select
-              value={quotationType}
-              onChange={handleQuotationTypeChange}
-              className="mt-1 w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-              disabled={loading}
-            >
-              <option value="">Select products category type</option>
-              {quotationTypes.map((type) => (
-                <option key={type} value={type}>
-                  {type}
-                </option>
-              ))}
-            </select>
+         <label className="text-sm font-medium text-gray-700">
+  Product Category *
+</label>
+
+<select
+  value={catId}
+  onChange={(e) => setCatId(Number(e.target.value))}
+  className="mt-1 w-full border rounded-lg px-3 py-2 text-sm"
+>
+  <option value="">Select Category</option>
+  {categories.map(cat => (
+    <option key={cat.cat_id} value={cat.cat_id}>
+      {cat.cat_name}
+    </option>
+  ))}
+</select>
+
 
             {showCustomInput && (
               <input

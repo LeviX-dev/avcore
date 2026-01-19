@@ -14,7 +14,7 @@ getMissedAssignedFullData ,
 getTodaysAssignedLeadsFullData ,
 getUpcomingAssignedFullData, 
 getEmployeeLeadWorkReport,
-
+getEmployeeWiseAssignedLeadCount, deleteDocument , getQuotationPendingLeads ,
  
 } from '../controllers/rawDataController.js';
 import uploadMiddleware from '../middleware/upload.js';
@@ -31,12 +31,18 @@ router.get('/master-data', getAllRawData);
 
 router.post('/master-data/import', upload.single('file'), importRawData);
 router.put('/master-data/:master_id', updateRawData);
-router.delete('/master-data/:master_id', deleteClient);
+router.post('/master-data/:master_id', deleteClient);
+
 router.post('/master-data/delete-multiple', deleteMultipleClients);
 
 router.post('/master-data/add-single', addSingleRawData);
 
-router.post('/upload/:master_id', uploadMiddleware, uploadDocuments);
+router.post('/upload/:master_id', uploadMiddleware, uploadDocuments); 
+// routes/documents.js (or your existing routes file)
+
+router.delete('/document/:doc_id', deleteDocument);
+
+
 
 router.get('/documents/:master_id', getDocumentsByMasterId);
 
@@ -80,6 +86,8 @@ router.get('/dashboard/upcoming-assign-fulldata', getUpcomingAssignedFullData);
 
 router.get('/reports/employee-leadwork-report', getEmployeeLeadWorkReport); 
 
+router.get('/reports/employee-detailed', getEmployeeWiseAssignedLeadCount);
 
+router.get('/quotation-pending', getQuotationPendingLeads);
 
 export default router;

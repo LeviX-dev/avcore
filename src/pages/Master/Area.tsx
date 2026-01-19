@@ -138,8 +138,8 @@ const Area = () => {
       )}
 
       {/* Table */}
-      <div className="mt-2 overflow-x-auto rounded border border-stroke bg-white shadow">
-        <table className="w-full min-w-[600px] table-auto">
+     <div className="overflow-x-auto rounded-sm border border-stroke bg-white shadow-default dark:border-strokedark dark:bg-boxdark">
+<table className="w-full table-auto sm:min-w-[600px]">
           <thead>
             <tr className="bg-gray-200 text-left">
               <th className="py-3 px-4 font-medium">Area ID</th>

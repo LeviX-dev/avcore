@@ -6,7 +6,8 @@ import { categoryList, createCategory,updateCategoryController,
     deleteProductEntity, updateReferenceController, addAreaController,
     getAreaController,deleteAreaController,updateAreaController 
 , addProductTypeOnly , addBrandToProduct , addModelToBrand ,getProductTypeDetails ,updateBrand,
-
+createKit , getKits , getProductsByCategory , getKitById , updateKit , toggleKitStatus , 
+ getProductsAndKitsByCategory ,  createQuotation ,  getQuotationByMasterId , 
 
 
 } from '../controllers/masterController.js';
@@ -54,6 +55,24 @@ router.get('/area', getAreaController); // Fetch Area
 router.delete('/area/:id', deleteAreaController); // Delete Area
 router.put('/area/:id', updateAreaController); //Update Area
 
-// router.post("/addcity", addCityController);
+// router.post("/addcity", addCityController); 
+
+
+
+router.post('/kit', createKit);
+router.get('/allkit', getKits);
+router.get('/products/category/:cat_id', getProductsByCategory);
+router.get('/kit/:id', getKitById);
+router.put('/kit/:id', updateKit);
+router.put('/kit/:id/status', toggleKitStatus);
+router.get("/category-products-kits/:cat_id", getProductsAndKitsByCategory);
+
+
+
+router.post("/quotation", createQuotation);
+
+router.get("/quotation/:master_id", getQuotationByMasterId);
+
+
 
 export default router;

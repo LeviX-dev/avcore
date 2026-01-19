@@ -1,6 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import axios from 'axios';
 import { BASE_URL } from '../../../public/config.js';
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+import { faHistory } from '@fortawesome/free-solid-svg-icons';
 
 interface TeleCallerData {
   name: string;
@@ -16,7 +18,11 @@ interface TeleCallerData {
   assigned_to?: string | string[];
   telecaller_name?: string;
   followup_date?: string;
-  assigned_to_ids?: string;
+  assigned_to_ids?: string; 
+
+    number?: string; // For contact number
+  reassignment_remarks?: any[]; // For reassignment history
+
 }
 
 interface EditTeleCallerFormProps {
@@ -39,7 +45,8 @@ const EditTeleCallerForm: React.FC<EditTeleCallerFormProps> = ({
     next_followup_date: data.followup_date || '',
     lead_stage: data.lead_stage || '',
     quick_remark: data.quick_remark || '',
-    detailed_remark: data.detailed_remark || '',
+    detailed_remark: data.detailed_remark || '', 
+      contact_number: data.number || '',
   });
 
   const [categories, setCategories] = useState<{ id: number; name: string }[]>([]);
@@ -153,17 +160,30 @@ const EditTeleCallerForm: React.FC<EditTeleCallerFormProps> = ({
     }
   }, [searchTerm, users]);
 
+
   const handleChange = (
-    e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>,
-  ) => {
-    const { name, value } = e.target;
+  e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>,
+) => {
+  const { name, value } = e.target;
+  
+  // Auto-copy quick_remark (call_status) to detailed_remark when quick_remark is selected
+  if (name === 'call_status' && value) {
+    setFormData((prev) => ({ 
+      ...prev, 
+      [name]: value,
+      detailed_remark: value // Copy to detailed_remark
+    }));
+  } else {
     setFormData((prev) => ({ ...prev, [name]: value }));
-    
-    // Clear error when field is updated
-    if (formErrors[name]) {
-      setFormErrors(prev => ({ ...prev, [name]: '' }));
-    }
-  };
+  }
+  
+  // Clear error when field is updated
+  if (formErrors[name]) {
+    setFormErrors(prev => ({ ...prev, [name]: '' }));
+  }
+};
+
+
 
   const handleUserSelection = (userName: string, userId: string) => {
     setSelectedUsers(prev => {
@@ -236,9 +256,10 @@ const EditTeleCallerForm: React.FC<EditTeleCallerFormProps> = ({
       errors.category = 'Category is required';
     }
 
-    if (!formData.call_status) {
-      errors.call_status = 'Quick remark is required';
-    }
+    // Removed validation for call_status (Quick Remark)
+    // if (!formData.call_status) {
+    //   errors.call_status = 'Quick remark is required';
+    // }
 
     if (!formData.next_followup_date) {
       errors.next_followup_date = 'Follow-up date is required';
@@ -260,9 +281,10 @@ const EditTeleCallerForm: React.FC<EditTeleCallerFormProps> = ({
       errors.assignedUsers = 'At least one user must be assigned';
     }
 
-    if (!formData.detailed_remark?.trim()) {
-      errors.detailed_remark = 'Detailed remark is required';
-    }
+    // Removed validation for detailed_remark
+    // if (!formData.detailed_remark?.trim()) {
+    //   errors.detailed_remark = 'Detailed remark is required';
+    // }
 
     setFormErrors(errors);
     return Object.keys(errors).length === 0;
@@ -382,74 +404,91 @@ const EditTeleCallerForm: React.FC<EditTeleCallerFormProps> = ({
         </div>
 
         <form onSubmit={handleEdit} className="space-y-8">
-          {/* Basic Information Section */}
-          <div className="bg-gray-50 dark:bg-gray-900/50 p-5 rounded-xl">
-            <h3 className="text-lg font-semibold mb-4 text-gray-800 dark:text-white border-b border-gray-300 dark:border-gray-700 pb-2">
-              📋 Basic Information
-            </h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-              <div>
-                <label className="block mb-2 text-sm font-medium text-gray-700 dark:text-white">
-                  Client Name *
-                </label>
-                <input
-                  type="text"
-                  name="name"
-                  className={`w-full p-3 border rounded-lg text-sm dark:bg-gray-800 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors ${
-                    formErrors.name 
-                      ? 'border-red-500 dark:border-red-500' 
-                      : 'border-gray-300 dark:border-gray-600'
-                  }`}
-                  value={formData.name}
-                  onChange={handleChange}
-                  placeholder="Enter client name"
-                  required
-                />
-                {formErrors.name && (
-                  <p className="text-red-500 text-xs mt-1">{formErrors.name}</p>
-                )}
-              </div>
+{/* Basic Information Section */}
+<div className="bg-gray-50 dark:bg-gray-900/50 p-5 rounded-xl">
+  <h3 className="text-lg font-semibold mb-4 text-gray-800 dark:text-white border-b border-gray-300 dark:border-gray-700 pb-2">
+    📋 Basic Information
+  </h3>
+  
+  {/* ADD CONTACT NUMBER HERE */}
+  <div className="grid grid-cols-1 md:grid-cols-3 gap-5 mb-5">
+    {/* Client Name */}
+    <div>
+      <label className="block mb-2 text-sm font-medium text-gray-700 dark:text-white">
+        Client Name *
+      </label>
+      <input
+        type="text"
+        name="name"
+        className={`w-full p-3 border rounded-lg text-sm dark:bg-gray-800 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors ${
+          formErrors.name 
+            ? 'border-red-500 dark:border-red-500' 
+            : 'border-gray-300 dark:border-gray-600'
+        }`}
+        value={formData.name}
+        onChange={handleChange}
+        placeholder="Enter client name"
+        required
+      />
+      {formErrors.name && (
+        <p className="text-red-500 text-xs mt-1">{formErrors.name}</p>
+      )}
+    </div>
 
-              {categories.length > 0 && (
-                <div>
-                  <label className="block mb-2 text-sm font-medium text-gray-700 dark:text-white">
-                    Category *
-                  </label>
-                  <select
-                    name="category"
-                    value={formData.cat_id}
-                    onChange={(e) => {
-                      const val = e.target.value;
-                      setFormData((prev) => ({
-                        ...prev,
-                        category: val,
-                        cat_id: parseInt(val, 10),
-                      }));
-                      if (formErrors.category) {
-                        setFormErrors(prev => ({ ...prev, category: '' }));
-                      }
-                    }}
-                    className={`w-full p-3 border rounded-lg text-sm dark:bg-gray-800 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors ${
-                      formErrors.category 
-                        ? 'border-red-500 dark:border-red-500' 
-                        : 'border-gray-300 dark:border-gray-600'
-                    }`}
-                    required
-                  >
-                    <option value="">Select category</option>
-                    {categories.map((cat) => (
-                      <option key={cat.id} value={cat.id}>
-                        {cat.name}
-                      </option>
-                    ))}
-                  </select>
-                  {formErrors.category && (
-                    <p className="text-red-500 text-xs mt-1">{formErrors.category}</p>
-                  )}
-                </div>
-              )}
-            </div>
-          </div>
+    {/* ADDED: Contact Number */}
+    <div>
+      <label className="block mb-2 text-sm font-medium text-gray-700 dark:text-white">
+        Contact No.
+      </label>
+      <input
+        type="text"
+        name="contact_number" // You might need to add this to your formData state
+        className="w-full p-3 border border-gray-300 dark:border-gray-600 rounded-lg text-sm dark:bg-gray-800 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors"
+        value={data.number || ''} // Assuming data has a 'number' field
+        readOnly // Make it read-only since it's for display
+        placeholder="Contact number"
+      />
+    </div>
+
+    {/* Category */}
+    <div>
+      <label className="block mb-2 text-sm font-medium text-gray-700 dark:text-white">
+        Category *
+      </label>
+      <select
+        name="category"
+        value={formData.cat_id}
+        onChange={(e) => {
+          const val = e.target.value;
+          setFormData((prev) => ({
+            ...prev,
+            category: val,
+            cat_id: parseInt(val, 10),
+          }));
+          if (formErrors.category) {
+            setFormErrors(prev => ({ ...prev, category: '' }));
+          }
+        }}
+        className={`w-full p-3 border rounded-lg text-sm dark:bg-gray-800 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors ${
+          formErrors.category 
+            ? 'border-red-500 dark:border-red-500' 
+            : 'border-gray-300 dark:border-gray-600'
+        }`}
+        required
+      >
+        <option value="">Select category</option>
+        {categories.map((cat) => (
+          <option key={cat.id} value={cat.id}>
+            {cat.name}
+          </option>
+        ))}
+      </select>
+      {formErrors.category && (
+        <p className="text-red-500 text-xs mt-1">{formErrors.category}</p>
+      )}
+    </div>
+  </div>
+</div>
 
           {/* Lead Management Section */}
           <div className="bg-gray-50 dark:bg-gray-900/50 p-5 rounded-xl">
@@ -462,7 +501,7 @@ const EditTeleCallerForm: React.FC<EditTeleCallerFormProps> = ({
               {/* QUICK REMARK */}
               <div>
                 <label className="block mb-2 text-sm font-medium text-gray-700 dark:text-white">
-                  Quick Remark *
+                  Quick Remark {/* Removed * */}
                 </label>
                 <select
                   name="call_status"
@@ -473,7 +512,7 @@ const EditTeleCallerForm: React.FC<EditTeleCallerFormProps> = ({
                   }`}
                   value={formData.call_status}
                   onChange={handleChange}
-                  required
+                  // Removed required attribute
                 >
                   <option value="">Select Quick Remark</option>
                   {tcStatuses.map((status, index) => (
@@ -540,144 +579,272 @@ const EditTeleCallerForm: React.FC<EditTeleCallerFormProps> = ({
               </div>
             </div>
 
-            {/* Assigned To (Multiple) - Checkbox Style with Search and 5 Columns */}
-            <div className="mb-6">
-              <div className="flex justify-between items-center mb-3">
-                <label className="block text-sm font-medium text-gray-700 dark:text-white">
-                  Assigned To (Multiple) *
-                </label>
-                <div className="flex gap-2">
-                  <span className="text-xs text-gray-500 dark:text-gray-400">
-                    {selectedUsers.length} of {users.length} selected
-                  </span>
-                  <button
-                    type="button"
-                    onClick={handleSelectAllUsers}
-                    className="text-xs px-3 py-1.5 bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300 rounded hover:bg-blue-200 dark:hover:bg-blue-800 transition-colors"
+          
+          {/* Assigned To (Multiple) - Checkbox Style with Search and 5 Columns */}
+<div className="mb-6">
+  <div className="flex justify-between items-center mb-3">
+    <label className="block text-sm font-medium text-gray-700 dark:text-white">
+      Assigned To (Multiple) *
+    </label>
+    <div className="flex gap-2">
+      <span className="text-xs text-gray-500 dark:text-gray-400">
+        {selectedUsers.length} of {users.length} selected
+      </span>
+      <button
+        type="button"
+        onClick={handleSelectAllUsers}
+        className="text-xs px-3 py-1.5 bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300 rounded hover:bg-blue-200 dark:hover:bg-blue-800 transition-colors whitespace-nowrap"
+      >
+        {selectedUsers.length === filteredUsers.length ? 'Deselect All' : 'Select All Filtered'}
+      </button>
+    </div>
+  </div>
+  
+  {/* Search Box */}
+  <div className="mb-4">
+    <div className="relative">
+      <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+        <svg className="h-5 w-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+        </svg>
+      </div>
+      <input
+        type="text"
+        value={searchTerm}
+        onChange={(e) => setSearchTerm(e.target.value)}
+        className="w-full pl-10 pr-4 py-2.5 border border-gray-300 dark:border-gray-600 rounded-lg text-sm dark:bg-gray-800 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
+        placeholder="Search users by name or role..."
+      />
+      {searchTerm && (
+        <button
+          type="button"
+          onClick={() => setSearchTerm('')}
+          className="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
+        >
+          <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+          </svg>
+        </button>
+      )}
+    </div>
+    {searchTerm && (
+      <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+        Showing {filteredUsers.length} of {users.length} users
+      </p>
+    )}
+  </div>
+  
+  {/* Selected Users Preview */}
+  {selectedUsers.length > 0 && (
+    <div className="mb-4 p-4 bg-blue-50 dark:bg-blue-900/30 rounded-lg border border-blue-200 dark:border-blue-800">
+      <div className="text-xs text-blue-700 dark:text-blue-300 mb-2 font-medium">
+        Selected Users ({selectedUsers.length}):
+      </div>
+      <div className="flex flex-wrap gap-2">
+        {getSelectedUserNames().map((userName, index) => (
+          <span 
+            key={index} 
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300 border border-blue-200 dark:border-blue-700 max-w-[180px]"
+          >
+            <span className="truncate" title={userName}>
+              {userName}
+            </span>
+            <button
+              type="button"
+              onClick={() => removeSelectedUser(selectedUsers[index])}
+              className="ml-1 text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300 text-xs font-bold flex-shrink-0"
+              aria-label={`Remove ${userName}`}
+            >
+              ×
+            </button>
+          </span>
+        ))}
+      </div>
+    </div>
+  )}
+  
+  {/* Users Checkbox Grid - 5 Columns */}
+  <div className={`border rounded-lg p-4 max-h-64 overflow-y-auto transition-colors ${
+    formErrors.assignedUsers 
+      ? 'border-red-500 dark:border-red-500' 
+      : 'border-gray-300 dark:border-gray-600'
+  }`}>
+    {filteredUsers.length > 0 ? (
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
+        {filteredUsers.map((user) => {
+          // Helper function to format role display
+          const formatRoleForDisplay = (role: string) => {
+            if (!role) return 'No role';
+            if (role.length > 18) return role.substring(0, 16) + '...';
+            return role;
+          };
+
+          return (
+            <div 
+              key={user.user_id} 
+              className={`flex flex-col p-3 rounded-lg transition-all min-w-[140px] ${
+                selectedUsers.includes(user.name)
+                  ? 'bg-blue-50 dark:bg-blue-900/30 border border-blue-200 dark:border-blue-700 shadow-sm'
+                  : 'border border-transparent hover:bg-gray-50 dark:hover:bg-gray-800 hover:border-gray-200 dark:hover:border-gray-700'
+              }`}
+            >
+              <div className="flex items-start mb-2">
+                <input
+                  type="checkbox"
+                  id={`user-${user.user_id}`}
+                  checked={selectedUsers.includes(user.name)}
+                  onChange={() => handleUserSelection(user.name, user.user_id)}
+                  className="h-4 w-4 text-blue-600 rounded focus:ring-blue-500 focus:ring-offset-0 mt-1 flex-shrink-0"
+                />
+                <label 
+                  htmlFor={`user-${user.user_id}`}
+                  className="ml-3 text-sm text-gray-700 dark:text-gray-300 cursor-pointer flex-1 min-w-0"
+                >
+                  <div 
+                    className="font-medium truncate mb-1"
+                    title={user.name}
                   >
-                    {selectedUsers.length === filteredUsers.length ? 'Deselect All' : 'Select All Filtered'}
-                  </button>
-                </div>
+                    {user.name}
+                  </div>
+                  <div 
+                    className="text-xs text-gray-500 dark:text-gray-400 truncate w-full"
+                    title={user.role || 'No role'}
+                  >
+                    {formatRoleForDisplay(user.role || 'No role')}
+                  </div>
+                </label>
               </div>
-              
-              {/* Search Box */}
-              <div className="mb-4">
-                <div className="relative">
-                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                    <svg className="h-5 w-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                    </svg>
-                  </div>
-                  <input
-                    type="text"
-                    value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
-                    className="w-full pl-10 pr-4 py-2.5 border border-gray-300 dark:border-gray-600 rounded-lg text-sm dark:bg-gray-800 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
-                    placeholder="Search users by name or role..."
-                  />
-                  {searchTerm && (
-                    <button
-                      type="button"
-                      onClick={() => setSearchTerm('')}
-                      className="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
-                    >
-                      <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                      </svg>
-                    </button>
-                  )}
-                </div>
-                {searchTerm && (
-                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                    Showing {filteredUsers.length} of {users.length} users
-                  </p>
-                )}
-              </div>
-              
-              {/* Selected Users Preview */}
-              {selectedUsers.length > 0 && (
-                <div className="mb-4 p-4 bg-blue-50 dark:bg-blue-900/30 rounded-lg border border-blue-200 dark:border-blue-800">
-                  <div className="text-xs text-blue-700 dark:text-blue-300 mb-2 font-medium">
-                    Selected Users ({selectedUsers.length}):
-                  </div>
-                  <div className="flex flex-wrap gap-2">
-                    {getSelectedUserNames().map((userName, index) => (
-                      <span 
-                        key={index} 
-                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300 border border-blue-200 dark:border-blue-700"
-                      >
-                        {userName}
-                        <button
-                          type="button"
-                          onClick={() => removeSelectedUser(selectedUsers[index])}
-                          className="ml-1 text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300 text-xs font-bold"
-                          aria-label={`Remove ${userName}`}
-                        >
-                          ×
-                        </button>
-                      </span>
-                    ))}
-                  </div>
-                </div>
-              )}
-              
-              {/* Users Checkbox Grid - 5 Columns */}
-              <div className={`border rounded-lg p-4 max-h-64 overflow-y-auto transition-colors ${
-                formErrors.assignedUsers 
-                  ? 'border-red-500 dark:border-red-500' 
-                  : 'border-gray-300 dark:border-gray-600'
-              }`}>
-                {filteredUsers.length > 0 ? (
-                  <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3">
-                    {filteredUsers.map((user) => (
-                      <div 
-                        key={user.user_id} 
-                        className={`flex flex-col p-3 rounded-lg transition-all ${
-                          selectedUsers.includes(user.name)
-                            ? 'bg-blue-50 dark:bg-blue-900/30 border border-blue-200 dark:border-blue-700 shadow-sm'
-                            : 'border border-transparent hover:bg-gray-50 dark:hover:bg-gray-800 hover:border-gray-200 dark:hover:border-gray-700'
-                        }`}
-                      >
-                        <div className="flex items-start mb-2">
-                          <input
-                            type="checkbox"
-                            id={`user-${user.user_id}`}
-                            checked={selectedUsers.includes(user.name)}
-                            onChange={() => handleUserSelection(user.name, user.user_id)}
-                            className="h-4 w-4 text-blue-600 rounded focus:ring-blue-500 focus:ring-offset-0 mt-1"
-                          />
-                          <label 
-                            htmlFor={`user-${user.user_id}`}
-                            className="ml-3 text-sm text-gray-700 dark:text-gray-300 cursor-pointer flex-1"
-                          >
-                            <div className="font-medium line-clamp-1">{user.name}</div>
-                            <div className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                              {user.role || 'No role'}
-                            </div>
-                          </label>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <div className="text-center py-8 text-gray-500 dark:text-gray-400">
-                    <div className="text-3xl mb-3">🔍</div>
-                    <p className="font-medium">No users found</p>
-                    <p className="text-xs mt-1">Try a different search term</p>
-                  </div>
-                )}
-              </div>
-              
-              {formErrors.assignedUsers && (
-                <p className="text-red-500 text-xs mt-2">{formErrors.assignedUsers}</p>
-              )}
             </div>
+          );
+        })}
+      </div>
+    ) : (
+      <div className="text-center py-8 text-gray-500 dark:text-gray-400">
+        <div className="text-3xl mb-3">🔍</div>
+        <p className="font-medium">No users found</p>
+        <p className="text-xs mt-1">Try a different search term</p>
+      </div>
+    )}
+  </div>
+  
+  {formErrors.assignedUsers && (
+    <p className="text-red-500 text-xs mt-2">{formErrors.assignedUsers}</p>
+  )}
+</div>
+
+
+
+{/* Add this section after the Detailed Remark section, before the Submit Buttons */}
+
+{/* Reassignment History Section - Without FontAwesome */}
+{Array.isArray(data.reassignment_remarks) && data.reassignment_remarks.length > 0 && (
+  <div className="mt-6 bg-gray-50 dark:bg-gray-900/50 p-5 rounded-xl">
+    <h3 className="text-lg font-semibold mb-4 text-gray-800 dark:text-white border-b border-gray-300 dark:border-gray-700 pb-2 flex items-center gap-2">
+      <span className="text-yellow-500">📋</span>
+      Reassignment History ({data.reassignment_remarks.length})
+    </h3>
+
+    <div className="bg-white dark:bg-boxdark border rounded-md p-3 max-h-60 overflow-y-auto space-y-2">
+      {data.reassignment_remarks
+        .slice()
+        .sort((a: any, b: any) => {
+          const dateA = new Date(a?.reassignment_date || a?.created_at || 0).getTime();
+          const dateB = new Date(b?.reassignment_date || b?.created_at || 0).getTime();
+          return dateB - dateA; // Latest first
+        })
+        .map((remarkObj: any, index: number) => {
+          const displayNumber = index + 1;
+
+          // Object format
+          if (remarkObj && typeof remarkObj === 'object') {
+            return (
+              <div
+                key={index}
+                className="border rounded p-3 text-xs bg-gray-50 dark:bg-gray-800"
+              >
+                {/* Header */}
+                <div className="flex justify-between items-center mb-1">
+                  <div className="flex items-center gap-1.5">
+                    <span className="font-semibold text-blue-600">
+                      #{displayNumber}
+                    </span>
+
+                    {remarkObj.leadStage && (
+                      <span className="px-1.5 py-0.5 text-[10px] bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300 rounded">
+                        {remarkObj.leadStage}
+                      </span>
+                    )}
+
+                    {index === 0 && (
+                      <span className="px-1 py-0.5 text-[9px] bg-green-100 text-green-700 rounded">
+                        Latest
+                      </span>
+                    )}
+                  </div>
+
+                  <span className="text-[10px] text-gray-500">
+                    {remarkObj.reassignment_date || remarkObj.created_at || ''}
+                  </span>
+                </div>
+
+                {/* From → To */}
+                {remarkObj.assignedTo && (
+                  <div className="text-gray-700 dark:text-gray-300 mb-1">
+                    <span className="font-medium">
+                      {remarkObj.name || 'Unknown'}
+                    </span>
+                    {remarkObj.role && (
+                      <span className="text-gray-400">
+                        {' '}({remarkObj.role})
+                      </span>
+                    )}
+                    <span className="mx-1 text-gray-400">→</span>
+                    <span className="font-medium">
+                      {remarkObj.assignedTo}
+                    </span>
+                  </div>
+                )}
+
+                {/* Remark */}
+                {remarkObj.remark && (
+                  <div className="bg-white dark:bg-gray-900 px-2 py-1 rounded text-gray-800 dark:text-gray-200 text-[11px]">
+                    {remarkObj.remark}
+                  </div>
+                )}
+              </div>
+            );
+          }
+
+          // Legacy string format
+          if (typeof remarkObj === 'string') {
+            return (
+              <div
+                key={index}
+                className="border rounded p-3 text-xs bg-gray-50 dark:bg-gray-800"
+              >
+                <div className="flex justify-between items-center mb-1">
+                  <span className="font-semibold text-blue-600">
+                    #{displayNumber}
+                  </span>
+                  <span className="text-[10px] text-gray-500">
+                    Legacy Format
+                  </span>
+                </div>
+                {remarkObj}
+              </div>
+            );
+          }
+
+          return null;
+        })}
+    </div>
+  </div>
+)}
 
             {/* DETAILED REMARK */}
             <div>
               <label className="block mb-2 text-sm font-medium text-gray-700 dark:text-white">
-                Detailed Remark *
-                
+                Detailed Remark {/* Removed * */}
               </label>
               <textarea
                 name="detailed_remark"
@@ -689,7 +856,7 @@ const EditTeleCallerForm: React.FC<EditTeleCallerFormProps> = ({
                     ? 'border-red-500 dark:border-red-500' 
                     : 'border-gray-300 dark:border-gray-600'
                 }`}
-                required
+                // Removed required attribute
               />
               {formErrors.detailed_remark && (
                 <p className="text-red-500 text-xs mt-1">{formErrors.detailed_remark}</p>

@@ -105,7 +105,7 @@ const Category = () => {
 
       {/* Table Wrapper */}
       <div className="overflow-x-auto rounded-sm border border-stroke bg-white shadow-default dark:border-strokedark dark:bg-boxdark">
-        <table className="w-full min-w-[600px] table-auto">
+<table className="w-full table-auto sm:min-w-[600px]">
           <thead>
             <tr className="bg-gray-200 dark:bg-meta-4">
               <th className="py-3 px-3 text-left text-sm font-medium text-black dark:text-white">
