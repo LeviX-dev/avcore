@@ -24,7 +24,7 @@ import {
   faUsers,
   faTasks,
   faCalendarAlt,
-  faTrashAlt, // Add this
+  faTrashAlt,
 } from '@fortawesome/free-solid-svg-icons';
 import Breadcrumb from '../../components/Breadcrumbs/Breadcrumb.js';
 import axios from 'axios';
@@ -150,13 +150,12 @@ interface DocumentData {
   videos: DocItem[];
 }
 
-// Update the DocItem interface
 interface DocItem {
-  doc_id: number; // Add this
+  doc_id: number;
   url: string;
   link?: string | null;
   remark?: string | null;
-  document_type?: string; // Optional: to know the type
+  document_type?: string;
 }
 
 // ActionButton Component
@@ -394,7 +393,7 @@ const STAGE_PERCENTAGE_MAP: Record<string, number> = {
   'Closed Deal': 100,
 };
 
-// ProgressStatus Component - Compact with smaller percentage
+// ProgressStatus Component
 const ProgressStatus: React.FC<{
   stage: string;
   status_percentage?: number;
@@ -409,11 +408,9 @@ const ProgressStatus: React.FC<{
   const cleanStage = stage ? stage.trim() : '';
   const percentage = status_percentage;
 
-  // Get progress bar color based on exact stage-to-color mapping
   const getProgressColor = (stage: string) => {
     const stageLower = stage.toLowerCase().trim();
 
-    // Exact mapping from color table
     if (stageLower.includes('fresh'))
       return 'bg-[#FFFFFF] border border-gray-300';
     if (stageLower.includes('cold')) return 'bg-[#A9A9A9]';
@@ -429,20 +426,16 @@ const ProgressStatus: React.FC<{
     if (stageLower.includes('drop')) return 'bg-[#FF0000]';
     if (stageLower.includes('closed')) return 'bg-[#006400]';
 
-    // Fallback
     return 'bg-[#A9A9A9]';
   };
 
   return (
     <div className="flex flex-col items-center w-16">
-      {/* Percentage Display - Medium size */}
       <div className="text-sm font-bold text-gray-900 dark:text-white mb-0.5">
         {percentage}%
       </div>
 
-      {/* Progress Bar Container - Very thin */}
       <div className="w-full h-1.5 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden mb-0.5">
-        {/* Progress Fill with exact color */}
         <div
           className={`h-full rounded-full ${getProgressColor(
             cleanStage,
@@ -451,7 +444,6 @@ const ProgressStatus: React.FC<{
         />
       </div>
 
-      {/* Stage Name - Smaller text */}
       <div className="w-full text-center">
         <div className="text-[10px] font-medium text-gray-700 dark:text-gray-300 truncate">
           {is_drop_stage ? previous_stage || cleanStage : cleanStage || 'N/A'}
@@ -469,7 +461,6 @@ const ProgressStatus: React.FC<{
 const DropLeadsPage: React.FC = () => {
   // State declarations
   const [dropLeads, setDropLeads] = useState<DropLead[]>([]);
-  const [filteredLeads, setFilteredLeads] = useState<DropLead[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedClient, setSelectedClient] = useState<DropLead | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -541,7 +532,7 @@ const DropLeadsPage: React.FC = () => {
   const userFilterRef = useRef<HTMLDivElement>(null);
   const cityFilterRef = useRef<HTMLDivElement>(null);
 
-  // Add these state variables near your other state declarations (around line ~242)
+  // Batch selection state
   const [selectedLeads, setSelectedLeads] = useState<number[]>([]);
   const [selectedMasterIds, setSelectedMasterIds] = useState<number[]>([]);
   const [showAssignPopup, setShowAssignPopup] = useState(false);
@@ -552,15 +543,17 @@ const DropLeadsPage: React.FC = () => {
     reassignmentDate: new Date().toISOString().split('T')[0],
   });
 
-  const [openRemark, setOpenRemark] = useState(null);
+  const [openRemark, setOpenRemark] = useState<any>(null);
+  const [detailedRemark, setDetailedRemark] = useState('');
 
-  const handleShowRemark = (text) => {
+  // Handle remark display
+  const handleShowRemark = (text: string) => {
     if (!text) return;
     setOpenRemark(text);
   };
 
-  // Add this function after your other handler functions (around line ~535)
-  const handleChange = (
+  // Handle assign form changes
+  const handleAssignChange = (
     e: React.ChangeEvent<
       HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement
     >,
@@ -572,241 +565,34 @@ const DropLeadsPage: React.FC = () => {
     }));
   };
 
-  // Fetch drop leads
-  const fetchDropLeads = async () => {
-    try {
-      setLoading(true);
-      const response = await axios.get(
-        `${BASE_URL}api/dashboard/drop-leads-fulldata`,
-        {
-          params: {
-            page: currentPage,
-            limit: itemsPerPage,
-          },
-          withCredentials: true,
-        },
-      );
-
-      const data = response.data;
-
-      // Handle different response formats
-      let dropLeadsArray: any[] = [];
-      let totalCount = 0;
-
-      if (Array.isArray(data)) {
-        // API returns array directly
-        dropLeadsArray = data;
-        totalCount = data.length;
-      } else if (data.success && Array.isArray(data.leads)) {
-        // API returns {success: true, leads: [...], total: number}
-        dropLeadsArray = data.leads;
-        totalCount = data.total || data.leads.length;
-      } else {
-        console.error('Unexpected data format:', data);
-        setDropLeads([]);
-        setFilteredLeads([]);
-        setTotalLeads(0);
-        return;
-      }
-
-      // For drop leads, we need to extract previous stage from reassignment remarks
-      const processReassignmentRemarks = (remarks: any[]) => {
-        if (!remarks || !Array.isArray(remarks)) return [];
-
-        return remarks.map((remark: any) => ({
-          remark: remark.remark || '',
-          created_by_user: remark.created_by_user || 0,
-          created_at: remark.created_at || '',
-          name: remark.name || '',
-          role: remark.role || '',
-          assignedTo: remark.assignedTo || '',
-          leadStage: remark.leadStage || '',
-          reassignment_date: remark.reassignment_date || '',
-        }));
-      };
-
-      const parseValue = (value: any) => {
-        if (
-          value === 'Not Available' ||
-          value === null ||
-          value === undefined ||
-          value === '' ||
-          value === 'Not Found'
-        ) {
-          return '';
-        }
-        return value;
-      };
-
-      const parseIdValue = (value: any) => {
-        if (
-          value === 'Not Available' ||
-          value === null ||
-          value === undefined ||
-          value === 'Not Found'
-        ) {
-          return '';
-        }
-        return isNaN(value) ? value : Number(value);
-      };
-
-      const processedData = dropLeadsArray.map((item: any) => {
-        // For drop leads, the current stage is always "Drop"
-        const currentStage = 'Drop';
-        const cleanStage = 'Drop';
-
-        // Find previous stage from reassignment remarks
-        let previousStage = '';
-        const reassignmentRemarks = processReassignmentRemarks(
-          item.reassignment_remarks,
-        );
-
-        // Find the most recent non-drop stage from reassignment remarks
-        if (reassignmentRemarks.length > 0) {
-          const nonDropRemarks = reassignmentRemarks.filter(
-            (remark: any) =>
-              remark.leadStage && remark.leadStage.trim() !== 'Drop',
-          );
-
-          if (nonDropRemarks.length > 0) {
-            // Sort by date to get most recent
-            const sorted = nonDropRemarks.sort((a: any, b: any) => {
-              const dateA = a.reassignment_date
-                ? new Date(a.reassignment_date).getTime()
-                : 0;
-              const dateB = b.reassignment_date
-                ? new Date(b.reassignment_date).getTime()
-                : 0;
-              return dateB - dateA; // Most recent first
-            });
-            previousStage = sorted[0]?.leadStage?.trim() || '';
-          }
-        }
-
-        // If no previous stage found, use default
-        if (!previousStage) {
-          previousStage = 'Positive Lead'; // Default for drop leads
-        }
-
-        // Calculate percentage based on previous stage
-        const status_percentage = previousStage
-          ? STAGE_PERCENTAGE_MAP[previousStage] || 0
-          : 0;
-
-        // Get assigned user info
-        const assignedTo = parseValue(
-          item.reassigned_to ||
-            item.telecaller_name ||
-            item.latest_reassigned_to ||
-            item.a_assigned_to,
-        );
-
-        const assignDate = parseDateValue(
-          item.a_assign_date ||
-            item.assign_date ||
-            item.reassignment_date ||
-            item.created_at,
-        );
-
-        const followupDate = parseValue(item.followup_date);
-
-        return {
-          master_id: item.master_id,
-          name: parseValue(item.name),
-          number: parseValue(item.number),
-          email: parseValue(item.email),
-          address: parseValue(item.address),
-          city: parseValue(item.city),
-          cat_id: parseIdValue(item.cat_id),
-          status: parseValue(item.status),
-          lead_status: parseValue(item.lead_status),
-          lead_stage: cleanStage,
-          created_at: parseValue(item.created_at),
-          quick_remark: parseValue(item.quick_remark),
-          detailed_remark: parseValue(item.detailed_remark),
-          followup_date: followupDate,
-          assign_date: assignDate,
-          assigned_to: assignedTo,
-          assigned_user_name: assignedTo,
-          reassignment_id: parseIdValue(item.reassignment_id),
-          reassignment_date: parseValue(item.reassignment_date),
-          reassigned_to: parseValue(item.reassigned_to),
-          telecaller_name: assignedTo,
-          document_count: item.document_count || 0,
-          area_name: parseValue(item.area_name),
-          area: parseValue(item.area_name),
-          cat_name: parseValue(item.cat_name),
-          reference_name: parseValue(item.reference_name),
-          room_length: parseValue(item.room_length),
-          room_width: parseValue(item.room_width),
-          room_height: parseValue(item.room_height),
-          location_link: parseValue(item.location_link),
-          p_type: parseValue(item.p_type),
-          budget_range: parseValue(item.budget_range),
-          current_stage: parseValue(item.current_stage),
-          room_ready: parseValue(item.room_ready),
-          time_to_complete: parseValue(item.time_to_complete),
-          site_visit_date: parseValue(item.site_visit_date),
-          demo_date: parseValue(item.demo_date),
-          ar_number: parseValue(item.ar_number),
-          ca_number: parseValue(item.ca_number),
-          e_number: parseValue(item.e_number),
-          sm_number: parseValue(item.sm_number),
-          pop_number: parseValue(item.pop_number),
-          other_number: parseValue(item.other_number),
-          reassignment_remarks: reassignmentRemarks,
-          latest_assignedTo: parseValue(item.latest_assignedTo),
-          latest_leadStage: parseValue(item.latest_leadStage),
-
-          // Battery-related fields
-          status_percentage: status_percentage,
-          is_drop_stage: true, // Always true for drop leads
-          previous_stage: previousStage,
-
-          // Additional fields for EditRawData
-          category_other: parseValue(item.category_other),
-          reference_other: parseValue(item.reference_other),
-          architect_name: parseValue(item.architect_name),
-          alternate_number: parseValue(item.alternate_number),
-          reference_id: parseIdValue(item.reference_id),
-          area_id: parseIdValue(item.area_id),
-          assign_id: parseIdValue(item.assign_id),
-          document_location_link: parseValue(item.document_location_link),
-        };
-      });
-
-      const sortedData = processedData.sort(
-        (a: DropLead, b: DropLead) => b.master_id - a.master_id,
-      );
-
-      setDropLeads(sortedData);
-      setFilteredLeads(sortedData);
-      setTotalLeads(totalCount);
-
-      // Extract unique cities
-      const cities = sortedData
-        .map((lead) => lead.city?.trim())
-        .filter(
-          (city) =>
-            city &&
-            city !== '' &&
-            city !== 'Not Available' &&
-            city !== 'N/A' &&
-            city !== 'Not Found',
-        )
-        .filter((city, index, self) => self.indexOf(city) === index)
-        .sort() as string[];
-      setAvailableCities(cities);
-    } catch (error) {
-      console.error('Error fetching drop leads:', error);
-      setDropLeads([]);
-      setFilteredLeads([]);
-      setTotalLeads(0);
-    } finally {
-      setLoading(false);
+  // Parse value helper function
+  const parseValue = (value: any) => {
+    if (
+      value === 'Not Available' ||
+      value === null ||
+      value === undefined ||
+      value === '' ||
+      value === 'Not Found'
+    ) {
+      return '';
     }
+    return value;
   };
 
+  // Parse ID value helper function
+  const parseIdValue = (value: any) => {
+    if (
+      value === 'Not Available' ||
+      value === null ||
+      value === undefined ||
+      value === 'Not Found'
+    ) {
+      return '';
+    }
+    return isNaN(value) ? value : Number(value);
+  };
+
+  // Parse date value helper function
   const parseDateValue = (value: any) => {
     if (
       value === 'Not Available' ||
@@ -818,24 +604,422 @@ const DropLeadsPage: React.FC = () => {
       return '';
     }
 
-    // If it's already a Date object or valid timestamp
     if (value instanceof Date) {
-      return value.toISOString().split('T')[0]; // Return YYYY-MM-DD format
+      return value.toISOString().split('T')[0];
     }
 
-    // If it's a string, try to parse it
     if (typeof value === 'string') {
-      // Remove any timezone issues
-      const dateStr = value.split('T')[0]; // Take only date part
+      const dateStr = value.split('T')[0];
       const date = new Date(dateStr);
 
-      // Check if date is valid
       if (!isNaN(date.getTime())) {
-        return date.toISOString().split('T')[0]; // Return in YYYY-MM-DD format
+        return date.toISOString().split('T')[0];
       }
     }
 
     return '';
+  };
+
+  // Process reassignment remarks
+  const processReassignmentRemarks = (remarks: any[]) => {
+    if (!remarks || !Array.isArray(remarks)) return [];
+
+    return remarks.map((remark: any) => ({
+      remark: remark.remark || '',
+      created_by_user: remark.created_by_user || 0,
+      created_at: remark.created_at || '',
+      name: remark.name || '',
+      role: remark.role || '',
+      assignedTo: remark.assignedTo || '',
+      leadStage: remark.leadStage || '',
+      reassignment_date: remark.reassignment_date || '',
+    }));
+  };
+
+  // Fetch drop leads with server-side pagination and filtering
+  const fetchDropLeads = async () => {
+    try {
+      setLoading(true);
+      
+      // Build filter parameters
+      const filterParams: any = {
+        page: currentPage,
+        limit: itemsPerPage,
+      };
+
+      // Add search term if exists
+      if (searchTerm.trim()) {
+        filterParams.search = searchTerm;
+      }
+
+      // Add date filters
+      if (selectedEntryFromDate) filterParams.entryFromDate = selectedEntryFromDate;
+      if (selectedEntryToDate) filterParams.entryToDate = selectedEntryToDate;
+      if (selectedFollowupFromDate) filterParams.followupFromDate = selectedFollowupFromDate;
+      if (selectedFollowupToDate) filterParams.followupToDate = selectedFollowupToDate;
+      
+      // Add array filters
+      if (selectedStages.length > 0) filterParams.stages = selectedStages.join(',');
+      if (selectedUsersFilter.length > 0) filterParams.users = selectedUsersFilter.join(',');
+      if (selectedCities.length > 0) filterParams.cities = selectedCities.join(',');
+
+      const response = await axios.get(
+        `${BASE_URL}api/dashboard/drop-leads-fulldata`,
+        {
+          params: filterParams,
+          withCredentials: true,
+        }
+      );
+
+      const data = response.data;
+
+      if (data.success) {
+        const dropLeadsArray = data.dropLeads || [];
+        
+        const processedData = dropLeadsArray.map((item: any) => {
+          // For drop leads, the current stage is always "Drop"
+          const currentStage = 'Drop';
+          const cleanStage = 'Drop';
+
+          // Find previous stage from reassignment remarks
+          let previousStage = '';
+          const reassignmentRemarks = processReassignmentRemarks(
+            item.reassignment_remarks,
+          );
+
+          // Find the most recent non-drop stage from reassignment remarks
+          if (reassignmentRemarks.length > 0) {
+            const nonDropRemarks = reassignmentRemarks.filter(
+              (remark: any) =>
+                remark.leadStage && remark.leadStage.trim() !== 'Drop',
+            );
+
+            if (nonDropRemarks.length > 0) {
+              // Sort by date to get most recent
+              const sorted = nonDropRemarks.sort((a: any, b: any) => {
+                const dateA = a.reassignment_date
+                  ? new Date(a.reassignment_date).getTime()
+                  : 0;
+                const dateB = b.reassignment_date
+                  ? new Date(b.reassignment_date).getTime()
+                  : 0;
+                return dateB - dateA; // Most recent first
+              });
+              previousStage = sorted[0]?.leadStage?.trim() || '';
+            }
+          }
+
+          // If no previous stage found, use default
+          if (!previousStage) {
+            previousStage = 'Positive Lead'; // Default for drop leads
+          }
+
+          // Calculate percentage based on previous stage
+          const status_percentage = previousStage
+            ? STAGE_PERCENTAGE_MAP[previousStage] || 0
+            : 0;
+
+          // Get assigned user info
+          const assignedTo = parseValue(
+            item.reassigned_to ||
+              item.telecaller_name ||
+              item.latest_assignedTo ||
+              item.assigned_to,
+          );
+
+          const assignDate = parseDateValue(
+            item.assign_date ||
+              item.reassignment_date ||
+              item.created_at,
+          );
+
+          const followupDate = parseValue(item.followup_date);
+
+          return {
+            master_id: item.master_id,
+            name: parseValue(item.name),
+            number: parseValue(item.number),
+            email: parseValue(item.email),
+            address: parseValue(item.address),
+            city: parseValue(item.city),
+            cat_id: parseIdValue(item.cat_id),
+            status: parseValue(item.status),
+            lead_status: parseValue(item.lead_status),
+            lead_stage: cleanStage,
+            created_at: parseValue(item.created_at),
+            quick_remark: parseValue(item.quick_remark),
+            detailed_remark: parseValue(item.detailed_remark),
+            followup_date: followupDate,
+            assign_date: assignDate,
+            assigned_to: assignedTo,
+            assigned_user_name: assignedTo,
+            reassignment_id: parseIdValue(item.reassignment_id),
+            reassignment_date: parseValue(item.reassignment_date),
+            reassigned_to: parseValue(item.reassigned_to),
+            telecaller_name: assignedTo,
+            document_count: item.document_count || 0,
+            area_name: parseValue(item.area_name),
+            area: parseValue(item.area_name),
+            cat_name: parseValue(item.cat_name),
+            reference_name: parseValue(item.reference_name),
+            room_length: parseValue(item.room_length),
+            room_width: parseValue(item.room_width),
+            room_height: parseValue(item.room_height),
+            location_link: parseValue(item.location_link),
+            p_type: parseValue(item.p_type),
+            budget_range: parseValue(item.budget_range),
+            current_stage: parseValue(item.current_stage),
+            room_ready: parseValue(item.room_ready),
+            time_to_complete: parseValue(item.time_to_complete),
+            site_visit_date: parseValue(item.site_visit_date),
+            demo_date: parseValue(item.demo_date),
+            ar_number: parseValue(item.ar_number),
+            ca_number: parseValue(item.ca_number),
+            e_number: parseValue(item.e_number),
+            sm_number: parseValue(item.sm_number),
+            pop_number: parseValue(item.pop_number),
+            other_number: parseValue(item.other_number),
+            reassignment_remarks: reassignmentRemarks,
+            latest_assignedTo: parseValue(item.latest_assignedTo),
+            latest_leadStage: parseValue(item.latest_leadStage),
+
+            // Battery-related fields
+            status_percentage: status_percentage,
+            is_drop_stage: true,
+            previous_stage: previousStage,
+
+            // Additional fields for EditRawData
+            category_other: parseValue(item.category_other),
+            reference_other: parseValue(item.reference_other),
+            architect_name: parseValue(item.architect_name),
+            alternate_number: parseValue(item.alternate_number),
+            reference_id: parseIdValue(item.reference_id),
+            area_id: parseIdValue(item.area_id),
+            assign_id: parseIdValue(item.assign_id),
+            document_location_link: parseValue(item.document_location_link),
+          };
+        });
+
+        const sortedData = processedData.sort(
+          (a: DropLead, b: DropLead) => b.master_id - a.master_id,
+        );
+
+        // Update total leads from backend response
+        setTotalLeads(data.total || 0);
+        
+        // Set the data
+        setDropLeads(sortedData);
+        
+        // Extract unique cities from the current page data
+        const cities = sortedData
+          .map(lead => lead.city?.trim())
+          .filter(city => city && city !== '' && city !== 'Not Available' && city !== 'N/A')
+          .filter((city, index, self) => self.indexOf(city) === index)
+          .sort() as string[];
+        setAvailableCities(cities);
+        
+      } else {
+        console.error('Error fetching drop leads:', data);
+        setDropLeads([]);
+        setTotalLeads(0);
+      }
+    } catch (error) {
+      console.error('Error fetching drop leads:', error);
+      setDropLeads([]);
+      setTotalLeads(0);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Apply filters function (server-side)
+  const applyFilters = async () => {
+    try {
+      setLoading(true);
+      
+      // Build filter parameters for server-side
+      const filterParams: any = {
+        page: currentPage,
+        limit: itemsPerPage,
+      };
+
+      // Add search term if exists
+      if (searchTerm.trim()) {
+        filterParams.search = searchTerm;
+      }
+
+      // Add date filters
+      if (selectedEntryFromDate) filterParams.entryFromDate = selectedEntryFromDate;
+      if (selectedEntryToDate) filterParams.entryToDate = selectedEntryToDate;
+      if (selectedFollowupFromDate) filterParams.followupFromDate = selectedFollowupFromDate;
+      if (selectedFollowupToDate) filterParams.followupToDate = selectedFollowupToDate;
+      
+      // Add array filters
+      if (selectedStages.length > 0) filterParams.stages = selectedStages.join(',');
+      if (selectedUsersFilter.length > 0) filterParams.users = selectedUsersFilter.join(',');
+      if (selectedCities.length > 0) filterParams.cities = selectedCities.join(',');
+      
+      // Call API with filters
+      const response = await axios.get(
+        `${BASE_URL}api/dashboard/drop-leads-fulldata`,
+        {
+          params: filterParams,
+          withCredentials: true,
+        }
+      );
+
+      const data = response.data;
+
+      if (data.success) {
+        const dropLeadsArray = data.dropLeads || [];
+        
+        const processedData = dropLeadsArray.map((item: any) => {
+          // For drop leads, the current stage is always "Drop"
+          const currentStage = 'Drop';
+          const cleanStage = 'Drop';
+
+          // Find previous stage from reassignment remarks
+          let previousStage = '';
+          const reassignmentRemarks = processReassignmentRemarks(
+            item.reassignment_remarks,
+          );
+
+          // Find the most recent non-drop stage from reassignment remarks
+          if (reassignmentRemarks.length > 0) {
+            const nonDropRemarks = reassignmentRemarks.filter(
+              (remark: any) =>
+                remark.leadStage && remark.leadStage.trim() !== 'Drop',
+            );
+
+            if (nonDropRemarks.length > 0) {
+              // Sort by date to get most recent
+              const sorted = nonDropRemarks.sort((a: any, b: any) => {
+                const dateA = a.reassignment_date
+                  ? new Date(a.reassignment_date).getTime()
+                  : 0;
+                const dateB = b.reassignment_date
+                  ? new Date(b.reassignment_date).getTime()
+                  : 0;
+                return dateB - dateA;
+              });
+              previousStage = sorted[0]?.leadStage?.trim() || '';
+            }
+          }
+
+          if (!previousStage) {
+            previousStage = 'Positive Lead';
+          }
+
+          const status_percentage = previousStage
+            ? STAGE_PERCENTAGE_MAP[previousStage] || 0
+            : 0;
+
+          const assignedTo = parseValue(
+            item.reassigned_to ||
+              item.telecaller_name ||
+              item.latest_assignedTo ||
+              item.assigned_to,
+          );
+
+          const assignDate = parseDateValue(
+            item.assign_date ||
+              item.reassignment_date ||
+              item.created_at,
+          );
+
+          const followupDate = parseValue(item.followup_date);
+
+          return {
+            master_id: item.master_id,
+            name: parseValue(item.name),
+            number: parseValue(item.number),
+            email: parseValue(item.email),
+            address: parseValue(item.address),
+            city: parseValue(item.city),
+            cat_id: parseIdValue(item.cat_id),
+            status: parseValue(item.status),
+            lead_status: parseValue(item.lead_status),
+            lead_stage: cleanStage,
+            created_at: parseValue(item.created_at),
+            quick_remark: parseValue(item.quick_remark),
+            detailed_remark: parseValue(item.detailed_remark),
+            followup_date: followupDate,
+            assign_date: assignDate,
+            assigned_to: assignedTo,
+            assigned_user_name: assignedTo,
+            reassignment_id: parseIdValue(item.reassignment_id),
+            reassignment_date: parseValue(item.reassignment_date),
+            reassigned_to: parseValue(item.reassigned_to),
+            telecaller_name: assignedTo,
+            document_count: item.document_count || 0,
+            area_name: parseValue(item.area_name),
+            area: parseValue(item.area_name),
+            cat_name: parseValue(item.cat_name),
+            reference_name: parseValue(item.reference_name),
+            room_length: parseValue(item.room_length),
+            room_width: parseValue(item.room_width),
+            room_height: parseValue(item.room_height),
+            location_link: parseValue(item.location_link),
+            p_type: parseValue(item.p_type),
+            budget_range: parseValue(item.budget_range),
+            current_stage: parseValue(item.current_stage),
+            room_ready: parseValue(item.room_ready),
+            time_to_complete: parseValue(item.time_to_complete),
+            site_visit_date: parseValue(item.site_visit_date),
+            demo_date: parseValue(item.demo_date),
+            ar_number: parseValue(item.ar_number),
+            ca_number: parseValue(item.ca_number),
+            e_number: parseValue(item.e_number),
+            sm_number: parseValue(item.sm_number),
+            pop_number: parseValue(item.pop_number),
+            other_number: parseValue(item.other_number),
+            reassignment_remarks: reassignmentRemarks,
+            latest_assignedTo: parseValue(item.latest_assignedTo),
+            latest_leadStage: parseValue(item.latest_leadStage),
+
+            status_percentage: status_percentage,
+            is_drop_stage: true,
+            previous_stage: previousStage,
+
+            category_other: parseValue(item.category_other),
+            reference_other: parseValue(item.reference_other),
+            architect_name: parseValue(item.architect_name),
+            alternate_number: parseValue(item.alternate_number),
+            reference_id: parseIdValue(item.reference_id),
+            area_id: parseIdValue(item.area_id),
+            assign_id: parseIdValue(item.assign_id),
+            document_location_link: parseValue(item.document_location_link),
+          };
+        });
+
+        const sortedData = processedData.sort(
+          (a: DropLead, b: DropLead) => b.master_id - a.master_id,
+        );
+
+        // Set the data from server response
+        setDropLeads(sortedData);
+        setTotalLeads(data.total || 0);
+        
+        // Extract unique cities for filter dropdown
+        const cities = sortedData
+          .map(lead => lead.city?.trim())
+          .filter(city => city && city !== '' && city !== 'Not Available' && city !== 'N/A')
+          .filter((city, index, self) => self.indexOf(city) === index)
+          .sort() as string[];
+        setAvailableCities(cities);
+        
+      } else {
+        console.error('Error fetching filtered drop leads:', data);
+        setDropLeads([]);
+        setTotalLeads(0);
+      }
+    } catch (error) {
+      console.error('Error applying filters:', error);
+      setDropLeads([]);
+      setTotalLeads(0);
+    } finally {
+      setLoading(false);
+    }
   };
 
   // Fetch other data
@@ -887,195 +1071,102 @@ const DropLeadsPage: React.FC = () => {
     }
   };
 
-  // Apply filters function
-  const applyFilters = () => {
-    let filtered = [...dropLeads];
-    const lowerSearch = searchTerm.toLowerCase();
+  // Apply filters when filter criteria change
+useEffect(() => {
+  applyFilters();
+}, [
+  currentPage,
+  searchTerm,
+  selectedEntryFromDate,
+  selectedEntryToDate,
+  selectedFollowupFromDate,
+  selectedFollowupToDate,
+  selectedStages,
+  selectedUsersFilter,
+  selectedCities
+]); 
 
-    // Apply Search Term Filter
-    if (searchTerm) {
-      filtered = filtered.filter((lead) => {
-        const searchFields = [
-          lead.name?.toLowerCase() || '',
-          lead.number?.toString() || '',
-          lead.email?.toLowerCase() || '',
-          lead.address?.toLowerCase() || '',
-          lead.area?.toLowerCase() || '',
-          lead.cat_name?.toLowerCase() || '',
-          lead.master_id?.toString() || '',
-          lead.status?.toLowerCase() || '',
-          lead.assigned_to?.toLowerCase() || '',
-          lead.city?.toLowerCase() || '',
-          lead.lead_stage?.toLowerCase() || '',
-          lead.telecaller_name?.toLowerCase() || '',
-        ];
-        return searchFields.some((field) => field.includes(lowerSearch));
-      });
-    }
-
-    // Apply Entry Date Range Filter
-    if (selectedEntryFromDate || selectedEntryToDate) {
-      filtered = filtered.filter((lead) => {
-        if (!lead.assign_date) return false;
-
-        const leadDate = new Date(lead.assign_date);
-
-        if (isNaN(leadDate.getTime())) return false;
-
-        let fromDateValid = true;
-        let toDateValid = true;
-
-        if (selectedEntryFromDate) {
-          const fromDate = new Date(selectedEntryFromDate);
-          fromDateValid = leadDate >= fromDate;
-        }
-
-        if (selectedEntryToDate) {
-          const toDate = new Date(selectedEntryToDate);
-          toDateValid = leadDate <= toDate;
-        }
-
-        return fromDateValid && toDateValid;
-      });
-    }
-
-    // Apply Followup Date Range Filter
-    if (selectedFollowupFromDate || selectedFollowupToDate) {
-      filtered = filtered.filter((lead) => {
-        if (!lead.followup_date) return false;
-
-        const leadDate = new Date(lead.followup_date);
-
-        if (isNaN(leadDate.getTime())) return false;
-
-        let fromDateValid = true;
-        let toDateValid = true;
-
-        if (selectedFollowupFromDate) {
-          const fromDate = new Date(selectedFollowupFromDate);
-          fromDateValid = leadDate >= fromDate;
-        }
-
-        if (selectedFollowupToDate) {
-          const toDate = new Date(selectedFollowupToDate);
-          toDateValid = leadDate <= toDate;
-        }
-
-        return fromDateValid && toDateValid;
-      });
-    }
-
-    // Apply Stage Filter
-    if (selectedStages.length > 0) {
-      filtered = filtered.filter(
-        (lead) => lead.lead_stage && selectedStages.includes(lead.lead_stage),
-      );
-    }
-
-    // Apply Assigned User Filter
-    if (selectedUsersFilter.length > 0) {
-      filtered = filtered.filter(
-        (lead) =>
-          lead.assigned_to && selectedUsersFilter.includes(lead.assigned_to),
-      );
-    }
-
-    // Apply City Filter
-    if (selectedCities.length > 0) {
-      filtered = filtered.filter(
-        (lead) => lead.city && selectedCities.includes(lead.city),
-      );
-    }
-
-    setFilteredLeads(filtered);
+// Handle itemsPerPage changes - refetch data when itemsPerPage changes
+useEffect(() => {
+  if (currentPage === 1) {
+    // If we're on page 1, just refetch
+    fetchDropLeads();
+  } else {
+    // If we're not on page 1, reset to page 1 which will trigger fetchDropLeads
     setCurrentPage(1);
-  };
+  }
+}, [itemsPerPage]); // Only run when itemsPerPage changes 
 
-  // Apply filters when any filter changes
-  useEffect(() => {
-    applyFilters();
-  }, [
-    searchTerm,
-    selectedEntryFromDate,
-    selectedEntryToDate,
-    selectedFollowupFromDate,
-    selectedFollowupToDate,
-    selectedStages,
-    selectedUsersFilter,
-    selectedCities,
-    dropLeads,
-  ]);
-
-  // Handle custom record count
-  useEffect(() => {
-    if (
-      customRecordCount &&
-      typeof customRecordCount === 'number' &&
-      customRecordCount > 0
-    ) {
-      const limitedLeads = dropLeads.slice(0, customRecordCount);
-      setFilteredLeads(limitedLeads);
-      setCurrentPage(1);
-      setItemsPerPage(customRecordCount);
-    } else {
-      applyFilters();
-      setItemsPerPage(10);
-    }
-  }, [customRecordCount, dropLeads]);
 
   // Filter user search
-  useEffect(() => {
-    if (searchUserTerm.trim() === '') {
-      setFilteredUsers(users);
-    } else {
-      const term = searchUserTerm.toLowerCase();
-      const filtered = users.filter(
-        (user) =>
-          user.name.toLowerCase().includes(term) ||
-          (user.role && user.role.toLowerCase().includes(term)),
-      );
-      setFilteredUsers(filtered);
-    }
-  }, [searchUserTerm, users]);
+useEffect(() => {
+  if (searchUserTerm.trim() === '') {
+    setFilteredUsers(users);
+  } else {
+    const term = searchUserTerm.toLowerCase();
+    const filtered = users.filter(
+      (user) =>
+        user.name.toLowerCase().includes(term) ||
+        (user.role && user.role.toLowerCase().includes(term)),
+    );
+    setFilteredUsers(filtered);
+  }
+}, [searchUserTerm, users]); 
+
 
   // Filter handlers
   const handleStageSelect = (stage: string) => {
-    setSelectedStages((prev) =>
-      prev.includes(stage) ? prev.filter((s) => s !== stage) : [...prev, stage],
+    setSelectedStages(prev =>
+      prev.includes(stage) ? prev.filter(s => s !== stage) : [...prev, stage]
     );
+    setShowStageFilter(false);
   };
 
   const handleUserSelect = (userName: string) => {
-    setSelectedUsersFilter((prev) =>
-      prev.includes(userName)
-        ? prev.filter((u) => u !== userName)
-        : [...prev, userName],
+    setSelectedUsersFilter(prev =>
+      prev.includes(userName) ? prev.filter(u => u !== userName) : [...prev, userName]
     );
+    setShowUserFilter(false);
   };
 
   const handleCitySelect = (city: string) => {
-    setSelectedCities((prev) =>
-      prev.includes(city) ? prev.filter((c) => c !== city) : [...prev, city],
+    setSelectedCities(prev =>
+      prev.includes(city) ? prev.filter(c => c !== city) : [...prev, city]
     );
+    setShowCityFilter(false);
   };
 
-  const clearFilters = () => {
+  const clearFilters = async () => {
+    // Clear all date filters
     setSelectedEntryFromDate('');
     setSelectedEntryToDate('');
     setSelectedFollowupFromDate('');
     setSelectedFollowupToDate('');
+
+    // Clear all selection filters
     setSelectedStages([]);
     setSelectedUsersFilter([]);
     setSelectedCities([]);
 
+    // Clear search term
+    setSearchTerm('');
+
+    // Clear custom record count
+    setCustomRecordCount('');
+    setItemsPerPage(10);
+
+    // Close all dropdowns
     setShowEntryDateCalendar(false);
     setShowFollowupDateCalendar(false);
     setShowStageFilter(false);
     setShowUserFilter(false);
     setShowCityFilter(false);
 
-    setFilteredLeads(dropLeads);
+    // Reset to page 1
     setCurrentPage(1);
+    
+    // Refetch data without filters
+    await fetchDropLeads();
   };
 
   const closeAllDropdowns = () => {
@@ -1086,38 +1177,41 @@ const DropLeadsPage: React.FC = () => {
     setShowCityFilter(false);
   };
 
-  const handleCustomRecordInput = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const value = e.target.value;
-    if (value === '') {
-      setCustomRecordCount('');
-      return;
-    }
 
-    const numValue = parseInt(value);
-    if (!isNaN(numValue) && numValue > 0) {
-      setCustomRecordCount(numValue);
-    }
-  };
-
-  const clearCustomRecordCount = () => {
+const handleCustomRecordInput = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const value = e.target.value;
+  if (value === '') {
     setCustomRecordCount('');
     setItemsPerPage(10);
-  };
+    setCurrentPage(1);
+    // Trigger refetch when clearing
+    setRefreshTrigger(prev => prev + 1);
+    return;
+  }
 
-  // Pagination calculations
-  const totalItems = filteredLeads.length;
-  const totalPages = Math.ceil(totalItems / itemsPerPage);
+  const numValue = parseInt(value);
+  if (!isNaN(numValue) && numValue > 0) {
+    setCustomRecordCount(numValue);
+    setItemsPerPage(numValue);
+    setCurrentPage(1); // Reset to page 1
+    // Trigger immediate refetch
+    setRefreshTrigger(prev => prev + 1);
+  }
+};
 
-  // Get current items
-  const indexOfLastItem = currentPage * itemsPerPage;
-  const indexOfFirstItem = indexOfLastItem - itemsPerPage;
-  const currentItems = filteredLeads.slice(indexOfFirstItem, indexOfLastItem);
 
-  const showingStart = totalItems === 0 ? 0 : indexOfFirstItem + 1;
-  const showingEnd = Math.min(indexOfLastItem, totalItems);
+const clearCustomRecordCount = () => {
+  setCustomRecordCount('');
+  setItemsPerPage(10);
+  setCurrentPage(1);
+  // Trigger refetch
+  setRefreshTrigger(prev => prev + 1);
+};
 
+
+  // Pagination handler
   const handlePageChange = (page: number) => {
-    if (page >= 1 && page <= totalPages) {
+    if (page >= 1 && page <= Math.ceil(totalLeads / itemsPerPage)) {
       setCurrentPage(page);
     }
   };
@@ -1130,7 +1224,7 @@ const DropLeadsPage: React.FC = () => {
     fetchArea();
     fetchUsers();
     fetchLeadStages();
-  }, [refreshTrigger, currentPage]);
+  }, [refreshTrigger]);
 
   // Call functionality
   const handleEdit = (lead: DropLead) => {
@@ -1166,6 +1260,7 @@ const DropLeadsPage: React.FC = () => {
     await fetchDropLeads();
   };
 
+  // Document functionality
   const handleFileIconClick = async (lead: DropLead) => {
     setDocsClient(lead);
 
@@ -1175,6 +1270,7 @@ const DropLeadsPage: React.FC = () => {
     setLeadStage('');
     setLocationLink('');
     setRemark('');
+    setDetailedRemark('');
 
     try {
       const response = await axios.get(
@@ -1194,11 +1290,11 @@ const DropLeadsPage: React.FC = () => {
         const fullUrl = `${BASE_URL}${filePath}`;
 
         const docObj: DocItem = {
-          doc_id: doc.doc_id, // Add this
+          doc_id: doc.doc_id,
           url: fullUrl,
           link: doc.location_link,
           remark: doc.remark,
-          document_type: doc.document_type, // Optional
+          document_type: doc.document_type,
         };
 
         if (doc.document_type === 'image') {
@@ -1223,20 +1319,8 @@ const DropLeadsPage: React.FC = () => {
     const files = e.target.files;
     if (!files) return;
 
-    // ✅ Allow ALL file types
     const selectedFiles = Array.from(files);
-
     setUploadFiles(selectedFiles);
-
-    // Optional debug
-    console.log(
-      '📁 Selected files:',
-      selectedFiles.map((file) => ({
-        name: file.name,
-        type: file.type,
-        size: file.size,
-      })),
-    );
   };
 
   const handleUploadSubmit = async () => {
@@ -1246,25 +1330,33 @@ const DropLeadsPage: React.FC = () => {
     }
 
     const formData = new FormData();
-
+    
     // Add files
     uploadFiles.forEach((file) => {
       formData.append('files', file);
     });
-
+    
     // Add additional fields
-    if (locationLink) formData.append('location_link', locationLink);
-    if (remark) formData.append('remark', remark);
-    if (followupDate) formData.append('followup_date', followupDate);
-    if (leadStage) formData.append('leadStage', leadStage);
+    if (locationLink) formData.append("location_link", locationLink);
+    if (remark) formData.append("remark", remark);
+    if (followupDate) formData.append("followup_date", followupDate);
+    if (leadStage) formData.append("leadStage", leadStage);
+    
+    // Add detailed remark field
+    if (detailedRemark) {
+      formData.append('detailed_remark', detailedRemark);
+    }
 
-    // Ensure assignedTo always sent
+    // Enhanced assignedTo handling
     if (selectedUsers && selectedUsers.length > 0) {
+      const assignedToString = selectedUsers.join(',');
+      formData.append('assignedTo', assignedToString);
+      
       selectedUsers.forEach((userId) => {
         formData.append('assignedTo[]', userId);
       });
     } else {
-      formData.append('assignedTo[]', '');
+      formData.append('assignedTo', '');
     }
 
     try {
@@ -1272,82 +1364,68 @@ const DropLeadsPage: React.FC = () => {
         `${BASE_URL}api/upload/${docsClient.master_id}`,
         formData,
         {
-          headers: {
+          headers: { 
             'Content-Type': 'multipart/form-data',
           },
-          withCredentials: true,
-        },
+          withCredentials: true,    
+        }
       );
 
-      alert('✅ Files uploaded successfully!');
-
-      // Refresh documents - IMPORTANT: Wait a moment for the database to be ready
-      setTimeout(async () => {
-        try {
-          const refreshResponse = await axios.get(
-            `${BASE_URL}api/documents/${docsClient.master_id}`,
-            { withCredentials: true },
-          );
-
-          const processFilePath = (filePath: string) => {
-            filePath = filePath.replace(/^server\//, '').replace(/\\/g, '/');
-            if (!filePath.startsWith('uploads/'))
-              filePath = `uploads/${filePath}`;
-            return `${BASE_URL}${filePath}`;
-          };
-
-          const images: DocItem[] = [];
-          const documents: DocItem[] = [];
-          const videos: DocItem[] = [];
-
-          refreshResponse.data.documents.forEach((doc: any) => {
-            const docObj: DocItem = {
-              doc_id: doc.doc_id, // Make sure this is included
-              url: processFilePath(doc.document_path),
-              link: doc.location_link,
-              remark: doc.remark,
-              document_type: doc.document_type,
-            };
-
-            if (doc.document_type === 'image') images.push(docObj);
-            else if (doc.document_type === 'video') videos.push(docObj);
-            else documents.push(docObj);
-          });
-
-          // Update state with new data including doc_id
-          setDocsData({ images, documents, videos });
-
-          // Log to check if doc_id is present
-          console.log('📊 Updated docs data:', {
-            images: images.map((img) => ({ doc_id: img.doc_id, url: img.url })),
-            documents: documents.map((doc) => ({
-              doc_id: doc.doc_id,
-              url: doc.url,
-            })),
-            videos: videos.map((vid) => ({ doc_id: vid.doc_id, url: vid.url })),
-          });
-        } catch (refreshError) {
-          console.error('Error refreshing documents:', refreshError);
+      let successMsg = '✅ Files uploaded successfully!\n\n';
+      
+      if (response.data.summary) {
+        const { summary } = response.data;
+        successMsg += `📁 Files Uploaded: ${summary.files_uploaded}\n`;
+        successMsg += `👥 Reassignments Added: ${summary.reassignments_added}\n`;
+        if (summary.duplicates_skipped > 0) {
+          successMsg += `⚠️ Duplicates Skipped: ${summary.duplicates_skipped}\n`;
         }
-      }, 500); // Small delay to ensure database is updated
+      }
 
+      if (response.data.updated_fields) {
+        const fields = response.data.updated_fields;
+        successMsg += '\n📊 Updates:\n';
+        if (fields.raw_data_followup_date || fields.followup_date) successMsg += '• Follow-up date updated\n';
+        if (fields.raw_data_lead_stage || fields.lead_stage) successMsg += '• Lead stage updated\n';
+        if (fields.raw_data_detailed_remark || fields.detailed_remark) successMsg += '• Detailed remark updated\n';
+        if (fields.reassignments_created > 0 || fields.reassignment_count > 0) {
+          const count = fields.reassignments_created || fields.reassignment_count;
+          successMsg += `• ${count} reassignment(s) created\n`;
+        } else {
+          successMsg += '• No reassignments created\n';
+        }
+      }
+
+      alert(successMsg);
+
+      // Wait a moment for the server to process, then refresh
+      await new Promise(resolve => setTimeout(resolve, 500));
+      
+      // Refresh the document list
+      await refreshDocumentList();
+      
       // Clear the form
       setUploadFiles([]);
-      setLocationLink('');
-      setRemark('');
-      setFollowupDate('');
+      setLocationLink("");
+      setRemark("");
+      setDetailedRemark("");
+      setFollowupDate("");
       setSelectedUsers([]);
-      setLeadStage('');
+      setLeadStage("");
 
       // Refresh the main table data
-      fetchDropLeads();
-    } catch (error: any) {
-      console.error('❌ Upload error:', error);
+      setRefreshTrigger(prev => prev + 1);
 
+    } catch (error: any) {
+      console.error("❌ Upload error:", error);
+      
       if (error.response?.data?.message) {
         alert(`❌ Upload failed: ${error.response.data.message}`);
+        if (error.response.data.error) {
+          console.error('Server error details:', error.response.data.error);
+        }
       } else {
-        alert('❌ Error uploading files.');
+        alert("❌ Error uploading files. Please check console for details.");
       }
     }
   };
@@ -1382,44 +1460,29 @@ const DropLeadsPage: React.FC = () => {
     }
   };
 
-  // Modified handleDeleteDocument with fallback
-  const handleDeleteDocument = async (doc: DocItem) => {
-    if (
-      !window.confirm(
-        'Are you sure you want to delete this document? This action cannot be undone.',
-      )
-    ) {
+  const handleDeleteDocument = async (docId: number) => {
+    if (!docId || isNaN(docId)) {
+      alert('❌ Invalid document ID');
+      return;
+    }
+
+    if (!window.confirm('Are you sure you want to delete this document? This action cannot be undone.')) {
       return;
     }
 
     try {
-      // If doc_id is not available, try to extract it from the URL or use a different approach
-      let docId = doc.doc_id;
-
-      if (!docId) {
-        // Try to get doc_id from the document URL or path
-        // You might need to store doc_id separately or use a different identifier
-        alert(
-          'Document ID not available. Please refresh the document list and try again.',
-        );
-        return;
-      }
-
-      const response = await axios.delete(`${BASE_URL}api/document/${docId}`, {
-        withCredentials: true,
-      });
+      const response = await axios.delete(
+        `${BASE_URL}api/document/${docId}`,
+        { withCredentials: true }
+      );
 
       if (response.data.success) {
         alert('✅ Document deleted successfully!');
-
-        // Filter out the deleted document from state
-        const filterDoc = (item: DocItem) => item.url !== doc.url; // Use URL as identifier
-
-        setDocsData((prev) => ({
-          images: prev.images.filter(filterDoc),
-          documents: prev.documents.filter(filterDoc),
-          videos: prev.videos.filter(filterDoc),
-        }));
+        
+        // Refresh the document list
+        if (docsClient) {
+          await refreshDocumentList();
+        }
       } else {
         alert('❌ Failed to delete document');
       }
@@ -1429,11 +1492,50 @@ const DropLeadsPage: React.FC = () => {
     }
   };
 
-  // Detail modal render function - Updated to match reference exactly
+  const refreshDocumentList = async () => {
+    if (!docsClient) return;
+
+    try {
+      const refreshResponse = await axios.get(
+        `${BASE_URL}api/documents/${docsClient.master_id}`,
+        { withCredentials: true }
+      );
+
+      const processFilePath = (filePath: string) => {
+        filePath = filePath.replace(/^server\//, '').replace(/\\/g, '/');
+        if (!filePath.startsWith('uploads/')) filePath = `uploads/${filePath}`;
+        return `${BASE_URL}${filePath}`;
+      };
+
+      const images: DocItem[] = [];
+      const documents: DocItem[] = [];
+      const videos: DocItem[] = [];
+
+      refreshResponse.data.documents.forEach((doc: any) => {
+        const docObj: DocItem = {
+          doc_id: doc.doc_id,
+          url: processFilePath(doc.document_path),
+          link: doc.location_link,
+          remark: doc.remark,
+          document_type: doc.document_type
+        };
+
+        if (doc.document_type === "image") images.push(docObj);
+        else if (doc.document_type === "video") videos.push(docObj);
+        else documents.push(docObj);
+      });
+
+      setDocsData({ images, documents, videos });
+    } catch (error) {
+      console.error('Error refreshing document list:', error);
+    }
+  };
+
+  // Detail modal render function
   const renderDetailsModal = () => {
     if (!selectedLeadDetails) return null;
 
-    const isEmpty = (value) => {
+    const isEmpty = (value: any) => {
       return (
         !value ||
         value === '' ||
@@ -1446,13 +1548,12 @@ const DropLeadsPage: React.FC = () => {
       );
     };
 
-    const formatValue = (value) => {
+    const formatValue = (value: any) => {
       if (isEmpty(value)) return 'N/A';
       return value;
     };
 
-    // Function to check if a field exists and is not empty
-    const hasField = (fieldName) => {
+    const hasField = (fieldName: keyof DropLead) => {
       return (
         selectedLeadDetails[fieldName] &&
         !isEmpty(selectedLeadDetails[fieldName])
@@ -1571,7 +1672,7 @@ const DropLeadsPage: React.FC = () => {
           {/* Compact Content - Scrollable */}
           <div className="overflow-y-auto max-h-[calc(85vh-140px)]">
             <div className="p-4 space-y-4">
-              {/* Contact Info - Always show if lead exists */}
+              {/* Contact Info */}
               <div className="bg-gradient-to-r from-gray-50 to-gray-100 dark:from-gray-800/50 dark:to-gray-900/50 p-3 rounded-lg border border-gray-200 dark:border-gray-700">
                 <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2 flex items-center gap-2">
                   <FontAwesomeIcon
@@ -1657,7 +1758,7 @@ const DropLeadsPage: React.FC = () => {
                 </div>
               </div>
 
-              {/* Additional Contact Numbers - Only show if exists */}
+              {/* Additional Contact Numbers */}
               {hasContactNumbers && (
                 <div className="bg-gradient-to-r from-indigo-50 to-purple-50 dark:from-indigo-900/20 dark:to-purple-900/20 p-3 rounded-lg border border-indigo-100 dark:border-indigo-800/30">
                   <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2 flex items-center gap-2">
@@ -1742,7 +1843,7 @@ const DropLeadsPage: React.FC = () => {
                 </div>
               )}
 
-              {/* Lead & Category Information - Only show if exists */}
+              {/* Lead & Category Information */}
               {hasLeadInfo && (
                 <div className="bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20 p-3 rounded-lg border border-blue-100 dark:border-blue-800/30">
                   <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2 flex items-center gap-2">
@@ -1800,7 +1901,7 @@ const DropLeadsPage: React.FC = () => {
                 </div>
               )}
 
-              {/* Stage & Assignment - Only show if exists */}
+              {/* Stage & Assignment */}
               {(hasLeadStages || hasAssignmentInfo) && (
                 <div className="grid grid-cols-2 gap-4">
                   {/* Lead Stages */}
@@ -1971,7 +2072,7 @@ const DropLeadsPage: React.FC = () => {
                 </div>
               )}
 
-              {/* Dates Information - Only show if exists */}
+              {/* Dates Information */}
               {hasDates && (
                 <div className="bg-gradient-to-r from-emerald-50 to-teal-50 dark:from-emerald-900/20 dark:to-teal-900/20 p-3 rounded-lg border border-emerald-100 dark:border-emerald-800/30">
                   <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2 flex items-center gap-2">
@@ -2034,7 +2135,7 @@ const DropLeadsPage: React.FC = () => {
                 </div>
               )}
 
-              {/* Project Details - Only show if exists */}
+              {/* Project Details */}
               {hasProjectDetails && (
                 <div className="bg-gradient-to-r from-amber-50 to-yellow-50 dark:from-amber-900/20 dark:to-yellow-900/20 p-3 rounded-lg border border-amber-100 dark:border-amber-800/30">
                   <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2 flex items-center gap-2">
@@ -2106,7 +2207,7 @@ const DropLeadsPage: React.FC = () => {
                 </div>
               )}
 
-              {/* Links - Only show if exists */}
+              {/* Links */}
               {hasLinks && (
                 <div className="bg-gradient-to-r from-blue-50 to-cyan-50 dark:from-blue-900/20 dark:to-cyan-900/20 p-3 rounded-lg border border-blue-100 dark:border-blue-800/30">
                   <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2 flex items-center gap-2">
@@ -2146,7 +2247,7 @@ const DropLeadsPage: React.FC = () => {
                 </div>
               )}
 
-              {/* Remarks - Only show if exists */}
+              {/* Remarks */}
               {hasRemarks && (
                 <div className="bg-gradient-to-r from-gray-50 to-slate-50 dark:from-gray-800/50 dark:to-slate-900/50 p-3 rounded-lg border border-gray-200 dark:border-gray-700">
                   <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2 flex items-center gap-2">
@@ -2195,7 +2296,7 @@ const DropLeadsPage: React.FC = () => {
                 </div>
               )}
 
-              {/* Reassignment History - Only show if exists */}
+              {/* Reassignment History */}
               {selectedLeadDetails.reassignment_remarks &&
                 Array.isArray(selectedLeadDetails.reassignment_remarks) &&
                 selectedLeadDetails.reassignment_remarks.length > 0 && (
@@ -2218,7 +2319,6 @@ const DropLeadsPage: React.FC = () => {
                           typeof remarks[0] === 'object' &&
                           'remark' in remarks[0]
                         ) {
-                          // Array of objects (full reassignment data)
                           return (remarks as any[])
                             .slice(0, 4)
                             .map((remarkObj, index) => (
@@ -2260,7 +2360,6 @@ const DropLeadsPage: React.FC = () => {
                           remarks.length > 0 &&
                           typeof remarks[0] === 'string'
                         ) {
-                          // Array of strings (legacy format)
                           return (remarks as string[])
                             .slice(0, 4)
                             .map((remark, index) => (
@@ -2322,6 +2421,7 @@ const DropLeadsPage: React.FC = () => {
                 setUploadFiles([]);
                 setLocationLink('');
                 setRemark('');
+                setDetailedRemark('');
                 setFollowupDate('');
                 setSelectedUsers([]);
                 setLeadStage('');
@@ -2434,21 +2534,21 @@ const DropLeadsPage: React.FC = () => {
                       )}
                     </div>
 
-                    {/* Checkbox Selection Area - 3 Columns */}
+                    {/* Checkbox Selection Area */}
                     <div className="border border-gray-300 dark:border-gray-600 rounded p-3 max-h-40 overflow-y-auto">
                       {/* Select All Filtered Button */}
                       <div className="mb-2 pb-2 border-b dark:border-gray-700">
                         <button
                           type="button"
                           onClick={() => {
-                            // Handle select all filtered users
                             const allFilteredSelected = filteredUsers.every(
                               (user) =>
-                                selectedUsers.includes(user.user_id || user.id),
+                                selectedUsers.includes(
+                                  user.user_id || user.id,
+                                ),
                             );
 
                             if (allFilteredSelected) {
-                              // Deselect all filtered users
                               setSelectedUsers((prev) =>
                                 prev.filter(
                                   (userId) =>
@@ -2460,7 +2560,6 @@ const DropLeadsPage: React.FC = () => {
                                 ),
                               );
                             } else {
-                              // Add all filtered users
                               const filteredUserIds = filteredUsers.map(
                                 (user) => user.user_id || user.id,
                               );
@@ -2483,7 +2582,7 @@ const DropLeadsPage: React.FC = () => {
                         </span>
                       </div>
 
-                      {/* Users List - 3 Columns */}
+                      {/* Users List */}
                       {filteredUsers.length > 0 ? (
                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2">
                           {filteredUsers.map((user) => {
@@ -2524,9 +2623,6 @@ const DropLeadsPage: React.FC = () => {
                                 >
                                   <div className="font-medium line-clamp-1">
                                     {user.name}
-                                  </div>
-                                  <div className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
-                                    {user.role || 'No role'}
                                   </div>
                                 </label>
                               </div>
@@ -2601,18 +2697,18 @@ const DropLeadsPage: React.FC = () => {
                     />
                   </div>
 
-                  {/* Remark */}
+                  {/* Detailed Remark Field */}
                   <div>
                     <label className="block mb-1.5 text-xs font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400">
-                      Remark
+                      Detailed Remark
                     </label>
                     <textarea
-                      placeholder="Add a note..."
-                      value={remark}
-                      onChange={(e) => setRemark(e.target.value)}
+                      placeholder="Enter detailed remark for this update..."
+                      value={detailedRemark}
+                      onChange={(e) => setDetailedRemark(e.target.value)}
                       className="w-full p-2.5 border border-gray-300 rounded-lg text-sm dark:text-white dark:bg-gray-800 focus:ring-2 focus:ring-blue-500 outline-none"
                       rows={3}
-                    ></textarea>
+                    />
                   </div>
 
                   {/* File Upload Area */}
@@ -2725,9 +2821,8 @@ const DropLeadsPage: React.FC = () => {
                             >
                               <FontAwesomeIcon icon={faDownload} />
                             </a>
-                            {/* Images Section - Update delete button */}
                             <button
-                              onClick={() => handleDeleteDocument(doc)}
+                              onClick={() => handleDeleteDocument(doc.doc_id)}
                               className="p-2 bg-white rounded-full text-red-600 hover:scale-110 transition-transform"
                               title="Delete"
                             >
@@ -2825,9 +2920,8 @@ const DropLeadsPage: React.FC = () => {
                             >
                               <FontAwesomeIcon icon={faDownload} />
                             </a>
-                            {/* Documents Section - Update delete button */}
                             <button
-                              onClick={() => handleDeleteDocument(doc)}
+                              onClick={() => handleDeleteDocument(doc.doc_id)}
                               className="p-2 text-gray-400 hover:text-red-500"
                               title="Delete"
                             >
@@ -2874,9 +2968,8 @@ const DropLeadsPage: React.FC = () => {
                                   className="text-xs"
                                 />
                               </a>
-                              {/* Videos Section - Update delete button */}
                               <button
-                                onClick={() => handleDeleteDocument(doc)}
+                                onClick={() => handleDeleteDocument(doc.doc_id)}
                                 className="p-1 text-gray-400 hover:text-red-500"
                                 title="Delete"
                               >
@@ -2935,73 +3028,93 @@ const DropLeadsPage: React.FC = () => {
 
   return (
     <div className="p-4">
-      <Breadcrumb pageName="Drop Leads" />
 
       {/* Sticky Header with Filters */}
       <div className="sticky top-0 z-50 w-full bg-white/95 dark:bg-boxdark/95 backdrop-blur-sm shadow-lg border-b border-gray-200/80 dark:border-gray-800 mb-4">
         <div className="px-4 py-3">
-          {/* Header with Breadcrumb and Compact Search */}
           <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 mb-2">
-            <h2 className="text-lg font-medium">Drop Leads</h2>
-
-            {/* Compact Search Input and Custom Record Count */}
-            <div className="flex flex-col sm:flex-row gap-3 w-full sm:w-auto">
-              {/* Custom Record Count Input */}
-              <div className="w-full sm:w-48">
-                <div className="relative">
-                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                    <svg
-                      className="h-4 w-4 text-gray-400"
-                      fill="none"
-                      stroke="currentColor"
-                      viewBox="0 0 24 24"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
-                      />
-                    </svg>
-                  </div>
-                  <input
-                    type="number"
-                    className="w-full pl-10 pr-10 py-2 text-sm border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
-                    placeholder="Show N records"
-                    value={customRecordCount}
-                    onChange={handleCustomRecordInput}
-                    min="1"
+            <div className="flex items-center gap-3">
+              <h2 className="text-lg font-medium">Drop Leads</h2>
+              <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-gradient-to-r from-blue-100 to-blue-200 dark:from-blue-900/30 dark:to-blue-800/30 text-blue-800 dark:text-blue-300 border border-blue-200 dark:border-blue-700/30">
+                <svg
+                  className="w-4 h-4 mr-1"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth="2"
+                    d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
                   />
-                  {customRecordCount && (
-                    <button
-                      onClick={clearCustomRecordCount}
-                      className="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
-                      title="Clear limit"
-                    >
-                      <svg
-                        className="h-4 w-4"
-                        fill="none"
-                        stroke="currentColor"
-                        viewBox="0 0 24 24"
-                      >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          strokeWidth={2}
-                          d="M6 18L18 6M6 6l12 12"
-                        />
-                      </svg>
-                    </button>
-                  )}
-                </div>
-                {customRecordCount && (
-                  <div className="text-xs text-blue-600 dark:text-blue-400 mt-1 ml-1">
-                    Showing first {customRecordCount} records
-                  </div>
-                )}
-              </div>
+                </svg>
+                {totalLeads} Leads
+              </span>
+            </div>
 
-              {/* Compact Search Input */}
+            <div className="flex flex-col sm:flex-row gap-3 w-full sm:w-auto">
+            {/* Custom Record Count Input */}
+<div className="w-full sm:w-48">
+  <div className="relative">
+    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+      <svg
+        className="h-4 w-4 text-gray-400"
+        fill="none"
+        stroke="currentColor"
+        viewBox="0 0 24 24"
+      >
+        <path
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          strokeWidth={2}
+          d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
+        />
+      </svg>
+    </div>
+    <input
+      type="number"
+      className="w-full pl-10 pr-10 py-2 text-sm border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+      placeholder="Records per page"
+      value={customRecordCount}
+      onChange={handleCustomRecordInput}
+      min="1"
+      max="1000"
+    />
+    {customRecordCount && (
+      <button
+        onClick={clearCustomRecordCount}
+        className="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
+        title="Clear limit"
+      >
+        <svg
+          className="h-4 w-4"
+          fill="none"
+          stroke="currentColor"
+          viewBox="0 0 24 24"
+        >
+          <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            strokeWidth={2}
+            d="M6 18L18 6M6 6l12 12"
+          />
+        </svg>
+      </button>
+    )}
+  </div>
+  {customRecordCount ? (
+    <div className="text-xs text-blue-600 dark:text-blue-400 mt-1 ml-1 font-medium">
+      Showing {customRecordCount} records per page
+    </div>
+  ) : (
+    <div className="text-xs text-gray-500 dark:text-gray-400 mt-1 ml-1">
+      Default: 10 records per page
+    </div>
+  )}
+</div>
+
+              {/* Search Input */}
               <div className="w-full sm:w-72">
                 <div className="relative">
                   <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
@@ -3028,6 +3141,28 @@ const DropLeadsPage: React.FC = () => {
                   />
                 </div>
               </div>
+
+              {/* Reset Filter Button */}
+              <button
+                onClick={clearFilters}
+                className="bg-gradient-to-r from-gray-600 to-gray-700 hover:from-gray-700 hover:to-gray-800 text-white px-4 py-2 rounded-lg text-sm font-medium flex items-center gap-2 transition-all shadow-md hover:shadow-lg whitespace-nowrap"
+              >
+                <svg
+                  className="h-4 w-4"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
+                  />
+                </svg>
+                Reset Filter
+              </button>
+
               {/* Reassign Button */}
               <button
                 onClick={() => {
@@ -3170,34 +3305,26 @@ const DropLeadsPage: React.FC = () => {
         </div>
       ) : (
         <>
-          <div className="max-w-full overflow-auto rounded-lg border border-stroke bg-white shadow-default dark:border-strokedark dark:bg-boxdark">
-            <div className="overflow-x-auto">
-              <table className="w-full table-auto">
+<div className="max-w-full overflow-auto rounded-lg border border-stroke bg-white shadow-default dark:border-strokedark dark:bg-boxdark">
+  <div className="overflow-x-auto">
+    <table className="w-full table-auto" key={`table-${itemsPerPage}-${currentPage}`}>
                 <thead>
                   <tr className="bg-gradient-to-r from-gray-50 to-gray-100 dark:from-meta-4 dark:to-gray-800 border-b-2 border-gray-200 dark:border-gray-700">
-                    {/* Add Checkbox Column */}
+                    {/* Checkbox Column */}
                     <th className="py-5 px-4">
                       <input
                         type="checkbox"
                         checked={(() => {
-                          const currentEntries = filteredLeads.slice(
-                            (currentPage - 1) * itemsPerPage,
-                            currentPage * itemsPerPage,
-                          );
                           return (
-                            currentEntries.length > 0 &&
-                            currentEntries.every((lead) =>
+                            dropLeads.length > 0 &&
+                            dropLeads.every((lead) =>
                               selectedLeads.includes(lead.master_id),
                             )
                           );
                         })()}
                         onChange={(e) => {
                           const isChecked = e.target.checked;
-                          const currentEntries = filteredLeads.slice(
-                            (currentPage - 1) * itemsPerPage,
-                            currentPage * itemsPerPage,
-                          );
-                          const currentIds = currentEntries.map(
+                          const currentIds = dropLeads.map(
                             (lead) => lead.master_id,
                           );
 
@@ -3474,10 +3601,12 @@ const DropLeadsPage: React.FC = () => {
                                 onClick={(e) => {
                                   e.stopPropagation();
                                   setSelectedCities([]);
+                                  applyFilters();
+                                  setShowCityFilter(false);
                                 }}
                                 className="text-xs font-medium text-blue-600 hover:text-blue-800 dark:text-blue-400 transition-colors"
                               >
-                                Clear All
+                                Clear
                               </button>
                               <button
                                 onClick={(e) => {
@@ -3597,6 +3726,8 @@ const DropLeadsPage: React.FC = () => {
                                 onClick={(e) => {
                                   e.stopPropagation();
                                   setSelectedUsersFilter([]);
+                                  applyFilters();
+                                  setShowUserFilter(false);
                                 }}
                                 className="text-xs font-medium text-blue-600 hover:text-blue-800 dark:text-blue-400 transition-colors"
                               >
@@ -3708,6 +3839,8 @@ const DropLeadsPage: React.FC = () => {
                                 onClick={(e) => {
                                   e.stopPropagation();
                                   setSelectedStages([]);
+                                  applyFilters();
+                                  setShowStageFilter(false);
                                 }}
                                 className="text-xs font-medium text-blue-600 hover:text-blue-800 dark:text-blue-400 transition-colors"
                               >
@@ -3767,9 +3900,18 @@ const DropLeadsPage: React.FC = () => {
                                 {selectedStages.map((stage) => (
                                   <span
                                     key={stage}
-                                    className="inline-flex items-center px-3 py-1.5 rounded-full text-xs font-semibold bg-gradient-to-r from-blue-50 to-blue-100 dark:from-blue-900/30 dark:to-blue-800/20 text-blue-800 dark:text-blue-300 border border-blue-200 dark:border-blue-700/30 shadow-sm truncate max-w-[100px]"
+                                    className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-300"
                                   >
-                                    {stage}
+                                    Stage: {stage}
+                                    <button
+                                      onClick={() => {
+                                        handleStageSelect(stage);
+                                        setShowStageFilter(false);
+                                      }}
+                                      className="ml-1 text-purple-600 hover:text-purple-800 dark:text-purple-400"
+                                    >
+                                      ×
+                                    </button>
                                   </span>
                                 ))}
                               </div>
@@ -3794,7 +3936,7 @@ const DropLeadsPage: React.FC = () => {
                 </thead>
 
                 <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
-                  {currentItems.map((lead, index) => (
+                  {dropLeads.map((lead, index) => (
                     <tr
                       key={index}
                       className="border-b border-gray-100 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors duration-150 last:border-b-0"
@@ -3806,13 +3948,11 @@ const DropLeadsPage: React.FC = () => {
                           checked={selectedLeads.includes(lead.master_id)}
                           onChange={() => {
                             const leadId = lead.master_id;
-                            // Update selected leads for UI
                             setSelectedLeads((prev) =>
                               prev.includes(leadId)
                                 ? prev.filter((id) => id !== leadId)
                                 : [...prev, leadId],
                             );
-                            // Also update selected master IDs
                             setSelectedMasterIds((prev) =>
                               prev.includes(leadId)
                                 ? prev.filter((id) => id !== leadId)
@@ -3852,7 +3992,7 @@ const DropLeadsPage: React.FC = () => {
                         </div>
                       </td>
 
-                      {/* Client Name - Now with enhanced styling */}
+                      {/* Client Name */}
                       <td className="py-4 px-4">
                         <div
                           onClick={() => {
@@ -3941,18 +4081,12 @@ const DropLeadsPage: React.FC = () => {
                         <span
                           onClick={() =>
                             handleShowRemark(
-                              lead.detailed_remark &&
-                                lead.detailed_remark !== 'Not Available'
-                                ? lead.detailed_remark
-                                : lead.quick_remark,
+                              lead.detailed_remark ||
+                                lead.quick_remark ||
+                                'No remarks',
                             )
                           }
-                          title={
-                            lead.detailed_remark &&
-                            lead.detailed_remark !== 'Not Available'
-                              ? lead.detailed_remark
-                              : lead.quick_remark || 'No remarks'
-                          }
+                          title="Click to view full remark"
                           className={`inline-flex cursor-pointer rounded-full py-1.5 px-3.5 text-sm font-semibold border shadow-sm truncate max-w-[220px]
       ${
         lead.quick_remark === 'Interested'
@@ -3970,13 +4104,10 @@ const DropLeadsPage: React.FC = () => {
           : 'bg-gradient-to-r from-slate-50 to-slate-100 dark:from-slate-800/30 dark:to-slate-700/20 text-slate-800 dark:text-slate-300 border-slate-200 dark:border-slate-600/30'
       }`}
                         >
+                          {lead.detailed_remark?.substring(0, 20) || '—'}
                           {lead.detailed_remark &&
-                          lead.detailed_remark !== 'Not Available' &&
-                          lead.detailed_remark.trim() !== ''
-                            ? `${lead.detailed_remark.substring(0, 20)}${
-                                lead.detailed_remark.length > 20 ? '...' : ''
-                              }`
-                            : lead.quick_remark || '—'}
+                            lead.detailed_remark.length > 20 &&
+                            '...'}
                         </span>
                       </td>
 
@@ -4041,15 +4172,15 @@ const DropLeadsPage: React.FC = () => {
           </div>
 
           {/* Pagination */}
-          {totalItems > 0 && (
+          {totalLeads > 0 && (
             <Pagination
               currentPage={currentPage}
-              totalPages={totalPages}
+              totalPages={Math.ceil(totalLeads / itemsPerPage)}
               onPageChange={handlePageChange}
-              totalItems={totalItems}
+              totalItems={totalLeads}
               itemsPerPage={itemsPerPage}
-              showingStart={showingStart}
-              showingEnd={showingEnd}
+              showingStart={((currentPage - 1) * itemsPerPage) + 1}
+              showingEnd={Math.min(currentPage * itemsPerPage, totalLeads)}
             />
           )}
         </>
@@ -4091,11 +4222,11 @@ const DropLeadsPage: React.FC = () => {
       {/* Reassign Popup Modal */}
       {showAssignPopup && (
         <div className="fixed inset-0 z-[9999] bg-black/70 flex justify-center items-center">
-          <div className="bg-white dark:bg-boxdark p-3 rounded-lg shadow-lg w-full max-w-2xl max-h-[80vh] overflow-y-auto border dark:border-strokedark">
+          <div className="bg-white dark:bg-boxdark p-6 rounded-lg shadow-lg w-full max-w-2xl max-h-[80vh] overflow-y-auto border dark:border-strokedark">
             {/* HEADER */}
             <div className="flex items-center justify-between border-b pb-3 mb-4 dark:border-strokedark">
-              <h2 className="text-lg font-semibold text-black dark:text-white">
-                Reassign Selected Drop Leads ({selectedMasterIds.length})
+              <h2 className="text-2xl font-bold text-black dark:text-white">
+                Assign Selected Records ({selectedMasterIds.length})
               </h2>
               <button
                 onClick={() => setShowAssignPopup(false)}
@@ -4105,128 +4236,78 @@ const DropLeadsPage: React.FC = () => {
               </button>
             </div>
 
-            {/* SELECTED DROP LEADS (COMPACT) */}
-            <div className="mb-3 p-2 bg-gray-50 dark:bg-gray-800 rounded text-sm">
-              <span className="font-medium dark:text-white text-black">
-                Selected Drop Leads:
-              </span>{' '}
-              <span className="text-blue-600 font-semibold">
-                {selectedMasterIds.length}
-              </span>
-              {filteredLeads && filteredLeads.length > 0 && (
-                <div className="mt-2 max-h-32 overflow-y-auto">
-                  {filteredLeads
-                    .filter((lead) =>
-                      selectedMasterIds.includes(lead.master_id),
-                    )
-                    .slice(0, 10)
-                    .map((lead) => (
-                      <div
-                        key={lead.master_id}
-                        className="flex items-center gap-2 p-1 text-sm"
-                      >
-                        <span className="font-medium">{lead.name}</span>
-                        <span className="text-gray-500">
-                          (ID: {lead.master_id})
-                        </span>
-                        <span className="text-gray-500">- {lead.number}</span>
-                      </div>
-                    ))}
-                  {selectedMasterIds.length > 10 && (
-                    <div className="text-gray-500 text-sm italic p-1">
-                      ... and {selectedMasterIds.length - 10} more records
-                    </div>
-                  )}
-                </div>
-              )}
-            </div>
-
             {/* FORM */}
             <form
               onSubmit={async (e) => {
                 e.preventDefault();
 
-                if (!assignData.assignedTo.length || !assignData.leadStage) {
-                  alert('Please select at least one user and a lead stage');
+                if (
+                  !assignData.assignedTo.length ||
+                  !assignData.leadStage ||
+                  !assignData.reassignmentDate
+                ) {
+                  alert('Please select users, lead stage, and followup date');
                   return;
                 }
 
                 try {
-                  const assignments = [];
-
-                  selectedMasterIds.forEach((masterId) => {
-                    assignData.assignedTo.forEach((user) => {
-                      assignments.push({
-                        master_id: masterId,
-                        assignedTo: user,
+                  // ONE request per master_id (backend loops users)
+                  const requests = selectedMasterIds.map((master_id) =>
+                    fetch(`${BASE_URL}api/add`, {
+                      method: 'POST',
+                      headers: { 'Content-Type': 'application/json' },
+                      credentials: 'include',
+                      body: JSON.stringify({
+                        master_id,
+                        assignedTo: assignData.assignedTo,
                         leadStage: assignData.leadStage,
                         remark: assignData.remark,
                         reassignment_date: assignData.reassignmentDate,
-                      });
-                    });
-                  });
-
-                  const responses = await Promise.all(
-                    assignments.map((assignment) =>
-                      fetch(`${BASE_URL}api/add`, {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        credentials: 'include',
-                        body: JSON.stringify(assignment),
+                        followup_date: assignData.reassignmentDate,
                       }),
-                    ),
+                    }),
                   );
 
+                  const responses = await Promise.all(requests);
                   const results = await Promise.all(
                     responses.map((r) => r.json()),
                   );
 
                   let totalInserted = 0;
-                  let skippedDetails = [];
+                  let totalSkipped = 0;
 
-                  results.forEach((result) => {
-                    if (result.success) {
-                      if (result.inserted?.length)
-                        totalInserted += result.inserted.length;
-                      if (result.skipped?.length) {
-                        result.skipped.forEach((s) => {
-                          skippedDetails.push(
-                            `"${s.finalName}" for stage "${assignData.leadStage}"`,
-                          );
-                        });
-                      }
-                    } else {
-                      skippedDetails.push(result.message || 'Unknown error');
-                    }
+                  results.forEach((r) => {
+                    totalInserted += r.inserted_count || 0;
+                    totalSkipped += r.skipped_count || 0;
                   });
 
                   alert(
-                    `✅ ${totalInserted} reassignment(s) created` +
-                      (skippedDetails.length
-                        ? `\n⚠ Skipped:\n- ${skippedDetails.join('\n- ')}`
-                        : ''),
+                    `✅ Assignment completed\nInserted: ${totalInserted}\nSkipped: ${totalSkipped}`,
                   );
 
+                  // RESET
                   setAssignData({
                     assignedTo: [],
                     leadStage: '',
                     remark: '',
                     reassignmentDate: new Date().toISOString().split('T')[0],
                   });
+
                   setSelectedMasterIds([]);
                   setSelectedLeads([]);
                   setShowAssignPopup(false);
-                  fetchDropLeads();
-                } catch (err) {
+                  setRefreshTrigger((prev) => prev + 1);
+                } catch (error) {
+                  console.error('Network error:', error);
                   alert('❌ Submission failed');
                 }
               }}
               className="space-y-4"
             >
-              {/* ASSIGN TO */}
+              {/* ASSIGN TO - WITH SELECT/CLEAR ALL BUTTONS */}
               <div>
                 <div className="flex justify-between items-center mb-2">
-                  <label className="block font-semibold text-green-600 dark:text-green-400 mb-2">
+                  <label className="block font-semibold text-green-600 dark:text-green-400">
                     Assign To
                   </label>
                   <div className="flex gap-2">
@@ -4258,7 +4339,8 @@ const DropLeadsPage: React.FC = () => {
                   </div>
                 </div>
 
-                <div className="border rounded p-2 max-h-48 overflow-y-auto dark:border-form-strokedark dark:bg-form-input">
+                {/* USER LIST */}
+                <div className="border rounded p-3 max-h-48 overflow-y-auto dark:border-form-strokedark dark:bg-form-input">
                   {users.length === 0 ? (
                     <div className="text-center py-4 text-gray-500 dark:text-gray-400">
                       No users available
@@ -4273,10 +4355,10 @@ const DropLeadsPage: React.FC = () => {
                         return (
                           <label
                             key={user.id}
-                            className={`flex gap-2 p-2 rounded cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800 ${
+                            className={`flex gap-2 p-2 rounded cursor-pointer transition-colors ${
                               checked
                                 ? 'bg-blue-50 dark:bg-blue-900/30 border border-blue-200 dark:border-blue-700'
-                                : ''
+                                : 'hover:bg-gray-50 dark:hover:bg-gray-800'
                             }`}
                           >
                             <input
@@ -4298,9 +4380,6 @@ const DropLeadsPage: React.FC = () => {
                               <div className="font-medium text-black dark:text-white">
                                 {user.name}
                               </div>
-                              <div className="text-gray-500 dark:text-gray-400">
-                                {user.role}
-                              </div>
                             </div>
                             <div className="text-xs px-1.5 py-0.5 rounded bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300">
                               {user.id}
@@ -4312,73 +4391,78 @@ const DropLeadsPage: React.FC = () => {
                   )}
                 </div>
 
-                <p className="text-sm text-blue-600 dark:text-blue-400 mt-1">
+                <p className="text-sm text-blue-600 dark:text-blue-400 mt-2">
                   Selected: {assignData.assignedTo.length}
                 </p>
               </div>
 
-              {/* LEAD DETAILS */}
+              {/* LEAD DETAILS - STAGE + FOLLOWUP DATE */}
               <div>
                 <label className="block font-semibold text-green-600 dark:text-green-400 mb-2">
                   Lead Details
                 </label>
 
-                {/* Single Line Container */}
-                <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   {/* Lead Stage */}
-                  <select
-                    name="leadStage"
-                    value={assignData.leadStage}
-                    onChange={handleChange}
-                    required
-                    className="border rounded p-2 w-full sm:w-[45%]
-                 dark:border-form-strokedark dark:bg-form-input 
-                 dark:text-white text-black"
-                  >
-                    <option value="">Select Lead Stage *</option>
-                    {leadStages.map((stage, index) => (
-                      <option key={index} value={stage}>
-                        {stage}
-                      </option>
-                    ))}
-                  </select>
+                  <div>
+                    <label className="block mb-1 text-sm font-medium text-black dark:text-white">
+                      Lead Stage *
+                    </label>
+                    <select
+                      name="leadStage"
+                      value={assignData.leadStage}
+                      onChange={(e) =>
+                        setAssignData({ ...assignData, leadStage: e.target.value })
+                      }
+                      required
+                      className="w-full border rounded p-2 dark:border-form-strokedark dark:bg-form-input dark:text-white text-black"
+                    >
+                      <option value="">Select Lead Stage</option>
+                      {leadStages.map((stage, i) => (
+                        <option key={i} value={stage}>
+                          {stage}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
 
                   {/* Followup Date */}
-                  <input
-                    type="date"
-                    name="reassignmentDate"
-                    value={assignData.reassignmentDate || ''}
-                    onChange={handleChange}
-                    required
-                    className="border rounded p-2 w-full sm:w-[30%]
-                 dark:border-form-strokedark dark:bg-form-input 
-                 dark:text-white text-black"
-                    min="2020-01-01"
-                    max="2030-12-31"
-                  />
-
-                  {/* Today Button */}
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setAssignData({
-                        ...assignData,
-                        reassignmentDate: new Date()
-                          .toISOString()
-                          .split('T')[0],
-                      });
-                    }}
-                    className="w-full sm:w-auto px-4 py-2 bg-blue-600 
-                 text-white rounded hover:bg-blue-700 
-                 text-sm whitespace-nowrap"
-                  >
-                    Today
-                  </button>
-                </div>
-
-                {/* Helper Text */}
-                <div className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                  Default is today's date. Change if needed.
+                  <div>
+                    <label className="block mb-1 text-sm font-medium text-black dark:text-white">
+                      Followup Date *
+                    </label>
+                    <div className="flex gap-3">
+                      <input
+                        type="date"
+                        name="reassignmentDate"
+                        value={assignData.reassignmentDate || ''}
+                        onChange={(e) =>
+                          setAssignData({
+                            ...assignData,
+                            reassignmentDate: e.target.value,
+                          })
+                        }
+                        required
+                        className="w-full border rounded p-2 dark:border-form-strokedark dark:bg-form-input dark:text-white text-black"
+                        min="2020-01-01"
+                        max="2030-12-31"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setAssignData({
+                            ...assignData,
+                            reassignmentDate: new Date()
+                              .toISOString()
+                              .split('T')[0],
+                          });
+                        }}
+                        className="px-3 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 text-sm whitespace-nowrap"
+                      >
+                        Today
+                      </button>
+                    </div>
+                  </div>
                 </div>
               </div>
 
@@ -4388,11 +4472,12 @@ const DropLeadsPage: React.FC = () => {
                   Remark (Optional)
                 </label>
                 <textarea
-                  name="remark"
-                  value={assignData.remark}
-                  onChange={handleChange}
-                  placeholder="Enter Remark"
                   rows={3}
+                  value={assignData.remark}
+                  onChange={(e) =>
+                    setAssignData({ ...assignData, remark: e.target.value })
+                  }
+                  placeholder="Enter Remark"
                   className="w-full border rounded p-2 dark:border-form-strokedark dark:bg-form-input dark:text-white text-black"
                 />
               </div>
@@ -4414,7 +4499,7 @@ const DropLeadsPage: React.FC = () => {
                     !assignData.leadStage ||
                     !assignData.reassignmentDate
                   }
-                  className="px-5 py-2 rounded bg-green-600 text-white hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center"
+                  className="px-6 py-2.5 rounded-lg font-medium bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 text-white shadow-lg hover:shadow-xl transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center"
                 >
                   <svg
                     className="w-5 h-5 mr-2"

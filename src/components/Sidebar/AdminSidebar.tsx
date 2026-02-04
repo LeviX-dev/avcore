@@ -646,6 +646,23 @@ const AdminSidebar = ({ sidebarOpen, setSidebarOpen }: SidebarProps) => {
                   </NavLink>
                 </li>
 
+<li>
+  <NavLink
+    to="/attendance-report"
+    className={({ isActive }) =>
+      `group relative flex items-center gap-3 rounded-lg py-3 px-4 font-medium duration-300 ease-in-out transition-all hover:bg-indigo-500/20 hover:border-l-4 hover:border-l-indigo-400 hover:pl-3 ${
+        isActive
+          ? 'bg-indigo-500/20 border-l-4 border-l-indigo-400 text-white shadow-lg'
+          : 'text-gray-300'
+      }`
+    }
+  >
+    <CalendarCheck className="w-5 h-5" />
+    Attendance Report
+  </NavLink>
+</li>
+
+
                 {/* <!-- Menu Item Report --> */}
                 <SidebarLinkGroup
                   activeCondition={
@@ -754,7 +771,23 @@ const AdminSidebar = ({ sidebarOpen, setSidebarOpen }: SidebarProps) => {
                                 <Users className="w-4 h-4" />
                                 Employee Reports
                               </NavLink>
-                            </li>
+                            </li> 
+
+                            <li>
+  <NavLink
+    to="/report/daily-reports"
+    className={({ isActive }) =>
+      `group relative flex items-center gap-2 rounded-md px-3 py-2 text-sm font-medium transition-all duration-300 hover:bg-cyan-500/10 hover:text-white ${
+        isActive ? 'text-white bg-cyan-500/20' : 'text-gray-400'
+      }`
+    }
+  >
+    <TrendingUp className="w-4 h-4" />
+    Daily Reports & Tasks
+  </NavLink>
+</li>
+
+
                           </ul>
                         </div>
                         {/* <!-- Dropdown Menu End --> */}

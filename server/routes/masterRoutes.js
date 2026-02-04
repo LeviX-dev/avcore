@@ -8,7 +8,7 @@ import { categoryList, createCategory,updateCategoryController,
 , addProductTypeOnly , addBrandToProduct , addModelToBrand ,getProductTypeDetails ,updateBrand,
 createKit , getKits , getProductsByCategory , getKitById , updateKit , toggleKitStatus , 
  getProductsAndKitsByCategory ,  createQuotation ,  getQuotationByMasterId , 
-
+getQuotationRevisionsByMasterId , updateQuotationWithRevision , getQuotationForEdit 
 
 } from '../controllers/masterController.js';
 import uploadMiddleware from '../middleware/upload.js';
@@ -59,19 +59,25 @@ router.put('/area/:id', updateAreaController); //Update Area
 
 
 
+
 router.post('/kit', createKit);
 router.get('/allkit', getKits);
 router.get('/products/category/:cat_id', getProductsByCategory);
 router.get('/kit/:id', getKitById);
 router.put('/kit/:id', updateKit);
 router.put('/kit/:id/status', toggleKitStatus);
-router.get("/category-products-kits/:cat_id", getProductsAndKitsByCategory);
+router.get('/category-products-kits/:cat_id', getProductsAndKitsByCategory);
 
+router.post('/quotation', createQuotation);
 
+// router.get('/quotation/:master_id', getQuotationByMasterId);
+router.get('/quotation/:master_id/:revision', getQuotationByMasterId);
 
-router.post("/quotation", createQuotation);
+router.get('/revisions/:master_id', getQuotationRevisionsByMasterId);
 
-router.get("/quotation/:master_id", getQuotationByMasterId);
+router.put('/quotation/:qt_id', updateQuotationWithRevision);
+
+router.get('/quotation/:qt_id/revision/:revision', getQuotationForEdit);
 
 
 

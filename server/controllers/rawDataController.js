@@ -1069,7 +1069,7 @@ const __dirname = path.dirname(__filename);
 
 export const getAllRawData = async (req, res) => {
   try {
-    // 1️⃣ Fetch raw_data + joins (including reassignment data)
+    // 1️⃣ Fetch raw_data + joins (including latest reassignment)
     const query = `
       SELECT 
         rd.master_id,
@@ -1128,16 +1128,12 @@ export const getAllRawData = async (req, res) => {
         IFNULL(c.cat_name, 'Not Available') AS cat_name,
         IFNULL(r.reference_name, 'Not Available') AS reference_name,
 
-        -- ASSIGNMENT DETAILS
-        IFNULL(asg.assign_date, 'Not Available') AS assign_date,
-        IFNULL(asg.target_date, 'Not Available') AS target_date,
-        IFNULL(asg.mode, 'Not Available') AS mode,
-        IFNULL(asg.remark, 'Not Available') AS assignment_remark,
-        IFNULL(asg.assigned_to, 'Not Available') AS assigned_to,
-        IFNULL(asg.assigned_to_user_id, 'Not Available') AS assigned_to_user_id,
-        IFNULL(asg.assign_type, 'Not Available') AS assign_type,
+        -- ASSIGNMENT DETAILS (LATEST REASSIGNMENT)
+        IFNULL(DATE(lr.reassignment_date), 'Not Available') AS assign_date,
+        IFNULL(lr.assignedTo, 'Not Available') AS assigned_to,
+        IFNULL(u.user_id, 'Not Available') AS assigned_to_user_id,
 
-        -- ✅ NEW: DOCUMENT LOCATION LINK
+        -- DOCUMENT LOCATION LINK
         MAX(d.location_link) AS document_location_link
 
       FROM raw_data rd
@@ -1146,7 +1142,15 @@ export const getAllRawData = async (req, res) => {
       LEFT JOIN reference r ON rd.reference_id = r.reference_id
       LEFT JOIN assignments asg ON rd.assign_id = asg.assign_id
 
-      -- ✅ NEW: DOCUMENTS JOIN
+      -- ✅ LATEST REASSIGNMENT
+      LEFT JOIN (
+        SELECT r1.*, ROW_NUMBER() OVER (PARTITION BY master_id ORDER BY id DESC) rn
+        FROM reassignment r1
+      ) lr ON rd.master_id = lr.master_id AND lr.rn = 1
+
+      LEFT JOIN users u ON lr.assignedTo = u.name
+
+      -- DOCUMENTS
       LEFT JOIN documents d ON d.master_id = rd.master_id
 
       GROUP BY rd.master_id
@@ -1236,7 +1240,180 @@ export const getAllRawData = async (req, res) => {
 };
 
 
+
+
+// export const getAllRawData = async (req, res) => {
+//   try {
+//     // 1️⃣ Fetch raw_data + joins (including reassignment data)
+//     const query = `
+//       SELECT 
+//         rd.master_id,
+
+//         -- MAIN RAW DATA FIELDS
+//         IFNULL(rd.name, 'Not Available') AS name,
+//         IFNULL(rd.number, 'Not Available') AS number,
+//         IFNULL(rd.alternate_number, 'Not Available') AS alternate_number,
+//         IFNULL(rd.email, 'Not Available') AS email,
+//         IFNULL(rd.address, 'Not Available') AS address,
+//         IFNULL(rd.city, 'Not Available') AS city,
+//         IFNULL(rd.status, 'Not Available') AS status,
+//         IFNULL(rd.lead_status, 'Not Available') AS lead_status,
+//         IFNULL(rd.lead_stage, 'Not Available') AS lead_stage,  
+//         IFNULL(rd.current_stage, 'Not Available') AS current_stage,
+//         IFNULL(rd.created_by_user, 'Not Available') AS created_by_user,
+//         IFNULL(rd.assign_id, 'Not Available') AS assign_id,
+//         IFNULL(rd.followup_date, 'Not Available') AS followup_date,
+
+//         -- IDS
+//         IFNULL(rd.cat_id, 'Not Available') AS cat_id,
+//         IFNULL(rd.reference_id, 'Not Available') AS reference_id,
+//         IFNULL(rd.area_id, 'Not Available') AS area_id,
+
+//         -- DIMENSIONS
+//         IFNULL(rd.room_length, 'Not Available') AS room_length,
+//         IFNULL(rd.room_width, 'Not Available') AS room_width,
+//         IFNULL(rd.room_height, 'Not Available') AS room_height,
+
+//         -- EXTRA DETAILS
+//         IFNULL(rd.location_link, 'Not Available') AS location_link,
+//         IFNULL(rd.p_type, 'Not Available') AS p_type,
+//         IFNULL(rd.budget_range, 'Not Available') AS budget_range,
+//         IFNULL(rd.time_to_complete, 'Not Available') AS time_to_complete,
+//         IFNULL(rd.site_visit_date, 'Not Available') AS site_visit_date,
+//         IFNULL(rd.demo_date, 'Not Available') AS demo_date,
+
+//         -- ACTIVITY
+//         IFNULL(rd.lead_activity, 0) AS lead_activity,
+
+//         -- NUMBERS
+//         IFNULL(rd.ar_number, 'Not Available') AS ar_number,
+//         IFNULL(rd.architect_name, 'Not Available') AS architect_name,
+//         IFNULL(rd.ca_number, 'Not Available') AS ca_number,
+//         IFNULL(rd.e_number, 'Not Available') AS e_number,
+//         IFNULL(rd.sm_number, 'Not Available') AS sm_number,
+//         IFNULL(rd.pop_number, 'Not Available') AS pop_number,
+//         IFNULL(rd.other_number, 'Not Available') AS other_number,
+
+//         -- REMARKS
+//         IFNULL(rd.quick_remark, 'Not Available') AS quick_remark,
+//         IFNULL(rd.detailed_remark, 'Not Available') AS detailed_remark,
+
+//         -- AREA / CATEGORY / REFERENCE
+//         IFNULL(a.area_name, 'Not Available') AS area_name,
+//         IFNULL(c.cat_name, 'Not Available') AS cat_name,
+//         IFNULL(r.reference_name, 'Not Available') AS reference_name,
+
+//         -- ASSIGNMENT DETAILS
+//         IFNULL(asg.assign_date, 'Not Available') AS assign_date,
+//         IFNULL(asg.target_date, 'Not Available') AS target_date,
+//         IFNULL(asg.mode, 'Not Available') AS mode,
+//         IFNULL(asg.remark, 'Not Available') AS assignment_remark,
+//         IFNULL(asg.assigned_to, 'Not Available') AS assigned_to,
+//         IFNULL(asg.assigned_to_user_id, 'Not Available') AS assigned_to_user_id,
+//         IFNULL(asg.assign_type, 'Not Available') AS assign_type,
+
+//         -- ✅ NEW: DOCUMENT LOCATION LINK
+//         MAX(d.location_link) AS document_location_link
+
+//       FROM raw_data rd
+//       LEFT JOIN area a ON rd.area_id = a.area_id
+//       LEFT JOIN category c ON rd.cat_id = c.cat_id
+//       LEFT JOIN reference r ON rd.reference_id = r.reference_id
+//       LEFT JOIN assignments asg ON rd.assign_id = asg.assign_id 
+
+//       -- ✅ NEW: DOCUMENTS JOIN
+//       LEFT JOIN documents d ON d.master_id = rd.master_id
+
+//       GROUP BY rd.master_id
+//       ORDER BY rd.master_id DESC
+//     `;
+
+//     const [rows] = await db.query(query);
+
+//     // 2️⃣ Fetch other inputs
+//     const masterIds = rows.map(r => r.master_id);
+//     let otherInputsRows = [];
+
+//     if (masterIds.length > 0) {
+//       const [otherInputs] = await db.query(
+//         `SELECT master_id, cat_id, reference_id, input_text, created_at
+//          FROM raw_data_other_inputs
+//          WHERE master_id IN (?)
+//          ORDER BY created_at DESC`,
+//         [masterIds]
+//       );
+//       otherInputsRows = otherInputs;
+//     }
+
+//     // 3️⃣ Fetch reassignment history
+//     let reassignmentRows = [];
+//     if (masterIds.length > 0) {
+//       const [reassignments] = await db.query(
+//         `SELECT rm.*, u.name, u.role
+//          FROM reassignment rm
+//          LEFT JOIN users u ON u.user_id = rm.created_by_user
+//          WHERE rm.master_id IN (?)
+//          ORDER BY rm.reassignment_date DESC, rm.created_at DESC`,
+//         [masterIds]
+//       );
+//       reassignmentRows = reassignments;
+//     }
+
+//     // 4️⃣ Map final data
+//     const formattedRows = rows.map(row => {
+//       const categoryOther =
+//         otherInputsRows.find(
+//           oi =>
+//             oi.master_id === row.master_id &&
+//             oi.cat_id === parseInt(row.cat_id)
+//         )?.input_text || '';
+
+//       const referenceOther =
+//         otherInputsRows.find(
+//           oi =>
+//             oi.master_id === row.master_id &&
+//             oi.reference_id === parseInt(row.reference_id)
+//         )?.input_text || '';
+
+//       const reassignments = reassignmentRows
+//         .filter(r => r.master_id === row.master_id)
+//         .map(r => ({
+//           remark: r.remark || '',
+//           assignedTo: r.assignedTo || '',
+//           leadStage: r.leadStage || '',
+//           created_by_user: r.created_by_user || '',
+//           created_at: r.created_at
+//             ? new Date(r.created_at).toLocaleString('en-GB')
+//             : '',
+//           reassignment_date: r.reassignment_date
+//             ? new Date(r.reassignment_date).toLocaleString('en-GB')
+//             : '',
+//           name: r.name || '',
+//           role: r.role || ''
+//         }));
+
+//       return {
+//         ...row,
+//         category_other: categoryOther,
+//         reference_other: referenceOther,
+//         reassignment_remarks: reassignments,
+//         latest_assignedTo: reassignments[0]?.assignedTo || '',
+//         latest_leadStage: reassignments[0]?.leadStage || ''
+//       };
+//     });
+
+//     return res.status(200).json(formattedRows);
+
+//   } catch (error) {
+//     console.error("❌ Error fetching raw_data:", error);
+//     return res.status(500).json({ error: "Failed to fetch raw_data" });
+//   }
+// };
+
+
 // ROLE GROUPS
+
+
 const TELECALLER_ROLES = [
   'tele_caller',
   'digital_marketing',
@@ -1256,217 +1433,219 @@ const isManagementLike = (role) => MANAGEMENT_ROLES.includes(role);
 
 
 
-export const getCompleteRawData = async (req, res) => {
-  try {
-    if (!req.session.user) {
-      return res.status(401).json({ message: "Unauthorized: No session" });
-    }
+// export const getCompleteRawData = async (req, res) => {
+//   try {
+//     if (!req.session.user) {
+//       return res.status(401).json({ message: "Unauthorized: No session" });
+//     }
 
-    const { id: userId, role } = req.session.user;
+//     const { id: userId, role } = req.session.user;
 
-    /* ================= CURRENT USER ================= */
-    const [userResult] = await db.query(
-      "SELECT name FROM users WHERE user_id = ?",
-      [userId]
-    );
-    const currentUserName = userResult[0]?.name || '';
+//     /* ================= CURRENT USER ================= */
+//     const [userResult] = await db.query(
+//       "SELECT name FROM users WHERE user_id = ?",
+//       [userId]
+//     );
+//     const currentUserName = userResult[0]?.name || '';
 
-    /* ================= MAIN QUERY ================= */
-    let query = `
-      SELECT 
-        rd.master_id,
+//     /* ================= MAIN QUERY ================= */
+//     let query = `
+//       SELECT 
+//         rd.master_id,
 
-        -- MAIN RAW DATA
-        IFNULL(rd.name, 'Not Available') AS name,
-        IFNULL(rd.number, 'Not Available') AS number,
-        IFNULL(rd.alternate_number, 'Not Available') AS alternate_number,
-        IFNULL(rd.email, 'Not Available') AS email,
-        IFNULL(rd.address, 'Not Available') AS address,
-        IFNULL(rd.city, 'Not Available') AS city,
-        IFNULL(rd.status, 'Not Available') AS status,
-        IFNULL(rd.lead_status, 'Not Available') AS lead_status,
-        IFNULL(rd.lead_stage, 'Not Available') AS lead_stage,
-        IFNULL(rd.current_stage, 'Not Available') AS current_stage,
-        IFNULL(rd.created_by_user, 'Not Available') AS created_by_user,
-        IFNULL(rd.assign_id, 'Not Available') AS assign_id,
-        IFNULL(rd.followup_date, 'Not Available') AS followup_date,
+//         -- MAIN RAW DATA
+//         IFNULL(rd.name, 'Not Available') AS name,
+//         IFNULL(rd.number, 'Not Available') AS number,
+//         IFNULL(rd.alternate_number, 'Not Available') AS alternate_number,
+//         IFNULL(rd.email, 'Not Available') AS email,
+//         IFNULL(rd.address, 'Not Available') AS address,
+//         IFNULL(rd.city, 'Not Available') AS city,
+//         IFNULL(rd.status, 'Not Available') AS status,
+//         IFNULL(rd.lead_status, 'Not Available') AS lead_status,
+//         IFNULL(rd.lead_stage, 'Not Available') AS lead_stage,
+//         IFNULL(rd.current_stage, 'Not Available') AS current_stage,
+//         IFNULL(rd.created_by_user, 'Not Available') AS created_by_user,
+//         IFNULL(rd.assign_id, 'Not Available') AS assign_id,
+//         IFNULL(rd.followup_date, 'Not Available') AS followup_date,
 
-        -- IDS
-        IFNULL(rd.cat_id, 'Not Available') AS cat_id,
-        IFNULL(rd.reference_id, 'Not Available') AS reference_id,
-        IFNULL(rd.area_id, 'Not Available') AS area_id,
+//         -- IDS
+//         IFNULL(rd.cat_id, 'Not Available') AS cat_id,
+//         IFNULL(rd.reference_id, 'Not Available') AS reference_id,
+//         IFNULL(rd.area_id, 'Not Available') AS area_id,
 
-        -- DIMENSIONS
-        IFNULL(rd.room_length, 'Not Available') AS room_length,
-        IFNULL(rd.room_width, 'Not Available') AS room_width,
-        IFNULL(rd.room_height, 'Not Available') AS room_height,
+//         -- DIMENSIONS
+//         IFNULL(rd.room_length, 'Not Available') AS room_length,
+//         IFNULL(rd.room_width, 'Not Available') AS room_width,
+//         IFNULL(rd.room_height, 'Not Available') AS room_height,
 
-        -- EXTRA DETAILS
-        IFNULL(rd.location_link, 'Not Available') AS location_link,
-        IFNULL(rd.p_type, 'Not Available') AS p_type,
-        IFNULL(rd.budget_range, 'Not Available') AS budget_range,
-        IFNULL(rd.time_to_complete, 'Not Available') AS time_to_complete,
-        IFNULL(rd.site_visit_date, 'Not Available') AS site_visit_date,
-        IFNULL(rd.demo_date, 'Not Available') AS demo_date,
+//         -- EXTRA DETAILS
+//         IFNULL(rd.location_link, 'Not Available') AS location_link,
+//         IFNULL(rd.p_type, 'Not Available') AS p_type,
+//         IFNULL(rd.budget_range, 'Not Available') AS budget_range,
+//         IFNULL(rd.time_to_complete, 'Not Available') AS time_to_complete,
+//         IFNULL(rd.site_visit_date, 'Not Available') AS site_visit_date,
+//         IFNULL(rd.demo_date, 'Not Available') AS demo_date,
 
-        -- ACTIVITY
-        IFNULL(rd.lead_activity, 0) AS lead_activity,
+//         -- ACTIVITY
+//         IFNULL(rd.lead_activity, 0) AS lead_activity,
 
-        -- NUMBERS
-        IFNULL(rd.ar_number, 'Not Available') AS ar_number,
-        IFNULL(rd.architect_name, 'Not Available') AS architect_name,
-        IFNULL(rd.ca_number, 'Not Available') AS ca_number,
-        IFNULL(rd.e_number, 'Not Available') AS e_number,
-        IFNULL(rd.sm_number, 'Not Available') AS sm_number,
-        IFNULL(rd.pop_number, 'Not Available') AS pop_number,
-        IFNULL(rd.other_number, 'Not Available') AS other_number,
+//         -- NUMBERS
+//         IFNULL(rd.ar_number, 'Not Available') AS ar_number,
+//         IFNULL(rd.architect_name, 'Not Available') AS architect_name,
+//         IFNULL(rd.ca_number, 'Not Available') AS ca_number,
+//         IFNULL(rd.e_number, 'Not Available') AS e_number,
+//         IFNULL(rd.sm_number, 'Not Available') AS sm_number,
+//         IFNULL(rd.pop_number, 'Not Available') AS pop_number,
+//         IFNULL(rd.other_number, 'Not Available') AS other_number,
 
-        -- REMARKS
-        IFNULL(rd.quick_remark, 'Not Available') AS quick_remark,
-        IFNULL(rd.detailed_remark, 'Not Available') AS detailed_remark,
+//         -- REMARKS
+//         IFNULL(rd.quick_remark, 'Not Available') AS quick_remark,
+//         IFNULL(rd.detailed_remark, 'Not Available') AS detailed_remark,
 
-        -- AREA / CATEGORY / REFERENCE
-        IFNULL(a.area_name, 'Not Available') AS area_name,
-        IFNULL(c.cat_name, 'Not Available') AS cat_name,
-        IFNULL(ref.reference_name, 'Not Available') AS reference_name,
+//         -- AREA / CATEGORY / REFERENCE
+//         IFNULL(a.area_name, 'Not Available') AS area_name,
+//         IFNULL(c.cat_name, 'Not Available') AS cat_name,
+//         IFNULL(ref.reference_name, 'Not Available') AS reference_name,
 
-        -- ASSIGNMENT DATE
-        IFNULL(DATE(asg.assign_date), 'Not Available') AS assign_date,
+//         -- ASSIGNMENT DATE
+//         IFNULL(DATE(asg.assign_date), 'Not Available') AS assign_date,
 
-        -- LATEST REASSIGNMENT
-        lr.id AS reassignment_id,
-        lr.reassignment_date,
-        lr.assignedTo AS reassigned_to,
-        lr.remark AS reassignment_remark,
-        lr.leadStage AS reassignment_lead_stage,
+//         -- LATEST REASSIGNMENT
+//         lr.id AS reassignment_id,
+//         lr.reassignment_date,
+//         lr.assignedTo AS reassigned_to,
+//         lr.remark AS reassignment_remark,
+//         lr.leadStage AS reassignment_lead_stage,
 
-        -- USER
-        IFNULL(u.name, 'Not Available') AS telecaller_name,
-        u.user_id AS assigned_to_user_id,
+//         -- USER
+//         IFNULL(u.name, 'Not Available') AS telecaller_name,
+//         u.user_id AS assigned_to_user_id,
 
-        -- CALL / PRODUCT
-        MAX(tct.tc_remark) AS call_remark,
-        MAX(tct.tc_call_duration) AS call_duration,
-        GROUP_CONCAT(p.product_name) AS products,
+//         -- CALL / PRODUCT
+//         MAX(tct.tc_remark) AS call_remark,
+//         MAX(tct.tc_call_duration) AS call_duration,
+//         GROUP_CONCAT(p.product_name) AS products,
 
-        -- ✅ NEW: DOCUMENT LOCATION LINK
-        MAX(d.location_link) AS document_location_link
+//         -- ✅ NEW: DOCUMENT LOCATION LINK
+//         MAX(d.location_link) AS document_location_link
 
-      FROM raw_data rd
+//       FROM raw_data rd
 
-      LEFT JOIN area a ON rd.area_id = a.area_id
-      LEFT JOIN category c ON rd.cat_id = c.cat_id
-      LEFT JOIN reference ref ON rd.reference_id = ref.reference_id
+//       LEFT JOIN area a ON rd.area_id = a.area_id
+//       LEFT JOIN category c ON rd.cat_id = c.cat_id
+//       LEFT JOIN reference ref ON rd.reference_id = ref.reference_id
 
-      LEFT JOIN assignments asg ON rd.assign_id = asg.assign_id
+//       LEFT JOIN assignments asg ON rd.assign_id = asg.assign_id
 
-      -- LATEST REASSIGNMENT
-      LEFT JOIN (
-        SELECT r1.*, ROW_NUMBER() OVER (PARTITION BY master_id ORDER BY id DESC) rn
-        FROM reassignment r1
-      ) lr ON rd.master_id = lr.master_id AND lr.rn = 1
+//       -- LATEST REASSIGNMENT
+//       LEFT JOIN (
+//         SELECT r1.*, ROW_NUMBER() OVER (PARTITION BY master_id ORDER BY id DESC) rn
+//         FROM reassignment r1
+//       ) lr ON rd.master_id = lr.master_id AND lr.rn = 1
 
-      LEFT JOIN users u ON lr.assignedTo = u.name
-      LEFT JOIN tele_caller_table tct ON rd.master_id = tct.master_id
-      LEFT JOIN product_mapping pm ON rd.master_id = pm.master_id
-      LEFT JOIN product p ON p.product_id = pm.product_id
+//       LEFT JOIN users u ON lr.assignedTo = u.name
+//       LEFT JOIN tele_caller_table tct ON rd.master_id = tct.master_id
+//       LEFT JOIN product_mapping pm ON rd.master_id = pm.master_id
+//       LEFT JOIN product p ON p.product_id = pm.product_id
 
-      -- ✅ NEW: DOCUMENTS JOIN
-      LEFT JOIN documents d ON d.master_id = rd.master_id
-    `;
+//       -- ✅ NEW: DOCUMENTS JOIN
+//       LEFT JOIN documents d ON d.master_id = rd.master_id
+//     `;
 
-    const params = [];
 
-    /* ================= ROLE FILTER ================= */
-    if (isTelecallerLike(role)) {
-      query += ` WHERE lr.assignedTo = ?`;
-      params.push(currentUserName);
-    } else if (isAdminLike(role)) {
-      query += ` WHERE rd.status IN ('Assigned', 'Not Interested')`;
-    } else if (!isManagementLike(role)) {
-      query += ` WHERE lr.assignedTo = ?`;
-      params.push(currentUserName);
-    }
+// const params = [];
 
-    query += ` GROUP BY rd.master_id ORDER BY rd.master_id DESC`;
 
-    const [rows] = await db.query(query, params);
+//     /* ================= ROLE FILTER ================= */
+//     if (isTelecallerLike(role)) {
+//       query += ` WHERE lr.assignedTo = ?`;
+//       params.push(currentUserName);
+//     } else if (isAdminLike(role)) {
+//       query += ` WHERE rd.status IN ('Assigned', 'Not Interested')`;
+//     } else if (!isManagementLike(role)) {
+//       query += ` WHERE lr.assignedTo = ?`;
+//       params.push(currentUserName);
+//     }
 
-    /* ================= OTHER INPUTS ================= */
-    const masterIds = rows.map(r => r.master_id);
-    let otherInputsRows = [];
+//     query += ` GROUP BY rd.master_id ORDER BY rd.master_id DESC`;
 
-    if (masterIds.length) {
-      const [otherInputs] = await db.query(
-        `SELECT master_id, cat_id, reference_id, input_text
-         FROM raw_data_other_inputs
-         WHERE master_id IN (?)
-         ORDER BY created_at DESC`,
-        [masterIds]
-      );
-      otherInputsRows = otherInputs;
-    }
+//     const [rows] = await db.query(query, params);
 
-    /* ================= REASSIGNMENT HISTORY ================= */
-    let reassignmentRows = [];
-    if (masterIds.length) {
-      const [reassignments] = await db.query(
-        `SELECT rm.*, u.name, u.role
-         FROM reassignment rm
-         LEFT JOIN users u ON u.user_id = rm.created_by_user
-         WHERE rm.master_id IN (?)
-         ORDER BY rm.reassignment_date DESC, rm.created_at DESC`,
-        [masterIds]
-      );
-      reassignmentRows = reassignments;
-    }
+//     /* ================= OTHER INPUTS ================= */
+//     const masterIds = rows.map(r => r.master_id);
+//     let otherInputsRows = [];
 
-    /* ================= FINAL MAP ================= */
-    const formattedRows = rows.map(row => {
-      const rowCatId = parseInt(row.cat_id);
-      const rowRefId = parseInt(row.reference_id);
+//     if (masterIds.length) {
+//       const [otherInputs] = await db.query(
+//         `SELECT master_id, cat_id, reference_id, input_text
+//          FROM raw_data_other_inputs
+//          WHERE master_id IN (?)
+//          ORDER BY created_at DESC`,
+//         [masterIds]
+//       );
+//       otherInputsRows = otherInputs;
+//     }
 
-      const categoryOther =
-        otherInputsRows.find(
-          oi => oi.master_id === row.master_id && oi.cat_id === rowCatId
-        )?.input_text || '';
+//     /* ================= REASSIGNMENT HISTORY ================= */
+//     let reassignmentRows = [];
+//     if (masterIds.length) {
+//       const [reassignments] = await db.query(
+//         `SELECT rm.*, u.name, u.role
+//          FROM reassignment rm
+//          LEFT JOIN users u ON u.user_id = rm.created_by_user
+//          WHERE rm.master_id IN (?)
+//          ORDER BY rm.reassignment_date DESC, rm.created_at DESC`,
+//         [masterIds]
+//       );
+//       reassignmentRows = reassignments;
+//     }
 
-      const referenceOther =
-        otherInputsRows.find(
-          oi => oi.master_id === row.master_id && oi.reference_id === rowRefId
-        )?.input_text || '';
+//     /* ================= FINAL MAP ================= */
+//     const formattedRows = rows.map(row => {
+//       const rowCatId = parseInt(row.cat_id);
+//       const rowRefId = parseInt(row.reference_id);
 
-      const reassignments = reassignmentRows
-        .filter(r => r.master_id === row.master_id)
-        .map(r => ({
-          remark: r.remark || '',
-          assignedTo: r.assignedTo || '',
-          leadStage: r.leadStage || '',
-          created_by_user: r.created_by_user || '',
-          created_at: r.created_at ? new Date(r.created_at).toLocaleString('en-GB') : '',
-          reassignment_date: r.reassignment_date ? new Date(r.reassignment_date).toLocaleString('en-GB') : '',
-          name: r.name || '',
-          role: r.role || ''
-        }));
+//       const categoryOther =
+//         otherInputsRows.find(
+//           oi => oi.master_id === row.master_id && oi.cat_id === rowCatId
+//         )?.input_text || '';
 
-      return {
-        ...row,
-        category_other: categoryOther,
-        reference_other: referenceOther,
-        reassignment_remarks: reassignments,
-        latest_assignedTo: reassignments[0]?.assignedTo || '',
-        latest_leadStage: reassignments[0]?.leadStage || '',
-        assign_date: row.assign_date
-      };
-    });
+//       const referenceOther =
+//         otherInputsRows.find(
+//           oi => oi.master_id === row.master_id && oi.reference_id === rowRefId
+//         )?.input_text || '';
 
-    return res.status(200).json(formattedRows);
+//       const reassignments = reassignmentRows
+//         .filter(r => r.master_id === row.master_id)
+//         .map(r => ({
+//           remark: r.remark || '',
+//           assignedTo: r.assignedTo || '',
+//           leadStage: r.leadStage || '',
+//           created_by_user: r.created_by_user || '',
+//           created_at: r.created_at ? new Date(r.created_at).toLocaleString('en-GB') : '',
+//           reassignment_date: r.reassignment_date ? new Date(r.reassignment_date).toLocaleString('en-GB') : '',
+//           name: r.name || '',
+//           role: r.role || ''
+//         }));
 
-  } catch (error) {
-    console.error("❌ Error in getCompleteRawData:", error);
-    res.status(500).json({ message: "Failed to fetch data" });
-  }
-};
+//       return {
+//         ...row,
+//         category_other: categoryOther,
+//         reference_other: referenceOther,
+//         reassignment_remarks: reassignments,
+//         latest_assignedTo: reassignments[0]?.assignedTo || '',
+//         latest_leadStage: reassignments[0]?.leadStage || '',
+//         assign_date: row.assign_date
+//       };
+//     });
+
+//     return res.status(200).json(formattedRows);
+
+//   } catch (error) {
+//     console.error("❌ Error in getCompleteRawData:", error);
+//     res.status(500).json({ message: "Failed to fetch data" });
+//   }
+// };
 
 
 
@@ -1712,6 +1891,220 @@ export const getCompleteRawData = async (req, res) => {
 // };
 
 
+export const getCompleteRawData = async (req, res) => {
+  try {
+    if (!req.session.user) {
+      return res.status(401).json({ message: "Unauthorized: No session" });
+    }
+
+    const { id: userId, role } = req.session.user;
+
+    /* ================= CURRENT USER ================= */
+    const [userResult] = await db.query(
+      "SELECT name FROM users WHERE user_id = ?",
+      [userId]
+    );
+    const currentUserName = userResult[0]?.name || '';
+
+    /* ================= MAIN QUERY ================= */
+    let query = `
+      SELECT 
+        rd.master_id,
+
+        -- MAIN RAW DATA
+        IFNULL(rd.name, 'Not Available') AS name,
+        IFNULL(rd.number, 'Not Available') AS number,
+        IFNULL(rd.alternate_number, 'Not Available') AS alternate_number,
+        IFNULL(rd.email, 'Not Available') AS email,
+        IFNULL(rd.address, 'Not Available') AS address,
+        IFNULL(rd.city, 'Not Available') AS city,
+        IFNULL(rd.status, 'Not Available') AS status,
+        IFNULL(rd.lead_status, 'Not Available') AS lead_status,
+        IFNULL(rd.lead_stage, 'Not Available') AS lead_stage,
+        IFNULL(rd.current_stage, 'Not Available') AS current_stage,
+        IFNULL(rd.created_by_user, 'Not Available') AS created_by_user,
+        IFNULL(rd.assign_id, 'Not Available') AS assign_id,
+        IFNULL(rd.followup_date, 'Not Available') AS followup_date,
+
+        -- IDS
+        IFNULL(rd.cat_id, 'Not Available') AS cat_id,
+        IFNULL(rd.reference_id, 'Not Available') AS reference_id,
+        IFNULL(rd.area_id, 'Not Available') AS area_id,
+
+        -- DIMENSIONS
+        IFNULL(rd.room_length, 'Not Available') AS room_length,
+        IFNULL(rd.room_width, 'Not Available') AS room_width,
+        IFNULL(rd.room_height, 'Not Available') AS room_height,
+
+        -- EXTRA DETAILS
+        IFNULL(rd.location_link, 'Not Available') AS location_link,
+        IFNULL(rd.p_type, 'Not Available') AS p_type,
+        IFNULL(rd.budget_range, 'Not Available') AS budget_range,
+        IFNULL(rd.time_to_complete, 'Not Available') AS time_to_complete,
+        IFNULL(rd.site_visit_date, 'Not Available') AS site_visit_date,
+        IFNULL(rd.demo_date, 'Not Available') AS demo_date,
+
+        -- ACTIVITY
+        IFNULL(rd.lead_activity, 0) AS lead_activity,
+
+        -- NUMBERS
+        IFNULL(rd.ar_number, 'Not Available') AS ar_number,
+        IFNULL(rd.architect_name, 'Not Available') AS architect_name,
+        IFNULL(rd.ca_number, 'Not Available') AS ca_number,
+        IFNULL(rd.e_number, 'Not Available') AS e_number,
+        IFNULL(rd.sm_number, 'Not Available') AS sm_number,
+        IFNULL(rd.pop_number, 'Not Available') AS pop_number,
+        IFNULL(rd.other_number, 'Not Available') AS other_number,
+
+        -- REMARKS
+        IFNULL(rd.quick_remark, 'Not Available') AS quick_remark,
+        IFNULL(rd.detailed_remark, 'Not Available') AS detailed_remark,
+
+        -- AREA / CATEGORY / REFERENCE
+        IFNULL(a.area_name, 'Not Available') AS area_name,
+        IFNULL(c.cat_name, 'Not Available') AS cat_name,
+        IFNULL(ref.reference_name, 'Not Available') AS reference_name,
+
+        -- ASSIGNMENT DATE
+        IFNULL(DATE(asg.assign_date), 'Not Available') AS assign_date,
+
+        -- LATEST REASSIGNMENT
+        lr.id AS reassignment_id,
+        lr.reassignment_date,
+        lr.assignedTo AS reassigned_to,
+        lr.remark AS reassignment_remark,
+        lr.leadStage AS reassignment_lead_stage,
+
+        -- USER
+        IFNULL(u.name, 'Not Available') AS telecaller_name,
+        u.user_id AS assigned_to_user_id,
+
+        -- CALL / PRODUCT
+        MAX(tct.tc_remark) AS call_remark,
+        MAX(tct.tc_call_duration) AS call_duration,
+        GROUP_CONCAT(p.product_name) AS products,
+
+        -- DOCUMENT LOCATION LINK
+        MAX(d.location_link) AS document_location_link
+
+      FROM raw_data rd
+      LEFT JOIN area a ON rd.area_id = a.area_id
+      LEFT JOIN category c ON rd.cat_id = c.cat_id
+      LEFT JOIN reference ref ON rd.reference_id = ref.reference_id
+      LEFT JOIN assignments asg ON rd.assign_id = asg.assign_id
+
+      -- LATEST REASSIGNMENT
+      LEFT JOIN (
+        SELECT r1.*, ROW_NUMBER() OVER (PARTITION BY master_id ORDER BY id DESC) rn
+        FROM reassignment r1
+      ) lr ON rd.master_id = lr.master_id AND lr.rn = 1
+
+      LEFT JOIN users u ON lr.assignedTo = u.name
+      LEFT JOIN tele_caller_table tct ON rd.master_id = tct.master_id
+      LEFT JOIN product_mapping pm ON rd.master_id = pm.master_id
+      LEFT JOIN product p ON p.product_id = pm.product_id
+      LEFT JOIN documents d ON d.master_id = rd.master_id
+
+      WHERE 1=1
+        AND rd.lead_stage NOT IN ('Drop', 'Closed Deal')
+    `;
+
+    const params = [];
+
+    /* ================= ROLE FILTER ================= */
+    if (isTelecallerLike(role)) {
+      query += ` AND lr.assignedTo = ?`;
+      params.push(currentUserName);
+    } 
+    else if (isAdminLike(role)) {
+      query += ` AND rd.status IN ('Assigned', 'Not Interested')`;
+    } 
+    else if (!isManagementLike(role)) {
+      query += ` AND lr.assignedTo = ?`;
+      params.push(currentUserName);
+    }
+
+    query += ` GROUP BY rd.master_id ORDER BY rd.master_id DESC`;
+
+    const [rows] = await db.query(query, params);
+
+    /* ================= OTHER INPUTS ================= */
+    const masterIds = rows.map(r => r.master_id);
+    let otherInputsRows = [];
+
+    if (masterIds.length) {
+      const [otherInputs] = await db.query(
+        `SELECT master_id, cat_id, reference_id, input_text
+         FROM raw_data_other_inputs
+         WHERE master_id IN (?)
+         ORDER BY created_at DESC`,
+        [masterIds]
+      );
+      otherInputsRows = otherInputs;
+    }
+
+    /* ================= REASSIGNMENT HISTORY ================= */
+    let reassignmentRows = [];
+    if (masterIds.length) {
+      const [reassignments] = await db.query(
+        `SELECT rm.*, u.name, u.role
+         FROM reassignment rm
+         LEFT JOIN users u ON u.user_id = rm.created_by_user
+         WHERE rm.master_id IN (?)
+         ORDER BY rm.reassignment_date DESC, rm.created_at DESC`,
+        [masterIds]
+      );
+      reassignmentRows = reassignments;
+    }
+
+    /* ================= FINAL MAP ================= */
+    const formattedRows = rows.map(row => {
+      const rowCatId = parseInt(row.cat_id);
+      const rowRefId = parseInt(row.reference_id);
+
+      const categoryOther =
+        otherInputsRows.find(
+          oi => oi.master_id === row.master_id && oi.cat_id === rowCatId
+        )?.input_text || '';
+
+      const referenceOther =
+        otherInputsRows.find(
+          oi => oi.master_id === row.master_id && oi.reference_id === rowRefId
+        )?.input_text || '';
+
+      const reassignments = reassignmentRows
+        .filter(r => r.master_id === row.master_id)
+        .map(r => ({
+          remark: r.remark || '',
+          assignedTo: r.assignedTo || '',
+          leadStage: r.leadStage || '',
+          created_by_user: r.created_by_user || '',
+          created_at: r.created_at ? new Date(r.created_at).toLocaleString('en-GB') : '',
+          reassignment_date: r.reassignment_date ? new Date(r.reassignment_date).toLocaleString('en-GB') : '',
+          name: r.name || '',
+          role: r.role || ''
+        }));
+
+      return {
+        ...row,
+        category_other: categoryOther,
+        reference_other: referenceOther,
+        reassignment_remarks: reassignments,
+        latest_assignedTo: reassignments[0]?.assignedTo || '',
+        latest_leadStage: reassignments[0]?.leadStage || '',
+        assign_date: row.assign_date
+      };
+    });
+
+    return res.status(200).json(formattedRows);
+
+  } catch (error) {
+    console.error("❌ Error in getCompleteRawData:", error);
+    res.status(500).json({ message: "Failed to fetch data" });
+  }
+};
+
+
 
 
 const normalizeName = (name = "") =>
@@ -1720,7 +2113,6 @@ const normalizeName = (name = "") =>
     .trim()
     .replace(/\s+/g, " ")
     .toLowerCase();
-
 
 
 export const importRawData = async (req, res) => {
@@ -2771,6 +3163,121 @@ const mimeExtensionMap = {
 
 
 
+// export const uploadDocuments = async (req, res) => {
+//   try {
+//     const { master_id } = req.params;
+
+//     if (!master_id) {
+//       return res.status(400).json({ message: 'master_id is required' });
+//     }
+
+//     if (!req.files || !req.files.files) {
+//       return res.status(400).json({ message: 'No files uploaded' });
+//     }
+
+//     const {
+//       location_link,
+//       remark,
+//       detailed_remark,
+//       reassignment_remark,
+//       new_remark
+//     } = req.body;
+
+//     const finalRemark =
+//       detailed_remark ||
+//       reassignment_remark ||
+//       new_remark ||
+//       remark ||
+//       null;
+
+//     const filesArray = Array.isArray(req.files.files)
+//       ? req.files.files
+//       : [req.files.files];
+
+//     const docValues = [];
+//     const uploadedDocs = [];
+
+//     for (const file of filesArray) {
+//       // ✅ REAL ORIGINAL NAME
+//       const originalName = file.name;
+
+//       // ✅ EXTENSION FROM MIME TYPE (NOT filename)
+//       const safeExt =
+//         mimeExtensionMap[file.mimetype] ||
+//         path.extname(originalName).toLowerCase() ||
+//         '.bin';
+
+//       // ✅ CLEAN BASE NAME
+//       const baseName = path
+//         .basename(originalName, path.extname(originalName))
+//         .replace(/[^a-zA-Z0-9]/g, '_');
+
+//       // ✅ FINAL SAFE FILE NAME
+//       const fileName = `${master_id}_${Date.now()}_${baseName}${safeExt}`;
+
+//       // ✅ FILE TYPE
+//       const fileType = file.mimetype.startsWith('image/')
+//         ? 'image'
+//         : file.mimetype.startsWith('video/')
+//         ? 'video'
+//         : 'document';
+
+//       // ✅ UPLOAD DIRECTORY
+//       const uploadDir = path.join('uploads', fileType);
+//       if (!fs.existsSync(uploadDir)) {
+//         fs.mkdirSync(uploadDir, { recursive: true });
+//       }
+
+//       // ✅ SAVE FILE
+//       const savePath = path.join(uploadDir, fileName);
+//       await file.mv(savePath);
+
+//       // ✅ PATH FOR DB
+//       const dbPath = path.join(fileType, fileName).replace(/\\/g, '/');
+
+//       // ✅ DB VALUES - Match your table columns exactly
+//       docValues.push([
+//         master_id,           // master_id (varchar)
+//         dbPath,              // document_path
+//         fileType,            // document_type
+//         location_link || null, // location_link
+//         finalRemark          // remark
+//         // Note: uploaded_at is automatic (TIMESTAMP DEFAULT CURRENT_TIMESTAMP)
+//       ]);
+
+//       uploadedDocs.push({
+//         document_path: dbPath,
+//         document_type: fileType,
+//         original_name: originalName
+//       });
+//     }
+
+//     // ✅ BULK INSERT - Match your table columns
+//     await db.query(
+//       `INSERT INTO documents
+//        (master_id, document_path, document_type, location_link, remark)
+//        VALUES ?`,
+//       [docValues]
+//     );
+
+//     return res.status(200).json({
+//       success: true,
+//       message: 'Documents uploaded successfully',
+//       documents: uploadedDocs
+//     });
+
+//   } catch (error) {
+//     console.error('❌ uploadDocuments error:', error);
+//     return res.status(500).json({
+//       success: false,
+//       message: 'Server error during upload',
+//       error: error.message
+//     });
+//   }
+// };
+
+
+
 export const uploadDocuments = async (req, res) => {
   try {
     const { master_id } = req.params;
@@ -2788,8 +3295,34 @@ export const uploadDocuments = async (req, res) => {
       remark,
       detailed_remark,
       reassignment_remark,
-      new_remark
+      new_remark,
+      followup_date,
+      leadStage,
+      assignedTo
     } = req.body;
+
+    /* ======================================================
+       🔹 MINIMAL REQUIRED LOGS
+    ====================================================== */
+    console.log('UPLOAD REQUEST:', {
+      master_id,
+      assignedTo,
+      followup_date,
+      leadStage
+    });
+
+    /* ======================================================
+       🔹 NORMALIZE assignedTo (🔥 FIX)
+    ====================================================== */
+    let assignedToArray = [];
+
+    if (Array.isArray(assignedTo)) {
+      assignedToArray = assignedTo;
+    } else if (typeof assignedTo === 'string' && assignedTo.trim() !== '') {
+      assignedToArray = assignedTo.split(',').map(v => v.trim());
+    }
+
+    console.log('assignedTo normalized:', assignedToArray);
 
     const finalRemark =
       detailed_remark ||
@@ -2805,85 +3338,179 @@ export const uploadDocuments = async (req, res) => {
     const docValues = [];
     const uploadedDocs = [];
 
+    const updated_fields = {
+      raw_data_followup_date: false,
+      raw_data_lead_stage: false,
+      raw_data_detailed_remark: false,
+      reassignments_created: 0,
+      documents_created: 0
+    };
+
+    /* ======================================================
+       🔹 UPDATE raw_data
+    ====================================================== */
+    if (followup_date) {
+      await db.query(
+        `UPDATE raw_data SET followup_date = ? WHERE master_id = ?`,
+        [followup_date, master_id]
+      );
+      updated_fields.raw_data_followup_date = true;
+    }
+
+    if (leadStage) {
+      await db.query(
+        `UPDATE raw_data SET lead_stage = ? WHERE master_id = ?`,
+        [leadStage, master_id]
+      );
+      updated_fields.raw_data_lead_stage = true;
+    }
+
+    if (detailed_remark && detailed_remark.trim() !== '') {
+      await db.query(
+        `UPDATE raw_data SET detailed_remark = ? WHERE master_id = ?`,
+        [detailed_remark, master_id]
+      );
+      updated_fields.raw_data_detailed_remark = true;
+    }
+
+    /* ======================================================
+       🔹 CREATE REASSIGNMENT (FIXED)
+    ====================================================== */
+    let reassignments = [];
+
+    if (assignedToArray.length > 0) {
+      const created_by_user = req.session?.user?.id || 0;
+
+      const [assignData] = await db.query(
+        `SELECT assign_id FROM raw_data WHERE master_id = ?`,
+        [master_id]
+      );
+
+      let assign_id = assignData.length ? assignData[0].assign_id : null;
+
+      if (!assign_id) {
+        const [newAssign] = await db.execute(
+          `INSERT INTO assignments (assign_date) VALUES (NOW())`
+        );
+        assign_id = newAssign.insertId;
+
+        await db.execute(
+          `UPDATE raw_data SET assign_id = ? WHERE master_id = ?`,
+          [assign_id, master_id]
+        );
+      }
+
+      const reassignment_date =
+        followup_date || new Date().toISOString().split('T')[0];
+
+      console.log('Creating reassignment for users:', assignedToArray);
+
+      for (const userId of assignedToArray) {
+        if (!userId) continue;
+
+        let assignedName = userId;
+
+        if (!isNaN(userId)) {
+          const [userRow] = await db.query(
+            `SELECT name FROM users WHERE user_id = ?`,
+            [userId]
+          );
+          if (userRow.length) assignedName = userRow[0].name;
+        }
+
+        const reassignmentRemark =
+          detailed_remark || finalRemark || 'Document uploaded';
+
+        const [insertRes] = await db.query(
+          `INSERT INTO reassignment
+           (assign_id, master_id, created_by_user, assignedTo, leadStage, remark, reassignment_date, created_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?, NOW())`,
+          [
+            assign_id,
+            master_id,
+            created_by_user,
+            assignedName,
+            leadStage || 'Cold Lead',
+            reassignmentRemark,
+            reassignment_date
+          ]
+        );
+
+        reassignments.push({
+          id: insertRes.insertId,
+          userId,
+          assignedName
+        });
+
+        updated_fields.reassignments_created++;
+      }
+    }
+
+    /* ======================================================
+       🔹 DOCUMENT UPLOAD
+    ====================================================== */
     for (const file of filesArray) {
-      // ✅ REAL ORIGINAL NAME
       const originalName = file.name;
+      const ext = path.extname(originalName);
+      const safeName = `${master_id}_${Date.now()}_${originalName.replace(/\s+/g, '_')}`;
 
-      // ✅ EXTENSION FROM MIME TYPE (NOT filename)
-      const safeExt =
-        mimeExtensionMap[file.mimetype] ||
-        path.extname(originalName).toLowerCase() ||
-        '.bin';
-
-      // ✅ CLEAN BASE NAME
-      const baseName = path
-        .basename(originalName, path.extname(originalName))
-        .replace(/[^a-zA-Z0-9]/g, '_');
-
-      // ✅ FINAL SAFE FILE NAME
-      const fileName = `${master_id}_${Date.now()}_${baseName}${safeExt}`;
-
-      // ✅ FILE TYPE
       const fileType = file.mimetype.startsWith('image/')
         ? 'image'
         : file.mimetype.startsWith('video/')
         ? 'video'
         : 'document';
 
-      // ✅ UPLOAD DIRECTORY
       const uploadDir = path.join('uploads', fileType);
-      if (!fs.existsSync(uploadDir)) {
-        fs.mkdirSync(uploadDir, { recursive: true });
-      }
+      if (!fs.existsSync(uploadDir)) fs.mkdirSync(uploadDir, { recursive: true });
 
-      // ✅ SAVE FILE
-      const savePath = path.join(uploadDir, fileName);
+      const savePath = path.join(uploadDir, safeName);
       await file.mv(savePath);
 
-      // ✅ PATH FOR DB
-      const dbPath = path.join(fileType, fileName).replace(/\\/g, '/');
+      const dbPath = `${fileType}/${safeName}`;
 
-      // ✅ DB VALUES - Match your table columns exactly
       docValues.push([
-        master_id,           // master_id (varchar)
-        dbPath,              // document_path
-        fileType,            // document_type
-        location_link || null, // location_link
-        finalRemark          // remark
-        // Note: uploaded_at is automatic (TIMESTAMP DEFAULT CURRENT_TIMESTAMP)
+        master_id,
+        dbPath,
+        fileType,
+        location_link || null,
+        detailed_remark || finalRemark
       ]);
 
-      uploadedDocs.push({
-        document_path: dbPath,
-        document_type: fileType,
-        original_name: originalName
-      });
+      uploadedDocs.push({ document_path: dbPath, document_type: fileType });
+      updated_fields.documents_created++;
     }
 
-    // ✅ BULK INSERT - Match your table columns
-    await db.query(
-      `INSERT INTO documents
-       (master_id, document_path, document_type, location_link, remark)
-       VALUES ?`,
-      [docValues]
-    );
+    if (docValues.length) {
+      await db.query(
+        `INSERT INTO documents
+         (master_id, document_path, document_type, location_link, remark)
+         VALUES ?`,
+        [docValues]
+      );
+    }
+
+    console.log('SUMMARY:', updated_fields);
 
     return res.status(200).json({
       success: true,
-      message: 'Documents uploaded successfully',
+      summary: {
+        files_uploaded: uploadedDocs.length,
+        reassignments_added: updated_fields.reassignments_created,
+        documents_created: updated_fields.documents_created
+      },
+      updated_fields,
+      reassignments,
       documents: uploadedDocs
     });
 
   } catch (error) {
-    console.error('❌ uploadDocuments error:', error);
+    console.error('UPLOAD ERROR:', error.message);
     return res.status(500).json({
       success: false,
-      message: 'Server error during upload',
-      error: error.message
+      message: 'Server error during upload'
     });
   }
 };
-
 
 
 
@@ -3008,7 +3635,7 @@ export const addReassignment = async (req, res) => {
     }
 
     /* ------------------------------------------------
-       STEP 1: Resolve assign_id (same as updateRawData)
+       STEP 1: Resolve assign_id
     ------------------------------------------------ */
     let finalAssignId = assign_id;
 
@@ -3040,7 +3667,7 @@ export const addReassignment = async (req, res) => {
       : assignedTo.toString().split(",").map(u => u.trim());
 
     /* ------------------------------------------------
-       STEP 3: Get last reassignment (for duplicate logic)
+       STEP 3: Previous reassignment
     ------------------------------------------------ */
     const [last] = await db.execute(
       `SELECT assignedTo, leadStage, remark
@@ -3063,20 +3690,18 @@ export const addReassignment = async (req, res) => {
     const skipped = [];
 
     /* ------------------------------------------------
-       STEP 4: Insert reassignment (same logic as updateRawData)
+       STEP 4: Insert reassignment
     ------------------------------------------------ */
     for (const user of users) {
       if (!user) continue;
 
-      const finalLeadStage =
-        leadStage || previous?.leadStage || null;
-
+      const finalLeadStage = leadStage || previous?.leadStage || null;
       const finalRemark =
         remark && remark.trim() !== ""
           ? remark
           : previous?.remark || "";
 
-      // Duplicate check (same day + same stage + same user)
+      // Duplicate check
       const [dup] = await db.execute(
         `SELECT id, remark FROM reassignment
          WHERE master_id = ?
@@ -3090,17 +3715,13 @@ export const addReassignment = async (req, res) => {
       );
 
       if (dup.length && dup[0].remark === finalRemark) {
-        skipped.push({
-          user,
-          leadStage: finalLeadStage,
-          reason: "duplicate"
-        });
+        skipped.push({ user, leadStage: finalLeadStage });
         continue;
       }
 
       const [insertRes] = await db.execute(
         `INSERT INTO reassignment
-          (assign_id, master_id, created_by_user, assignedTo, leadStage, remark, reassignment_date, created_at)
+         (assign_id, master_id, created_by_user, assignedTo, leadStage, remark, reassignment_date, created_at)
          VALUES (?, ?, ?, ?, ?, ?, ?, NOW())`,
         [
           finalAssignId,
@@ -3113,25 +3734,25 @@ export const addReassignment = async (req, res) => {
         ]
       );
 
-      inserted.push({
-        id: insertRes.insertId,
-        user,
-        leadStage: finalLeadStage
-      });
+      inserted.push({ id: insertRes.insertId, user });
     }
 
     /* ------------------------------------------------
-       STEP 5: Update raw_data (sync)
+       STEP 5: Sync raw_data (IMPORTANT)
     ------------------------------------------------ */
-    if (leadStage || followup_date) {
-      await db.execute(
-        `UPDATE raw_data
-         SET lead_stage = COALESCE(?, lead_stage),
-             followup_date = COALESCE(?, followup_date)
-         WHERE master_id = ?`,
-        [leadStage || null, followup_date || null, master_id]
-      );
-    }
+    await db.execute(
+      `UPDATE raw_data
+       SET lead_stage      = COALESCE(?, lead_stage),
+           followup_date   = COALESCE(?, followup_date),
+           detailed_remark = COALESCE(?, detailed_remark)
+       WHERE master_id = ?`,
+      [
+        leadStage || null,
+        followup_date || reassignment_date || null,
+        remark && remark.trim() !== '' ? remark : null,
+        master_id
+      ]
+    );
 
     res.status(200).json({
       success: true,
@@ -3152,6 +3773,7 @@ export const addReassignment = async (req, res) => {
     });
   }
 };
+
 
 
 
@@ -3408,7 +4030,7 @@ export const deleteClient = async (req, res) => {
     }
 
     await connection.commit();
-    res.json({ message: 'Selected leads deleted successfully (single-delete logic)' });
+    res.json({ message: 'Selected leads deleted successfully' });
 
   } catch (err) {
     await connection.rollback();
@@ -4172,6 +4794,7 @@ export const getReassignmentByMaster = async (req, res) => {
 
 
 
+// In your backend (e.g., dropLeadsController.js)
 export const getDropLeadsFullData = async (req, res) => {
   try {
     if (!req.session.user) {
@@ -4179,6 +4802,582 @@ export const getDropLeadsFullData = async (req, res) => {
     }
 
     const { id: userId, role } = req.session.user;
+    const today = new Date().toISOString().slice(0, 10);
+    
+    // Get pagination and filter parameters from query
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 10;
+    const offset = (page - 1) * limit;
+    
+    // Get filter parameters
+    const search = req.query.search || '';
+    const entryFromDate = req.query.entryFromDate;
+    const entryToDate = req.query.entryToDate;
+    const followupFromDate = req.query.followupFromDate;
+    const followupToDate = req.query.followupToDate;
+    const stages = req.query.stages ? req.query.stages.split(',') : [];
+    const users = req.query.users ? req.query.users.split(',') : [];
+    const cities = req.query.cities ? req.query.cities.split(',') : [];
+
+    /* ================= CURRENT USER ================= */
+    const [userResult] = await db.query(
+      "SELECT name FROM users WHERE user_id = ?",
+      [userId]
+    );
+    const currentUserName = userResult[0]?.name || '';
+
+    /* ================= COUNT TOTAL RECORDS ================= */
+    let countQuery = `
+      SELECT COUNT(DISTINCT rd.master_id) as total
+      FROM raw_data rd
+      LEFT JOIN (
+        SELECT r1.*, ROW_NUMBER() OVER (PARTITION BY master_id ORDER BY id DESC) rn
+        FROM reassignment r1
+      ) lr ON rd.master_id = lr.master_id AND lr.rn = 1
+      WHERE (rd.lead_stage = 'Drop' OR lr.leadStage = 'Drop')
+    `;
+
+    let countParams = [];
+
+    /* ================= SEARCH FILTER ================= */
+    if (search) {
+      countQuery += ` AND (
+        rd.name LIKE ? OR 
+        rd.number LIKE ? OR 
+        rd.email LIKE ? OR 
+        rd.address LIKE ? OR 
+        rd.city LIKE ? OR 
+        rd.lead_stage LIKE ? OR 
+        lr.assignedTo LIKE ?
+      )`;
+      const searchPattern = `%${search}%`;
+      countParams.push(searchPattern, searchPattern, searchPattern, searchPattern, searchPattern, searchPattern, searchPattern);
+    }
+
+    /* ================= DATE FILTERS ================= */
+    if (entryFromDate) {
+      countQuery += ` AND DATE(rd.assign_date) >= ?`;
+      countParams.push(entryFromDate);
+    }
+    if (entryToDate) {
+      countQuery += ` AND DATE(rd.assign_date) <= ?`;
+      countParams.push(entryToDate);
+    }
+    if (followupFromDate) {
+      countQuery += ` AND DATE(rd.followup_date) >= ?`;
+      countParams.push(followupFromDate);
+    }
+    if (followupToDate) {
+      countQuery += ` AND DATE(rd.followup_date) <= ?`;
+      countParams.push(followupToDate);
+    }
+
+    /* ================= STAGE FILTER ================= */
+    if (stages.length > 0) {
+      countQuery += ` AND rd.lead_stage IN (?)`;
+      countParams.push(stages);
+    }
+
+    /* ================= USER FILTER ================= */
+    if (users.length > 0) {
+      countQuery += ` AND lr.assignedTo IN (?)`;
+      countParams.push(users);
+    }
+
+    /* ================= CITY FILTER ================= */
+    if (cities.length > 0) {
+      countQuery += ` AND rd.city IN (?)`;
+      countParams.push(cities);
+    }
+
+    /* ================= ROLE FILTER FOR COUNT ================= */
+    if (isTelecallerLike(role)) {
+      countQuery += ` AND lr.assignedTo = ?`;
+      countParams.push(currentUserName);
+    } else if (isAdminLike(role)) {
+      // no filter
+    } else if (!isManagementLike(role)) {
+      countQuery += ` AND lr.assignedTo = ?`;
+      countParams.push(currentUserName);
+    }
+
+    const [countResult] = await db.query(countQuery, countParams);
+    const total = countResult[0]?.total || 0;
+
+    /* ================= MAIN QUERY WITH PAGINATION ================= */
+    let query = `
+      SELECT 
+        rd.master_id,
+        IFNULL(rd.name, 'Not Available') AS name,
+        IFNULL(rd.number, 'Not Available') AS number,
+        IFNULL(rd.alternate_number, 'Not Available') AS alternate_number,
+        IFNULL(rd.email, 'Not Available') AS email,
+        IFNULL(rd.address, 'Not Available') AS address,
+        IFNULL(rd.city, 'Not Available') AS city,
+        IFNULL(rd.status, 'Not Available') AS status,
+        IFNULL(rd.lead_status, 'Not Available') AS lead_status,
+        IFNULL(rd.lead_stage, 'Not Available') AS lead_stage,
+        IFNULL(rd.current_stage, 'Not Available') AS current_stage,
+        IFNULL(rd.created_by_user, 'Not Available') AS created_by_user,
+        IFNULL(rd.assign_id, 'Not Available') AS assign_id,
+        IFNULL(rd.followup_date, 'Not Available') AS followup_date,
+        IFNULL(rd.cat_id, 'Not Available') AS cat_id,
+        IFNULL(rd.reference_id, 'Not Available') AS reference_id,
+        IFNULL(rd.area_id, 'Not Available') AS area_id,
+        IFNULL(rd.room_length, 'Not Available') AS room_length,
+        IFNULL(rd.room_width, 'Not Available') AS room_width,
+        IFNULL(rd.room_height, 'Not Available') AS room_height,
+        IFNULL(rd.location_link, 'Not Available') AS location_link,
+        IFNULL(rd.p_type, 'Not Available') AS p_type,
+        IFNULL(rd.budget_range, 'Not Available') AS budget_range,
+        IFNULL(rd.time_to_complete, 'Not Available') AS time_to_complete,
+        IFNULL(rd.site_visit_date, 'Not Available') AS site_visit_date,
+        IFNULL(rd.demo_date, 'Not Available') AS demo_date,
+        IFNULL(rd.lead_activity, 0) AS lead_activity,
+        IFNULL(rd.ar_number, 'Not Available') AS ar_number,
+        IFNULL(rd.architect_name, 'Not Available') AS architect_name,
+        IFNULL(rd.ca_number, 'Not Available') AS ca_number,
+        IFNULL(rd.e_number, 'Not Available') AS e_number,
+        IFNULL(rd.sm_number, 'Not Available') AS sm_number,
+        IFNULL(rd.pop_number, 'Not Available') AS pop_number,
+        IFNULL(rd.other_number, 'Not Available') AS other_number,
+        IFNULL(rd.quick_remark, 'Not Available') AS quick_remark,
+        IFNULL(rd.detailed_remark, 'Not Available') AS detailed_remark,
+        IFNULL(a.area_name, 'Not Available') AS area_name,
+        IFNULL(c.cat_name, 'Not Available') AS cat_name,
+        IFNULL(ref.reference_name, 'Not Available') AS reference_name,
+        IFNULL(DATE(asg.assign_date), 'Not Available') AS assign_date,
+        lr.id AS reassignment_id,
+        lr.reassignment_date,
+        lr.assignedTo AS reassigned_to,
+        lr.remark AS reassignment_remark,
+        lr.leadStage AS reassignment_lead_stage,
+        IFNULL(u.name, 'Not Available') AS telecaller_name,
+        u.user_id AS assigned_to_user_id,
+        MAX(tct.tc_remark) AS call_remark,
+        MAX(tct.tc_call_duration) AS call_duration,
+        GROUP_CONCAT(p.product_name) AS products,
+        MAX(d.location_link) AS document_location_link
+
+      FROM raw_data rd
+
+      LEFT JOIN area a ON rd.area_id = a.area_id
+      LEFT JOIN category c ON rd.cat_id = c.cat_id
+      LEFT JOIN reference ref ON rd.reference_id = ref.reference_id
+      LEFT JOIN assignments asg ON rd.assign_id = asg.assign_id
+      LEFT JOIN (
+        SELECT r1.*, ROW_NUMBER() OVER (PARTITION BY master_id ORDER BY id DESC) rn
+        FROM reassignment r1
+      ) lr ON rd.master_id = lr.master_id AND lr.rn = 1
+      LEFT JOIN users u ON lr.assignedTo = u.name
+      LEFT JOIN tele_caller_table tct ON rd.master_id = tct.master_id
+      LEFT JOIN product_mapping pm ON rd.master_id = pm.master_id
+      LEFT JOIN product p ON p.product_id = pm.product_id
+      LEFT JOIN documents d ON d.master_id = rd.master_id
+
+      WHERE (rd.lead_stage = 'Drop' OR lr.leadStage = 'Drop')
+    `;
+
+    let params = [];
+
+    /* ================= SEARCH FILTER ================= */
+    if (search) {
+      query += ` AND (
+        rd.name LIKE ? OR 
+        rd.number LIKE ? OR 
+        rd.email LIKE ? OR 
+        rd.address LIKE ? OR 
+        rd.city LIKE ? OR 
+        rd.lead_stage LIKE ? OR 
+        lr.assignedTo LIKE ?
+      )`;
+      const searchPattern = `%${search}%`;
+      params.push(searchPattern, searchPattern, searchPattern, searchPattern, searchPattern, searchPattern, searchPattern);
+    }
+
+    /* ================= DATE FILTERS ================= */
+    if (entryFromDate) {
+      query += ` AND DATE(rd.assign_date) >= ?`;
+      params.push(entryFromDate);
+    }
+    if (entryToDate) {
+      query += ` AND DATE(rd.assign_date) <= ?`;
+      params.push(entryToDate);
+    }
+    if (followupFromDate) {
+      query += ` AND DATE(rd.followup_date) >= ?`;
+      params.push(followupFromDate);
+    }
+    if (followupToDate) {
+      query += ` AND DATE(rd.followup_date) <= ?`;
+      params.push(followupToDate);
+    }
+
+    /* ================= STAGE FILTER ================= */
+    if (stages.length > 0) {
+      query += ` AND rd.lead_stage IN (?)`;
+      params.push(stages);
+    }
+
+    /* ================= USER FILTER ================= */
+    if (users.length > 0) {
+      query += ` AND lr.assignedTo IN (?)`;
+      params.push(users);
+    }
+
+    /* ================= CITY FILTER ================= */
+    if (cities.length > 0) {
+      query += ` AND rd.city IN (?)`;
+      params.push(cities);
+    }
+
+    /* ================= ROLE FILTER ================= */
+    if (isTelecallerLike(role)) {
+      query += ` AND lr.assignedTo = ?`;
+      params.push(currentUserName);
+    } else if (isAdminLike(role)) {
+      // no filter
+    } else if (!isManagementLike(role)) {
+      query += ` AND lr.assignedTo = ?`;
+      params.push(currentUserName);
+    }
+
+    query += ` GROUP BY rd.master_id ORDER BY rd.master_id DESC LIMIT ? OFFSET ?`;
+    
+    // Add pagination parameters
+    params.push(limit, offset);
+
+    const [rows] = await db.query(query, params);
+
+    /* ================= OTHER INPUTS ================= */
+    const masterIds = rows.map(r => r.master_id);
+    let otherInputsRows = [];
+
+    if (masterIds.length) {
+      const [otherInputs] = await db.query(
+        `SELECT master_id, cat_id, reference_id, input_text
+         FROM raw_data_other_inputs
+         WHERE master_id IN (?)
+         ORDER BY created_at DESC`,
+        [masterIds]
+      );
+      otherInputsRows = otherInputs;
+    }
+
+    /* ================= REASSIGNMENT HISTORY ================= */
+    let reassignmentRows = [];
+    if (masterIds.length) {
+      const [reassignments] = await db.query(
+        `SELECT rm.*, u.name, u.role
+         FROM reassignment rm
+         LEFT JOIN users u ON u.user_id = rm.created_by_user
+         WHERE rm.master_id IN (?)
+         ORDER BY rm.reassignment_date DESC, rm.created_at DESC`,
+        [masterIds]
+      );
+      reassignmentRows = reassignments;
+    }
+
+    /* ================= FINAL MAP ================= */
+    const formattedRows = rows.map(row => {
+      const rowCatId = parseInt(row.cat_id);
+      const rowRefId = parseInt(row.reference_id);
+
+      const categoryOther =
+        otherInputsRows.find(
+          oi => oi.master_id === row.master_id && oi.cat_id === rowCatId
+        )?.input_text || '';
+
+      const referenceOther =
+        otherInputsRows.find(
+          oi => oi.master_id === row.master_id && oi.reference_id === rowRefId
+        )?.input_text || '';
+
+      const reassignments = reassignmentRows
+        .filter(r => r.master_id === row.master_id)
+        .map(r => ({
+          remark: r.remark || '',
+          assignedTo: r.assignedTo || '',
+          leadStage: r.leadStage || '',
+          created_by_user: r.created_by_user || '',
+          created_at: r.created_at
+            ? new Date(r.created_at).toLocaleString('en-GB')
+            : '',
+          reassignment_date: r.reassignment_date
+            ? new Date(r.reassignment_date).toLocaleString('en-GB')
+            : '',
+          name: r.name || '',
+          role: r.role || ''
+        }));
+
+      return {
+        ...row,
+        category_other: categoryOther,
+        reference_other: referenceOther,
+        reassignment_remarks: reassignments,
+        latest_assignedTo: reassignments[0]?.assignedTo || '',
+        latest_leadStage: reassignments[0]?.leadStage || '',
+        assign_date: row.assign_date
+      };
+    });
+
+    // Calculate pagination info
+    const totalPages = Math.ceil(total / limit);
+
+    return res.status(200).json({
+      success: true,
+      total: total,
+      currentPage: page,
+      totalPages: totalPages,
+      limit: limit,
+      dropLeads: formattedRows,
+      showing: {
+        from: offset + 1,
+        to: Math.min(offset + limit, total),
+        total: total
+      }
+    });
+
+  } catch (error) {
+    console.error("❌ Error in getDropLeadsFullData:", error);
+    res.status(500).json({ message: "Failed to fetch drop leads data" });
+  }
+};
+
+
+
+// export const getClosedLeadsFullData = async (req, res) => {
+//   try {
+//     if (!req.session.user) {
+//       return res.status(401).json({ message: "Unauthorized: No session" });
+//     }
+
+//     const { id: userId, role } = req.session.user;
+
+//     /* ================= CURRENT USER ================= */
+//     const [userResult] = await db.query(
+//       "SELECT name FROM users WHERE user_id = ?",
+//       [userId]
+//     );
+//     const currentUserName = userResult[0]?.name || "";
+
+//     /* ================= MAIN QUERY ================= */
+//     let query = `
+//       SELECT 
+//         rd.master_id,
+
+//         -- MAIN RAW DATA
+//         IFNULL(rd.name, 'Not Available') AS name,
+//         IFNULL(rd.number, 'Not Available') AS number,
+//         IFNULL(rd.alternate_number, 'Not Available') AS alternate_number,
+//         IFNULL(rd.email, 'Not Available') AS email,
+//         IFNULL(rd.address, 'Not Available') AS address,
+//         IFNULL(rd.city, 'Not Available') AS city,
+//         IFNULL(rd.status, 'Not Available') AS status,
+//         IFNULL(rd.lead_status, 'Not Available') AS lead_status,
+//         IFNULL(rd.lead_stage, 'Not Available') AS lead_stage,
+//         IFNULL(rd.current_stage, 'Not Available') AS current_stage,
+//         IFNULL(rd.created_by_user, 'Not Available') AS created_by_user,
+//         IFNULL(rd.assign_id, 'Not Available') AS assign_id,
+//         IFNULL(rd.followup_date, 'Not Available') AS followup_date,
+
+//         -- IDS
+//         IFNULL(rd.cat_id, 'Not Available') AS cat_id,
+//         IFNULL(rd.reference_id, 'Not Available') AS reference_id,
+//         IFNULL(rd.area_id, 'Not Available') AS area_id,
+
+//         -- DIMENSIONS
+//         IFNULL(rd.room_length, 'Not Available') AS room_length,
+//         IFNULL(rd.room_width, 'Not Available') AS room_width,
+//         IFNULL(rd.room_height, 'Not Available') AS room_height,
+
+//         -- EXTRA DETAILS
+//         IFNULL(rd.location_link, 'Not Available') AS location_link,
+//         IFNULL(rd.p_type, 'Not Available') AS p_type,
+//         IFNULL(rd.budget_range, 'Not Available') AS budget_range,
+//         IFNULL(rd.time_to_complete, 'Not Available') AS time_to_complete,
+//         IFNULL(rd.site_visit_date, 'Not Available') AS site_visit_date,
+//         IFNULL(rd.demo_date, 'Not Available') AS demo_date,
+
+//         -- ACTIVITY
+//         IFNULL(rd.lead_activity, 0) AS lead_activity,
+
+//         -- NUMBERS
+//         IFNULL(rd.ar_number, 'Not Available') AS ar_number,
+//         IFNULL(rd.architect_name, 'Not Available') AS architect_name,
+//         IFNULL(rd.ca_number, 'Not Available') AS ca_number,
+//         IFNULL(rd.e_number, 'Not Available') AS e_number,
+//         IFNULL(rd.sm_number, 'Not Available') AS sm_number,
+//         IFNULL(rd.pop_number, 'Not Available') AS pop_number,
+//         IFNULL(rd.other_number, 'Not Available') AS other_number,
+
+//         -- REMARKS
+//         IFNULL(rd.quick_remark, 'Not Available') AS quick_remark,
+//         IFNULL(rd.detailed_remark, 'Not Available') AS detailed_remark,
+
+//         -- AREA / CATEGORY / REFERENCE
+//         IFNULL(a.area_name, 'Not Available') AS area_name,
+//         IFNULL(c.cat_name, 'Not Available') AS cat_name,
+//         IFNULL(ref.reference_name, 'Not Available') AS reference_name,
+
+//         -- ASSIGN DATE
+//         IFNULL(DATE(asg.assign_date), 'Not Available') AS assign_date,
+
+//         -- LATEST REASSIGNMENT
+//         lr.id AS reassignment_id,
+//         lr.reassignment_date,
+//         lr.assignedTo AS reassigned_to,
+//         lr.remark AS reassignment_remark,
+//         lr.leadStage AS reassignment_lead_stage,
+
+//         -- USER
+//         IFNULL(u.name, 'Not Available') AS telecaller_name,
+//         u.user_id AS assigned_to_user_id,
+
+//         -- CALL / PRODUCT
+//         MAX(tct.tc_remark) AS call_remark,
+//         MAX(tct.tc_call_duration) AS call_duration,
+//         GROUP_CONCAT(p.product_name) AS products,
+
+//         -- DOCUMENTS
+//         MAX(d.location_link) AS document_location_link
+
+//       FROM raw_data rd
+
+//       LEFT JOIN area a ON rd.area_id = a.area_id
+//       LEFT JOIN category c ON rd.cat_id = c.cat_id
+//       LEFT JOIN reference ref ON rd.reference_id = ref.reference_id
+//       LEFT JOIN assignments asg ON rd.assign_id = asg.assign_id
+
+//       LEFT JOIN (
+//         SELECT r1.*, ROW_NUMBER() OVER (PARTITION BY master_id ORDER BY id DESC) rn
+//         FROM reassignment r1
+//       ) lr ON rd.master_id = lr.master_id AND lr.rn = 1
+
+//       LEFT JOIN users u ON lr.assignedTo = u.name
+//       LEFT JOIN tele_caller_table tct ON rd.master_id = tct.master_id
+//       LEFT JOIN product_mapping pm ON rd.master_id = pm.master_id
+//       LEFT JOIN product p ON p.product_id = pm.product_id
+//       LEFT JOIN documents d ON d.master_id = rd.master_id
+//     `;
+
+//     const params = [];
+
+//     /* ================= CLOSED LEADS FILTER ================= */
+//     query += `
+//       WHERE rd.lead_stage = 'Closed Deal'
+//          OR lr.leadStage = 'Closed Deal'
+//     `;
+
+//     if (isTelecallerLike(role)) {
+//       query += ` AND lr.assignedTo = ?`;
+//       params.push(currentUserName);
+//     }
+
+//     query += ` GROUP BY rd.master_id ORDER BY rd.master_id DESC`;
+
+//     const [rows] = await db.query(query, params);
+
+//     /* ================= OTHER INPUTS ================= */
+//     const masterIds = rows.map(r => r.master_id);
+//     let otherInputsRows = [];
+
+//     if (masterIds.length) {
+//       const [otherInputs] = await db.query(
+//         `SELECT master_id, cat_id, reference_id, input_text
+//          FROM raw_data_other_inputs
+//          WHERE master_id IN (?)
+//          ORDER BY created_at DESC`,
+//         [masterIds]
+//       );
+//       otherInputsRows = otherInputs;
+//     }
+
+//     /* ================= REASSIGNMENT HISTORY ================= */
+//     let reassignmentRows = [];
+//     if (masterIds.length) {
+//       const [reassignments] = await db.query(
+//         `SELECT rm.*, u.name, u.role
+//          FROM reassignment rm
+//          LEFT JOIN users u ON u.user_id = rm.created_by_user
+//          WHERE rm.master_id IN (?)
+//          ORDER BY rm.reassignment_date DESC, rm.created_at DESC`,
+//         [masterIds]
+//       );
+//       reassignmentRows = reassignments;
+//     }
+
+//     /* ================= FINAL MAP ================= */
+//     const formattedRows = rows.map(row => {
+//       const rowCatId = parseInt(row.cat_id);
+//       const rowRefId = parseInt(row.reference_id);
+
+//       const categoryOther =
+//         otherInputsRows.find(
+//           oi => oi.master_id === row.master_id && oi.cat_id === rowCatId
+//         )?.input_text || "";
+
+//       const referenceOther =
+//         otherInputsRows.find(
+//           oi => oi.master_id === row.master_id && oi.reference_id === rowRefId
+//         )?.input_text || "";
+
+//       const reassignments = reassignmentRows
+//         .filter(r => r.master_id === row.master_id)
+//         .map(r => ({
+//           remark: r.remark || "",
+//           assignedTo: r.assignedTo || "",
+//           leadStage: r.leadStage || "",
+//           created_by_user: r.created_by_user || "",
+//           created_at: r.created_at
+//             ? new Date(r.created_at).toLocaleString("en-GB")
+//             : "",
+//           reassignment_date: r.reassignment_date
+//             ? new Date(r.reassignment_date).toLocaleString("en-GB")
+//             : "",
+//           name: r.name || "",
+//           role: r.role || ""
+//         }));
+
+//       return {
+//         ...row,
+//         category_other: categoryOther,
+//         reference_other: referenceOther,
+//         reassignment_remarks: reassignments,
+//         latest_assignedTo: reassignments[0]?.assignedTo || "",
+//         latest_leadStage: reassignments[0]?.leadStage || "",
+//         assign_date: row.assign_date
+//       };
+//     });
+
+//     return res.status(200).json(formattedRows);
+
+//   } catch (error) {
+//     console.error("❌ Error in getClosedLeadsFullData:", error);
+//     res.status(500).json({ message: "Failed to fetch closed leads data" });
+//   }
+// };
+
+
+export const getClosedLeadsFullData = async (req, res) => {
+  try {
+    if (!req.session.user) {
+      return res.status(401).json({ message: "Unauthorized: No session" });
+    }
+
+    const { id: userId, role } = req.session.user;
+
+    /* ================= PAGINATION PARAMETERS ================= */
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 10;
+    const offset = (page - 1) * limit;
+
+    // Validate pagination parameters
+    if (page < 1 || limit < 1 || limit > 100) {
+      return res.status(400).json({ 
+        message: "Invalid pagination parameters. Page must be >=1, limit between 1-100" 
+      });
+    }
 
     /* ================= CURRENT USER ================= */
     const [userResult] = await db.query(
@@ -4187,7 +5386,30 @@ export const getDropLeadsFullData = async (req, res) => {
     );
     const currentUserName = userResult[0]?.name || "";
 
-    /* ================= MAIN QUERY ================= */
+    /* ================= TOTAL COUNT QUERY ================= */
+    let countQuery = `
+      SELECT COUNT(DISTINCT rd.master_id) as total
+      FROM raw_data rd
+      LEFT JOIN (
+        SELECT r1.*, ROW_NUMBER() OVER (PARTITION BY master_id ORDER BY id DESC) rn
+        FROM reassignment r1
+      ) lr ON rd.master_id = lr.master_id AND lr.rn = 1
+      WHERE rd.lead_stage = 'Closed Deal'
+         OR lr.leadStage = 'Closed Deal'
+    `;
+
+    const countParams = [];
+
+    if (isTelecallerLike(role)) {
+      countQuery += ` AND lr.assignedTo = ?`;
+      countParams.push(currentUserName);
+    }
+
+    const [countResult] = await db.query(countQuery, countParams);
+    const total = countResult[0]?.total || 0;
+    const totalPages = Math.ceil(total / limit);
+
+    /* ================= MAIN QUERY WITH PAGINATION ================= */
     let query = `
       SELECT 
         rd.master_id,
@@ -4265,7 +5487,7 @@ export const getDropLeadsFullData = async (req, res) => {
         MAX(tct.tc_call_duration) AS call_duration,
         GROUP_CONCAT(p.product_name) AS products,
 
-        -- ✅ NEW: DOCUMENT LOCATION LINK
+        -- DOCUMENTS
         MAX(d.location_link) AS document_location_link
 
       FROM raw_data rd
@@ -4284,17 +5506,15 @@ export const getDropLeadsFullData = async (req, res) => {
       LEFT JOIN tele_caller_table tct ON rd.master_id = tct.master_id
       LEFT JOIN product_mapping pm ON rd.master_id = pm.master_id
       LEFT JOIN product p ON p.product_id = pm.product_id
-
-      -- ✅ NEW: DOCUMENTS JOIN
       LEFT JOIN documents d ON d.master_id = rd.master_id
     `;
 
     const params = [];
 
-    /* ================= DROP LEADS FILTER ================= */
+    /* ================= CLOSED LEADS FILTER ================= */
     query += `
-      WHERE rd.lead_stage = 'Drop'
-         OR lr.leadStage = 'Drop'
+      WHERE rd.lead_stage = 'Closed Deal'
+         OR lr.leadStage = 'Closed Deal'
     `;
 
     if (isTelecallerLike(role)) {
@@ -4302,7 +5522,9 @@ export const getDropLeadsFullData = async (req, res) => {
       params.push(currentUserName);
     }
 
-    query += ` GROUP BY rd.master_id ORDER BY rd.master_id DESC`;
+    // Add GROUP BY, ORDER BY, and PAGINATION
+    query += ` GROUP BY rd.master_id ORDER BY rd.master_id DESC LIMIT ? OFFSET ?`;
+    params.push(limit, offset);
 
     const [rows] = await db.query(query, params);
 
@@ -4316,7 +5538,7 @@ export const getDropLeadsFullData = async (req, res) => {
          FROM raw_data_other_inputs
          WHERE master_id IN (?)
          ORDER BY created_at DESC`,
-        [masterIds]
+        [masterIds.length ? masterIds : [0]] // Handle empty array case
       );
       otherInputsRows = otherInputs;
     }
@@ -4330,7 +5552,7 @@ export const getDropLeadsFullData = async (req, res) => {
          LEFT JOIN users u ON u.user_id = rm.created_by_user
          WHERE rm.master_id IN (?)
          ORDER BY rm.reassignment_date DESC, rm.created_at DESC`,
-        [masterIds]
+        [masterIds.length ? masterIds : [0]] // Handle empty array case
       );
       reassignmentRows = reassignments;
     }
@@ -4342,18 +5564,12 @@ export const getDropLeadsFullData = async (req, res) => {
 
       const categoryOther =
         otherInputsRows.find(
-          oi =>
-            oi.master_id === row.master_id &&
-            oi.cat_id !== null &&
-            oi.cat_id === rowCatId
+          oi => oi.master_id === row.master_id && oi.cat_id === rowCatId
         )?.input_text || "";
 
       const referenceOther =
         otherInputsRows.find(
-          oi =>
-            oi.master_id === row.master_id &&
-            oi.reference_id !== null &&
-            oi.reference_id === rowRefId
+          oi => oi.master_id === row.master_id && oi.reference_id === rowRefId
         )?.input_text || "";
 
       const reassignments = reassignmentRows
@@ -4384,17 +5600,33 @@ export const getDropLeadsFullData = async (req, res) => {
       };
     });
 
-    return res.status(200).json(formattedRows);
+    /* ================= RESPONSE WITH PAGINATION ================= */
+    return res.status(200).json({
+      success: true,
+      data: formattedRows,
+      pagination: {
+        total,
+        page,
+        limit,
+        totalPages,
+        hasNextPage: page < totalPages,
+        hasPrevPage: page > 1,
+        showingStart: offset + 1,
+        showingEnd: Math.min(offset + limit, total)
+      }
+    });
 
   } catch (error) {
-    console.error("❌ Error in getDropLeadsFullData:", error);
-    res.status(500).json({ message: "Failed to fetch drop leads data" });
+    console.error("❌ Error in getClosedLeadsFullData:", error);
+    res.status(500).json({ 
+      message: "Failed to fetch closed leads data",
+      error: error.message 
+    });
   }
 };
 
 
-
-export const getClosedLeadsFullData = async (req, res) => {
+export const getDemoLeadsFullData = async (req, res) => {
   try {
     if (!req.session.user) {
       return res.status(401).json({ message: "Unauthorized: No session" });
@@ -4511,10 +5743,10 @@ export const getClosedLeadsFullData = async (req, res) => {
 
     const params = [];
 
-    /* ================= CLOSED LEADS FILTER ================= */
+    /* ================= DEMO LEADS FILTER ================= */
     query += `
-      WHERE rd.lead_stage = 'Closed Deal'
-         OR lr.leadStage = 'Closed Deal'
+      WHERE rd.lead_stage = 'Demo'
+         OR lr.leadStage = 'Demo'
     `;
 
     if (isTelecallerLike(role)) {
@@ -4601,11 +5833,173 @@ export const getClosedLeadsFullData = async (req, res) => {
     return res.status(200).json(formattedRows);
 
   } catch (error) {
-    console.error("❌ Error in getClosedLeadsFullData:", error);
-    res.status(500).json({ message: "Failed to fetch closed leads data" });
+    console.error("❌ Error in getDemoLeadsFullData:", error);
+    res.status(500).json({ message: "Failed to fetch demo leads data" });
   }
 };
 
+
+
+// export const getQuotationPendingLeadsFullData = async (req, res) => {
+//   try {
+//     if (!req.session.user) {
+//       return res.status(401).json({ message: "Unauthorized: No session" });
+//     }
+
+//     const { id: userId, role } = req.session.user;
+
+//     const [userResult] = await db.query(
+//       "SELECT name FROM users WHERE user_id = ?",
+//       [userId]
+//     );
+//     const currentUserName = userResult[0]?.name || "";
+
+//     let query = `
+//       SELECT 
+//         rd.master_id,
+//         IFNULL(rd.name, 'Not Available') AS name,
+//         IFNULL(rd.number, 'Not Available') AS number,
+//         IFNULL(rd.email, 'Not Available') AS email,
+//         IFNULL(rd.address, 'Not Available') AS address,
+//         IFNULL(rd.city, 'Not Available') AS city,
+//         IFNULL(rd.lead_stage, 'Not Available') AS lead_stage,
+//         IFNULL(rd.followup_date, 'Not Available') AS followup_date,
+//         IFNULL(a.area_name, 'Not Available') AS area_name,
+//         IFNULL(c.cat_name, 'Not Available') AS cat_name,
+//         IFNULL(ref.reference_name, 'Not Available') AS reference_name,
+//         IFNULL(DATE(asg.assign_date), 'Not Available') AS assign_date,
+
+//         lr.id AS reassignment_id,
+//         lr.reassignment_date,
+//         lr.assignedTo AS reassigned_to,
+//         lr.remark AS reassignment_remark,
+//         lr.leadStage AS reassignment_lead_stage,
+
+//         IFNULL(u.name, 'Not Available') AS telecaller_name,
+//         MAX(tct.tc_remark) AS call_remark,
+//         GROUP_CONCAT(p.product_name) AS products
+
+//       FROM raw_data rd
+//       LEFT JOIN area a ON rd.area_id = a.area_id
+//       LEFT JOIN category c ON rd.cat_id = c.cat_id
+//       LEFT JOIN reference ref ON rd.reference_id = ref.reference_id
+//       LEFT JOIN assignments asg ON rd.assign_id = asg.assign_id
+
+//       LEFT JOIN (
+//         SELECT r1.*, ROW_NUMBER() OVER (PARTITION BY master_id ORDER BY id DESC) rn
+//         FROM reassignment r1
+//       ) lr ON rd.master_id = lr.master_id AND lr.rn = 1
+
+//       LEFT JOIN users u ON lr.assignedTo = u.name
+//       LEFT JOIN tele_caller_table tct ON rd.master_id = tct.master_id
+//       LEFT JOIN product_mapping pm ON rd.master_id = pm.master_id
+//       LEFT JOIN product p ON p.product_id = pm.product_id
+//     `;
+
+//     const params = [];
+
+//     query += `
+//       WHERE rd.lead_stage = 'Quotation Pending'
+//          OR lr.leadStage = 'Quotation Pending'
+//     `;
+
+//     if (isTelecallerLike(role)) {
+//       query += ` AND lr.assignedTo = ?`;
+//       params.push(currentUserName);
+//     }
+
+//     query += ` GROUP BY rd.master_id ORDER BY rd.master_id DESC`;
+
+//     const [rows] = await db.query(query, params);
+
+//     return res.status(200).json(rows);
+
+//   } catch (error) {
+//     console.error("❌ Error in getQuotationPendingLeadsFullData:", error);
+//     res.status(500).json({ message: "Failed to fetch quotation pending leads" });
+//   }
+// };
+
+
+export const getQuotationFollowupLeadsFullData = async (req, res) => {
+  try {
+    if (!req.session.user) {
+      return res.status(401).json({ message: "Unauthorized: No session" });
+    }
+
+    const { id: userId, role } = req.session.user;
+
+    const [userResult] = await db.query(
+      "SELECT name FROM users WHERE user_id = ?",
+      [userId]
+    );
+    const currentUserName = userResult[0]?.name || "";
+
+    let query = `
+      SELECT 
+        rd.master_id,
+        IFNULL(rd.name, 'Not Available') AS name,
+        IFNULL(rd.number, 'Not Available') AS number,
+        IFNULL(rd.email, 'Not Available') AS email,
+        IFNULL(rd.address, 'Not Available') AS address,
+        IFNULL(rd.city, 'Not Available') AS city,
+        IFNULL(rd.lead_stage, 'Not Available') AS lead_stage,
+        IFNULL(rd.followup_date, 'Not Available') AS followup_date,
+        IFNULL(a.area_name, 'Not Available') AS area_name,
+        IFNULL(c.cat_name, 'Not Available') AS cat_name,
+        IFNULL(ref.reference_name, 'Not Available') AS reference_name,
+        IFNULL(DATE(asg.assign_date), 'Not Available') AS assign_date,
+
+        lr.id AS reassignment_id,
+        lr.reassignment_date,
+        lr.assignedTo AS reassigned_to,
+        lr.remark AS reassignment_remark,
+        lr.leadStage AS reassignment_lead_stage,
+
+        IFNULL(u.name, 'Not Available') AS telecaller_name,
+        MAX(tct.tc_remark) AS call_remark,
+        GROUP_CONCAT(p.product_name) AS products
+
+      FROM raw_data rd
+      LEFT JOIN area a ON rd.area_id = a.area_id
+      LEFT JOIN category c ON rd.cat_id = c.cat_id
+      LEFT JOIN reference ref ON rd.reference_id = ref.reference_id
+      LEFT JOIN assignments asg ON rd.assign_id = asg.assign_id
+
+      LEFT JOIN (
+        SELECT r1.*, ROW_NUMBER() OVER (PARTITION BY master_id ORDER BY id DESC) rn
+        FROM reassignment r1
+      ) lr ON rd.master_id = lr.master_id AND lr.rn = 1
+
+      LEFT JOIN users u ON lr.assignedTo = u.name
+      LEFT JOIN tele_caller_table tct ON rd.master_id = tct.master_id
+      LEFT JOIN product_mapping pm ON rd.master_id = pm.master_id
+      LEFT JOIN product p ON p.product_id = pm.product_id
+    `;
+
+    const params = [];
+
+    query += `
+      WHERE rd.lead_stage = 'Quotation Follow-up'
+         OR lr.leadStage = 'Quotation Follow-up'
+    `;
+
+    if (isTelecallerLike(role)) {
+      query += ` AND lr.assignedTo = ?`;
+      params.push(currentUserName);
+    }
+
+    query += ` GROUP BY rd.master_id ORDER BY rd.master_id DESC`;
+
+    const [rows] = await db.query(query, params);
+
+    return res.status(200).json(rows);
+
+  } catch (error) {
+    console.error("❌ Error in getQuotationFollowupLeadsFullData:", error);
+    res.status(500).json({ message: "Failed to fetch quotation follow-up leads" });
+  }
+};
 
 
 
@@ -4831,6 +6225,9 @@ export const getClosedLeadsFullData = async (req, res) => {
 // };
 
 
+// In your backend API endpoint, update it to handle filter parameters
+
+
 export const getMissedAssignedFullData = async (req, res) => {
   try {
     if (!req.session.user) {
@@ -4839,6 +6236,21 @@ export const getMissedAssignedFullData = async (req, res) => {
 
     const { id: userId, role } = req.session.user;
     const today = new Date().toISOString().slice(0, 10);
+    
+    // Get pagination and filter parameters from query
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 10;
+    const offset = (page - 1) * limit;
+    
+    // Get filter parameters
+    const search = req.query.search || '';
+    const entryFromDate = req.query.entryFromDate;
+    const entryToDate = req.query.entryToDate;
+    const followupFromDate = req.query.followupFromDate;
+    const followupToDate = req.query.followupToDate;
+    const stages = req.query.stages ? req.query.stages.split(',') : [];
+    const users = req.query.users ? req.query.users.split(',') : [];
+    const cities = req.query.cities ? req.query.cities.split(',') : [];
 
     /* ================= CURRENT USER ================= */
     const [userResult] = await db.query(
@@ -4847,12 +6259,89 @@ export const getMissedAssignedFullData = async (req, res) => {
     );
     const currentUserName = userResult[0]?.name || '';
 
-    /* ================= MAIN QUERY ================= */
+    /* ================= COUNT TOTAL RECORDS ================= */
+    let countQuery = `
+      SELECT COUNT(DISTINCT rd.master_id) as total
+      FROM raw_data rd
+      LEFT JOIN (
+        SELECT r1.*, ROW_NUMBER() OVER (PARTITION BY master_id ORDER BY id DESC) rn
+        FROM reassignment r1
+      ) lr ON rd.master_id = lr.master_id AND lr.rn = 1
+      WHERE rd.followup_date < ?
+      AND rd.lead_stage NOT IN ('Drop','Closed Deal')
+    `;
+
+    let countParams = [today];
+
+    /* ================= SEARCH FILTER ================= */
+    if (search) {
+      countQuery += ` AND (
+        rd.name LIKE ? OR 
+        rd.number LIKE ? OR 
+        rd.email LIKE ? OR 
+        rd.address LIKE ? OR 
+        rd.city LIKE ? OR 
+        rd.lead_stage LIKE ? OR 
+        lr.assignedTo LIKE ?
+      )`;
+      const searchPattern = `%${search}%`;
+      countParams.push(searchPattern, searchPattern, searchPattern, searchPattern, searchPattern, searchPattern, searchPattern);
+    }
+
+    /* ================= DATE FILTERS ================= */
+    if (entryFromDate) {
+      countQuery += ` AND DATE(rd.assign_date) >= ?`;
+      countParams.push(entryFromDate);
+    }
+    if (entryToDate) {
+      countQuery += ` AND DATE(rd.assign_date) <= ?`;
+      countParams.push(entryToDate);
+    }
+    if (followupFromDate) {
+      countQuery += ` AND DATE(rd.followup_date) >= ?`;
+      countParams.push(followupFromDate);
+    }
+    if (followupToDate) {
+      countQuery += ` AND DATE(rd.followup_date) <= ?`;
+      countParams.push(followupToDate);
+    }
+
+    /* ================= STAGE FILTER ================= */
+    if (stages.length > 0) {
+      countQuery += ` AND rd.lead_stage IN (?)`;
+      countParams.push(stages);
+    }
+
+    /* ================= USER FILTER ================= */
+    if (users.length > 0) {
+      countQuery += ` AND lr.assignedTo IN (?)`;
+      countParams.push(users);
+    }
+
+    /* ================= CITY FILTER ================= */
+    if (cities.length > 0) {
+      countQuery += ` AND rd.city IN (?)`;
+      countParams.push(cities);
+    }
+
+    /* ================= ROLE FILTER FOR COUNT ================= */
+    if (isTelecallerLike(role)) {
+      countQuery += ` AND lr.assignedTo = ?`;
+      countParams.push(currentUserName);
+    } else if (isAdminLike(role)) {
+      // no filter
+    } else if (!isManagementLike(role)) {
+      countQuery += ` AND lr.assignedTo = ?`;
+      countParams.push(currentUserName);
+    }
+
+    const [countResult] = await db.query(countQuery, countParams);
+    const total = countResult[0]?.total || 0;
+
+    /* ================= MAIN QUERY WITH PAGINATION ================= */
     let query = `
       SELECT 
         rd.master_id,
-
-        -- MAIN RAW DATA
         IFNULL(rd.name, 'Not Available') AS name,
         IFNULL(rd.number, 'Not Available') AS number,
         IFNULL(rd.alternate_number, 'Not Available') AS alternate_number,
@@ -4866,29 +6355,19 @@ export const getMissedAssignedFullData = async (req, res) => {
         IFNULL(rd.created_by_user, 'Not Available') AS created_by_user,
         IFNULL(rd.assign_id, 'Not Available') AS assign_id,
         IFNULL(rd.followup_date, 'Not Available') AS followup_date,
-
-        -- IDS
         IFNULL(rd.cat_id, 'Not Available') AS cat_id,
         IFNULL(rd.reference_id, 'Not Available') AS reference_id,
         IFNULL(rd.area_id, 'Not Available') AS area_id,
-
-        -- DIMENSIONS
         IFNULL(rd.room_length, 'Not Available') AS room_length,
         IFNULL(rd.room_width, 'Not Available') AS room_width,
         IFNULL(rd.room_height, 'Not Available') AS room_height,
-
-        -- EXTRA DETAILS
         IFNULL(rd.location_link, 'Not Available') AS location_link,
         IFNULL(rd.p_type, 'Not Available') AS p_type,
         IFNULL(rd.budget_range, 'Not Available') AS budget_range,
         IFNULL(rd.time_to_complete, 'Not Available') AS time_to_complete,
         IFNULL(rd.site_visit_date, 'Not Available') AS site_visit_date,
         IFNULL(rd.demo_date, 'Not Available') AS demo_date,
-
-        -- ACTIVITY
         IFNULL(rd.lead_activity, 0) AS lead_activity,
-
-        -- NUMBERS
         IFNULL(rd.ar_number, 'Not Available') AS ar_number,
         IFNULL(rd.architect_name, 'Not Available') AS architect_name,
         IFNULL(rd.ca_number, 'Not Available') AS ca_number,
@@ -4896,36 +6375,22 @@ export const getMissedAssignedFullData = async (req, res) => {
         IFNULL(rd.sm_number, 'Not Available') AS sm_number,
         IFNULL(rd.pop_number, 'Not Available') AS pop_number,
         IFNULL(rd.other_number, 'Not Available') AS other_number,
-
-        -- REMARKS
         IFNULL(rd.quick_remark, 'Not Available') AS quick_remark,
         IFNULL(rd.detailed_remark, 'Not Available') AS detailed_remark,
-
-        -- AREA / CATEGORY / REFERENCE
         IFNULL(a.area_name, 'Not Available') AS area_name,
         IFNULL(c.cat_name, 'Not Available') AS cat_name,
         IFNULL(ref.reference_name, 'Not Available') AS reference_name,
-
-        -- ASSIGN DATE
         IFNULL(DATE(asg.assign_date), 'Not Available') AS assign_date,
-
-        -- LATEST REASSIGNMENT
         lr.id AS reassignment_id,
         lr.reassignment_date,
         lr.assignedTo AS reassigned_to,
         lr.remark AS reassignment_remark,
         lr.leadStage AS reassignment_lead_stage,
-
-        -- USER
         IFNULL(u.name, 'Not Available') AS telecaller_name,
         u.user_id AS assigned_to_user_id,
-
-        -- CALL / PRODUCT
         MAX(tct.tc_remark) AS call_remark,
         MAX(tct.tc_call_duration) AS call_duration,
         GROUP_CONCAT(p.product_name) AS products,
-
-        -- DOCUMENT LOCATION
         MAX(d.location_link) AS document_location_link
 
       FROM raw_data rd
@@ -4934,12 +6399,10 @@ export const getMissedAssignedFullData = async (req, res) => {
       LEFT JOIN category c ON rd.cat_id = c.cat_id
       LEFT JOIN reference ref ON rd.reference_id = ref.reference_id
       LEFT JOIN assignments asg ON rd.assign_id = asg.assign_id
-
       LEFT JOIN (
         SELECT r1.*, ROW_NUMBER() OVER (PARTITION BY master_id ORDER BY id DESC) rn
         FROM reassignment r1
       ) lr ON rd.master_id = lr.master_id AND lr.rn = 1
-
       LEFT JOIN users u ON lr.assignedTo = u.name
       LEFT JOIN tele_caller_table tct ON rd.master_id = tct.master_id
       LEFT JOIN product_mapping pm ON rd.master_id = pm.master_id
@@ -4950,7 +6413,58 @@ export const getMissedAssignedFullData = async (req, res) => {
       AND rd.lead_stage NOT IN ('Drop','Closed Deal')
     `;
 
-    const params = [today];
+    let params = [today];
+
+    /* ================= SEARCH FILTER ================= */
+    if (search) {
+      query += ` AND (
+        rd.name LIKE ? OR 
+        rd.number LIKE ? OR 
+        rd.email LIKE ? OR 
+        rd.address LIKE ? OR 
+        rd.city LIKE ? OR 
+        rd.lead_stage LIKE ? OR 
+        lr.assignedTo LIKE ?
+      )`;
+      const searchPattern = `%${search}%`;
+      params.push(searchPattern, searchPattern, searchPattern, searchPattern, searchPattern, searchPattern, searchPattern);
+    }
+
+    /* ================= DATE FILTERS ================= */
+    if (entryFromDate) {
+      query += ` AND DATE(rd.assign_date) >= ?`;
+      params.push(entryFromDate);
+    }
+    if (entryToDate) {
+      query += ` AND DATE(rd.assign_date) <= ?`;
+      params.push(entryToDate);
+    }
+    if (followupFromDate) {
+      query += ` AND DATE(rd.followup_date) >= ?`;
+      params.push(followupFromDate);
+    }
+    if (followupToDate) {
+      query += ` AND DATE(rd.followup_date) <= ?`;
+      params.push(followupToDate);
+    }
+
+    /* ================= STAGE FILTER ================= */
+    if (stages.length > 0) {
+      query += ` AND rd.lead_stage IN (?)`;
+      params.push(stages);
+    }
+
+    /* ================= USER FILTER ================= */
+    if (users.length > 0) {
+      query += ` AND lr.assignedTo IN (?)`;
+      params.push(users);
+    }
+
+    /* ================= CITY FILTER ================= */
+    if (cities.length > 0) {
+      query += ` AND rd.city IN (?)`;
+      params.push(cities);
+    }
 
     /* ================= ROLE FILTER ================= */
     if (isTelecallerLike(role)) {
@@ -4963,7 +6477,10 @@ export const getMissedAssignedFullData = async (req, res) => {
       params.push(currentUserName);
     }
 
-    query += ` GROUP BY rd.master_id ORDER BY rd.followup_date ASC`;
+    query += ` GROUP BY rd.master_id ORDER BY rd.followup_date ASC LIMIT ? OFFSET ?`;
+    
+    // Add pagination parameters
+    params.push(limit, offset);
 
     const [rows] = await db.query(query, params);
 
@@ -5039,10 +6556,21 @@ export const getMissedAssignedFullData = async (req, res) => {
       };
     });
 
+    // Calculate pagination info
+    const totalPages = Math.ceil(total / limit);
+
     return res.status(200).json({
       success: true,
-      total: formattedRows.length,
-      missedLeads: formattedRows
+      total: total,
+      currentPage: page,
+      totalPages: totalPages,
+      limit: limit,
+      missedLeads: formattedRows,
+      showing: {
+        from: offset + 1,
+        to: Math.min(offset + limit, total),
+        total: total
+      }
     });
 
   } catch (error) {
@@ -5050,221 +6578,6 @@ export const getMissedAssignedFullData = async (req, res) => {
     res.status(500).json({ message: "Failed to fetch missed follow-up data" });
   }
 };
-
-
-
-// export const getTodaysAssignedLeadsFullData = async (req, res) => {
-//   try {
-//     if (!req.session.user) {
-//       return res.status(401).json({ message: "Unauthorized: No session" });
-//     }
-
-//     const { id: userId, role } = req.session.user;
-
-//     /* ================= CURRENT USER ================= */
-//     const [userResult] = await db.query(
-//       "SELECT name FROM users WHERE user_id = ?",
-//       [userId]
-//     );
-//     const currentUserName = userResult[0]?.name || '';
-
-//     /* ================= MAIN QUERY ================= */
-//     let query = `
-//       SELECT 
-//         rd.master_id,
-
-//         -- MAIN RAW DATA
-//         IFNULL(rd.name, 'Not Available') AS name,
-//         IFNULL(rd.number, 'Not Available') AS number,
-//         IFNULL(rd.alternate_number, 'Not Available') AS alternate_number,
-//         IFNULL(rd.email, 'Not Available') AS email,
-//         IFNULL(rd.address, 'Not Available') AS address,
-//         IFNULL(rd.city, 'Not Available') AS city,
-//         IFNULL(rd.status, 'Not Available') AS status,
-//         IFNULL(rd.lead_status, 'Not Available') AS lead_status,
-//         IFNULL(rd.lead_stage, 'Not Available') AS lead_stage,
-//         IFNULL(rd.current_stage, 'Not Available') AS current_stage,
-//         IFNULL(rd.created_by_user, 'Not Available') AS created_by_user,
-//         IFNULL(rd.assign_id, 'Not Available') AS assign_id,
-//         IFNULL(rd.followup_date, 'Not Available') AS followup_date,
-
-//         -- IDS
-//         IFNULL(rd.cat_id, 'Not Available') AS cat_id,
-//         IFNULL(rd.reference_id, 'Not Available') AS reference_id,
-//         IFNULL(rd.area_id, 'Not Available') AS area_id,
-
-//         -- DIMENSIONS
-//         IFNULL(rd.room_length, 'Not Available') AS room_length,
-//         IFNULL(rd.room_width, 'Not Available') AS room_width,
-//         IFNULL(rd.room_height, 'Not Available') AS room_height,
-
-//         -- EXTRA DETAILS
-//         IFNULL(rd.location_link, 'Not Available') AS location_link,
-//         IFNULL(rd.p_type, 'Not Available') AS p_type,
-//         IFNULL(rd.budget_range, 'Not Available') AS budget_range,
-//         IFNULL(rd.time_to_complete, 'Not Available') AS time_to_complete,
-//         IFNULL(rd.site_visit_date, 'Not Available') AS site_visit_date,
-//         IFNULL(rd.demo_date, 'Not Available') AS demo_date,
-
-//         -- ACTIVITY
-//         IFNULL(rd.lead_activity, 0) AS lead_activity, 
-
-//         -- NUMBERS
-//         IFNULL(rd.ar_number, 'Not Available') AS ar_number,
-//         IFNULL(rd.architect_name, 'Not Available') AS architect_name,
-//         IFNULL(rd.ca_number, 'Not Available') AS ca_number,
-//         IFNULL(rd.e_number, 'Not Available') AS e_number,
-//         IFNULL(rd.sm_number, 'Not Available') AS sm_number,
-//         IFNULL(rd.pop_number, 'Not Available') AS pop_number,
-//         IFNULL(rd.other_number, 'Not Available') AS other_number,
-
-//         -- REMARKS
-//         IFNULL(rd.quick_remark, 'Not Available') AS quick_remark,
-//         IFNULL(rd.detailed_remark, 'Not Available') AS detailed_remark,
-
-//         -- AREA / CATEGORY / REFERENCE
-//         IFNULL(a.area_name, 'Not Available') AS area_name,
-//         IFNULL(c.cat_name, 'Not Available') AS cat_name,
-//         IFNULL(ref.reference_name, 'Not Available') AS reference_name,
-
-//         -- ASSIGN DATE
-//         IFNULL(DATE(asg.assign_date), 'Not Available') AS assign_date,
-
-//         -- LATEST REASSIGNMENT
-//         lr.id AS reassignment_id,
-//         lr.reassignment_date,
-//         lr.assignedTo AS reassigned_to,
-//         lr.remark AS reassignment_remark,
-//         lr.leadStage AS reassignment_lead_stage,
-
-//         -- USER
-//         IFNULL(u.name, 'Not Available') AS telecaller_name,
-//         u.user_id AS assigned_to_user_id,
-
-//         -- ✅ NEW: DOCUMENT LOCATION LINK
-//         MAX(d.location_link) AS document_location_link
-
-//       FROM raw_data rd
-//       LEFT JOIN area a ON rd.area_id = a.area_id
-//       LEFT JOIN category c ON rd.cat_id = c.cat_id
-//       LEFT JOIN reference ref ON rd.reference_id = ref.reference_id
-//       LEFT JOIN assignments asg ON rd.assign_id = asg.assign_id
-
-//       -- LATEST REASSIGNMENT
-//       LEFT JOIN (
-//         SELECT r1.*, ROW_NUMBER() OVER (PARTITION BY master_id ORDER BY id DESC) rn
-//         FROM reassignment r1
-//       ) lr ON rd.master_id = lr.master_id AND lr.rn = 1
-
-//       LEFT JOIN users u ON lr.assignedTo = u.name
-
-//       -- ✅ NEW: DOCUMENTS JOIN
-//       LEFT JOIN documents d ON d.master_id = rd.master_id
-//     `;
-
-//     const params = [];
-
-//     /* ================= TODAY CONDITION ================= */
-//     query += `
-//       WHERE (
-//         rd.followup_date = CURDATE()
-//         OR DATE(lr.reassignment_date) = CURDATE()
-//       )
-//     `;
-
-//     /* ================= ROLE FILTER ================= */
-//     if (isTelecallerLike(role)) {
-//       query += ` AND lr.assignedTo = ?`;
-//       params.push(currentUserName);
-//     } else if (isAdminLike(role)) {
-//       query += ` AND rd.status IN ('Assigned', 'Not Interested')`;
-//     } else if (!isManagementLike(role)) {
-//       query += ` AND lr.assignedTo = ?`;
-//       params.push(currentUserName);
-//     }
-
-//     query += ` GROUP BY rd.master_id ORDER BY rd.followup_date ASC`;
-
-//     const [rows] = await db.query(query, params);
-
-//     if (!rows.length) {
-//       return res.status(200).json({ success: true, total: 0, leads: [] });
-//     }
-
-//     /* ================= MASTER IDS ================= */
-//     const masterIds = rows.map(r => r.master_id);
-
-//     /* ================= OTHER INPUTS ================= */
-//     const [otherInputs] = await db.query(
-//       `SELECT master_id, cat_id, reference_id, input_text
-//        FROM raw_data_other_inputs
-//        WHERE master_id IN (?)
-//        ORDER BY created_at DESC`,
-//       [masterIds]
-//     );
-
-//     /* ================= REASSIGNMENT HISTORY ================= */
-//     const [reassignments] = await db.query(
-//       `SELECT rm.*, u.name, u.role
-//        FROM reassignment rm
-//        LEFT JOIN users u ON u.user_id = rm.created_by_user
-//        WHERE rm.master_id IN (?)
-//        ORDER BY rm.reassignment_date DESC, rm.created_at DESC`,
-//       [masterIds]
-//     );
-
-//     /* ================= FINAL MAP ================= */
-//     const finalResult = rows.map(row => {
-//       const rowCatId = parseInt(row.cat_id);
-//       const rowRefId = parseInt(row.reference_id);
-
-//       const category_other =
-//         otherInputs.find(
-//           oi => oi.master_id === row.master_id && oi.cat_id === rowCatId
-//         )?.input_text || '';
-
-//       const reference_other =
-//         otherInputs.find(
-//           oi => oi.master_id === row.master_id && oi.reference_id === rowRefId
-//         )?.input_text || '';
-
-//       const reassignment_remarks = reassignments
-//         .filter(r => r.master_id === row.master_id)
-//         .map(r => ({
-//           remark: r.remark || '',
-//           assignedTo: r.assignedTo || '',
-//           leadStage: r.leadStage || '',
-//           created_at: r.created_at
-//             ? new Date(r.created_at).toLocaleString('en-GB')
-//             : '',
-//           reassignment_date: r.reassignment_date
-//             ? new Date(r.reassignment_date).toLocaleString('en-GB')
-//             : '',
-//           name: r.name || '',
-//           role: r.role || ''
-//         }));
-
-//       return {
-//         ...row,
-//         category_other,
-//         reference_other,
-//         reassignment_remarks,
-//         latest_assignedTo: reassignment_remarks[0]?.assignedTo || '',
-//         latest_leadStage: reassignment_remarks[0]?.leadStage || ''
-//       };
-//     });
-
-//     return res.status(200).json({
-//       success: true,
-//       total: finalResult.length,
-//       leads: finalResult
-//     });
-
-//   } catch (error) {
-//     console.error("❌ Error in getTodaysAssignedLeadsFullData:", error);
-//     res.status(500).json({ message: "Failed to fetch today's leads" });
-//   }
-// };
 
 
 export const getTodaysAssignedLeadsFullData = async (req, res) => {
@@ -5355,7 +6668,7 @@ export const getTodaysAssignedLeadsFullData = async (req, res) => {
         IFNULL(u.name, 'Not Available') AS telecaller_name,
         u.user_id AS assigned_to_user_id,
 
-        -- DOCUMENT LOCATION
+        -- ✅ NEW: DOCUMENT LOCATION LINK
         MAX(d.location_link) AS document_location_link
 
       FROM raw_data rd
@@ -5364,12 +6677,15 @@ export const getTodaysAssignedLeadsFullData = async (req, res) => {
       LEFT JOIN reference ref ON rd.reference_id = ref.reference_id
       LEFT JOIN assignments asg ON rd.assign_id = asg.assign_id
 
+      -- LATEST REASSIGNMENT
       LEFT JOIN (
         SELECT r1.*, ROW_NUMBER() OVER (PARTITION BY master_id ORDER BY id DESC) rn
         FROM reassignment r1
       ) lr ON rd.master_id = lr.master_id AND lr.rn = 1
 
       LEFT JOIN users u ON lr.assignedTo = u.name
+
+      -- ✅ NEW: DOCUMENTS JOIN
       LEFT JOIN documents d ON d.master_id = rd.master_id
     `;
 
@@ -5381,7 +6697,6 @@ export const getTodaysAssignedLeadsFullData = async (req, res) => {
         rd.followup_date = CURDATE()
         OR DATE(lr.reassignment_date) = CURDATE()
       )
-      AND rd.lead_stage NOT IN ('Drop','Closed Deal')
     `;
 
     /* ================= ROLE FILTER ================= */
@@ -5477,6 +6792,8 @@ export const getTodaysAssignedLeadsFullData = async (req, res) => {
     res.status(500).json({ message: "Failed to fetch today's leads" });
   }
 };
+
+
 
 
 // export const getUpcomingAssignedFullData = async (req, res) => {
@@ -5907,7 +7224,6 @@ export const getUpcomingAssignedFullData = async (req, res) => {
 };
 
 
-
 export const getEmployeeLeadWorkReport = async (req, res) => {
   try {
     if (!req.session?.user) {
@@ -5921,17 +7237,17 @@ export const getEmployeeLeadWorkReport = async (req, res) => {
       WITH ranked AS (
         SELECT
           r.master_id,
-          r.assignedTo AS employee_name,
+          TRIM(LOWER(r.assignedTo)) AS employee_name,
           COALESCE(NULLIF(r.leadStage, ''), 'Fresh Lead') AS leadStage,
           r.created_at,
 
           ROW_NUMBER() OVER (
-            PARTITION BY r.master_id, r.assignedTo
+            PARTITION BY r.master_id, TRIM(LOWER(r.assignedTo))
             ORDER BY r.created_at ASC
           ) AS rn_first,
 
           ROW_NUMBER() OVER (
-            PARTITION BY r.master_id, r.assignedTo
+            PARTITION BY r.master_id, TRIM(LOWER(r.assignedTo))
             ORDER BY r.created_at DESC
           ) AS rn_last
 
@@ -6002,6 +7318,305 @@ export const getEmployeeLeadWorkReport = async (req, res) => {
   }
 };
 
+export const getDashboardLeadOverview = async (req, res) => {
+  try {
+    if (!req.session?.user) {
+      return res.status(401).json({ success: false });
+    }
+
+    const { employeeName } = req.query;
+
+    let employeeFilter = "";
+    const params = [];
+
+    if (employeeName) {
+      employeeFilter = ` AND TRIM(LOWER(s.employee_name)) = TRIM(LOWER(?)) `;
+      params.push(employeeName);
+    }
+
+    const query = `
+    WITH ranked AS (
+      SELECT
+        r.*,
+        ROW_NUMBER() OVER (PARTITION BY r.master_id ORDER BY r.created_at DESC) AS rn
+      FROM reassignment r
+    ),
+
+    stages AS (
+      SELECT
+        rd.master_id,
+        rd.name,
+        rd.number,
+        rd.email,
+        rd.city,
+        rd.created_at,
+
+        a.assign_date,
+
+        MAX(CASE WHEN ranked.rn = 1 THEN ranked.leadStage END) AS current_stage,
+        MAX(CASE WHEN ranked.rn = 2 THEN ranked.leadStage END) AS previous_stage,
+        MAX(CASE WHEN ranked.rn = 1 THEN ranked.assignedTo END) AS employee_name
+
+      FROM raw_data rd
+      LEFT JOIN ranked ON ranked.master_id = rd.master_id
+      LEFT JOIN assignments a ON a.assign_id = rd.assign_id
+
+      GROUP BY
+        rd.master_id,
+        rd.name,
+        rd.number,
+        rd.email,
+        rd.city,
+        rd.created_at,
+        a.assign_date
+    )
+
+    SELECT
+      /* TOTAL LEADS (GLOBAL) */
+      (SELECT COUNT(DISTINCT master_id) FROM raw_data) AS total_leads,
+
+      /* ASSIGNED */
+      COUNT(DISTINCT CASE
+        WHEN s.current_stage NOT IN ('Drop','Closed Deal')
+        THEN s.master_id
+      END) AS assigned_leads,
+
+      /* TODAY + MISSED */
+      COUNT(DISTINCT CASE
+        WHEN s.current_stage NOT IN ('Drop','Closed Deal')
+         AND DATE(s.assign_date) <= CURDATE()
+        THEN s.master_id
+      END) AS today_missed,
+
+      /* COMPLETED */
+      COUNT(DISTINCT CASE
+        WHEN s.current_stage = 'Closed Deal'
+        THEN s.master_id
+      END) AS completed_work,
+
+      /* NOT COMPLETED */
+      COUNT(DISTINCT CASE
+        WHEN s.current_stage IS NOT NULL
+         AND s.current_stage != 'Closed Deal'
+        THEN s.master_id
+      END) AS not_completed_work
+
+    FROM stages s
+    WHERE 1=1
+    ${employeeFilter}
+    `;
+
+    const [rows] = await db.query(query, params);
+
+    res.json({
+      success: true,
+      data: rows[0] || {
+        total_leads: 0,
+        assigned_leads: 0,
+        today_missed: 0,
+        completed_work: 0,
+        not_completed_work: 0
+      }
+    });
+
+  } catch (err) {
+    console.error("❌ Dashboard overview error:", err);
+    res.status(500).json({ success: false });
+  }
+};
+
+
+
+export const getSimpleLeadReport = async (req, res) => {
+  try {
+    if (!req.session?.user) {
+      return res.status(401).json({ success: false });
+    }
+
+    const query = `
+    WITH ranked AS (
+      SELECT
+        r.*,
+        ROW_NUMBER() OVER (PARTITION BY r.master_id ORDER BY r.created_at DESC) AS rn
+      FROM reassignment r
+    ),
+
+    stages AS (
+      SELECT
+        rd.master_id,
+        rd.name   AS lead_name,
+        rd.number AS lead_phone,
+        rd.email  AS lead_email,
+        rd.city   AS city,
+        rd.created_at AS lead_created,
+
+        a.assign_date,                     -- ✅ SAME SOURCE AS HISTORY
+
+        MAX(CASE WHEN ranked.rn = 1 THEN ranked.leadStage END) AS current_stage,
+        MAX(CASE WHEN ranked.rn = 2 THEN ranked.leadStage END) AS previous_stage,
+
+        MAX(CASE WHEN ranked.rn = 1 THEN ranked.assignedTo END) AS employee_name
+
+      FROM raw_data rd
+
+      LEFT JOIN ranked 
+        ON ranked.master_id = rd.master_id
+
+      LEFT JOIN assignments a               -- ✅ JOIN ADDED
+        ON a.assign_id = rd.assign_id       -- ✅ SAME REF AS getLeadHistory
+
+      GROUP BY
+        rd.master_id,
+        rd.name,
+        rd.number,
+        rd.email,
+        rd.city,
+        rd.created_at,
+        a.assign_date                       -- ✅ GROUPED
+    )
+
+    SELECT
+      s.*,
+      u.role AS employee_role,
+
+      CASE
+        WHEN u.role = 'tele_caller'
+         AND s.previous_stage IN ('Fresh Lead','Cold Lead','On Hold','Positive Lead')
+         AND s.current_stage IN ('Pre Site Visit','Demo','Quotation Pending')
+        THEN 'Converted'
+
+        WHEN u.role = 'field_marketing_executive'
+         AND s.previous_stage = 'Pre Site Visit'
+         AND s.current_stage = 'Quotation Pending'
+        THEN 'Converted'
+
+        WHEN u.role = 'junior_autocad_designer'
+         AND s.previous_stage = 'Quotation Pending'
+         AND s.current_stage = 'Quotation Follow-up'
+        THEN 'Converted'
+
+        WHEN u.role = 'tech_sale_sound_engineer'
+         AND s.previous_stage = 'Quotation Follow-up'
+         AND s.current_stage IN ('Demo','Pre Site Visit','Projection List')
+        THEN 'Converted'
+
+        WHEN u.role = 'technical_head'
+         AND s.previous_stage = 'Post Site Visit'
+         AND s.current_stage = 'Projection List'
+        THEN 'Converted'
+
+        ELSE 'Not Converted'
+      END AS conversion_status
+
+    FROM stages s
+    LEFT JOIN users u 
+      ON u.name = s.employee_name
+
+    ORDER BY s.master_id DESC
+    `;
+
+    const [rows] = await db.query(query);
+
+    const employees = [
+      ...new Map(
+        rows
+          .filter(r => r.employee_name)
+          .map(r => [
+            r.employee_name,
+            {
+              employee_name: r.employee_name,
+              role: r.employee_role
+            }
+          ])
+      ).values()
+    ];
+
+    res.json({
+      success: true,
+      total: rows.length,
+      data: rows,
+      employees
+    });
+
+  } catch (e) {
+    console.log("Simple Lead Report Error:", e);
+    res.status(500).json({ success: false });
+  }
+};
+
+
+
+export const getLeadHistory = async (req, res) => {
+  try {
+    const { master_id } = req.params;
+
+    const [rows] = await db.query(`
+SELECT
+  a.assign_date,                                   -- ✅ from raw_data → assignments
+
+  u.name AS created_by_user,
+  u.role AS employee_role,
+
+  r.assignedTo,
+  r.reassignment_date,
+
+  r.leadStage AS current_stage,                    -- ✅ STAGE FROM reassignment
+  r.remark,
+
+  u2.role AS assigned_role,
+
+  CASE
+    WHEN u2.role = 'tele_caller'
+     AND r.leadStage IN ('Pre Site Visit','Demo','Quotation Pending')
+    THEN 'Converted'
+
+    WHEN u2.role = 'field_marketing_executive'
+     AND r.leadStage = 'Quotation Pending'
+    THEN 'Converted'
+
+    WHEN u2.role = 'junior_autocad_designer'
+     AND r.leadStage = 'Quotation Follow-up'
+    THEN 'Converted'
+
+    WHEN u2.role = 'tech_sale_sound_engineer'
+     AND r.leadStage IN ('Demo','Pre Site Visit','Projection List')
+    THEN 'Converted'
+
+    WHEN u2.role = 'technical_head'
+     AND r.leadStage = 'Projection List'
+    THEN 'Converted'
+
+    ELSE 'Not Converted'
+  END AS conversion_status
+
+FROM reassignment r
+
+LEFT JOIN raw_data rd 
+  ON rd.master_id = r.master_id
+
+LEFT JOIN assignments a 
+  ON a.assign_id = rd.assign_id                  -- ✅ correct assign_date
+
+LEFT JOIN users u 
+  ON u.user_id = r.created_by_user
+
+LEFT JOIN users u2 
+  ON u2.name = r.assignedTo
+
+WHERE r.master_id = ?
+
+ORDER BY r.reassignment_date ASC
+    `, [master_id]);
+
+    res.json({ success: true, data: rows });
+
+  } catch (err) {
+    console.error("Lead History Error:", err);
+    res.status(500).json({ success: false });
+  }
+};
+
+
 
 
 export const getInactiveLeadDetails = async (req, res) => {
@@ -6067,123 +7682,123 @@ export const getInactiveLeadDetails = async (req, res) => {
 
 
 
-export const getEmployeeWiseAssignedLeadCount = async (req, res) => {
-  try {
-    if (!req.session.user) {
-      return res.status(401).json({ message: "Unauthorized" });
-    }
+// export const getEmployeeWiseAssignedLeadCount = async (req, res) => {
+//   try {
+//     if (!req.session.user) {
+//       return res.status(401).json({ message: "Unauthorized" });
+//     }
 
-    const { role } = req.session.user;
+//     const { role } = req.session.user;
 
-    if (!isAdminLike(role) && !isManagementLike(role)) {
-      return res.status(403).json({ message: "Access denied" });
-    }
+//     if (!isAdminLike(role) && !isManagementLike(role)) {
+//       return res.status(403).json({ message: "Access denied" });
+//     }
 
-    // 🔹 Latest reassignment per lead
-    const [latestReassignments] = await db.query(`
-      SELECT master_id, MAX(id) AS latest_id
-      FROM reassignment
-      GROUP BY master_id
-    `);
+//     // 🔹 Latest reassignment per lead
+//     const [latestReassignments] = await db.query(`
+//       SELECT master_id, MAX(id) AS latest_id
+//       FROM reassignment
+//       GROUP BY master_id
+//     `);
 
-    if (latestReassignments.length === 0) {
-      return res.status(200).json({
-        success: true,
-        totalEmployees: 0,
-        data: []
-      });
-    }
+//     if (latestReassignments.length === 0) {
+//       return res.status(200).json({
+//         success: true,
+//         totalEmployees: 0,
+//         data: []
+//       });
+//     }
 
-    const latestIds = latestReassignments.map(r => r.latest_id);
+//     const latestIds = latestReassignments.map(r => r.latest_id);
 
-    const query = `
-      SELECT 
-        u.name AS employee_name,
-        u.role,
+//     const query = `
+//       SELECT 
+//         u.name AS employee_name,
+//         u.role,
 
-        -- ✅ EXISTING COUNTS (UNCHANGED)
-        COUNT(DISTINCT rd.master_id) AS total_assigned,
+//         -- ✅ EXISTING COUNTS (UNCHANGED)
+//         COUNT(DISTINCT rd.master_id) AS total_assigned,
 
-        COUNT(DISTINCT CASE 
-          WHEN rd.followup_date = CURDATE()
-            OR DATE(re.reassignment_date) = CURDATE()
-          THEN rd.master_id
-        END) AS today_assigned,
+//         COUNT(DISTINCT CASE 
+//           WHEN rd.followup_date = CURDATE()
+//             OR DATE(re.reassignment_date) = CURDATE()
+//           THEN rd.master_id
+//         END) AS today_assigned,
 
-        COUNT(DISTINCT CASE 
-          WHEN rd.followup_date > CURDATE()
-            OR DATE(re.reassignment_date) > CURDATE()
-          THEN rd.master_id
-        END) AS upcoming_assigned,
+//         COUNT(DISTINCT CASE 
+//           WHEN rd.followup_date > CURDATE()
+//             OR DATE(re.reassignment_date) > CURDATE()
+//           THEN rd.master_id
+//         END) AS upcoming_assigned,
 
-        COUNT(DISTINCT CASE 
-          WHEN rd.followup_date < CURDATE()
-          THEN rd.master_id
-        END) AS missed_assigned,
+//         COUNT(DISTINCT CASE 
+//           WHEN rd.followup_date < CURDATE()
+//           THEN rd.master_id
+//         END) AS missed_assigned,
 
-        COUNT(DISTINCT CASE 
-          WHEN rd.lead_stage = 'Drop'
-          THEN rd.master_id
-        END) AS drop_count,
+//         COUNT(DISTINCT CASE 
+//           WHEN rd.lead_stage = 'Drop'
+//           THEN rd.master_id
+//         END) AS drop_count,
 
-        COUNT(DISTINCT CASE 
-          WHEN rd.lead_stage = 'Closed Deal'
-          THEN rd.master_id
-        END) AS closed_count,
+//         COUNT(DISTINCT CASE 
+//           WHEN rd.lead_stage = 'Closed Deal'
+//           THEN rd.master_id
+//         END) AS closed_count,
 
-        -- 🆕 Lead stage details (MariaDB compatible)
-        CONCAT(
-          '[',
-          GROUP_CONCAT(
-            DISTINCT JSON_OBJECT(
-              'master_id', rd.master_id,
-              'lead_name', rd.name,
-              'current_stage', rd.lead_stage,
-              'stage_history', (
-                SELECT CONCAT(
-                  '[',
-                  GROUP_CONCAT(
-                    JSON_OBJECT(
-                      'stage', rs.leadStage,
-                      'assignedTo', rs.assignedTo,
-                      'remark', rs.remark,
-                      'date', rs.reassignment_date
-                    )
-                    ORDER BY rs.id
-                  ),
-                  ']'
-                )
-                FROM reassignment rs
-                WHERE rs.master_id = rd.master_id
-              )
-            )
-          ),
-          ']'
-        ) AS lead_details
+//         -- 🆕 Lead stage details (MariaDB compatible)
+//         CONCAT(
+//           '[',
+//           GROUP_CONCAT(
+//             DISTINCT JSON_OBJECT(
+//               'master_id', rd.master_id,
+//               'lead_name', rd.name,
+//               'current_stage', rd.lead_stage,
+//               'stage_history', (
+//                 SELECT CONCAT(
+//                   '[',
+//                   GROUP_CONCAT(
+//                     JSON_OBJECT(
+//                       'stage', rs.leadStage,
+//                       'assignedTo', rs.assignedTo,
+//                       'remark', rs.remark,
+//                       'date', rs.reassignment_date
+//                     )
+//                     ORDER BY rs.id
+//                   ),
+//                   ']'
+//                 )
+//                 FROM reassignment rs
+//                 WHERE rs.master_id = rd.master_id
+//               )
+//             )
+//           ),
+//           ']'
+//         ) AS lead_details
 
-      FROM reassignment re
-      INNER JOIN raw_data rd ON rd.master_id = re.master_id
-      INNER JOIN users u ON u.name = re.assignedTo
-      WHERE re.id IN (?)
-      GROUP BY u.name, u.role
-      ORDER BY total_assigned DESC
-    `;
+//       FROM reassignment re
+//       INNER JOIN raw_data rd ON rd.master_id = re.master_id
+//       INNER JOIN users u ON u.name = re.assignedTo
+//       WHERE re.id IN (?)
+//       GROUP BY u.name, u.role
+//       ORDER BY total_assigned DESC
+//     `;
 
-    const [rows] = await db.query(query, [latestIds]);
+//     const [rows] = await db.query(query, [latestIds]);
 
-    res.status(200).json({
-      success: true,
-      totalEmployees: rows.length,
-      data: rows
-    });
+//     res.status(200).json({
+//       success: true,
+//       totalEmployees: rows.length,
+//       data: rows
+//     });
 
-  } catch (error) {
-    console.error("❌ Employee-wise lead count error:", error);
-    res.status(500).json({
-      message: "Failed to fetch employee-wise assigned lead counts"
-    });
-  }
-};
+//   } catch (error) {
+//     console.error("❌ Employee-wise lead count error:", error);
+//     res.status(500).json({
+//       message: "Failed to fetch employee-wise assigned lead counts"
+//     });
+//   }
+// };
 
 
 
@@ -6323,6 +7938,241 @@ export const getEmployeeWiseAssignedLeadCount = async (req, res) => {
 
 
 
+export const getEmployeeWiseAssignedLeadCount = async (req, res) => {
+  try {
+    if (!req.session?.user) {
+      return res.status(401).json({ message: "Unauthorized" });
+    }
+
+    const { role } = req.session.user;
+
+    if (!isAdminLike(role) && !isManagementLike(role)) {
+      return res.status(403).json({ message: "Access denied" });
+    }
+
+    const query = `
+    WITH ranked AS (
+      SELECT
+        r.*,
+        ROW_NUMBER() OVER (PARTITION BY r.master_id ORDER BY r.created_at DESC) AS rn
+      FROM reassignment r
+    ),
+
+    stages AS (
+      SELECT
+        rd.master_id,
+        MAX(CASE WHEN ranked.rn = 1 THEN ranked.leadStage END) AS current_stage,
+        MAX(CASE WHEN ranked.rn = 1 THEN ranked.assignedTo END) AS employee_name
+      FROM raw_data rd
+      LEFT JOIN ranked ON ranked.master_id = rd.master_id
+      GROUP BY rd.master_id
+    )
+
+    SELECT 
+      u.name AS employee_name,
+      u.role,
+
+      /* EXISTING COUNTS */
+      COUNT(re.id) AS total_assigned,
+
+      COUNT(CASE 
+        WHEN DATE(re.reassignment_date) = CURDATE()
+        THEN 1
+      END) AS today_assigned,
+
+      COUNT(CASE 
+        WHEN DATE(re.reassignment_date) > CURDATE()
+        THEN 1
+      END) AS upcoming_assigned,
+
+      COUNT(CASE 
+        WHEN DATE(re.reassignment_date) < CURDATE()
+        THEN 1
+      END) AS missed_assigned,
+
+      /* ✅ CONVERTED (CURRENT STAGE ONLY) */
+      COUNT(DISTINCT CASE
+
+        /* tele_caller */
+        WHEN u.role = 'tele_caller'
+         AND s.current_stage IN ('Pre Site Visit','Demo','Quotation Pending')
+        THEN s.master_id
+
+        /* field_marketing_executive */
+        WHEN u.role = 'field_marketing_executive'
+         AND s.current_stage = 'Quotation Pending'
+        THEN s.master_id
+
+        /* junior_autocad_designer */
+        WHEN u.role = 'junior_autocad_designer'
+         AND s.current_stage = 'Quotation Follow-up'
+        THEN s.master_id
+
+        /* tech_sale_sound_engineer */
+        WHEN u.role = 'tech_sale_sound_engineer'
+         AND s.current_stage IN ('Demo','Pre Site Visit','Projection List')
+        THEN s.master_id
+
+        /* technical_head */
+        WHEN u.role = 'technical_head'
+         AND s.current_stage = 'Projection List'
+        THEN s.master_id
+
+      END) AS converted_count,
+
+      /* ❌ NOT CONVERTED */
+      COUNT(DISTINCT s.master_id)
+      -
+      COUNT(DISTINCT CASE
+
+        WHEN u.role = 'tele_caller'
+         AND s.current_stage IN ('Pre Site Visit','Demo','Quotation Pending')
+        THEN s.master_id
+
+        WHEN u.role = 'field_marketing_executive'
+         AND s.current_stage = 'Quotation Pending'
+        THEN s.master_id
+
+        WHEN u.role = 'junior_autocad_designer'
+         AND s.current_stage = 'Quotation Follow-up'
+        THEN s.master_id
+
+        WHEN u.role = 'tech_sale_sound_engineer'
+         AND s.current_stage IN ('Demo','Pre Site Visit','Projection List')
+        THEN s.master_id
+
+        WHEN u.role = 'technical_head'
+         AND s.current_stage = 'Projection List'
+        THEN s.master_id
+
+      END) AS not_converted_count
+
+    FROM reassignment re
+    INNER JOIN raw_data rd ON rd.master_id = re.master_id
+    INNER JOIN users u ON u.name = re.assignedTo
+    LEFT JOIN stages s ON s.master_id = rd.master_id
+
+    GROUP BY u.name, u.role
+    ORDER BY total_assigned DESC
+    `;
+
+    const [rows] = await db.query(query);
+
+    res.status(200).json({
+      success: true,
+      totalEmployees: rows.length,
+      data: rows
+    });
+
+  } catch (error) {
+    console.error("❌ Employee-wise lead count error:", error);
+    res.status(500).json({
+      message: "Failed to fetch employee-wise assigned lead counts"
+    });
+  }
+};
+
+export const getEmployeeLeadsWithHistory = async (req, res) => {
+  try {
+    if (!req.session?.user) {
+      return res.status(401).json({ success: false });
+    }
+
+    const { employee } = req.params;
+
+    const query = `
+      WITH ranked AS (
+        SELECT r.*,
+               ROW_NUMBER() OVER (PARTITION BY r.master_id ORDER BY r.created_at DESC) rn
+        FROM reassignment r
+      ),
+
+      stages AS (
+        SELECT
+          rd.master_id,
+          MAX(CASE WHEN ranked.rn = 1 THEN ranked.leadStage END) current_stage,
+          MAX(CASE WHEN ranked.rn = 1 THEN ranked.assignedTo END) employee_name,
+          MAX(CASE WHEN ranked.rn = 1 THEN ranked.reassignment_date END) latest_reassignment_date
+        FROM raw_data rd
+        LEFT JOIN ranked ON ranked.master_id = rd.master_id
+        GROUP BY rd.master_id
+      )
+
+      SELECT
+        rd.master_id,
+        rd.name AS lead_name,
+        rd.number,
+        rd.email,
+        rd.city,
+        a.assign_date,
+        s.latest_reassignment_date AS reassignment_date,
+
+        CASE
+          WHEN u.role = 'tele_caller'
+           AND s.current_stage IN ('Pre Site Visit','Demo','Quotation Pending') THEN 'Converted'
+          WHEN u.role = 'field_marketing_executive'
+           AND s.current_stage = 'Quotation Pending' THEN 'Converted'
+          WHEN u.role = 'junior_autocad_designer'
+           AND s.current_stage = 'Quotation Follow-up' THEN 'Converted'
+          WHEN u.role = 'tech_sale_sound_engineer'
+           AND s.current_stage IN ('Demo','Pre Site Visit','Projection List') THEN 'Converted'
+          WHEN u.role = 'technical_head'
+           AND s.current_stage = 'Projection List' THEN 'Converted'
+          ELSE 'Not Converted'
+        END AS converted_status,
+
+        CONCAT(
+          '[',
+          GROUP_CONCAT(
+            CONCAT(
+              '{',
+                '"stage":"', IFNULL(re.leadStage,''), '",',
+                '"assignedTo":"', IFNULL(re.assignedTo,''), '",',
+                '"remark":"', REPLACE(IFNULL(re.remark,''), '"',''), '",',
+                '"date":"', IFNULL(re.reassignment_date,''), '"',
+              '}'
+            )
+            ORDER BY re.reassignment_date
+            SEPARATOR ','
+          ),
+          ']'
+        ) AS stage_history
+
+      FROM reassignment re
+      INNER JOIN raw_data rd ON rd.master_id = re.master_id
+      LEFT JOIN assignments a ON a.assign_id = re.assign_id
+      INNER JOIN users u ON u.name = re.assignedTo
+      LEFT JOIN stages s ON s.master_id = rd.master_id
+
+      WHERE re.assignedTo = ?
+
+      GROUP BY
+        rd.master_id,
+        rd.name,
+        rd.number,
+        rd.email,
+        rd.city,
+        a.assign_date,
+        s.latest_reassignment_date,
+        u.role,
+        s.current_stage
+
+      ORDER BY rd.master_id DESC
+    `;
+
+    const [rows] = await db.query(query, [employee]);
+
+    res.json({ success: true, data: rows });
+
+  } catch (err) {
+    console.error("❌ Employee leads error:", err.sqlMessage || err);
+    res.status(500).json({ success: false });
+  }
+};
+
+
+
+
 
 export const getQuotationPendingLeads = async (req, res) => {
   try {
@@ -6447,3 +8297,4 @@ export const getQuotationPendingLeads = async (req, res) => {
     return res.status(500).json({ error: "Failed to fetch quotation pending leads" });
   }
 };
+

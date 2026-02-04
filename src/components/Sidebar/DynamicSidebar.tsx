@@ -27,7 +27,12 @@ import {
   CheckCircle,
   ChevronDown,
   X,
-  LogOut
+  LogOut,
+  TrendingUp,
+  ShieldCheck,
+  UserCog ,
+    ClipboardCheck,
+    CalendarCheck,
 } from 'lucide-react';
 
 interface MenuItem {
@@ -159,34 +164,55 @@ const DynamicSidebar = ({ sidebarOpen, setSidebarOpen }: SidebarProps) => {
     path && (pathname === path || pathname.startsWith(path + '/'));
 
   // Get icon for menu
-  const getIcon = (label: string) => {
-    const iconMap: Record<string, React.ReactNode> = {
-      'Dashboard': <LayoutDashboard className="w-5 h-5 transition-transform group-hover:scale-110" />,
-      'Master': <Database className="w-5 h-5 transition-transform group-hover:scale-110" />,
-      'User': <Users className="w-5 h-5 transition-transform group-hover:scale-110" />,
-      'Master Data': <FileText className="w-5 h-5 transition-transform group-hover:scale-110" />,
-      'Campaign': <Megaphone className="w-5 h-5 transition-transform group-hover:scale-110" />,
-      'Assigned Call': <PhoneOutgoing className="w-5 h-5 transition-transform group-hover:scale-110" />,
-      'Today\'s To-Do': <CheckSquare className="w-5 h-5 transition-transform group-hover:scale-110" />,
-      'Missed Follow-up List': <ClipboardList className="w-5 h-5 transition-transform group-hover:scale-110" />,
-      'Upcoming Follow-ups': <CalendarDays className="w-5 h-5 transition-transform group-hover:scale-110" />,
-      'Report': <BarChart3 className="w-5 h-5 transition-transform group-hover:scale-110" />,
-      'Category': <FolderOpen className="w-4 h-4" />,
-      'Product': <Package className="w-4 h-4" />,
-      'Reference': <Bookmark className="w-4 h-4" />,
-      'Area': <Map className="w-4 h-4" />,
-      'Add User': <UserPlus className="w-4 h-4" />,
-      'User List': <List className="w-4 h-4" />,
-      'Create Campaign': <FolderPlus className="w-4 h-4" />,
-      'View Campaign': <Eye className="w-4 h-4" />,
-      'Drop Leads Report': <Eye className="w-4 h-4" />,
-      'Closed Leads Report': <CheckCircle className="w-4 h-4" />,
-      'Employee Reports': <Users className="w-4 h-4" />,
-      'Emp Assignment Count': <Users className="w-4 h-4" />,
-      'Logout': <LogOut className="w-5 h-5 transition-transform group-hover:scale-110" />,
-    };
-    return iconMap[label] || <LayoutDashboard className="w-5 h-5" />;
+const getIcon = (label: string) => {
+  const iconMap: Record<string, React.ReactNode> = {
+    'Dashboard': <LayoutDashboard className="w-5 h-5" />,
+    'Master': <Database className="w-5 h-5" />,
+    'User': <Users className="w-5 h-5" />,
+    'Master Data': <FileText className="w-5 h-5" />,
+    'Campaign': <Megaphone className="w-5 h-5" />,
+    'Assigned Call': <PhoneOutgoing className="w-5 h-5" />,
+    'Today’s To-Do': <CheckSquare className="w-5 h-5" />,
+    'Missed Follow-up List': <ClipboardList className="w-5 h-5" />,
+    'Upcoming Follow-ups': <CalendarDays className="w-5 h-5" />,
+    'Report': <BarChart3 className="w-5 h-5" />,
+
+    // Master children
+    'Category': <FolderOpen className="w-4 h-4" />,
+    'Product': <Package className="w-4 h-4" />,
+    'Reference': <Bookmark className="w-4 h-4" />,
+    'Area': <Map className="w-4 h-4" />,
+    'Kit': <Package className="w-4 h-4" />,
+
+    // User
+    'Add User': <UserPlus className="w-4 h-4" />,
+    'User List': <List className="w-4 h-4" />,
+
+    // Campaign
+    'Create Campaign': <FolderPlus className="w-4 h-4" />,
+    'View Campaign': <Eye className="w-4 h-4" />,
+
+    // Reports
+    'Drop Leads Report': <Eye className="w-4 h-4" />,
+    'Closed Leads Report': <CheckCircle className="w-4 h-4" />,
+    'EmployeeWise Report': <Users className="w-4 h-4" />,
+    'LeadWise Report': <TrendingUp className="w-4 h-4" />,
+
+    // ✅ THESE TWO WERE MISSING / WRONG
+    'Quotation Template': <FileText className="w-5 h-5" />,
+    'Attendance Report': <CalendarCheck className="w-5 h-5" />,
+
+    // Admin
+    'Role Permission': <ShieldCheck className="w-4 h-4" />,
+    'Employee Report': <UserCog className="w-4 h-4" />,
+
+    // Logout
+    'Logout': <LogOut className="w-5 h-5" />,
   };
+
+  return iconMap[label] || <FileText className="w-5 h-5" />;
+};
+
 
   // Get color for menu item with static classes
   const getColorClass = (label: string) => {

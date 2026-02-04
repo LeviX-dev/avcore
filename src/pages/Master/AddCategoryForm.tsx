@@ -45,19 +45,19 @@ const AddCategoryForm: React.FC<AddCategoryFormProps> = ({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 px-2">
-      <div className="bg-white rounded-md shadow-lg w-[90%] sm:w-[70%] lg:w-1/3 p-4 sm:p-6">
-        <h3 className="text-lg font-semibold mb-4 text-center sm:text-left">
+      <div className="bg-white dark:bg-boxdark rounded-lg shadow-lg w-[90%] sm:w-[70%] lg:w-1/3 p-6">
+        <h3 className="text-lg font-semibold mb-4 text-center sm:text-left text-black dark:text-white">
           Add New Category
         </h3>
 
         {feedback && (
-          <p className="mb-3 text-sm text-green-500 text-center sm:text-left">
+          <p className={`mb-3 text-sm text-center sm:text-left ${feedback.includes("successfully") ? "text-green-500" : "text-red-500"}`}>
             {feedback}
           </p>
         )}
 
         <form onSubmit={handleSubmit}>
-          <label className="block text-sm font-medium mb-2">
+          <label className="block text-sm font-medium mb-2 text-black dark:text-white">
             Category Name
           </label>
 
@@ -67,22 +67,22 @@ const AddCategoryForm: React.FC<AddCategoryFormProps> = ({
             value={formData.cat_name}
             onChange={handleChange}
             placeholder="Enter category name"
-            className="border w-full p-2 rounded mb-4 text-sm"
+            className="border border-stroke dark:border-strokedark w-full p-3 rounded-lg mb-6 bg-transparent text-black dark:text-white"
             required
           />
 
-          <div className="flex flex-col sm:flex-row justify-end gap-2">
+          <div className="flex flex-col sm:flex-row justify-end gap-3">
             <button
               type="button"
               onClick={onClose}
-              className="w-full sm:w-auto px-4 py-2 bg-gray-400 text-white rounded hover:bg-gray-500"
+              className="w-full sm:w-auto px-5 py-2.5 bg-gray-300 dark:bg-gray-600 text-black dark:text-white rounded-lg hover:bg-gray-400 dark:hover:bg-gray-700 transition"
             >
               Cancel
             </button>
 
             <button
               type="submit"
-              className="w-full sm:w-auto px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600"
+              className="w-full sm:w-auto px-5 py-2.5 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition"
             >
               Save
             </button>

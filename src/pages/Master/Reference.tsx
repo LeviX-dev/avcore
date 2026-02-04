@@ -64,7 +64,7 @@ const Reference = () => {
   };
 
   return (
-    <div>
+    <div className="px-2 sm:px-4 dark:bg-boxdark">
       <Breadcrumb pageName="Manage Sources" />
 
       {/* Top Controls */}
@@ -83,12 +83,12 @@ const Reference = () => {
             type="text"
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full sm:w-64 border rounded px-4 py-2"
+            className="w-full sm:w-64 border border-stroke dark:border-strokedark dark:bg-boxdark dark:text-white rounded px-4 py-2"
             placeholder="Search References..."
           />
           <button
             onClick={handleSearch}
-            className="w-full sm:w-auto bg-blue-500 text-white px-4 py-2 rounded"
+            className="w-full sm:w-auto bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600"
           >
             Search
           </button>
@@ -130,8 +130,8 @@ const Reference = () => {
       )}
 
       {/* Table */}
-       <div className="overflow-x-auto rounded-sm border border-stroke bg-white shadow-default dark:border-strokedark dark:bg-boxdark">
-<table className="w-full table-auto sm:min-w-[600px]">
+      <div className="overflow-x-auto rounded-sm border border-stroke bg-white shadow-default dark:border-strokedark dark:bg-boxdark">
+        <table className="w-full table-auto sm:min-w-[600px]">
           <thead>
             <tr className="bg-gray-200 text-left dark:bg-meta-4">
               <th className="py-4 px-4 font-medium text-black dark:text-white xl:pl-11">
@@ -152,16 +152,16 @@ const Reference = () => {
           <tbody>
             {filteredData.length > 0 ? (
               filteredData.map((reference) => (
-                <tr key={reference.reference_id}>
-                  <td className="border-b py-3 px-4 xl:pl-11">
+                <tr key={reference.reference_id} className="dark:border-strokedark">
+                  <td className="border-b border-stroke dark:border-strokedark py-3 px-4 xl:pl-11 text-black dark:text-white">
                     {reference.reference_id}
                   </td>
 
-                  <td className="border-b py-3 px-4 xl:pl-11">
+                  <td className="border-b border-stroke dark:border-strokedark py-3 px-4 xl:pl-11 text-black dark:text-white">
                     {reference.reference_name}
                   </td>
 
-                  <td className="border-b py-3 px-4 xl:pl-11">
+                  <td className="border-b border-stroke dark:border-strokedark py-3 px-4 xl:pl-11">
                     <span
                       className={`inline-flex rounded-full bg-opacity-10 py-1 px-3 text-sm font-medium ${
                         reference.status === "active"
@@ -174,7 +174,7 @@ const Reference = () => {
                     </span>
                   </td>
 
-                  <td className="border-b py-3 px-4">
+                  <td className="border-b border-stroke dark:border-strokedark py-3 px-4">
                     <div className="flex items-center gap-2">
                       <button
                         className="rounded-md bg-green-600 px-3 py-1 text-white hover:bg-opacity-80"
@@ -200,7 +200,7 @@ const Reference = () => {
               ))
             ) : (
               <tr>
-                <td colSpan={4} className="text-center py-5">
+                <td colSpan={4} className="text-center py-5 text-black dark:text-white">
                   No reference found
                 </td>
               </tr>

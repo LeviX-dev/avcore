@@ -20,6 +20,16 @@ import UploadRoutes from './routes/uploadRoutes.js';
 import campaignRoutes from "./routes/campaignRoutes.js";
 
 import dynamicSidebarRoutes from "./routes/dynamicSidebarRoutes.js";
+import metaRoutes from "./routes/metaRoutes.js"; 
+
+import attendanceRoutes from "./routes/attendanceRoutes.js";
+
+import cron from "node-cron";
+import { importMetaLeadsRoundRobin } from "./controllers/metaController.js";
+
+
+
+
 import path from 'path';
 import { fileURLToPath } from 'url';
 import fs from 'fs';
@@ -104,6 +114,12 @@ app.use(cors({
   credentials: true,
 }));
 
+app.use((req, res, next) => {
+  console.log("➡️", req.method, req.originalUrl);
+  next();
+});
+
+
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser());
@@ -133,6 +149,19 @@ app.use('/api', UploadRoutes)
 
 app.use('/api/dynamic', dynamicSidebarRoutes)
 app.use("/api/campaign", campaignRoutes);
+
+app.use("/api/sujit", metaRoutes);
+
+app.use("/api/attendance", attendanceRoutes);
+
+
+
+// ✅ ADD CRON HERE
+cron.schedule("* * * * *", async () => {
+  console.log("⏱ Meta auto-import running...");
+  await importMetaLeadsRoundRobin({}, {});
+});
+
 
 app.get('/test', (req, res) => {
   res.json({ message: 'API is working!' });

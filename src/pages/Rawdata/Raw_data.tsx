@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import {
   faEdit, // ✅ Edit button
@@ -23,6 +23,9 @@ import {
   faHistory,
   faMapMarkerAlt,
   faTasks, // Alternative for import button
+  faImage,
+  faVideo,
+  faFileAlt,
 } from '@fortawesome/free-solid-svg-icons';
 
 import Breadcrumb from '../../components/Breadcrumbs/Breadcrumb';
@@ -35,6 +38,7 @@ import {
   faFilter,
   faChevronDown,
 } from '@fortawesome/free-solid-svg-icons';
+import { useLocation } from 'react-router-dom';
 
 interface PaginationProps {
   currentPage: number;
@@ -92,22 +96,20 @@ const Pagination: React.FC<PaginationProps> = ({
         <button
           onClick={() => onPageChange(currentPage - 1)}
           disabled={currentPage === 1}
-          className={`relative inline-flex items-center rounded-md border border-white/10 bg-white/5 px-4 py-2 text-sm font-medium text-gray-200 ${
-            currentPage === 1
+          className={`relative inline-flex items-center rounded-md border border-white/10 bg-white/5 px-4 py-2 text-sm font-medium text-gray-200 ${currentPage === 1
               ? 'cursor-not-allowed opacity-50'
               : 'hover:bg-white/10'
-          }`}
+            }`}
         >
           Previous
         </button>
         <button
           onClick={() => onPageChange(currentPage + 1)}
           disabled={currentPage === totalPages}
-          className={`relative ml-3 inline-flex items-center rounded-md border border-white/10 bg-white/5 px-4 py-2 text-sm font-medium text-gray-200 ${
-            currentPage === totalPages
+          className={`relative ml-3 inline-flex items-center rounded-md border border-white/10 bg-white/5 px-4 py-2 text-sm font-medium text-gray-200 ${currentPage === totalPages
               ? 'cursor-not-allowed opacity-50'
               : 'hover:bg-white/10'
-          }`}
+            }`}
         >
           Next
         </button>
@@ -135,11 +137,10 @@ const Pagination: React.FC<PaginationProps> = ({
             <button
               onClick={() => onPageChange(currentPage - 1)}
               disabled={currentPage === 1}
-              className={`relative inline-flex items-center rounded-l-md px-2 py-2 text-gray-400 inset-ring inset-ring-gray-700 focus:z-20 focus:outline-offset-0 ${
-                currentPage === 1
+              className={`relative inline-flex items-center rounded-l-md px-2 py-2 text-gray-400 inset-ring inset-ring-gray-700 focus:z-20 focus:outline-offset-0 ${currentPage === 1
                   ? 'cursor-not-allowed opacity-50'
                   : 'hover:bg-white/5'
-              }`}
+                }`}
             >
               <span className="sr-only">Previous</span>
               <svg
@@ -177,11 +178,10 @@ const Pagination: React.FC<PaginationProps> = ({
                 <button
                   key={pageNumber}
                   onClick={() => onPageChange(pageNumber)}
-                  className={`relative inline-flex items-center px-4 py-2 text-sm font-semibold focus:z-20 focus:outline-offset-0 ${
-                    isCurrent
+                  className={`relative inline-flex items-center px-4 py-2 text-sm font-semibold focus:z-20 focus:outline-offset-0 ${isCurrent
                       ? 'z-10 bg-indigo-500 text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-500'
                       : 'text-gray-200 inset-ring inset-ring-gray-700 hover:bg-white/5'
-                  } ${pageNumber > 9 ? 'px-3' : 'px-4'}`}
+                    } ${pageNumber > 9 ? 'px-3' : 'px-4'}`}
                 >
                   {pageNumber}
                 </button>
@@ -192,11 +192,10 @@ const Pagination: React.FC<PaginationProps> = ({
             <button
               onClick={() => onPageChange(currentPage + 1)}
               disabled={currentPage === totalPages}
-              className={`relative inline-flex items-center rounded-r-md px-2 py-2 text-gray-400 inset-ring inset-ring-gray-700 focus:z-20 focus:outline-offset-0 ${
-                currentPage === totalPages
+              className={`relative inline-flex items-center rounded-r-md px-2 py-2 text-gray-400 inset-ring inset-ring-gray-700 focus:z-20 focus:outline-offset-0 ${currentPage === totalPages
                   ? 'cursor-not-allowed opacity-50'
                   : 'hover:bg-white/5'
-              }`}
+                }`}
             >
               <span className="sr-only">Next</span>
               <svg
@@ -409,6 +408,17 @@ const RawData = () => {
     percentage?: number;
   }
 
+  const formatDate = (dateString: string | undefined): string => {
+    if (!dateString) return '—';
+
+    try {
+      const [year, month, day] = dateString.split('-');
+      return `${day}/${month}/${year}`;
+    } catch (error) {
+      return dateString; // Return original if format is unexpected
+    }
+  };
+
   useEffect(() => {
     const fetchUsers = async () => {
       try {
@@ -466,12 +476,8 @@ const RawData = () => {
 
   const [itemsPerPage, setItemsPerPage] = useState(5);
 
-
-
   const [importErrors, setImportErrors] = useState([]);
 
-
-  
   // Filter states
   const [showEntryDateCalendar, setShowEntryDateCalendar] = useState(false);
   const [showFollowupDateCalendar, setShowFollowupDateCalendar] =
@@ -514,771 +520,1840 @@ const RawData = () => {
     useState<Data | null>(null);
   const [showDetailsModal, setShowDetailsModal] = useState(false);
 
+  const EMPTY_POSTER =
+    'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNDAwIiBoZWlnaHQ9IjIyNSIgdmlld0JveD0iMCAwIDQwMCAyMjUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+PHJlY3Qgd2lkdGg9IjQwMCIgaGVpZ2h0PSIyMjUiIGZpbGw9IiNlNWU3ZWIiLz48dGV4dCB4PSIyMDAiIHk9IjExMiIgZm9udC1zaXplPSIyMCIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZmlsbD0iIzY2NiI+VmlkZW88L3RleHQ+PC9zdmc+';
+
+  const EMPTY_IMAGE =
+    'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTUwIiBoZWlnaHQ9IjE1MCIgdmlld0JveD0iMCAwIDE1MCAxNTAiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+PHJlY3Qgd2lkdGg9IjE1MCIgaGVpZ2h0PSIxNTAiIGZpbGw9IiNlNWU3ZWIiLz48dGV4dCB4PSI3NSIgeT0iNzUiIGZvbnQtc2l6ZT0iMTQiIHRleHQtYW5jaG9yPSJtaWRkbGUiIGZpbGw9IiM2NjYiPkltYWdlPC90ZXh0Pjwvc3ZnPg==';
+
+  const [activeTab, setActiveTab] = useState('details');
+
+  const [documentsData, setDocumentsData] = useState({
+    images: [],
+    documents: [],
+    videos: [],
+  });
+
+  const [loadingDocs, setLoadingDocs] = useState(false);
+  const [docsFetched, setDocsFetched] = useState(false);
+
+  useEffect(() => {
+    if (activeTab === 'documents') fetchDocuments();
+  }, [activeTab]);
+
+  useEffect(() => {
+    // reset when client changes
+    setActiveTab('details');
+    setDocsFetched(false);
+    setDocumentsData({ images: [], documents: [], videos: [] });
+  }, [selectedClientDetails?.master_id]);
+
+  const fetchDocuments = async () => {
+    if (!selectedClientDetails?.master_id || docsFetched) return;
+
+    setLoadingDocs(true);
+
+    try {
+      const response = await axios.get(
+        `${BASE_URL}api/documents/${selectedClientDetails.master_id}`,
+        { withCredentials: true },
+      );
+
+      const images: any[] = [];
+      const documents: any[] = [];
+      const videos: any[] = [];
+
+      response.data.documents.forEach((doc: any) => {
+        let filePath = doc.document_path
+          .replace(/^server\//, '')
+          .replace(/\\/g, '/');
+
+        if (!filePath.startsWith('uploads/')) filePath = `uploads/${filePath}`;
+
+        const fullUrl = `${BASE_URL}${filePath}`;
+
+        const obj = {
+          ...doc,
+          url: fullUrl,
+          document_name: doc.document_name || `Document ${doc.doc_id}`,
+          file_extension: doc.file_extension || '',
+        };
+
+        if (doc.document_type === 'image') images.push(obj);
+        else if (doc.document_type === 'video') videos.push(obj);
+        else documents.push(obj);
+      });
+
+      setDocumentsData({ images, documents, videos });
+      setDocsFetched(true);
+    } catch (e) {
+      console.error(e);
+      setDocumentsData({ images: [], documents: [], videos: [] });
+    } finally {
+      setLoadingDocs(false);
+    }
+  };
 
   const renderDetailsModal = () => {
-  if (!selectedClientDetails) return null;
+    if (!selectedClientDetails) return null;
 
-  const isEmpty = (value) => {
+    // State for tabs and documents
+
+    const isEmpty = (value) => {
+      return (
+        !value ||
+        value === '' ||
+        value === 'Not Available' ||
+        value === 'N/A' ||
+        value === 'null' ||
+        value === null ||
+        value === undefined
+      );
+    };
+
+    const formatValue = (value) => {
+      if (isEmpty(value)) return 'N/A';
+      return value;
+    };
+
+    // Function to check if a field exists and is not empty
+    const hasField = (fieldName) => {
+      return (
+        selectedClientDetails[fieldName] &&
+        !isEmpty(selectedClientDetails[fieldName])
+      );
+    };
+
+    // Check for various contact numbers
+    const hasContactNumbers =
+      hasField('ar_number') ||
+      hasField('ca_number') ||
+      hasField('e_number') ||
+      hasField('sm_number') ||
+      hasField('pop_number') ||
+      hasField('other_number') ||
+      hasField('architect_name') ||
+      hasField('alternate_number');
+
+    // Check for lead info
+    const hasLeadInfo =
+      hasField('cat_name') ||
+      hasField('category_other') ||
+      hasField('reference_name') ||
+      hasField('reference_other');
+
+    // Check for project details
+    const hasProjectDetails =
+      hasField('room_length') ||
+      hasField('room_width') ||
+      hasField('room_height') ||
+      hasField('p_type') ||
+      hasField('budget_range') ||
+      hasField('time_to_complete') ||
+      hasField('room_ready');
+
+    // Check for lead stages
+    const hasLeadStages =
+      hasField('stage') ||
+      hasField('lead_stage') ||
+      hasField('current_stage') ||
+      hasField('lead_status') ||
+      hasField('status') ||
+      hasField('lead_activity') ||
+      hasField('status_percentage');
+
+    // Check for dates
+    const hasDates =
+      hasField('assign_date') ||
+      hasField('followup_date') ||
+      hasField('site_visit_date') ||
+      hasField('demo_date');
+
+    // Check for assignment info
+    const hasAssignmentInfo =
+      hasField('assigned_to') || hasField('telecaller_name');
+
+    // Check for links
+    const hasLinks = hasField('document_location_link');
+
+    // Check for remarks
+    const hasRemarks = hasField('quick_remark') || hasField('detailed_remark');
+
+    // Function to get file icon based on extension
+    const getFileIcon = (extension) => {
+      const ext = extension?.toLowerCase() || '';
+      if (ext.includes('pdf')) return '📕';
+      if (ext.includes('doc')) return '📄';
+      if (ext.includes('xls')) return '📊';
+      if (ext.includes('ppt')) return '📽️';
+      if (ext.includes('txt')) return '📝';
+      return '📎';
+    };
+
     return (
-      !value ||
-      value === '' ||
-      value === 'Not Available' ||
-      value === 'N/A' ||
-      value === 'null' ||
-      value === null ||
-      value === undefined
-    );
-  };
-
-  const formatValue = (value) => {
-    if (isEmpty(value)) return 'N/A';
-    return value;
-  };
-
-  // Function to check if a field exists and is not empty
-  const hasField = (fieldName) => {
-    return (
-      selectedClientDetails[fieldName] &&
-      !isEmpty(selectedClientDetails[fieldName])
-    );
-  };
-
-  // Check for various contact numbers
-  const hasContactNumbers =
-    hasField('ar_number') ||
-    hasField('ca_number') ||
-    hasField('e_number') ||
-    hasField('sm_number') ||
-    hasField('pop_number') ||
-    hasField('other_number') ||
-    hasField('architect_name') ||
-    hasField('alternate_number');
-
-  // Check for lead info
-  const hasLeadInfo =
-    hasField('cat_name') ||
-    hasField('category_other') ||
-    hasField('reference_name') ||
-    hasField('reference_other');
-
-  // Check for project details
-  const hasProjectDetails =
-    hasField('room_length') ||
-    hasField('room_width') ||
-    hasField('room_height') ||
-    hasField('p_type') ||
-    hasField('budget_range') ||
-    hasField('time_to_complete') ||
-    hasField('room_ready');
-
-  // Check for lead stages
-  const hasLeadStages =
-    hasField('stage') ||
-    hasField('lead_stage') ||
-    hasField('current_stage') ||
-    hasField('lead_status') ||
-    hasField('status') ||
-    hasField('lead_activity') ||
-    hasField('status_percentage');
-
-  // Check for dates
-  const hasDates =
-    hasField('assign_date') ||
-    hasField('followup_date') ||
-    hasField('site_visit_date') ||
-    hasField('demo_date');
-
-  // Check for assignment info
-  const hasAssignmentInfo =
-    hasField('assigned_to') || hasField('telecaller_name');
-
-  // Check for links
-  const hasLinks = hasField('document_location_link');
-
-  // Check for remarks
-  const hasRemarks = hasField('quick_remark') || hasField('detailed_remark');
-
-  return (
-    <div className="fixed inset-0 bg-black/60 flex justify-center items-center z-[9999] p-4 backdrop-blur-sm">
-      <div className="bg-white dark:bg-boxdark rounded-xl shadow-2xl w-full max-w-2xl max-h-[85vh] overflow-hidden border border-gray-200 dark:border-gray-800">
-        {/* Compact Header */}
-        <div className="sticky top-0 bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-gray-800 dark:to-gray-900 p-4 border-b border-gray-200 dark:border-gray-800">
-          <div className="flex justify-between items-start">
-            <div className="flex-1">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-purple-600 rounded-lg flex items-center justify-center shadow-lg">
-                  <span className="text-white font-bold text-lg">
-                    {selectedClientDetails.name?.charAt(0) || 'C'}
-                  </span>
-                </div>
-                <div>
-                  <h2 className="text-xl font-bold text-black dark:text-white truncate max-w-xs">
-                    {selectedClientDetails.name}
-                  </h2>
-                  <div className="flex items-center gap-3 text-xs text-gray-600 dark:text-gray-400 mt-1 flex-wrap">
-                    {hasField('master_id') && (
-                      <span className="bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 px-2 py-0.5 rounded-full">
-                        ID: {selectedClientDetails.master_id}
-                      </span>
-                    )}
-                    <span className="bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 px-2 py-0.5 rounded-full">
-                      Created: {selectedClientDetails.assign_date || 'N/A'}
+      <div className="fixed inset-0 bg-black/60 flex justify-center items-center z-[9999] p-4 backdrop-blur-sm">
+        <div className="bg-white dark:bg-boxdark rounded-xl shadow-2xl w-full max-w-2xl max-h-[85vh] overflow-hidden border border-gray-200 dark:border-gray-800">
+          {/* Compact Header with Tabs */}
+          <div className="sticky top-0 z-10 bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-gray-800 dark:to-gray-900 p-4 border-b border-gray-200 dark:border-gray-800">
+            <div className="flex justify-between items-start">
+              <div className="flex-1">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-purple-600 rounded-lg flex items-center justify-center shadow-lg">
+                    <span className="text-white font-bold text-lg">
+                      {selectedClientDetails.name?.charAt(0) || 'C'}
                     </span>
                   </div>
+                  <div>
+                    <h2 className="text-xl font-bold text-black dark:text-white truncate max-w-xs">
+                      {selectedClientDetails.name}
+                    </h2>
+                    <div className="flex items-center gap-3 text-xs text-gray-600 dark:text-gray-400 mt-1 flex-wrap">
+                      {hasField('master_id') && (
+                        <span className="bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 px-2 py-0.5 rounded-full">
+                          ID: {selectedClientDetails.master_id}
+                        </span>
+                      )}
+                      <span className="bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 px-2 py-0.5 rounded-full">
+                        Created: {selectedClientDetails.assign_date || 'N/A'}
+                      </span>
+                    </div>
+                  </div>
                 </div>
               </div>
+              <button
+                onClick={() => {
+                  setShowDetailsModal(false);
+                  setSelectedClientDetails(null);
+                }}
+                className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 text-xl p-1 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors"
+              >
+                ×
+              </button>
             </div>
-            <button
-              onClick={() => {
-                setShowDetailsModal(false);
-                setSelectedClientDetails(null);
-              }}
-              className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 text-xl p-1 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors"
-            >
-              ×
-            </button>
+
+            {/* Tabs Navigation */}
+            <div className="mt-4 flex border-b border-gray-200 dark:border-gray-700">
+              <button
+                onClick={() => setActiveTab('details')}
+                className={`px-4 py-2 font-medium text-sm transition-colors flex items-center gap-2 ${activeTab === 'details'
+                    ? 'text-blue-600 dark:text-blue-400 border-b-2 border-blue-500'
+                    : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-300'
+                  }`}
+              >
+                <FontAwesomeIcon icon={faInfoCircle} className="h-4 w-4" />
+                Details
+              </button>
+              <button
+                onClick={() => setActiveTab('documents')}
+                className={`px-4 py-2 font-medium text-sm transition-colors flex items-center gap-2 ${activeTab === 'documents'
+                    ? 'text-blue-600 dark:text-blue-400 border-b-2 border-blue-500'
+                    : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-300'
+                  }`}
+              >
+                <FontAwesomeIcon icon={faFile} className="h-4 w-4" />
+                Documents
+                {documentsData.images.length +
+                  documentsData.documents.length +
+                  documentsData.videos.length >
+                  0 && (
+                    <span className="ml-1 bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-300 text-xs font-semibold px-2 py-0.5 rounded-full">
+                      {documentsData.images.length +
+                        documentsData.documents.length +
+                        documentsData.videos.length}
+                    </span>
+                  )}
+              </button>
+            </div>
           </div>
-        </div>
 
-        {/* Compact Content - Scrollable */}
-        <div className="overflow-y-auto max-h-[calc(85vh-140px)]">
-          <div className="p-4 space-y-4">
-            {/* Contact Info - Always show if client exists */}
-            <div className="bg-gradient-to-r from-gray-50 to-gray-100 dark:from-gray-800/50 dark:to-gray-900/50 p-3 rounded-lg border border-gray-200 dark:border-gray-700">
-              <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2 flex items-center gap-2">
-                <FontAwesomeIcon
-                  icon={faUser}
-                  className="h-4 w-4 text-blue-500"
-                />
-                Contact Information
-              </h3>
-              <div className="grid grid-cols-2 gap-3 text-sm">
-                {hasField('name') && (
-                  <div>
-                    <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">
-                      Name
-                    </div>
-                    <div className="font-medium text-black dark:text-white bg-white dark:bg-gray-800 px-2 py-1 rounded truncate">
-                      {formatValue(selectedClientDetails.name)}
-                    </div>
+          {/* Tab Content */}
+          <div className="overflow-y-auto max-h-[calc(85vh-140px)]">
+            {activeTab === 'details' ? (
+              // Details Tab Content
+              <div className="p-4 space-y-4">
+                {/* Contact Info - Always show if client exists */}
+                <div className="bg-gradient-to-r from-gray-50 to-gray-100 dark:from-gray-800/50 dark:to-gray-900/50 p-3 rounded-lg border border-gray-200 dark:border-gray-700">
+                  <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2 flex items-center gap-2">
+                    <FontAwesomeIcon
+                      icon={faUser}
+                      className="h-4 w-4 text-blue-500"
+                    />
+                    Contact Information
+                  </h3>
+                  <div className="grid grid-cols-2 gap-3 text-sm">
+                    {hasField('name') && (
+                      <div>
+                        <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">
+                          Name
+                        </div>
+                        <div className="font-medium text-black dark:text-white bg-white dark:bg-gray-800 px-2 py-1 rounded truncate">
+                          {formatValue(selectedClientDetails.name)}
+                        </div>
+                      </div>
+                    )}
+                    {hasField('number') && (
+                      <div>
+                        <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">
+                          Phone
+                        </div>
+                        <div className="font-medium text-black dark:text-white bg-white dark:bg-gray-800 px-2 py-1 rounded truncate">
+                          {formatValue(selectedClientDetails.number)}
+                        </div>
+                      </div>
+                    )}
+                    {hasField('email') && (
+                      <div>
+                        <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">
+                          Email
+                        </div>
+                        <div className="font-medium text-black dark:text-white bg-white dark:bg-gray-800 px-2 py-1 rounded truncate">
+                          {formatValue(selectedClientDetails.email)}
+                        </div>
+                      </div>
+                    )}
+                    {hasField('alternate_number') && (
+                      <div>
+                        <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">
+                          Alternate Phone
+                        </div>
+                        <div className="font-medium text-black dark:text-white bg-white dark:bg-gray-800 px-2 py-1 rounded truncate">
+                          {formatValue(selectedClientDetails.alternate_number)}
+                        </div>
+                      </div>
+                    )}
+                    {hasField('address') && (
+                      <div className="col-span-2">
+                        <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">
+                          Address
+                        </div>
+                        <div className="font-medium text-black dark:text-white bg-white dark:bg-gray-800 px-2 py-1 rounded truncate">
+                          {formatValue(selectedClientDetails.address)}
+                        </div>
+                      </div>
+                    )}
+                    {hasField('city') && (
+                      <div>
+                        <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">
+                          City
+                        </div>
+                        <div className="font-medium text-black dark:text-white bg-white dark:bg-gray-800 px-2 py-1 rounded truncate">
+                          {formatValue(selectedClientDetails.city)}
+                        </div>
+                      </div>
+                    )}
+                    {hasField('area') && (
+                      <div>
+                        <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">
+                          Area
+                        </div>
+                        <div className="font-medium text-black dark:text-white bg-white dark:bg-gray-800 px-2 py-1 rounded truncate">
+                          {formatValue(selectedClientDetails.area)}
+                        </div>
+                      </div>
+                    )}
                   </div>
-                )}
-                {hasField('number') && (
-                  <div>
-                    <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">
-                      Phone
-                    </div>
-                    <div className="font-medium text-black dark:text-white bg-white dark:bg-gray-800 px-2 py-1 rounded truncate">
-                      {formatValue(selectedClientDetails.number)}
-                    </div>
-                  </div>
-                )}
-                {hasField('email') && (
-                  <div>
-                    <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">
-                      Email
-                    </div>
-                    <div className="font-medium text-black dark:text-white bg-white dark:bg-gray-800 px-2 py-1 rounded truncate">
-                      {formatValue(selectedClientDetails.email)}
-                    </div>
-                  </div>
-                )}
-                {hasField('alternate_number') && (
-                  <div>
-                    <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">
-                      Alternate Phone
-                    </div>
-                    <div className="font-medium text-black dark:text-white bg-white dark:bg-gray-800 px-2 py-1 rounded truncate">
-                      {formatValue(selectedClientDetails.alternate_number)}
-                    </div>
-                  </div>
-                )}
-                {hasField('address') && (
-                  <div className="col-span-2">
-                    <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">
-                      Address
-                    </div>
-                    <div className="font-medium text-black dark:text-white bg-white dark:bg-gray-800 px-2 py-1 rounded truncate">
-                      {formatValue(selectedClientDetails.address)}
-                    </div>
-                  </div>
-                )}
-                {hasField('city') && (
-                  <div>
-                    <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">
-                      City
-                    </div>
-                    <div className="font-medium text-black dark:text-white bg-white dark:bg-gray-800 px-2 py-1 rounded truncate">
-                      {formatValue(selectedClientDetails.city)}
-                    </div>
-                  </div>
-                )}
-                {hasField('area') && (
-                  <div>
-                    <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">
-                      Area
-                    </div>
-                    <div className="font-medium text-black dark:text-white bg-white dark:bg-gray-800 px-2 py-1 rounded truncate">
-                      {formatValue(selectedClientDetails.area)}
-                    </div>
-                  </div>
-                )}
-              </div>
-            </div>
-
-            {/* Additional Contact Numbers - Only show if exists */}
-            {hasContactNumbers && (
-              <div className="bg-gradient-to-r from-indigo-50 to-purple-50 dark:from-indigo-900/20 dark:to-purple-900/20 p-3 rounded-lg border border-indigo-100 dark:border-indigo-800/30">
-                <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2 flex items-center gap-2">
-                  <FontAwesomeIcon
-                    icon={faUsers}
-                    className="h-4 w-4 text-indigo-500"
-                  />
-                  Additional Contacts
-                </h3>
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 text-sm">
-                  {hasField('architect_name') && (
-                    <div>
-                      <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">
-                        Architect
-                      </div>
-                      <div className="font-medium text-black dark:text-white truncate">
-                        {formatValue(selectedClientDetails.architect_name)}
-                      </div>
-                    </div>
-                  )}
-
-                  {hasField('ar_number') && (
-                    <div>
-                      <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">
-                        Architect Number
-                      </div>
-                      <div className="font-medium text-black dark:text-white">
-                        {formatValue(selectedClientDetails.ar_number)}
-                      </div>
-                    </div>
-                  )}
-
-                  {hasField('ca_number') && (
-                    <div>
-                      <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">
-                        CA Number
-                      </div>
-                      <div className="font-medium text-black dark:text-white">
-                        {formatValue(selectedClientDetails.ca_number)}
-                      </div>
-                    </div>
-                  )}
-
-                  {hasField('e_number') && (
-                    <div>
-                      <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">
-                        Electrician
-                      </div>
-                      <div className="font-medium text-black dark:text-white">
-                        {formatValue(selectedClientDetails.e_number)}
-                      </div>
-                    </div>
-                  )}
-
-                  {hasField('sm_number') && (
-                    <div>
-                      <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">
-                        Site Manager
-                      </div>
-                      <div className="font-medium text-black dark:text-white">
-                        {formatValue(selectedClientDetails.sm_number)}
-                      </div>
-                    </div>
-                  )}
-
-                  {hasField('pop_number') && (
-                    <div>
-                      <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">
-                        POP Number
-                      </div>
-                      <div className="font-medium text-black dark:text-white">
-                        {formatValue(selectedClientDetails.pop_number)}
-                      </div>
-                    </div>
-                  )}
-
-                  {hasField('other_number') && (
-                    <div>
-                      <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">
-                        Other Number
-                      </div>
-                      <div className="font-medium text-black dark:text-white">
-                        {formatValue(selectedClientDetails.other_number)}
-                      </div>
-                    </div>
-                  )}
                 </div>
-              </div>
-            )}
 
-            {/* Lead & Category Information - Only show if exists */}
-            {hasLeadInfo && (
-              <div className="bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20 p-3 rounded-lg border border-blue-100 dark:border-blue-800/30">
-                <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2 flex items-center gap-2">
-                  <FontAwesomeIcon
-                    icon={faInfoCircle}
-                    className="h-4 w-4 text-blue-500"
-                  />
-                  Lead Details
-                </h3>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  {hasField('cat_name') && (
-                    <div>
-                      <div className="text-xs text-gray-500 dark:text-gray-400">
-                        Category
-                      </div>
-                      <div className="font-medium text-black dark:text-white truncate">
-                        {formatValue(selectedClientDetails.cat_name)}
-                        {hasField('category_other') && (
-                          <span className="text-xs text-blue-600 dark:text-blue-400 ml-2">
-                            ({selectedClientDetails.category_other})
-                          </span>
-                        )}
-                      </div>
-                    </div>
-                  )}
-
-                  {hasField('reference_name') && (
-                    <div>
-                      <div className="text-xs text-gray-500 dark:text-gray-400">
-                        Reference
-                      </div>
-                      <div className="font-medium text-black dark:text-white truncate">
-                        {formatValue(selectedClientDetails.reference_name)}
-                        {hasField('reference_other') && (
-                          <span className="text-xs text-blue-600 dark:text-blue-400 ml-2">
-                            ({selectedClientDetails.reference_other})
-                          </span>
-                        )}
-                      </div>
-                    </div>
-                  )}
-                </div>
-              </div>
-            )}
-
-            {/* Stage & Assignment - Only show if exists */}
-            {(hasLeadStages || hasAssignmentInfo) && (
-              <div className="grid grid-cols-2 gap-4">
-                {/* Lead Stages */}
-                {hasLeadStages && (
-                  <div className="bg-gradient-to-r from-purple-50 to-pink-50 dark:from-purple-900/20 dark:to-pink-900/20 p-3 rounded-lg border border-purple-100 dark:border-purple-800/30">
+                {/* Additional Contact Numbers - Only show if exists */}
+                {hasContactNumbers && (
+                  <div className="bg-gradient-to-r from-indigo-50 to-purple-50 dark:from-indigo-900/20 dark:to-purple-900/20 p-3 rounded-lg border border-indigo-100 dark:border-indigo-800/30">
                     <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2 flex items-center gap-2">
                       <FontAwesomeIcon
-                        icon={faUser}
-                        className="h-4 w-4 text-purple-500"
+                        icon={faUsers}
+                        className="h-4 w-4 text-indigo-500"
                       />
-                      Lead Stages
+                      Additional Contacts
                     </h3>
-                    <div className="space-y-2">
-                      {hasField('stage') && (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 text-sm">
+                      {hasField('architect_name') && (
                         <div>
-                          <div className="text-xs text-gray-500 dark:text-gray-400">
-                            Stage
+                          <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">
+                            Architect
                           </div>
-                          <div className="font-medium text-black dark:text-white">
-                            {formatValue(selectedClientDetails.stage)}
+                          <div className="font-medium text-black dark:text-white truncate">
+                            {formatValue(selectedClientDetails.architect_name)}
                           </div>
                         </div>
                       )}
-                      {hasField('lead_stage') && (
+
+                      {hasField('ar_number') && (
                         <div>
-                          <div className="text-xs text-gray-500 dark:text-gray-400">
-                            Lead Stage
+                          <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">
+                            Architect Number
                           </div>
                           <div className="font-medium text-black dark:text-white">
-                            {formatValue(selectedClientDetails.lead_stage)}
+                            {formatValue(selectedClientDetails.ar_number)}
                           </div>
                         </div>
                       )}
-                      {hasField('current_stage') && (
+
+                      {hasField('ca_number') && (
                         <div>
-                          <div className="text-xs text-gray-500 dark:text-gray-400">
-                            Current Stage
+                          <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">
+                            CA Number
                           </div>
                           <div className="font-medium text-black dark:text-white">
-                            {formatValue(selectedClientDetails.current_stage)}
+                            {formatValue(selectedClientDetails.ca_number)}
                           </div>
                         </div>
                       )}
-                      {hasField('lead_activity') && (
+
+                      {hasField('e_number') && (
                         <div>
-                          <div className="text-xs text-gray-500 dark:text-gray-400">
-                            Lead Activity
+                          <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">
+                            Electrician
                           </div>
                           <div className="font-medium text-black dark:text-white">
-                            {formatValue(selectedClientDetails.lead_activity)}
+                            {formatValue(selectedClientDetails.e_number)}
                           </div>
                         </div>
                       )}
-                  {hasField('status_percentage') && (
-  <div>
-    <div className="text-xs text-gray-500 dark:text-gray-400">Progress</div>
-    <div className="mt-0.5">
-      <ProgressStatus
-        stage={selectedClientDetails.lead_stage || selectedClientDetails.latest_leadStage}
-        status_percentage={selectedClientDetails.status_percentage}
-        is_drop_stage={selectedClientDetails.is_drop_stage}
-        previous_stage={selectedClientDetails.previous_stage}
-      />
-    </div>
-  </div>
-)}
+
+                      {hasField('sm_number') && (
+                        <div>
+                          <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">
+                            Site Manager
+                          </div>
+                          <div className="font-medium text-black dark:text-white">
+                            {formatValue(selectedClientDetails.sm_number)}
+                          </div>
+                        </div>
+                      )}
+
+                      {hasField('pop_number') && (
+                        <div>
+                          <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">
+                            POP Number
+                          </div>
+                          <div className="font-medium text-black dark:text-white">
+                            {formatValue(selectedClientDetails.pop_number)}
+                          </div>
+                        </div>
+                      )}
+
+                      {hasField('other_number') && (
+                        <div>
+                          <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">
+                            Other Number
+                          </div>
+                          <div className="font-medium text-black dark:text-white">
+                            {formatValue(selectedClientDetails.other_number)}
+                          </div>
+                        </div>
+                      )}
                     </div>
                   </div>
                 )}
 
-                {/* Assignment Info */}
-                {hasAssignmentInfo && (
-                  <div className="bg-gradient-to-r from-teal-50 to-cyan-50 dark:from-teal-900/20 dark:to-cyan-900/20 p-3 rounded-lg border border-teal-100 dark:border-teal-800/30">
+                {/* Lead & Category Information - Only show if exists */}
+                {hasLeadInfo && (
+                  <div className="bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20 p-3 rounded-lg border border-blue-100 dark:border-blue-800/30">
                     <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2 flex items-center gap-2">
                       <FontAwesomeIcon
-                        icon={faTasks}
-                        className="h-4 w-4 text-teal-500"
+                        icon={faInfoCircle}
+                        className="h-4 w-4 text-blue-500"
                       />
-                      Assignment
+                      Lead Details
                     </h3>
-                    <div className="space-y-2">
-                      {hasField('assigned_to') && (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      {hasField('cat_name') && (
                         <div>
                           <div className="text-xs text-gray-500 dark:text-gray-400">
-                            Assigned To
+                            Category
                           </div>
                           <div className="font-medium text-black dark:text-white truncate">
-                            {formatValue(selectedClientDetails.assigned_to)}
-                          </div>
-                        </div>
-                      )}
-                      {hasField('telecaller_name') && (
-                        <div>
-                          <div className="text-xs text-gray-500 dark:text-gray-400">
-                            Telecaller
-                          </div>
-                          <div className="font-medium text-black dark:text-white truncate">
-                            {formatValue(
-                              selectedClientDetails.telecaller_name,
+                            {formatValue(selectedClientDetails.cat_name)}
+                            {hasField('category_other') && (
+                              <span className="text-xs text-blue-600 dark:text-blue-400 ml-2">
+                                ({selectedClientDetails.category_other})
+                              </span>
                             )}
                           </div>
                         </div>
                       )}
-                      {hasField('status') && (
+
+                      {hasField('reference_name') && (
                         <div>
                           <div className="text-xs text-gray-500 dark:text-gray-400">
-                            Status
+                            Reference
                           </div>
-                          <div
-                            className={`font-medium ${
-                              selectedClientDetails.status === 'Assigned'
-                                ? 'text-green-600 dark:text-green-400'
-                                : selectedClientDetails.status === 'Unassigned'
-                                ? 'text-red-600 dark:text-red-400'
-                                : 'text-blue-600 dark:text-blue-400'
-                            }`}
-                          >
-                            {formatValue(selectedClientDetails.status)}
-                          </div>
-                        </div>
-                      )}
-                      {hasField('lead_status') && (
-                        <div>
-                          <div className="text-xs text-gray-500 dark:text-gray-400">
-                            Lead Status
-                          </div>
-                          <div
-                            className={`font-medium ${
-                              selectedClientDetails.lead_status === 'Active'
-                                ? 'text-green-600 dark:text-green-400'
-                                : 'text-gray-600 dark:text-gray-400'
-                            }`}
-                          >
-                            {formatValue(selectedClientDetails.lead_status)}
+                          <div className="font-medium text-black dark:text-white truncate">
+                            {formatValue(selectedClientDetails.reference_name)}
+                            {hasField('reference_other') && (
+                              <span className="text-xs text-blue-600 dark:text-blue-400 ml-2">
+                                ({selectedClientDetails.reference_other})
+                              </span>
+                            )}
                           </div>
                         </div>
                       )}
                     </div>
                   </div>
                 )}
-              </div>
-            )}
 
-            {/* Dates Information - Only show if exists */}
-            {hasDates && (
-              <div className="bg-gradient-to-r from-emerald-50 to-teal-50 dark:from-emerald-900/20 dark:to-teal-900/20 p-3 rounded-lg border border-emerald-100 dark:border-emerald-800/30">
-                <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2 flex items-center gap-2">
-                  <FontAwesomeIcon
-                    icon={faCalendarAlt}
-                    className="h-4 w-4 text-emerald-500"
-                  />
-                  Dates
-                </h3>
-                <div className="grid grid-cols-2 gap-3 text-sm">
-                  {hasField('assign_date') && (
-                    <div>
-                      <div className="text-xs text-gray-500 dark:text-gray-400">
-                        Entry Date
-                      </div>
-                      <div className="font-medium text-black dark:text-white">
-                        {formatValue(selectedClientDetails.assign_date)}
-                      </div>
-                    </div>
-                  )}
-                  {hasField('followup_date') && (
-                    <div>
-                      <div className="text-xs text-gray-500 dark:text-gray-400">
-                        Follow-up Date
-                      </div>
-                      <div
-                        className={`font-medium ${
-                          selectedClientDetails.followup_date &&
-                          new Date(selectedClientDetails.followup_date) <
-                            new Date()
-                            ? 'text-red-600 dark:text-red-400'
-                            : 'text-green-600 dark:text-green-400'
-                        }`}
-                      >
-                        {formatValue(selectedClientDetails.followup_date)}
-                      </div>
-                    </div>
-                  )}
-                  {hasField('site_visit_date') && (
-                    <div>
-                      <div className="text-xs text-gray-500 dark:text-gray-400">
-                        Site Visit
-                      </div>
-                      <div className="font-medium text-black dark:text-white">
-                        {formatValue(selectedClientDetails.site_visit_date)}
-                      </div>
-                    </div>
-                  )}
-                  {hasField('demo_date') && (
-                    <div>
-                      <div className="text-xs text-gray-500 dark:text-gray-400">
-                        Demo Date
-                      </div>
-                      <div className="font-medium text-black dark:text-white">
-                        {formatValue(selectedClientDetails.demo_date)}
-                      </div>
-                    </div>
-                  )}
-                </div>
-              </div>
-            )}
-
-            {/* Project Details - Only show if exists */}
-            {hasProjectDetails && (
-              <div className="bg-gradient-to-r from-amber-50 to-yellow-50 dark:from-amber-900/20 dark:to-yellow-900/20 p-3 rounded-lg border border-amber-100 dark:border-amber-800/30">
-                <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2 flex items-center gap-2">
-                  <FontAwesomeIcon
-                    icon={faFile}
-                    className="h-4 w-4 text-amber-500"
-                  />
-                  Project Details
-                </h3>
-                <div className="grid grid-cols-2 gap-3 text-sm">
-                  {(hasField('room_length') || hasField('room_width')) && (
-                    <div>
-                      <div className="text-xs text-gray-500 dark:text-gray-400">
-                        Room Size
-                      </div>
-                      <div className="font-medium text-black dark:text-white">
-                        {formatValue(selectedClientDetails.room_length)} ×{' '}
-                        {formatValue(selectedClientDetails.room_width)}
-                        {hasField('room_height') &&
-                          ` × ${formatValue(
-                            selectedClientDetails.room_height,
-                          )}`}
-                      </div>
-                    </div>
-                  )}
-                  {hasField('p_type') && (
-                    <div>
-                      <div className="text-xs text-gray-500 dark:text-gray-400">
-                        Type
-                      </div>
-                      <div className="font-medium text-black dark:text-white truncate">
-                        {formatValue(selectedClientDetails.p_type)}
-                      </div>
-                    </div>
-                  )}
-                  {hasField('budget_range') && (
-                    <div>
-                      <div className="text-xs text-gray-500 dark:text-gray-400">
-                        Budget Range
-                      </div>
-                      <div className="font-medium text-black dark:text-white">
-                        {formatValue(selectedClientDetails.budget_range)}
-                      </div>
-                    </div>
-                  )}
-                  {hasField('time_to_complete') &&
-                    selectedClientDetails.time_to_complete !==
-                      'Not Available' && (
-                      <div>
-                        <div className="text-xs text-gray-500 dark:text-gray-400">
-                          Time to Complete
-                        </div>
-                        <div className="font-medium text-black dark:text-white">
-                          {formatValue(
-                            selectedClientDetails.time_to_complete,
+                {/* Stage & Assignment - Only show if exists */}
+                {(hasLeadStages || hasAssignmentInfo) && (
+                  <div className="grid grid-cols-2 gap-4">
+                    {/* Lead Stages */}
+                    {hasLeadStages && (
+                      <div className="bg-gradient-to-r from-purple-50 to-pink-50 dark:from-purple-900/20 dark:to-pink-900/20 p-3 rounded-lg border border-purple-100 dark:border-purple-800/30">
+                        <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2 flex items-center gap-2">
+                          <FontAwesomeIcon
+                            icon={faUser}
+                            className="h-4 w-4 text-purple-500"
+                          />
+                          Lead Stages
+                        </h3>
+                        <div className="space-y-2">
+                          {hasField('stage') && (
+                            <div>
+                              <div className="text-xs text-gray-500 dark:text-gray-400">
+                                Stage
+                              </div>
+                              <div className="font-medium text-black dark:text-white">
+                                {formatValue(selectedClientDetails.stage)}
+                              </div>
+                            </div>
+                          )}
+                          {hasField('lead_stage') && (
+                            <div>
+                              <div className="text-xs text-gray-500 dark:text-gray-400">
+                                Lead Stage
+                              </div>
+                              <div className="font-medium text-black dark:text-white">
+                                {formatValue(selectedClientDetails.lead_stage)}
+                              </div>
+                            </div>
+                          )}
+                          {hasField('current_stage') && (
+                            <div>
+                              <div className="text-xs text-gray-500 dark:text-gray-400">
+                                Current Stage
+                              </div>
+                              <div className="font-medium text-black dark:text-white">
+                                {formatValue(
+                                  selectedClientDetails.current_stage,
+                                )}
+                              </div>
+                            </div>
+                          )}
+                          {hasField('lead_activity') && (
+                            <div>
+                              <div className="text-xs text-gray-500 dark:text-gray-400">
+                                Lead Activity
+                              </div>
+                              <div className="font-medium text-black dark:text-white">
+                                {formatValue(
+                                  selectedClientDetails.lead_activity,
+                                )}
+                              </div>
+                            </div>
+                          )}
+                          {hasField('status_percentage') && (
+                            <div>
+                              <div className="text-xs text-gray-500 dark:text-gray-400">
+                                Progress
+                              </div>
+                              <div className="mt-0.5">
+                                <ProgressStatus
+                                  stage={
+                                    selectedClientDetails.lead_stage ||
+                                    selectedClientDetails.latest_leadStage
+                                  }
+                                  status_percentage={
+                                    selectedClientDetails.status_percentage
+                                  }
+                                  is_drop_stage={
+                                    selectedClientDetails.is_drop_stage
+                                  }
+                                  previous_stage={
+                                    selectedClientDetails.previous_stage
+                                  }
+                                />
+                              </div>
+                            </div>
                           )}
                         </div>
                       </div>
                     )}
-                  {hasField('room_ready') && (
-                    <div>
-                      <div className="text-xs text-gray-500 dark:text-gray-400">
-                        Room Ready
-                      </div>
-                      <div className="font-medium text-black dark:text-white">
-                        {formatValue(selectedClientDetails.room_ready)}
-                      </div>
-                    </div>
-                  )}
-                </div>
-              </div>
-            )}
 
-            {/* Links - Only show if exists */}
-            {hasLinks && (
-              <div className="bg-gradient-to-r from-blue-50 to-cyan-50 dark:from-blue-900/20 dark:to-cyan-900/20 p-3 rounded-lg border border-blue-100 dark:border-blue-800/30">
-                <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2 flex items-center gap-2">
-                  <FontAwesomeIcon
-                    icon={faMapMarkerAlt}
-                    className="h-4 w-4 text-blue-500"
-                  />
-                  Links
-                </h3>
-                <div className="space-y-2">
-                  {hasField('document_location_link') && (
-                    <a
-                      href={selectedClientDetails.document_location_link}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="inline-flex items-center gap-2 px-3 py-2 text-sm bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 rounded-lg hover:bg-blue-200 dark:hover:bg-blue-800/50 transition-colors border border-blue-200 dark:border-blue-700"
-                    >
-                      <FontAwesomeIcon icon={faFile} className="h-3 w-3" />
-                      Document Location Link
-                    </a>
-                  )}
-                </div>
-              </div>
-            )}
-
-            {/* Remarks - Only show if exists */}
-            {hasRemarks && (
-              <div className="bg-gradient-to-r from-gray-50 to-slate-50 dark:from-gray-800/50 dark:to-slate-900/50 p-3 rounded-lg border border-gray-200 dark:border-gray-700">
-                <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2 flex items-center gap-2">
-                  <FontAwesomeIcon
-                    icon={faInfoCircle}
-                    className="h-4 w-4 text-gray-500"
-                  />
-                  Remarks
-                </h3>
-                <div className="text-sm">
-                  {hasField('quick_remark') && (
-                    <div className="mb-2">
-                      <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">
-                        Quick Remark
-                      </div>
-                      <div className="font-medium text-black dark:text-white bg-white dark:bg-gray-800 p-2 rounded border border-gray-200 dark:border-gray-700">
-                        <span
-                          className={`px-2 py-1 rounded-full text-xs ${
-                            selectedClientDetails.quick_remark === 'Interested'
-                              ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300'
-                              : selectedClientDetails.quick_remark ===
-                                'Not Interested'
-                              ? 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300'
-                              : selectedClientDetails.quick_remark ===
-                                'Not Reachable'
-                              ? 'bg-gray-100 text-gray-800 dark:bg-gray-900/30 dark:text-gray-300'
-                              : 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300'
-                          }`}
-                        >
-                          {formatValue(selectedClientDetails.quick_remark)}
-                        </span>
-                      </div>
-                    </div>
-                  )}
-                  {hasField('detailed_remark') && (
-                    <div>
-                      <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">
-                        Detailed Remark
-                      </div>
-                      <div className="text-black dark:text-white bg-white dark:bg-gray-800 p-2 rounded border border-gray-200 dark:border-gray-700 whitespace-pre-line">
-                        {formatValue(selectedClientDetails.detailed_remark)}
-                      </div>
-                    </div>
-                  )}
-                </div>
-              </div>
-            )}
-
-            {/* Reassignment History - Only show if exists */}
-            {selectedClientDetails.reassignment_remarks &&
-              Array.isArray(selectedClientDetails.reassignment_remarks) &&
-              selectedClientDetails.reassignment_remarks.length > 0 && (
-                <div className="bg-gradient-to-r from-purple-50 to-pink-50 dark:from-purple-900/20 dark:to-pink-900/20 p-3 rounded-lg border border-purple-100 dark:border-purple-800/30">
-                  <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2 flex items-center gap-2">
-                    <FontAwesomeIcon
-                      icon={faHistory}
-                      className="h-4 w-4 text-purple-500"
-                    />
-                    Reassignment History (
-                    {selectedClientDetails.reassignment_remarks.length})
-                  </h3>
-                  <div className="space-y-2">
-                    {selectedClientDetails.reassignment_remarks
-                      .slice(0, 3)
-                      .map((remark, index) => (
-                        <div
-                          key={index}
-                          className="bg-white dark:bg-gray-800/50 p-3 rounded-lg border border-gray-200 dark:border-gray-700"
-                        >
-                          {typeof remark === 'object' ? (
-                            <>
-                              <div className="flex justify-between items-start mb-2">
-                                <div>
-                                  <span className="font-medium text-blue-600 dark:text-blue-400">
-                                    {remark.name || 'Unknown'}
-                                  </span>
-                                  <span className="mx-2 text-gray-400">→</span>
-                                  <span className="font-medium text-green-600 dark:text-green-400">
-                                    {remark.assignedTo || 'Unknown'}
-                                  </span>
-                                </div>
-                                <span className="text-xs text-gray-500">
-                                  {remark.created_at}
-                                </span>
+                    {/* Assignment Info */}
+                    {hasAssignmentInfo && (
+                      <div className="bg-gradient-to-r from-teal-50 to-cyan-50 dark:from-teal-900/20 dark:to-cyan-900/20 p-3 rounded-lg border border-teal-100 dark:border-teal-800/30">
+                        <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2 flex items-center gap-2">
+                          <FontAwesomeIcon
+                            icon={faTasks}
+                            className="h-4 w-4 text-teal-500"
+                          />
+                          Assignment
+                        </h3>
+                        <div className="space-y-2">
+                          {hasField('assigned_to') && (
+                            <div>
+                              <div className="text-xs text-gray-500 dark:text-gray-400">
+                                Assigned To
                               </div>
-                              {remark.remark && (
-                                <p className="text-sm text-gray-600 dark:text-gray-300 mt-2 pt-2 border-t border-gray-100 dark:border-gray-700">
-                                  {remark.remark}
-                                </p>
-                              )}
-                            </>
-                          ) : (
-                            <p className="text-sm text-gray-600 dark:text-gray-300">
-                              {remark}
-                            </p>
+                              <div className="font-medium text-black dark:text-white truncate">
+                                {formatValue(selectedClientDetails.assigned_to)}
+                              </div>
+                            </div>
+                          )}
+                          {hasField('telecaller_name') && (
+                            <div>
+                              <div className="text-xs text-gray-500 dark:text-gray-400">
+                                Telecaller
+                              </div>
+                              <div className="font-medium text-black dark:text-white truncate">
+                                {formatValue(
+                                  selectedClientDetails.telecaller_name,
+                                )}
+                              </div>
+                            </div>
+                          )}
+                          {hasField('status') && (
+                            <div>
+                              <div className="text-xs text-gray-500 dark:text-gray-400">
+                                Status
+                              </div>
+                              <div
+                                className={`font-medium ${selectedClientDetails.status === 'Assigned'
+                                    ? 'text-green-600 dark:text-green-400'
+                                    : selectedClientDetails.status ===
+                                      'Unassigned'
+                                      ? 'text-red-600 dark:text-red-400'
+                                      : 'text-blue-600 dark:text-blue-400'
+                                  }`}
+                              >
+                                {formatValue(selectedClientDetails.status)}
+                              </div>
+                            </div>
+                          )}
+                          {hasField('lead_status') && (
+                            <div>
+                              <div className="text-xs text-gray-500 dark:text-gray-400">
+                                Lead Status
+                              </div>
+                              <div
+                                className={`font-medium ${selectedClientDetails.lead_status === 'Active'
+                                    ? 'text-green-600 dark:text-green-400'
+                                    : 'text-gray-600 dark:text-gray-400'
+                                  }`}
+                              >
+                                {formatValue(selectedClientDetails.lead_status)}
+                              </div>
+                            </div>
                           )}
                         </div>
-                      ))}
+                      </div>
+                    )}
                   </div>
-                </div>
-              )}
+                )}
+
+                {/* Dates Information - Only show if exists */}
+                {hasDates && (
+                  <div className="bg-gradient-to-r from-emerald-50 to-teal-50 dark:from-emerald-900/20 dark:to-teal-900/20 p-3 rounded-lg border border-emerald-100 dark:border-emerald-800/30">
+                    <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2 flex items-center gap-2">
+                      <FontAwesomeIcon
+                        icon={faCalendarAlt}
+                        className="h-4 w-4 text-emerald-500"
+                      />
+                      Dates
+                    </h3>
+                    <div className="grid grid-cols-2 gap-3 text-sm">
+                      {hasField('assign_date') && (
+                        <div>
+                          <div className="text-xs text-gray-500 dark:text-gray-400">
+                            Entry Date
+                          </div>
+                          <div className="font-medium text-black dark:text-white">
+                            {formatDate(
+                              formatValue(selectedClientDetails.assign_date),
+                            )}
+                          </div>
+                        </div>
+                      )}
+                      {hasField('followup_date') && (
+                        <div>
+                          <div className="text-xs text-gray-500 dark:text-gray-400">
+                            Follow-up Date
+                          </div>
+                          <div className="font-medium text-black dark:text-white">
+                            {formatDate(
+                              formatValue(selectedClientDetails.followup_date),
+                            )}
+                          </div>
+                        </div>
+                      )}
+
+                      {hasField('site_visit_date') && (
+                        <div>
+                          <div className="text-xs text-gray-500 dark:text-gray-400">
+                            Site Visit
+                          </div>
+                          <div className="font-medium text-black dark:text-white">
+                            {formatValue(selectedClientDetails.site_visit_date)}
+                          </div>
+                        </div>
+                      )}
+                      {hasField('demo_date') && (
+                        <div>
+                          <div className="text-xs text-gray-500 dark:text-gray-400">
+                            Demo Date
+                          </div>
+                          <div className="font-medium text-black dark:text-white">
+                            {formatValue(selectedClientDetails.demo_date)}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                {/* Project Details - Only show if exists */}
+                {hasProjectDetails && (
+                  <div className="bg-gradient-to-r from-amber-50 to-yellow-50 dark:from-amber-900/20 dark:to-yellow-900/20 p-3 rounded-lg border border-amber-100 dark:border-amber-800/30">
+                    <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2 flex items-center gap-2">
+                      <FontAwesomeIcon
+                        icon={faFile}
+                        className="h-4 w-4 text-amber-500"
+                      />
+                      Project Details
+                    </h3>
+                    <div className="grid grid-cols-2 gap-3 text-sm">
+                      {(hasField('room_length') || hasField('room_width')) && (
+                        <div>
+                          <div className="text-xs text-gray-500 dark:text-gray-400">
+                            Room Size
+                          </div>
+                          <div className="font-medium text-black dark:text-white">
+                            {formatValue(selectedClientDetails.room_length)} ×{' '}
+                            {formatValue(selectedClientDetails.room_width)}
+                            {hasField('room_height') &&
+                              ` × ${formatValue(
+                                selectedClientDetails.room_height,
+                              )}`}
+                          </div>
+                        </div>
+                      )}
+                      {hasField('p_type') && (
+                        <div>
+                          <div className="text-xs text-gray-500 dark:text-gray-400">
+                            Type
+                          </div>
+                          <div className="font-medium text-black dark:text-white truncate">
+                            {formatValue(selectedClientDetails.p_type)}
+                          </div>
+                        </div>
+                      )}
+                      {hasField('budget_range') && (
+                        <div>
+                          <div className="text-xs text-gray-500 dark:text-gray-400">
+                            Budget Range
+                          </div>
+                          <div className="font-medium text-black dark:text-white">
+                            {formatValue(selectedClientDetails.budget_range)}
+                          </div>
+                        </div>
+                      )}
+                      {hasField('time_to_complete') &&
+                        selectedClientDetails.time_to_complete !==
+                        'Not Available' && (
+                          <div>
+                            <div className="text-xs text-gray-500 dark:text-gray-400">
+                              Time to Complete
+                            </div>
+                            <div className="font-medium text-black dark:text-white">
+                              {formatValue(
+                                selectedClientDetails.time_to_complete,
+                              )}
+                            </div>
+                          </div>
+                        )}
+                      {hasField('room_ready') && (
+                        <div>
+                          <div className="text-xs text-gray-500 dark:text-gray-400">
+                            Room Ready
+                          </div>
+                          <div className="font-medium text-black dark:text-white">
+                            {formatValue(selectedClientDetails.room_ready)}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                {/* Links - Only show if exists */}
+                {hasLinks && (
+                  <div className="bg-gradient-to-r from-blue-50 to-cyan-50 dark:from-blue-900/20 dark:to-cyan-900/20 p-3 rounded-lg border border-blue-100 dark:border-blue-800/30">
+                    <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2 flex items-center gap-2">
+                      <FontAwesomeIcon
+                        icon={faMapMarkerAlt}
+                        className="h-4 w-4 text-blue-500"
+                      />
+                      Links
+                    </h3>
+                    <div className="space-y-2">
+                      {hasField('document_location_link') && (
+                        <a
+                          href={selectedClientDetails.document_location_link}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex items-center gap-2 px-3 py-2 text-sm bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 rounded-lg hover:bg-blue-200 dark:hover:bg-blue-800/50 transition-colors border border-blue-200 dark:border-blue-700"
+                        >
+                          <FontAwesomeIcon icon={faFile} className="h-3 w-3" />
+                          Document Location Link
+                        </a>
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                {/* Remarks - Only show if exists */}
+                {hasRemarks && (
+                  <div className="bg-gradient-to-r from-gray-50 to-slate-50 dark:from-gray-800/50 dark:to-slate-900/50 p-3 rounded-lg border border-gray-200 dark:border-gray-700">
+                    <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2 flex items-center gap-2">
+                      <FontAwesomeIcon
+                        icon={faInfoCircle}
+                        className="h-4 w-4 text-gray-500"
+                      />
+                      Remarks
+                    </h3>
+                    <div className="text-sm">
+                      {hasField('quick_remark') && (
+                        <div className="mb-2">
+                          <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">
+                            Quick Remark
+                          </div>
+                          <div className="font-medium text-black dark:text-white bg-white dark:bg-gray-800 p-2 rounded border border-gray-200 dark:border-gray-700">
+                            <span
+                              className={`px-2 py-1 rounded-full text-xs ${selectedClientDetails.quick_remark ===
+                                  'Interested'
+                                  ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300'
+                                  : selectedClientDetails.quick_remark ===
+                                    'Not Interested'
+                                    ? 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300'
+                                    : selectedClientDetails.quick_remark ===
+                                      'Not Reachable'
+                                      ? 'bg-gray-100 text-gray-800 dark:bg-gray-900/30 dark:text-gray-300'
+                                      : 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300'
+                                }`}
+                            >
+                              {formatValue(selectedClientDetails.quick_remark)}
+                            </span>
+                          </div>
+                        </div>
+                      )}
+                      {hasField('detailed_remark') && (
+                        <div>
+                          <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">
+                            Detailed Remark
+                          </div>
+                          <div className="text-black dark:text-white bg-white dark:bg-gray-800 p-2 rounded border border-gray-200 dark:border-gray-700 whitespace-pre-line">
+                            {formatValue(selectedClientDetails.detailed_remark)}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                {/* Reassignment History - Only show if exists */}
+                {selectedClientDetails.reassignment_remarks &&
+                  Array.isArray(selectedClientDetails.reassignment_remarks) &&
+                  selectedClientDetails.reassignment_remarks.length > 0 && (
+                    <div className="bg-gradient-to-r from-purple-50 to-pink-50 dark:from-purple-900/20 dark:to-pink-900/20 p-3 rounded-lg border border-purple-100 dark:border-purple-800/30">
+                      <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2 flex items-center gap-2">
+                        <FontAwesomeIcon
+                          icon={faHistory}
+                          className="h-4 w-4 text-purple-500"
+                        />
+                        Reassignment History (
+                        {selectedClientDetails.reassignment_remarks.length})
+                      </h3>
+                      <div className="space-y-2">
+                        {selectedClientDetails.reassignment_remarks
+                          .slice(0, 3)
+                          .map((remark, index) => (
+                            <div
+                              key={index}
+                              className="bg-white dark:bg-gray-800/50 p-3 rounded-lg border border-gray-200 dark:border-gray-700"
+                            >
+                              {typeof remark === 'object' ? (
+                                <>
+                                  <div className="flex justify-between items-start mb-2">
+                                    <div>
+                                      <span className="font-medium text-blue-600 dark:text-blue-400">
+                                        {remark.name || 'Unknown'}
+                                      </span>
+                                      <span className="mx-2 text-gray-400">
+                                        →
+                                      </span>
+                                      <span className="font-medium text-green-600 dark:text-green-400">
+                                        {remark.assignedTo || 'Unknown'}
+                                      </span>
+                                    </div>
+                                    <span className="text-xs text-gray-500">
+                                      {remark.created_at}
+                                    </span>
+                                  </div>
+                                  {remark.remark && (
+                                    <p className="text-sm text-gray-600 dark:text-gray-300 mt-2 pt-2 border-t border-gray-100 dark:border-gray-700">
+                                      {remark.remark}
+                                    </p>
+                                  )}
+                                </>
+                              ) : (
+                                <p className="text-sm text-gray-600 dark:text-gray-300">
+                                  {remark}
+                                </p>
+                              )}
+                            </div>
+                          ))}
+                      </div>
+                    </div>
+                  )}
+              </div>
+            ) : (
+              // Documents Tab Content
+              <div className="p-4">
+                {loadingDocs ? (
+                  <div className="flex justify-center items-center py-12">
+                    <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500"></div>
+                    <span className="ml-3 text-gray-600 dark:text-gray-400">
+                      Loading documents...
+                    </span>
+                  </div>
+                ) : (
+                  <>
+                    {/* Total Count */}
+                    <div className="mb-6 p-4 bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20 rounded-lg border border-blue-200 dark:border-blue-800/30">
+                      <div className="flex items-center justify-between">
+                        <h3 className="font-semibold text-gray-700 dark:text-gray-300">
+                          Documents Summary
+                        </h3>
+                        <span className="text-2xl font-bold text-blue-600 dark:text-blue-400">
+                          {documentsData.images.length +
+                            documentsData.documents.length +
+                            documentsData.videos.length}
+                        </span>
+                      </div>
+                      <div className="grid grid-cols-3 gap-3 mt-3">
+                        <div className="text-center p-3 bg-white dark:bg-gray-800 rounded-lg border border-blue-200 dark:border-blue-700/30">
+                          <div className="text-lg font-bold text-blue-600 dark:text-blue-400">
+                            {documentsData.images.length}
+                          </div>
+                          <div className="text-sm text-gray-600 dark:text-gray-400">
+                            Images
+                          </div>
+                        </div>
+                        <div className="text-center p-3 bg-white dark:bg-gray-800 rounded-lg border border-green-200 dark:border-green-700/30">
+                          <div className="text-lg font-bold text-green-600 dark:text-green-400">
+                            {documentsData.documents.length}
+                          </div>
+                          <div className="text-sm text-gray-600 dark:text-gray-400">
+                            Documents
+                          </div>
+                        </div>
+                        <div className="text-center p-3 bg-white dark:bg-gray-800 rounded-lg border border-purple-200 dark:border-purple-700/30">
+                          <div className="text-lg font-bold text-purple-600 dark:text-purple-400">
+                            {documentsData.videos.length}
+                          </div>
+                          <div className="text-sm text-gray-600 dark:text-gray-400">
+                            Videos
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Images Section */}
+                    {documentsData.images.length > 0 && (
+                      <div className="mb-6">
+                        <h4 className="font-semibold text-gray-700 dark:text-gray-300 mb-3 flex items-center gap-2">
+                          <FontAwesomeIcon
+                            icon={faImage}
+                            className="h-4 w-4 text-blue-500"
+                          />
+                          Images ({documentsData.images.length})
+                        </h4>
+                        <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                          {documentsData.images.map((image, index) => (
+                            <div key={index} className="relative group">
+                              <img
+                                src={image.url}
+                                className="w-full h-32 object-cover rounded-lg border"
+                                onError={(e) => {
+                                  e.currentTarget.onerror = null;
+                                  e.currentTarget.src = EMPTY_IMAGE;
+                                }}
+                              />
+
+                              <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity rounded-lg flex items-center justify-center">
+                                <a
+                                  href={image.url}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="text-white bg-blue-500 hover:bg-blue-600 px-3 py-1 rounded text-sm mr-2"
+                                >
+                                  View
+                                </a>
+                                {image.remark && (
+                                  <div className="absolute bottom-0 left-0 right-0 bg-black/70 text-white text-xs p-2 rounded-b-lg">
+                                    {image.remark}
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Documents Section */}
+                    {documentsData.documents.length > 0 && (
+                      <div className="mb-6">
+                        <h4 className="font-semibold text-gray-700 dark:text-gray-300 mb-3 flex items-center gap-2">
+                          <FontAwesomeIcon
+                            icon={faFileAlt}
+                            className="h-4 w-4 text-green-500"
+                          />
+                          Documents ({documentsData.documents.length})
+                        </h4>
+                        <div className="space-y-2">
+                          {documentsData.documents.map((doc, index) => (
+                            <div
+                              key={index}
+                              className="flex items-center justify-between p-3 bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+                            >
+                              <div className="flex items-center gap-3">
+                                <div className="text-xl">
+                                  {getFileIcon(doc.file_extension)}
+                                </div>
+                                <div className="min-w-0">
+                                  <div className="font-medium text-gray-800 dark:text-gray-200 truncate">
+                                    {doc.document_name}
+                                  </div>
+                                  {doc.remark && (
+                                    <div className="text-sm text-gray-600 dark:text-gray-400 truncate">
+                                      {doc.remark}
+                                    </div>
+                                  )}
+                                </div>
+                              </div>
+                              <div className="flex items-center gap-2">
+                                {doc.uploaded_at && (
+                                  <span className="text-xs text-gray-500 dark:text-gray-400">
+                                    {new Date(
+                                      doc.uploaded_at,
+                                    ).toLocaleDateString()}
+                                  </span>
+                                )}
+                                <a
+                                  href={doc.url}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="px-3 py-1 bg-green-500 hover:bg-green-600 text-white text-sm rounded transition-colors"
+                                >
+                                  Open
+                                </a>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Videos Section */}
+                    {documentsData.videos.length > 0 && (
+                      <div className="mb-6">
+                        <h4 className="font-semibold text-gray-700 dark:text-gray-300 mb-3 flex items-center gap-2">
+                          <FontAwesomeIcon
+                            icon={faVideo}
+                            className="h-4 w-4 text-purple-500"
+                          />
+                          Videos ({documentsData.videos.length})
+                        </h4>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                          {documentsData.videos.map((video, index) => (
+                            <div
+                              key={index}
+                              className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden"
+                            >
+                              <div className="aspect-video bg-black">
+                                <video
+                                  controls
+                                  className="w-full h-full"
+                                  poster={EMPTY_POSTER}
+                                >
+                                  <source src={video.url} type="video/mp4" />
+                                </video>
+                              </div>
+                              <div className="p-3">
+                                <div className="flex justify-between items-start">
+                                  <div className="font-medium text-gray-800 dark:text-gray-200">
+                                    Video {index + 1}
+                                  </div>
+                                  <a
+                                    href={video.url}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="px-2 py-1 bg-purple-500 hover:bg-purple-600 text-white text-xs rounded transition-colors"
+                                  >
+                                    Download
+                                  </a>
+                                </div>
+                                {video.remark && (
+                                  <div className="mt-2 text-sm text-gray-600 dark:text-gray-400">
+                                    {video.remark}
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* No Documents Message */}
+                    {documentsData.images.length === 0 &&
+                      documentsData.documents.length === 0 &&
+                      documentsData.videos.length === 0 && (
+                        <div className="text-center py-12">
+                          <FontAwesomeIcon
+                            icon={faFile}
+                            className="text-4xl text-gray-400 dark:text-gray-600 mb-3"
+                          />
+                          <h3 className="text-lg font-semibold text-gray-600 dark:text-gray-400">
+                            No Documents Found
+                          </h3>
+                          <p className="text-gray-500 dark:text-gray-500 mt-1">
+                            No documents have been uploaded for this client.
+                          </p>
+                        </div>
+                      )}
+                  </>
+                )}
+              </div>
+            )}
           </div>
         </div>
       </div>
-    </div>
-  );
-};
+    );
+  };
 
+  //  const location = useLocation();
+
+  //    useEffect(() => {
+  //     // Check if we were sent here with a specific stage filter
+  //     if (location.state?.lead_stage) {
+  //       const stage = location.state.lead_stage;
+
+  //       // Set ONLY this stage in filters
+  //       setSelectedStages([stage]);
+
+  //       // Clear any existing search
+  //       setSearchTerm('');
+
+  //       console.log(`Auto-filtering by: ${stage}`);
+  //     }
+  //   }, []);
+
+  // In RawData component
+
+const location = useLocation();
+
+
+useEffect(() => {
+  // Check if we were sent here with a specific stage filter
+  if (location.state?.lead_stage) {
+    const stage = location.state.lead_stage;
+    const fromDashboard = location.state.from_dashboard;
+
+    console.log(`Filtering by stage: "${stage}" from dashboard: ${fromDashboard}`);
+    console.log('Raw data sample stages:', rawData.slice(0, 3).map(c => ({
+      name: c.name,
+      latest_leadStage: c.latest_leadStage,
+      lead_stage: c.lead_stage,
+      stage: c.stage,
+    })));
+
+    // Clear any existing search
+    setSearchTerm('');
+    setSelectedStages([]); // Clear any selected stages
+
+    // Handle "Others" stage - this includes empty/null stages
+    if (stage === 'Others') {
+      console.log('Applying "Others" stage filter (includes empty/null stages)');
+      
+      const othersFiltered = rawData.filter((client) => {
+        // Get the stage from any field
+        const clientStage = 
+          client.latest_leadStage?.trim() ||
+          client.lead_stage?.trim() ||
+          client.stage?.trim() ||
+          '';
+        
+        // Check if stage is empty, null, or contains "other"
+        const isOther = 
+          !clientStage || 
+          clientStage === '' ||
+          clientStage.toLowerCase().includes('other') ||
+          clientStage === 'Others' ||
+          clientStage === 'Other';
+        
+        return isOther;
+      });
+
+      console.log(`"Others" Stage Filter: Found ${othersFiltered.length} records`);
+      
+      // Debug: Show what records were found
+      if (othersFiltered.length > 0) {
+        console.log(
+          'Others stage records found:',
+          othersFiltered.map((c) => ({
+            name: c.name,
+            latest_leadStage: c.latest_leadStage,
+            lead_stage: c.lead_stage,
+            stage: c.stage,
+            master_id: c.master_id,
+          })),
+        );
+      }
+
+      setFilteredClients(othersFiltered);
+      setSearchTerm(''); // Don't set search term for Others
+    } 
+    // Handle "N/A" stage
+    else if (stage === 'N/A') {
+      console.log('Applying "N/A" stage filter');
+      
+      const naFiltered = rawData.filter((client) => {
+        const clientStage = 
+          client.latest_leadStage?.trim() ||
+          client.lead_stage?.trim() ||
+          client.stage?.trim() ||
+          '';
+
+        // Check if stage is explicitly "N/A" or "Not Available"
+        const isNA = 
+          clientStage.toLowerCase() === 'n/a' ||
+          clientStage.toLowerCase() === 'not available' ||
+          clientStage === 'N/A' ||
+          clientStage === 'Not Available';
+
+        return isNA;
+      });
+
+      console.log(`"N/A" Stage Filter: Found ${naFiltered.length} records`);
+      setFilteredClients(naFiltered);
+    } 
+    // Handle specific stages like "Fresh Lead", "Cold Lead", etc.
+    else {
+      console.log(`Applying specific stage filter for: "${stage}"`);
+      
+      // Set the stage in selected stages for UI
+      setSelectedStages([stage]);
+      
+      // Filter the data for exact stage match
+      const stageFiltered = rawData.filter((client) => {
+        // Check all stage fields
+        const clientStage = 
+          client.latest_leadStage?.trim() ||
+          client.lead_stage?.trim() ||
+          client.stage?.trim() ||
+          '';
+        
+        return clientStage === stage;
+      });
+
+      console.log(`Specific stage filter "${stage}": Found ${stageFiltered.length} records`);
+      
+      // Debug: Show what records were found
+      if (stageFiltered.length > 0) {
+        console.log(
+          `Records found for stage "${stage}":`,
+          stageFiltered.map((c) => ({
+            name: c.name,
+            latest_leadStage: c.latest_leadStage,
+            lead_stage: c.lead_stage,
+            stage: c.stage,
+            master_id: c.master_id,
+          })),
+        );
+      }
+
+      setFilteredClients(stageFiltered);
+    }
+
+    // Keep the from_dashboard flag
+    if (fromDashboard) {
+      window.history.replaceState({ 
+        lead_stage: stage,
+        from_dashboard: true 
+      }, document.title);
+    }
+  }
+
+  // Handle category filter from Category-wise Active Leads chart
+  if (location.state?.category_name) {
+    const category = location.state.category_name;
+    const fromDashboard = location.state.from_dashboard;
+    
+    console.log(`Filtering by category: "${category}" from dashboard: ${fromDashboard}`);
+
+    // Clear any existing search
+    setSearchTerm('');
+
+    if (category === 'N/A') {
+      const naFiltered = rawData.filter(
+        (client) =>
+          !client.cat_name ||
+          client.cat_name.trim() === '' ||
+          client.cat_name.toLowerCase() === 'n/a' ||
+          client.cat_name.toLowerCase() === 'not available' ||
+          client.cat_name === 'N/A',
+      );
+      console.log(`N/A Category Filter: Found ${naFiltered.length} records`);
+      setFilteredClients(naFiltered);
+    } else if (category === 'Others' || category.toLowerCase() === 'other') {
+      const othersFiltered = rawData.filter((client) => {
+        const clientCategory = (client.cat_name?.trim() || '').toLowerCase();
+        // Look for "other" (with or without 's')
+        const isOther = clientCategory === 'other' || 
+                       clientCategory.includes('other') || 
+                       clientCategory === 'others';
+        return isOther;
+      });
+      
+      console.log(`Others Category Filter: Found ${othersFiltered.length} records`);
+      
+      // Debug: Show what category records were found
+      if (othersFiltered.length > 0) {
+        console.log(
+          'Others category records found:',
+          othersFiltered.map((c) => ({
+            name: c.name,
+            cat_name: c.cat_name,
+            master_id: c.master_id,
+            category_other: c.category_other,
+          })),
+        );
+      }
+      
+      setFilteredClients(othersFiltered);
+      
+      // Also set search term to "other" (lowercase) for proper filtering
+      if (fromDashboard) {
+        setSearchTerm('other');
+      }
+    } else {
+      console.log(`Setting search term for category: ${category}`);
+      setSearchTerm(category);
+    }
+
+    // Keep the from_dashboard flag
+    if (fromDashboard) {
+      window.history.replaceState({ 
+        category_name: category,
+        from_dashboard: true 
+      }, document.title);
+    }
+  }
+
+  // Handle reference filter from Sources-wise Active Leads chart
+  if (location.state?.reference_name) {
+    const reference = location.state.reference_name;
+    const fromDashboard = location.state.from_dashboard;
+    
+    console.log(`Filtering by reference: "${reference}" from dashboard: ${fromDashboard}`);
+    
+    // Clear any existing search
+    setSearchTerm('');
+    
+    // Handle special cases: N/A and Others
+    if (reference === 'N/A') {
+      // Filter by empty/null reference values
+      const naFiltered = rawData.filter((client) => {
+        const clientReference = client.reference_name?.trim() || '';
+        const isNA = 
+          !clientReference ||
+          clientReference === '' ||
+          clientReference.toLowerCase() === 'n/a' ||
+          clientReference.toLowerCase() === 'not available' ||
+          clientReference === 'N/A' ||
+          clientReference === 'Not Available';
+        return isNA;
+      });
+      
+      console.log(`N/A Reference Filter: Found ${naFiltered.length} records`);
+      setFilteredClients(naFiltered);
+    } 
+    else if (reference === 'Others' || reference.toLowerCase() === 'other') {
+      // Filter by reference containing "other" (case-insensitive)
+      const othersFiltered = rawData.filter((client) => {
+        const clientReference = (client.reference_name?.trim() || '').toLowerCase();
+        const isOther = 
+          clientReference === 'other' ||
+          clientReference.includes('other') ||
+          clientReference === 'others';
+        return isOther;
+      });
+      
+      console.log(`Others Reference Filter: Found ${othersFiltered.length} records`);
+      
+      // Debug: Show what records were found
+      if (othersFiltered.length > 0) {
+        console.log(
+          'Others reference records found:',
+          othersFiltered.map((c) => ({
+            name: c.name,
+            reference_name: c.reference_name,
+            master_id: c.master_id,
+          })),
+        );
+      }
+      
+      setFilteredClients(othersFiltered);
+      
+      // Also set search term to "other" (lowercase) for proper filtering
+      if (fromDashboard) {
+        setSearchTerm('other');
+      }
+    } 
+    else {
+      // Normal reference filtering
+      console.log(`Setting search term for reference: ${reference}`);
+      setSearchTerm(reference);
+    }
+    
+    // Keep the from_dashboard flag in location state
+    if (fromDashboard) {
+      window.history.replaceState({ 
+        reference_name: reference,
+        from_dashboard: true 
+      }, document.title);
+    }
+  }
+
+  // Handle budget range filter from Budget Range-wise Leads chart
+  if (location.state?.budget_range) {
+    const budgetRange = location.state.budget_range;
+    const fromDashboard = location.state.from_dashboard;
+    
+    console.log(`Filtering by budget range: "${budgetRange}" from dashboard: ${fromDashboard}`);
+
+    // Clear any existing search
+    setSearchTerm('');
+
+    if (budgetRange === 'Not Specified') {
+      // Filter for "Not Available", empty, or N/A budget ranges
+      const notSpecifiedFiltered = rawData.filter((client) => {
+        const clientBudget = (client.budget_range?.trim() || '');
+        const isNotSpecified = 
+          !clientBudget ||
+          clientBudget === '' ||
+          clientBudget.toLowerCase() === 'not available' ||
+          clientBudget.toLowerCase() === 'n/a' ||
+          clientBudget === 'N/A' ||
+          clientBudget === 'Not Available';
+        return isNotSpecified;
+      });
+      
+      console.log(`Not Specified Budget Filter: Found ${notSpecifiedFiltered.length} records`);
+      
+      // Debug: Show what records were found
+      if (notSpecifiedFiltered.length > 0) {
+        console.log(
+          'Not Specified budget records found:',
+          notSpecifiedFiltered.map((c) => ({
+            name: c.name,
+            budget_range: c.budget_range,
+            master_id: c.master_id,
+          })),
+        );
+      }
+      
+      setFilteredClients(notSpecifiedFiltered);
+      setSearchTerm(''); // Clear search term for this case
+    } 
+    else if (budgetRange === 'Other' || budgetRange === 'Others' || budgetRange.toLowerCase() === 'other') {
+      // IMPORTANT: Your data has "7lack", not "other"
+      // We need to filter for budget ranges that are NOT empty/N/A and NOT matching the standard ranges
+      const standardRanges = [
+        'basic range: above ₹7 lakh',
+        'premium range: above ₹10 lakh', 
+        'ultra-premium range: above ₹15 lakh',
+        'elite range: above ₹25 lakh'
+      ];
+      
+      const otherFiltered = rawData.filter((client) => {
+        const clientBudget = (client.budget_range?.trim() || '').toLowerCase();
+        
+        // Skip empty or "not available" budgets (those are "Not Specified")
+        if (!clientBudget || 
+            clientBudget === '' || 
+            clientBudget === 'not available' || 
+            clientBudget === 'n/a' ||
+            clientBudget === 'not specified') {
+          return false;
+        }
+        
+        // Check if it matches any standard range
+        const isStandardRange = standardRanges.some(range => 
+          clientBudget.includes(range) || range.includes(clientBudget)
+        );
+        
+        // Check for "7lack" specifically
+        const is7Lack = clientBudget.includes('7lack') || clientBudget.includes('7 lakh');
+        
+        // Return true if it's NOT a standard range OR if it's "7lack"
+        return !isStandardRange || is7Lack;
+      });
+      
+      console.log(`Other Budget Filter: Found ${otherFiltered.length} records`);
+      
+      // Debug: Show what budget records were found
+      if (otherFiltered.length > 0) {
+        console.log(
+          'Other budget records found:',
+          otherFiltered.map((c) => ({
+            name: c.name,
+            budget_range: c.budget_range,
+            master_id: c.master_id,
+          })),
+        );
+        
+        // Set search term to the specific value (like "7lack")
+        const firstBudget = otherFiltered[0].budget_range || '';
+        if (firstBudget.includes('7lack') || firstBudget.includes('7 lakh')) {
+          setSearchTerm('7lack');
+        } else {
+          setSearchTerm(firstBudget);
+        }
+      }
+      
+      setFilteredClients(otherFiltered);
+    } 
+    else {
+      // Normal budget filtering for specific ranges (like "Premium Range: Above ₹10 Lakh")
+      console.log(`Setting search term for budget: ${budgetRange}`);
+      setSearchTerm(budgetRange);
+    }
+
+    // Keep the from_dashboard flag
+    if (fromDashboard) {
+      window.history.replaceState({ 
+        budget_range: budgetRange,
+        from_dashboard: true 
+      }, document.title);
+    }
+  }
+
+  // Add debug logging for stage data
+  console.log('Stage data check:', {
+    totalRecords: rawData.length,
+    freshLead: rawData.filter(c => 
+      (c.latest_leadStage === 'Fresh Lead' || 
+       c.lead_stage === 'Fresh Lead' || 
+       c.stage === 'Fresh Lead')
+    ).map(c => ({ name: c.name, stage: c.latest_leadStage || c.lead_stage || c.stage })),
+    coldLead: rawData.filter(c => 
+      (c.latest_leadStage === 'Cold Lead' || 
+       c.lead_stage === 'Cold Lead' || 
+       c.stage === 'Cold Lead')
+    ).map(c => ({ name: c.name, stage: c.latest_leadStage || c.lead_stage || c.stage })),
+    preSiteVisit: rawData.filter(c => 
+      (c.latest_leadStage === 'Pre Site Visit' || 
+       c.lead_stage === 'Pre Site Visit' || 
+       c.stage === 'Pre Site Visit')
+    ).map(c => ({ name: c.name, stage: c.latest_leadStage || c.lead_stage || c.stage })),
+    emptyStages: rawData.filter(c => 
+      !c.latest_leadStage && !c.lead_stage && !c.stage
+    ).map(c => ({ name: c.name, latest_leadStage: c.latest_leadStage, lead_stage: c.lead_stage, stage: c.stage })),
+    allStages: rawData.map(c => ({
+      name: c.name,
+      latest_leadStage: c.latest_leadStage,
+      lead_stage: c.lead_stage,
+      stage: c.stage,
+      master_id: c.master_id
+    }))
+  });
+
+}, [location.state, rawData]);
+
+
+
+const applyFilters = () => {
+  let filtered = [...rawData];
+  const lowerSearch = searchTerm.toLowerCase();
+
+  // Check if this is a reference-specific filter from dashboard
+  const isReferenceFilter = location.state?.reference_name && 
+                           location.state?.from_dashboard &&
+                           (searchTerm === location.state.reference_name || 
+                            (location.state.reference_name === 'Others' && searchTerm.toLowerCase() === 'other'));
+
+  // Check if this is a category-specific filter from dashboard
+  const isCategoryFilter = location.state?.category_name && 
+                          location.state?.from_dashboard &&
+                          (searchTerm === location.state.category_name ||
+                           (location.state.category_name === 'Others' && searchTerm.toLowerCase() === 'other') ||
+                           (location.state.category_name === 'Other' && searchTerm.toLowerCase() === 'other'));
+
+  // Check if this is a budget-specific filter from dashboard
+  const isBudgetFilter = location.state?.budget_range && 
+                        location.state?.from_dashboard;
+
+  // Check if this is a stage-specific filter from dashboard
+  const isStageFilter = location.state?.lead_stage && 
+                       location.state?.from_dashboard &&
+                       (searchTerm === location.state.lead_stage ||
+                        (location.state.lead_stage === 'Others' && searchTerm.toLowerCase() === 'other'));
+
+  // Apply Search Term Filter
+  if (searchTerm) {
+    console.log(`Applying search filter for: "${searchTerm}"`);
+    
+    // Special handling for "Not Specified" budget filter
+  if (isBudgetFilter && location.state.budget_range === 'Not Specified') {
+    console.log(`Applying "Not Specified" budget filter`);
+    filtered = filtered.filter((client) => {
+      const clientBudget = (client.budget_range?.trim() || '').toLowerCase();
+      return !clientBudget ||
+             clientBudget === '' ||
+             clientBudget === 'not available' ||
+             clientBudget === 'n/a' ||
+             clientBudget === 'not specified';
+    });
+    console.log(`"Not Specified" budget filter results: ${filtered.length} records`);
+  }
+  // Special handling for "Other" budget filter
+  else if (isBudgetFilter && (location.state.budget_range === 'Other' || location.state.budget_range === 'Others')) {
+    console.log(`Applying "Other" budget filter`);
+    const standardRanges = [
+      'basic range: above ₹7 lakh',
+      'premium range: above ₹10 lakh', 
+      'ultra-premium range: above ₹15 lakh',
+      'elite range: above ₹25 lakh'
+    ];
+    
+    filtered = filtered.filter((client) => {
+      const clientBudget = (client.budget_range?.trim() || '').toLowerCase();
+      
+      // Skip empty/not available budgets (those are "Not Specified")
+      if (!clientBudget || 
+          clientBudget === '' || 
+          clientBudget === 'not available' || 
+          clientBudget === 'n/a' ||
+          clientBudget === 'not specified') {
+        return false;
+      }
+      
+      // Check if it matches any standard range
+      const isStandardRange = standardRanges.some(range => 
+        clientBudget.includes(range) || range.includes(clientBudget)
+      );
+      
+      // Check for "7lack" specifically
+      const is7Lack = clientBudget.includes('7lack') || clientBudget.includes('7 lakh');
+      
+      // Return true if it's NOT a standard range OR if it's "7lack"
+      return !isStandardRange || is7Lack;
+    });
+    console.log(`"Other" budget filter results: ${filtered.length} records`);
+  }
+    // Special handling for "Others" category filter
+    else if (isCategoryFilter && (location.state.category_name === 'Others' || 
+                             location.state.category_name === 'Other' || 
+                             searchTerm.toLowerCase() === 'other')) {
+      console.log(`Applying "Others" category filter`);
+      filtered = filtered.filter((client) => {
+        const clientCategory = (client.cat_name?.toLowerCase() || '');
+        return clientCategory === 'other' || 
+               clientCategory.includes('other') ||
+               clientCategory === 'others';
+      });
+      console.log(`"Others" category filter results: ${filtered.length} records`);
+    }
+    // Special handling for "Others" reference filter
+    else if (isReferenceFilter && (location.state.reference_name === 'Others' || searchTerm.toLowerCase() === 'other')) {
+      console.log(`Applying "Others" reference filter`);
+      filtered = filtered.filter((client) => {
+        const clientReference = (client.reference_name?.toLowerCase() || '');
+        return clientReference === 'other' || 
+               clientReference.includes('other') ||
+               clientReference === 'others';
+      });
+      console.log(`"Others" reference filter results: ${filtered.length} records`);
+    }
+    // Special handling for "Others" stage filter
+// In applyFilters function, update the stage section:
+else if (isStageFilter && location.state.lead_stage === 'Others') {
+  console.log(`Applying "Others" stage filter in applyFilters`);
+  
+  filtered = filtered.filter((client) => {
+    // Get stage from any field
+    const clientStage = 
+      client.latest_leadStage?.trim() ||
+      client.lead_stage?.trim() ||
+      client.stage?.trim() ||
+      '';
+    
+    // Check if stage is empty, null, or contains "other"
+    const isOther = 
+      !clientStage || 
+      clientStage === '' ||
+      clientStage.toLowerCase().includes('other') ||
+      clientStage === 'Others' ||
+      clientStage === 'Other';
+    
+    return isOther;
+  });
+  
+  console.log(`"Others" stage filter results: ${filtered.length} records`);
+}
+
+    // Category-specific filter (exact category name)
+    else if (isCategoryFilter) {
+      console.log(`Applying category-specific filter for: "${searchTerm}"`);
+      filtered = filtered.filter((client) => {
+        const clientCategory = client.cat_name?.toLowerCase() || '';
+        const searchLower = searchTerm.toLowerCase();
+        return clientCategory === searchLower || clientCategory.includes(searchLower);
+      });
+      console.log(`Category-specific filter results: ${filtered.length} records`);
+    } 
+    // Reference-specific filter
+    else if (isReferenceFilter) {
+      console.log(`Applying reference-specific filter for: "${searchTerm}"`);
+      filtered = filtered.filter((client) => {
+        const clientReference = client.reference_name?.toLowerCase() || '';
+        const searchLower = searchTerm.toLowerCase();
+        return clientReference === searchLower || clientReference.includes(searchLower);
+      });
+      console.log(`Reference-specific filter results: ${filtered.length} records`);
+    } 
+    // Budget-specific filter (for specific range like "Basic Range: Above ₹7 Lakh")
+    else if (isBudgetFilter && searchTerm) {
+      console.log(`Applying budget-specific filter for: "${searchTerm}"`);
+      filtered = filtered.filter((client) => {
+        const clientBudget = client.budget_range?.toLowerCase() || '';
+        const searchLower = searchTerm.toLowerCase();
+        
+        // Handle specific budget range matching
+        if (searchLower.includes('7 lakh') || searchLower.includes('7lack')) {
+          return clientBudget.includes('7lack') || clientBudget.includes('7 lakh');
+        }
+        
+        return clientBudget === searchLower || clientBudget.includes(searchLower);
+      });
+      console.log(`Budget-specific filter results: ${filtered.length} records`);
+    }
+    else {
+      // Normal search - search in all fields INCLUDING reference_name, cat_name, budget_range
+      filtered = filtered.filter((client) => {
+        const searchFields = [
+          client.name?.toLowerCase() || '',
+          client.number?.toString() || '',
+          client.email?.toLowerCase() || '',
+          client.address?.toLowerCase() || '',
+          client.area?.toLowerCase() || '',
+          client.cat_name?.toLowerCase() || '',
+          client.master_id?.toString() || '',
+          client.status?.toLowerCase() || '',
+          client.assigned_to?.toLowerCase() || '',
+          client.city?.toLowerCase() || '',
+          client.stage?.toLowerCase() || client.lead_stage?.toLowerCase() || '',
+          client.reference_name?.toLowerCase() || '',
+          client.budget_range?.toLowerCase() || '',
+          client.category_other?.toLowerCase() || '',
+          client.reference_other?.toLowerCase() || '',
+        ];
+        return searchFields.some((field) => field.includes(lowerSearch));
+      });
+      console.log(`Normal search results: ${filtered.length} records`);
+    }
+  }
+
+  // Apply Entry Date Range Filter
+  if (selectedEntryFromDate || selectedEntryToDate) {
+    filtered = filtered.filter((client) => {
+      if (!client.assign_date) return false;
+
+      const clientDate = new Date(client.assign_date);
+
+      if (isNaN(clientDate.getTime())) return false;
+
+      let fromDateValid = true;
+      let toDateValid = true;
+
+      if (selectedEntryFromDate) {
+        const fromDate = new Date(selectedEntryFromDate);
+        fromDateValid = clientDate >= fromDate;
+      }
+
+      if (selectedEntryToDate) {
+        const toDate = new Date(selectedEntryToDate);
+        toDateValid = clientDate <= toDate;
+      }
+
+      return fromDateValid && toDateValid;
+    });
+  }
+
+  // Apply Followup Date Range Filter
+  if (selectedFollowupFromDate || selectedFollowupToDate) {
+    filtered = filtered.filter((client) => {
+      if (!client.followup_date) return false;
+
+      const clientDate = new Date(client.followup_date);
+
+      if (isNaN(clientDate.getTime())) return false;
+
+      let fromDateValid = true;
+      let toDateValid = true;
+
+      if (selectedFollowupFromDate) {
+        const fromDate = new Date(selectedFollowupFromDate);
+        fromDateValid = clientDate >= fromDate;
+      }
+
+      if (selectedFollowupToDate) {
+        const toDate = new Date(selectedFollowupToDate);
+        toDateValid = clientDate <= toDate;
+      }
+
+      return fromDateValid && toDateValid;
+    });
+  }
+
+  // Apply Stage Filter
+  if (selectedStages.length > 0) {
+    filtered = filtered.filter(
+      (client) =>
+        (client.stage && selectedStages.includes(client.stage)) ||
+        (client.lead_stage && selectedStages.includes(client.lead_stage)),
+    );
+  }
+
+  // Apply Assigned User Filter
+  if (selectedUsers.length > 0) {
+    filtered = filtered.filter(
+      (client) =>
+        client.assigned_to && selectedUsers.includes(client.assigned_to),
+    );
+  }
+
+  // Apply City Filter
+  if (selectedCities.length > 0) {
+    filtered = filtered.filter(
+      (client) => client.city && selectedCities.includes(client.city),
+    );
+  }
+
+  setFilteredClients(filtered);
+  setCurrentPage(1);
+};
 
 
   useEffect(() => {
@@ -1327,66 +2402,70 @@ const RawData = () => {
     // Filtering will happen automatically via useEffect
   };
 
-  // Update Stage Handler
   const handleStageSelect = (stage: string) => {
     setSelectedStages((prev) =>
       prev.includes(stage) ? prev.filter((s) => s !== stage) : [...prev, stage],
     );
-    // Filtering will happen automatically via useEffect
+    setShowStageFilter(false);
   };
 
-  // Update User Handler
   const handleUserSelect = (userName: string) => {
     setSelectedUsers((prev) =>
       prev.includes(userName)
         ? prev.filter((u) => u !== userName)
         : [...prev, userName],
     );
-    // Filtering will happen automatically via useEffect
+    setShowUserFilter(false);
+  };
+
+  const handleCitySelect = (city: string) => {
+    setSelectedCities((prev) =>
+      prev.includes(city) ? prev.filter((c) => c !== city) : [...prev, city],
+    );
+    setShowCityFilter(false);
   };
 
   useEffect(() => {
     applyFilters();
   }, [searchTerm, rawData, selectedStages, selectedUsers, selectedCities]);
 
-
-
   const clearFilters = () => {
-  // Clear all date filters
-  setSelectedEntryDate('');
-  setSelectedFollowupDate('');
-  setSelectedEntryFromDate('');
-  setSelectedEntryToDate('');
-  setSelectedFollowupFromDate('');
-  setSelectedFollowupToDate('');
-  
-  // Clear all stage filters
-  setSelectedStages([]);
-  
-  // Clear all user filters
-  setSelectedUsers([]);
-  
-  // Clear all city filters
-  setSelectedCities([]);
-  
-  // Clear search term
-  setSearchTerm('');
-  
-  // Clear custom record count
-  setCustomRecordCount('');
-  setItemsPerPage(5);
-  
-  // Close all dropdowns
-  setShowEntryDateCalendar(false);
-  setShowFollowupDateCalendar(false);
-  setShowStageFilter(false);
-  setShowUserFilter(false);
-  setShowCityFilter(false);
+    // Clear all date filters
+    setSelectedEntryFromDate('');
+    setSelectedEntryToDate('');
+    setSelectedFollowupFromDate('');
+    setSelectedFollowupToDate('');
+    setSelectedEntryDate('');
+    setSelectedFollowupDate('');
 
-  // Reset to show all data
-  setFilteredClients(rawData);
-  setCurrentPage(1);
-};
+    // Clear all selection filters
+    setSelectedStages([]);
+    setSelectedUsers([]);
+    setSelectedCities([]);
+
+    // Clear search term
+    setSearchTerm('');
+
+    // Clear custom record count
+    setCustomRecordCount('');
+    setItemsPerPage(5);
+
+    // Close all dropdowns
+    setShowEntryDateCalendar(false);
+    setShowFollowupDateCalendar(false);
+    setShowStageFilter(false);
+    setShowUserFilter(false);
+    setShowCityFilter(false);
+
+    // Reset to show all data
+    setFilteredClients(rawData);
+    setCurrentPage(1);
+
+    setSelectedStages([]);
+    setSearchTerm('');
+
+    window.history.replaceState({}, document.title);
+  };
 
   const closeAllDropdowns = () => {
     setShowEntryDateCalendar(false);
@@ -1394,11 +2473,6 @@ const RawData = () => {
     setShowStageFilter(false);
     setShowUserFilter(false);
     setShowCityFilter(false);
-
-    // Prevent event bubbling
-    if (typeof event !== 'undefined') {
-      event?.stopPropagation();
-    }
   };
 
   // Add this function to extract unique cities from rawData
@@ -1423,14 +2497,6 @@ const RawData = () => {
     const uniqueCities = getUniqueCities(rawData);
     setAvailableCities(uniqueCities);
   }, [rawData]);
-
-  // Add city filter handler
-  const handleCitySelect = (city: string) => {
-    setSelectedCities((prev) =>
-      prev.includes(city) ? prev.filter((c) => c !== city) : [...prev, city],
-    );
-    // Filtering will happen automatically via useEffect
-  };
 
   // const fetchClients = async () => {
   //   try {
@@ -1560,93 +2626,86 @@ const RawData = () => {
     }));
   };
 
-
-
-
-
   const handleSubmit = async (event) => {
-  event.preventDefault();
+    event.preventDefault();
 
-  if (!file) {
-    alert('Please select a file');
-    return;
-  }
-
-  const formData1 = new FormData();
-  formData1.append('file', file);
-
-  try {
-    const response = await axios.post(
-      `${BASE_URL}api/master-data/import`,
-      formData1,
-      {
-        headers: { 'Content-Type': 'multipart/form-data' },
-        withCredentials: true,
-      },
-    );
-
-    console.log('📥 Import response:', response.data);
-
-    // Show summary in alert
-    const summary = response.data.summary;
-    const successMsg = summary.success > 0 ? 
-      `✅ ${summary.success} records imported successfully.\n` : 
-      '';
-    
-    if (summary.success > 0) {
-      alert(`${successMsg}Please check below for any issues.`);
+    if (!file) {
+      alert('Please select a file');
+      return;
     }
 
-    // 🔥 HANDLE ERRORS
-    if (response.data.errors && response.data.errors.length > 0) {
-      setImportErrors(response.data.errors);
-      // Don't close import popup yet
-    } else {
-      setShowImportPopup(false);
+    const formData1 = new FormData();
+    formData1.append('file', file);
+
+    try {
+      const response = await axios.post(
+        `${BASE_URL}api/master-data/import`,
+        formData1,
+        {
+          headers: { 'Content-Type': 'multipart/form-data' },
+          withCredentials: true,
+        },
+      );
+
+      console.log('📥 Import response:', response.data);
+
+      // Show summary in alert
+      const summary = response.data.summary;
+      const successMsg =
+        summary.success > 0
+          ? `✅ ${summary.success} records imported successfully.\n`
+          : '';
+
+      if (summary.success > 0) {
+        alert(`${successMsg}Please check below for any issues.`);
+      }
+
+      // 🔥 HANDLE ERRORS
+      if (response.data.errors && response.data.errors.length > 0) {
+        setImportErrors(response.data.errors);
+        // Don't close import popup yet
+      } else {
+        setShowImportPopup(false);
+      }
+
+      // 🔥 HANDLE DUPLICATES
+      if (response.data.duplicates && response.data.duplicates.length > 0) {
+        setDuplicateEntries(response.data.duplicates);
+        setShowDuplicateModal(true);
+      }
+
+      // Refresh data if any success
+      if (summary.success > 0) {
+        fetchRawData();
+      }
+    } catch (err) {
+      console.log('Import Error:', err);
+      console.log('Error response:', err.response?.data);
+
+      let errorMessage = 'Import failed. ';
+
+      if (err.response?.status === 409) {
+        errorMessage = `❌ Contact number already exists: ${err.response.data.duplicate.contact}`;
+      } else if (err.response?.data?.message) {
+        errorMessage += err.response.data.message;
+      } else if (err.message) {
+        errorMessage += err.message;
+      }
+
+      alert(errorMessage);
     }
+  };
 
-    // 🔥 HANDLE DUPLICATES
-    if (response.data.duplicates && response.data.duplicates.length > 0) {
-      setDuplicateEntries(response.data.duplicates);
-      setShowDuplicateModal(true);
-    }
+  const handleDuplicateModalClose = () => {
+    // setShowDuplicateModal(false);
+    // setDuplicateEntries([]);
+    // setError('');
+    setShowDuplicateModal(false);
+    setDuplicateEntries([]);
+    setError('');
 
-    // Refresh data if any success
-    if (summary.success > 0) {
-      fetchRawData();
-    }
-
-  } catch (err) {
-    console.log('Import Error:', err);
-    console.log('Error response:', err.response?.data);
-    
-    let errorMessage = 'Import failed. ';
-    
-    if (err.response?.status === 409) {
-      errorMessage = `❌ Contact number already exists: ${err.response.data.duplicate.contact}`;
-    } else if (err.response?.data?.message) {
-      errorMessage += err.response.data.message;
-    } else if (err.message) {
-      errorMessage += err.message;
-    }
-    
-    alert(errorMessage);
-  }
-};
-
-
-
-
-const handleDuplicateModalClose = () => {
-  // setShowDuplicateModal(false);
-  // setDuplicateEntries([]);
-  // setError(''); 
-  setShowDuplicateModal(false);
-  setDuplicateEntries([]);
-  setError('');
-
-  setShowImportPopup(false); // Add this to ensure import popup stays closed
-};
+    setShowImportPopup(false); // Add this to ensure import popup stays closed
+  };
 
   const handleForceImport = async () => {
     if (!file) return;
@@ -1901,7 +2960,9 @@ const handleDuplicateModalClose = () => {
           other_number: parseValue(item.other_number),
 
           // Lead information
+          latest_leadStage: parseValue(item.latest_leadStage),
           lead_stage: parseValue(item.lead_stage),
+
           quick_remark: parseValue(item.quick_remark),
           detailed_remark: parseValue(item.detailed_remark),
 
@@ -1916,22 +2977,22 @@ const handleDuplicateModalClose = () => {
 
           reassignment_remarks: Array.isArray(item.reassignment_remarks)
             ? item.reassignment_remarks.map((remark: any) => {
-                if (typeof remark === 'string') {
-                  return remark;
-                } else if (remark && typeof remark === 'object') {
-                  return {
-                    remark: remark.remark || '',
-                    assignedTo: remark.assignedTo || '',
-                    leadStage: remark.leadStage || '',
-                    reassignment_date: remark.reassignment_date || '',
-                    created_by_user: remark.created_by_user || 0,
-                    created_at: remark.created_at || '',
-                    name: remark.name || '',
-                    role: remark.role || '',
-                  };
-                }
-                return '';
-              })
+              if (typeof remark === 'string') {
+                return remark;
+              } else if (remark && typeof remark === 'object') {
+                return {
+                  remark: remark.remark || '',
+                  assignedTo: remark.assignedTo || '',
+                  leadStage: remark.leadStage || '',
+                  reassignment_date: remark.reassignment_date || '',
+                  created_by_user: remark.created_by_user || 0,
+                  created_at: remark.created_at || '',
+                  name: remark.name || '',
+                  role: remark.role || '',
+                };
+              }
+              return '';
+            })
             : [],
           previous_stage: previousStage,
 
@@ -2007,143 +3068,188 @@ const handleDuplicateModalClose = () => {
 
   // Updated handleAssignSubmit
 
-  // Updated handleAssignSubmit
   const handleAssignSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!assignData.assignedTo.length || !assignData.leadStage) {
-      alert('Please select at least one user and a lead stage');
+    if (
+      !assignData.assignedTo.length ||
+      !assignData.leadStage ||
+      !assignData.reassignmentDate
+    ) {
+      alert('Please fill all required fields');
       return;
     }
 
     try {
-      const firstClient = rawData.find((client) =>
-        selectedMasterIds.includes(client.master_id),
-      );
-      const assign_id = firstClient?.assign_id || null;
+      const requests = selectedMasterIds.map((master_id) => {
+        const client = rawData.find((c) => c.master_id === master_id);
 
-      const assignments = [];
+        return fetch(`${BASE_URL}api/add`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify({
+            master_id,
 
-      selectedMasterIds.forEach((masterId) => {
-        assignData.assignedTo.forEach((user) => {
-          const client = rawData.find((c) => c.master_id === masterId);
-          assignments.push({
-            master_id: masterId,
-            assignedTo: user,
+            // SAME STRUCTURE AS updateRawData
+            assignedTo: assignData.assignedTo, // ARRAY
             leadStage: assignData.leadStage,
             remark: assignData.remark,
-            reassignment_date: assignData.reassignmentDate, // Add date here
-            assign_id: client?.assign_id || assign_id,
-          });
+
+            // IMPORTANT: both dates
+            reassignment_date: assignData.reassignmentDate,
+            followup_date: assignData.reassignmentDate,
+
+            // optional (backend resolves if null)
+            assign_id: client?.assign_id || null,
+          }),
         });
       });
 
-      // Send all assignments
-      const responses = await Promise.all(
-        assignments.map((assignment) =>
-          fetch(`${BASE_URL}api/add`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            credentials: 'include',
-            body: JSON.stringify(assignment),
-          }),
-        ),
-      );
-
+      const responses = await Promise.all(requests);
       const results = await Promise.all(responses.map((r) => r.json()));
 
-      // Collect inserted and skipped items
-      let totalInserted = 0;
-      let skippedDetails: string[] = [];
+      let inserted = 0;
+      let skipped = 0;
 
-      results.forEach((result) => {
-        if (result.success) {
-          if (result.inserted?.length) totalInserted += result.inserted.length;
-          if (result.skipped?.length) {
-            result.skipped.forEach((s) => {
-              skippedDetails.push(
-                `"${s.finalName}" for stage "${assignData.leadStage}"`,
-              );
-            });
-          }
-        } else {
-          skippedDetails.push(result.message || 'Unknown error');
-        }
+      results.forEach((r) => {
+        inserted += r.inserted_count || 0;
+        skipped += r.skipped_count || 0;
       });
 
-      // Show alert messages
-      if (totalInserted > 0) {
-        alert(
-          `✅ ${totalInserted} reassignment(s) created successfully!` +
-            (skippedDetails.length > 0
-              ? `\n⚠ Skipped duplicates:\n- ${skippedDetails.join('\n- ')}`
-              : ''),
-        );
-      } else if (skippedDetails.length > 0) {
-        alert(
-          `⚠ All assignments were skipped as duplicates:\n- ${skippedDetails.join(
-            '\n- ',
-          )}`,
-        );
-      }
+      alert(`✅ Assignment Done\nInserted: ${inserted}\nSkipped: ${skipped}`);
 
       // Reset
       setAssignData({
         assignedTo: [],
         leadStage: '',
         remark: '',
-        reassignmentDate: new Date().toISOString().split('T')[0], // Reset to today
+        reassignmentDate: new Date().toISOString().split('T')[0],
       });
+
       setSelectedMasterIds([]);
       setSelectedClients([]);
       setShowAssignPopup(false);
       fetchRawData();
-    } catch (error) {
-      console.error('Network error:', error);
-      alert('❌ Something went wrong while submitting reassignments');
+    } catch (err) {
+      console.error(err);
+      alert('❌ Assignment failed');
     }
   };
 
-  const handleBulkDelete = async () => {
-    if (window.confirm('Are you sure you want to delete selected clients?')) {
+  const handleSingleDelete = async (master_id) => {
+    if (window.confirm('Are you sure you want to delete this entry?')) {
       try {
-        await axios.post(`${BASE_URL}api/master-data/delete-multiple`, {
-          ids: selectedClients,
-        });
-        setSelectedClients([]);
-        alert('Selected Entry deleted successfully.');
+        // Try the most common endpoint
+        const res = await axios.post(
+          `${BASE_URL}api/master-data/delete-multiple`,
+          {
+            ids: [master_id], // Send as array
+          },
+          {
+            withCredentials: true,
+            headers: {
+              'Content-Type': 'application/json',
+            },
+          },
+        );
+
+        console.log('Delete response:', res.data);
+
+        alert(res.data.message || 'Entry deleted successfully');
+
+        // Remove from selected arrays
+        setSelectedClients((prev) => prev.filter((id) => id !== master_id));
+        setSelectedMasterIds((prev) => prev.filter((id) => id !== master_id));
+
+        // Refresh the data
         fetchRawData();
       } catch (error) {
-        console.error(error);
-        alert('Failed to delete selected entry.');
+        console.error('Delete error details:', {
+          error,
+          response: error.response,
+          status: error.response?.status,
+          data: error.response?.data,
+        });
+
+        // Try alternative endpoint if first fails
+        if (error.response?.status === 404) {
+          try {
+            // Alternative: try without array wrapper
+            const res = await axios.post(
+              `${BASE_URL}api/master-data/delete`,
+              { master_id: master_id }, // Send as single field
+              { withCredentials: true },
+            );
+
+            alert(res.data.message || 'Entry deleted successfully');
+            fetchRawData();
+          } catch (secondError) {
+            alert(
+              secondError.response?.data?.message ||
+              'Cannot delete entry. Please check API endpoint.',
+            );
+          }
+        } else {
+          alert(
+            error.response?.data?.message ||
+            'Failed to delete entry. Please try again.',
+          );
+        }
       }
     }
   };
 
-
-
-const handleSingleDelete = async (master_id) => {
-  if (window.confirm('Are you sure you want to delete this entry?')) {
-    try {
-      // Send as array with single ID to the :master_id route
-      const res = await axios.post(
-        `${BASE_URL}api/master-data/${master_id}`,
-        { ids: [master_id] } // Add this
-      );
-
-      alert(res.data.message || 'Entry deleted successfully');
-      setSelectedClients([]);
-      fetchRawData();
-    } catch (error) {
-      console.error(error);
-      alert(
-        error.response?.data?.message || 'Failed to delete entry'
-      );
+  const handleBulkDelete = async () => {
+    if (selectedMasterIds.length === 0) {
+      alert('Please select entries to delete');
+      return;
     }
-  }
-};
 
+    if (
+      window.confirm(
+        `Are you sure you want to delete ${selectedMasterIds.length} selected entries?`,
+      )
+    ) {
+      try {
+        const res = await axios.post(
+          `${BASE_URL}api/master-data/delete-multiple`,
+          {
+            master_ids: selectedMasterIds,
+            ids: selectedMasterIds,
+          },
+          {
+            withCredentials: true,
+            headers: { 'Content-Type': 'application/json' },
+          },
+        );
 
+        console.log('Bulk delete response:', res.data);
+
+        if (res.data.success) {
+          alert(
+            res.data.message ||
+            `${selectedMasterIds.length} entries deleted successfully.`,
+          );
+        } else {
+          alert(res.data.message || 'Failed to delete selected entries.');
+        }
+
+        setSelectedClients([]);
+        setSelectedMasterIds([]);
+        fetchRawData();
+      } catch (error) {
+        console.error('Bulk delete error:', error);
+        console.error('Error response:', error.response);
+
+        alert(
+          error.response?.data?.message ||
+          error.response?.data?.error ||
+          'Failed to delete selected entries. Please try again.',
+        );
+      }
+    }
+  };
 
   const handleSingleFormChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>,
@@ -2247,69 +3353,77 @@ const handleSingleDelete = async (master_id) => {
     return { lastNonDropPercentages, updatePercentage };
   };
 
-// ProgressStatus Component - Compact with smaller percentage
-const ProgressStatus: React.FC<{ 
-  stage: string; 
-  status_percentage?: number;
-  is_drop_stage?: boolean;
-  previous_stage?: string;
-}> = ({ stage, status_percentage = 0, is_drop_stage = false, previous_stage = '' }) => {
-  
-  const cleanStage = stage ? stage.trim() : '';
-  const percentage = status_percentage;
-  
-  // Get progress bar color based on exact stage-to-color mapping
-  const getProgressColor = (stage: string) => {
-    const stageLower = stage.toLowerCase().trim();
-    
-    // Exact mapping from color table
-    if (stageLower.includes('fresh')) return 'bg-[#FFFFFF] border border-gray-300';
-    if (stageLower.includes('cold')) return 'bg-[#A9A9A9]';
-    if (stageLower.includes('on hold')) return 'bg-[#FDFD96]';
-    if (stageLower.includes('positive')) return 'bg-[#ADD8E6]';
-    if (stageLower.includes('pre site')) return 'bg-[#E0B0FF]';
-    if (stageLower.includes('past site') || stageLower.includes('post site')) return 'bg-[#593E67]';
-    if (stageLower.includes('demo')) return 'bg-[#FFB6C1]';
-    if (stageLower.includes('quote pending')) return 'bg-[#FFA500]';
-    if (stageLower.includes('quote followup')) return 'bg-[#A52A2A]';
-    if (stageLower.includes('projection')) return 'bg-[#90EE90]';
-    if (stageLower.includes('drop')) return 'bg-[#FF0000]';
-    if (stageLower.includes('closed')) return 'bg-[#006400]';
-    
-    // Fallback
-    return 'bg-[#A9A9A9]';
-  };
+  // ProgressStatus Component - Compact with smaller percentage
+  const ProgressStatus: React.FC<{
+    stage: string;
+    status_percentage?: number;
+    is_drop_stage?: boolean;
+    previous_stage?: string;
+  }> = ({
+    stage,
+    status_percentage = 0,
+    is_drop_stage = false,
+    previous_stage = '',
+  }) => {
+      const cleanStage = stage ? stage.trim() : '';
+      const percentage = status_percentage;
 
-  return (
-    <div className="flex flex-col items-center w-16">
-      {/* Percentage Display - Medium size */}
-      <div className="text-sm font-bold text-gray-900 dark:text-white mb-0.5">
-        {percentage}%
-      </div>
-      
-      {/* Progress Bar Container - Very thin */}
-      <div className="w-full h-1.5 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden mb-0.5">
-        {/* Progress Fill with exact color */}
-        <div 
-          className={`h-full rounded-full ${getProgressColor(cleanStage)} transition-all duration-300`}
-          style={{ width: `${percentage}%` }}
-        />
-      </div>
-      
-      {/* Stage Name - Smaller text */}
-      <div className="w-full text-center">
-        <div className="text-[10px] font-medium text-gray-700 dark:text-gray-300 truncate">
-          {is_drop_stage ? previous_stage || cleanStage : cleanStage || 'N/A'}
-        </div>
-        {is_drop_stage && (
-          <div className="text-[8px] text-red-500 font-medium mt-0.5">
-            DROPPED
+      // Get progress bar color based on exact stage-to-color mapping
+      const getProgressColor = (stage: string) => {
+        const stageLower = stage.toLowerCase().trim();
+
+        // Exact mapping from color table
+        if (stageLower.includes('fresh'))
+          return 'bg-[#FFFFFF] border border-gray-300';
+        if (stageLower.includes('cold')) return 'bg-[#A9A9A9]';
+        if (stageLower.includes('on hold')) return 'bg-[#FDFD96]';
+        if (stageLower.includes('positive')) return 'bg-[#ADD8E6]';
+        if (stageLower.includes('pre site')) return 'bg-[#E0B0FF]';
+        if (stageLower.includes('past site') || stageLower.includes('post site'))
+          return 'bg-[#593E67]';
+        if (stageLower.includes('demo')) return 'bg-[#FFB6C1]';
+        if (stageLower.includes('quote pending')) return 'bg-[#FFA500]';
+        if (stageLower.includes('quote followup')) return 'bg-[#A52A2A]';
+        if (stageLower.includes('projection')) return 'bg-[#90EE90]';
+        if (stageLower.includes('drop')) return 'bg-[#FF0000]';
+        if (stageLower.includes('closed')) return 'bg-[#006400]';
+
+        // Fallback
+        return 'bg-[#A9A9A9]';
+      };
+
+      return (
+        <div className="flex flex-col items-center w-16">
+          {/* Percentage Display - Medium size */}
+          <div className="text-sm font-bold text-gray-900 dark:text-white mb-0.5">
+            {percentage}%
           </div>
-        )}
-      </div>
-    </div>
-  );
-};
+
+          {/* Progress Bar Container - Very thin */}
+          <div className="w-full h-1.5 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden mb-0.5">
+            {/* Progress Fill with exact color */}
+            <div
+              className={`h-full rounded-full ${getProgressColor(
+                cleanStage,
+              )} transition-all duration-300`}
+              style={{ width: `${percentage}%` }}
+            />
+          </div>
+
+          {/* Stage Name - Smaller text */}
+          <div className="w-full text-center">
+            <div className="text-[10px] font-medium text-gray-700 dark:text-gray-300 truncate">
+              {is_drop_stage ? previous_stage || cleanStage : cleanStage || 'N/A'}
+            </div>
+            {is_drop_stage && (
+              <div className="text-[8px] text-red-500 font-medium mt-0.5">
+                DROPPED
+              </div>
+            )}
+          </div>
+        </div>
+      );
+    };
   // Helper function to get percentage from stage
   const getPercentageFromStage = (stage: string): number => {
     return STAGE_PERCENTAGE_MAP[stage] || 0;
@@ -2379,6 +3493,8 @@ const ProgressStatus: React.FC<{
           client.assigned_to?.toLowerCase() || '',
           client.city?.toLowerCase() || '',
           client.stage?.toLowerCase() || '',
+          client.reference_name?.toLowerCase() || '',
+          client.budget_range?.toLowerCase() || '',
         ];
         return searchFields.some((field) => field.includes(lowerSearch));
       });
@@ -2427,140 +3543,143 @@ const ProgressStatus: React.FC<{
     rawData,
   ]);
 
-  const applyFilters = (
-    currentRawData: Data[] = rawData,
-    entryFromDate: string = selectedEntryFromDate,
-    entryToDate: string = selectedEntryToDate,
-    stages: string[] = selectedStages,
-    users: string[] = selectedUsers,
-    cities: string[] = selectedCities,
-    followupFromDate: string = selectedFollowupFromDate,
-    followupToDate: string = selectedFollowupToDate,
-  ) => {
-    let filtered = currentRawData;
-    const lowerSearch = searchTerm.toLowerCase();
 
-    // 1. Apply Search Term Filter
-    filtered = filtered.filter((client) => {
-      const name = client.name?.toLowerCase() || '';
-      const number = client.number?.toString() || '';
-      const email = client.email?.toLowerCase() || '';
-      const address = client.address?.toLowerCase() || '';
-      const areaName = client.area?.toLowerCase() || '';
-      const catName = client.cat_name?.toLowerCase() || '';
-      const masterIdStr = client.master_id?.toString() || '';
-      const status = client.status?.toLowerCase() || '';
-      const assignedTo = client.assigned_to?.toLowerCase() || '';
 
-      return (
-        name.includes(lowerSearch) ||
-        number.includes(lowerSearch) ||
-        email.includes(lowerSearch) ||
-        address.includes(lowerSearch) ||
-        areaName.includes(lowerSearch) ||
-        catName.includes(lowerSearch) ||
-        masterIdStr.includes(lowerSearch) ||
-        status.includes(lowerSearch) ||
-        assignedTo.includes(lowerSearch)
-      );
-    });
 
-    // 2. Apply Entry Date Range Filter
-    if (entryFromDate || entryToDate) {
-      filtered = filtered.filter((client) => {
-        if (!client.assign_date) return false;
-
-        const clientDate = new Date(client.assign_date);
-
-        // Check if date is valid
-        if (isNaN(clientDate.getTime())) return false;
-
-        let fromDateValid = true;
-        let toDateValid = true;
-
-        // Check from date
-        if (entryFromDate) {
-          const fromDate = new Date(entryFromDate);
-          fromDateValid = clientDate >= fromDate;
-        }
-
-        // Check to date
-        if (entryToDate) {
-          const toDate = new Date(entryToDate);
-          toDateValid = clientDate <= toDate;
-        }
-
-        return fromDateValid && toDateValid;
-      });
-    }
-
-    // 3. Apply Followup Date Range Filter
-    if (followupFromDate || followupToDate) {
-      filtered = filtered.filter((client) => {
-        if (!client.followup_date) return false;
-
-        const clientDate = new Date(client.followup_date);
-
-        // Check if date is valid
-        if (isNaN(clientDate.getTime())) return false;
-
-        let fromDateValid = true;
-        let toDateValid = true;
-
-        // Check from date
-        if (followupFromDate) {
-          const fromDate = new Date(followupFromDate);
-          fromDateValid = clientDate >= fromDate;
-        }
-
-        // Check to date
-        if (followupToDate) {
-          const toDate = new Date(followupToDate);
-          toDateValid = clientDate <= toDate;
-        }
-
-        return fromDateValid && toDateValid;
-      });
-    }
-
-    // 4. Apply Stage Filter
-    if (stages.length > 0) {
-      filtered = filtered.filter(
-        (client) => client.stage && stages.includes(client.stage),
-      );
-    }
-
-    // 5. Apply Assigned User Filter
-    if (users.length > 0) {
-      filtered = filtered.filter(
-        (client) => client.assigned_to && users.includes(client.assigned_to),
-      );
-    }
-
-    // 6. Apply City Filter
-    if (cities.length > 0) {
-      filtered = filtered.filter(
-        (client) => client.city && cities.includes(client.city),
-      );
-    }
-
-    setFilteredClients(filtered);
-    setCurrentPage(1);
-  };
-
-  // Update existing useEffect for search to call the new function
-  // Update useEffect (around line 600-610)
+  // Apply filters when any filter changes
   useEffect(() => {
     applyFilters();
   }, [
     searchTerm,
-    rawData,
-    selectedEntryDate,
-    selectedFollowupDate,
+    selectedEntryFromDate,
+    selectedEntryToDate,
+    selectedFollowupFromDate,
+    selectedFollowupToDate,
     selectedStages,
     selectedUsers,
     selectedCities,
-  ]); // Add selectedCities
+    rawData,
+  ]);
+
+  // Handle custom record count
+  useEffect(() => {
+    if (
+      customRecordCount &&
+      typeof customRecordCount === 'number' &&
+      customRecordCount > 0
+    ) {
+      // Apply filters first, then limit the filtered results
+      let tempFiltered = [...rawData];
+
+      // Apply all active filters to the temp array
+      const lowerSearch = searchTerm.toLowerCase();
+      if (searchTerm) {
+        tempFiltered = tempFiltered.filter((client) => {
+          const searchFields = [
+            client.name?.toLowerCase() || '',
+            client.number?.toString() || '',
+            client.email?.toLowerCase() || '',
+            client.address?.toLowerCase() || '',
+            client.area?.toLowerCase() || '',
+            client.cat_name?.toLowerCase() || '',
+            client.master_id?.toString() || '',
+            client.status?.toLowerCase() || '',
+            client.assigned_to?.toLowerCase() || '',
+            client.city?.toLowerCase() || '',
+            client.stage?.toLowerCase() ||
+            client.lead_stage?.toLowerCase() ||
+            '',
+          ];
+          return searchFields.some((field) => field.includes(lowerSearch));
+        });
+      }
+
+      // Apply Entry Date Range Filter
+      if (selectedEntryFromDate || selectedEntryToDate) {
+        tempFiltered = tempFiltered.filter((client) => {
+          if (!client.assign_date) return false;
+          const clientDate = new Date(client.assign_date);
+          if (isNaN(clientDate.getTime())) return false;
+          let fromDateValid = true;
+          let toDateValid = true;
+          if (selectedEntryFromDate) {
+            const fromDate = new Date(selectedEntryFromDate);
+            fromDateValid = clientDate >= fromDate;
+          }
+          if (selectedEntryToDate) {
+            const toDate = new Date(selectedEntryToDate);
+            toDateValid = clientDate <= toDate;
+          }
+          return fromDateValid && toDateValid;
+        });
+      }
+
+      // Apply Followup Date Range Filter
+      if (selectedFollowupFromDate || selectedFollowupToDate) {
+        tempFiltered = tempFiltered.filter((client) => {
+          if (!client.followup_date) return false;
+          const clientDate = new Date(client.followup_date);
+          if (isNaN(clientDate.getTime())) return false;
+          let fromDateValid = true;
+          let toDateValid = true;
+          if (selectedFollowupFromDate) {
+            const fromDate = new Date(selectedFollowupFromDate);
+            fromDateValid = clientDate >= fromDate;
+          }
+          if (selectedFollowupToDate) {
+            const toDate = new Date(selectedFollowupToDate);
+            toDateValid = clientDate <= toDate;
+          }
+          return fromDateValid && toDateValid;
+        });
+      }
+
+      // Apply Stage Filter
+      if (selectedStages.length > 0) {
+        tempFiltered = tempFiltered.filter(
+          (client) =>
+            (client.stage && selectedStages.includes(client.stage)) ||
+            (client.lead_stage && selectedStages.includes(client.lead_stage)),
+        );
+      }
+
+      // Apply Assigned User Filter
+      if (selectedUsers.length > 0) {
+        tempFiltered = tempFiltered.filter(
+          (client) =>
+            client.assigned_to && selectedUsers.includes(client.assigned_to),
+        );
+      }
+
+      // Apply City Filter
+      if (selectedCities.length > 0) {
+        tempFiltered = tempFiltered.filter(
+          (client) => client.city && selectedCities.includes(client.city),
+        );
+      }
+
+      // Now limit the FILTERED results
+      const limitedClients = tempFiltered.slice(0, customRecordCount);
+      setFilteredClients(limitedClients);
+      setCurrentPage(1);
+      setItemsPerPage(customRecordCount);
+    } else {
+      // No custom record count, just apply filters normally
+      applyFilters();
+      setItemsPerPage(5);
+    }
+  }, [
+    customRecordCount,
+    rawData,
+    searchTerm,
+    selectedEntryFromDate,
+    selectedEntryToDate,
+    selectedFollowupFromDate,
+    selectedFollowupToDate,
+    selectedStages,
+    selectedUsers,
+    selectedCities,
+  ]);
 
   // Add this useEffect to debug filter states
   useEffect(() => {
@@ -2595,130 +3714,140 @@ const ProgressStatus: React.FC<{
     }
   };
 
-useEffect(() => {
-  if (
-    customRecordCount &&
-    typeof customRecordCount === 'number' &&
-    customRecordCount > 0
-  ) {
-    // First, apply all active filters to get filtered data
-    let tempFiltered = [...rawData];
-    const lowerSearch = searchTerm.toLowerCase();
-    
-    // Apply search filter
-    if (searchTerm) {
-      tempFiltered = tempFiltered.filter((client) => {
-        const searchFields = [
-          client.name?.toLowerCase() || '',
-          client.number?.toString() || '',
-          client.email?.toLowerCase() || '',
-          client.address?.toLowerCase() || '',
-          client.area?.toLowerCase() || '',
-          client.cat_name?.toLowerCase() || '',
-          client.master_id?.toString() || '',
-          client.status?.toLowerCase() || '',
-          client.assigned_to?.toLowerCase() || '',
-          client.city?.toLowerCase() || '',
-          client.stage?.toLowerCase() || '',
-        ];
-        return searchFields.some((field) => field.includes(lowerSearch));
-      });
-    }
-    
-    // Apply entry date filter
-    if (selectedEntryDate) {
-      tempFiltered = tempFiltered.filter(
-        (client) =>
-          client.assign_date && client.assign_date.includes(selectedEntryDate),
-      );
-    }
-    
-    // Apply followup date filter
-    if (selectedFollowupDate) {
-      tempFiltered = tempFiltered.filter(
-        (client) =>
-          client.followup_date &&
-          client.followup_date.includes(selectedFollowupDate),
-      );
-    }
-    
-    // Apply stage filter
-    if (selectedStages.length > 0) {
-      tempFiltered = tempFiltered.filter(
-        (client) => client.stage && selectedStages.includes(client.stage),
-      );
-    }
-    
-    // Apply user filter
-    if (selectedUsers.length > 0) {
-      tempFiltered = tempFiltered.filter(
-        (client) =>
-          client.assigned_to && selectedUsers.includes(client.assigned_to),
-      );
-    }
-    
-    // Apply city filter
-    if (selectedCities.length > 0) {
-      tempFiltered = tempFiltered.filter(
-        (client) => client.city && selectedCities.includes(client.city),
-      );
-    }
-    
-    // Apply entry date range filter
-    if (selectedEntryFromDate || selectedEntryToDate) {
-      tempFiltered = tempFiltered.filter((client) => {
-        if (!client.assign_date) return false;
-        const clientDate = new Date(client.assign_date);
-        if (isNaN(clientDate.getTime())) return false;
-        let fromDateValid = true;
-        let toDateValid = true;
-        if (selectedEntryFromDate) {
-          const fromDate = new Date(selectedEntryFromDate);
-          fromDateValid = clientDate >= fromDate;
-        }
-        if (selectedEntryToDate) {
-          const toDate = new Date(selectedEntryToDate);
-          toDateValid = clientDate <= toDate;
-        }
-        return fromDateValid && toDateValid;
-      });
-    }
-    
-    // Apply followup date range filter
-    if (selectedFollowupFromDate || selectedFollowupToDate) {
-      tempFiltered = tempFiltered.filter((client) => {
-        if (!client.followup_date) return false;
-        const clientDate = new Date(client.followup_date);
-        if (isNaN(clientDate.getTime())) return false;
-        let fromDateValid = true;
-        let toDateValid = true;
-        if (selectedFollowupFromDate) {
-          const fromDate = new Date(selectedFollowupFromDate);
-          fromDateValid = clientDate >= fromDate;
-        }
-        if (selectedFollowupToDate) {
-          const toDate = new Date(selectedFollowupToDate);
-          toDateValid = clientDate <= toDate;
-        }
-        return fromDateValid && toDateValid;
-      });
-    }
-    
-    // Now limit the FILTERED results, not the original rawData
-    const limitedClients = tempFiltered.slice(0, customRecordCount);
-    setFilteredClients(limitedClients);
-    setCurrentPage(1);
-    setItemsPerPage(customRecordCount);
-  } else {
-    // Reset to normal pagination - apply filters first
-    applyFilters();
-    setItemsPerPage(5); // Reset to default
-  }
-}, [customRecordCount, rawData, searchTerm, selectedEntryDate, selectedFollowupDate, 
-    selectedStages, selectedUsers, selectedCities, selectedEntryFromDate, 
-    selectedEntryToDate, selectedFollowupFromDate, selectedFollowupToDate]); 
+  useEffect(() => {
+    if (
+      customRecordCount &&
+      typeof customRecordCount === 'number' &&
+      customRecordCount > 0
+    ) {
+      // First, apply all active filters to get filtered data
+      let tempFiltered = [...rawData];
+      const lowerSearch = searchTerm.toLowerCase();
 
+      // Apply search filter
+      if (searchTerm) {
+        tempFiltered = tempFiltered.filter((client) => {
+          const searchFields = [
+            client.name?.toLowerCase() || '',
+            client.number?.toString() || '',
+            client.email?.toLowerCase() || '',
+            client.address?.toLowerCase() || '',
+            client.area?.toLowerCase() || '',
+            client.cat_name?.toLowerCase() || '',
+            client.master_id?.toString() || '',
+            client.status?.toLowerCase() || '',
+            client.assigned_to?.toLowerCase() || '',
+            client.city?.toLowerCase() || '',
+            client.stage?.toLowerCase() || '',
+          ];
+          return searchFields.some((field) => field.includes(lowerSearch));
+        });
+      }
 
+      // Apply entry date filter
+      if (selectedEntryDate) {
+        tempFiltered = tempFiltered.filter(
+          (client) =>
+            client.assign_date &&
+            client.assign_date.includes(selectedEntryDate),
+        );
+      }
+
+      // Apply followup date filter
+      if (selectedFollowupDate) {
+        tempFiltered = tempFiltered.filter(
+          (client) =>
+            client.followup_date &&
+            client.followup_date.includes(selectedFollowupDate),
+        );
+      }
+
+      // Apply stage filter
+      if (selectedStages.length > 0) {
+        tempFiltered = tempFiltered.filter(
+          (client) => client.stage && selectedStages.includes(client.stage),
+        );
+      }
+
+      // Apply user filter
+      if (selectedUsers.length > 0) {
+        tempFiltered = tempFiltered.filter(
+          (client) =>
+            client.assigned_to && selectedUsers.includes(client.assigned_to),
+        );
+      }
+
+      // Apply city filter
+      if (selectedCities.length > 0) {
+        tempFiltered = tempFiltered.filter(
+          (client) => client.city && selectedCities.includes(client.city),
+        );
+      }
+
+      // Apply entry date range filter
+      if (selectedEntryFromDate || selectedEntryToDate) {
+        tempFiltered = tempFiltered.filter((client) => {
+          if (!client.assign_date) return false;
+          const clientDate = new Date(client.assign_date);
+          if (isNaN(clientDate.getTime())) return false;
+          let fromDateValid = true;
+          let toDateValid = true;
+          if (selectedEntryFromDate) {
+            const fromDate = new Date(selectedEntryFromDate);
+            fromDateValid = clientDate >= fromDate;
+          }
+          if (selectedEntryToDate) {
+            const toDate = new Date(selectedEntryToDate);
+            toDateValid = clientDate <= toDate;
+          }
+          return fromDateValid && toDateValid;
+        });
+      }
+
+      // Apply followup date range filter
+      if (selectedFollowupFromDate || selectedFollowupToDate) {
+        tempFiltered = tempFiltered.filter((client) => {
+          if (!client.followup_date) return false;
+          const clientDate = new Date(client.followup_date);
+          if (isNaN(clientDate.getTime())) return false;
+          let fromDateValid = true;
+          let toDateValid = true;
+          if (selectedFollowupFromDate) {
+            const fromDate = new Date(selectedFollowupFromDate);
+            fromDateValid = clientDate >= fromDate;
+          }
+          if (selectedFollowupToDate) {
+            const toDate = new Date(selectedFollowupToDate);
+            toDateValid = clientDate <= toDate;
+          }
+          return fromDateValid && toDateValid;
+        });
+      }
+
+      // Now limit the FILTERED results, not the original rawData
+      const limitedClients = tempFiltered.slice(0, customRecordCount);
+      setFilteredClients(limitedClients);
+      setCurrentPage(1);
+      setItemsPerPage(customRecordCount);
+    } else {
+      // Reset to normal pagination - apply filters first
+      applyFilters();
+      setItemsPerPage(5); // Reset to default
+    }
+  }, [
+    customRecordCount,
+    rawData,
+    searchTerm,
+    selectedEntryDate,
+    selectedFollowupDate,
+    selectedStages,
+    selectedUsers,
+    selectedCities,
+    selectedEntryFromDate,
+    selectedEntryToDate,
+    selectedFollowupFromDate,
+    selectedFollowupToDate,
+  ]);
 
   const handleCustomRecordInput = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value;
@@ -2736,7 +3865,7 @@ useEffect(() => {
   // Add this function to clear the custom record count
   const clearCustomRecordCount = () => {
     setCustomRecordCount('');
-    setItemsPerPage(5); // Reset to default
+    setItemsPerPage(5);
   };
 
   // Handle "Select All" and "Clear All"
@@ -2763,17 +3892,34 @@ useEffect(() => {
 
   return (
     <div>
-      <div className="sticky top-0 z-50 w-full bg-white/95 dark:bg-boxdark/95 backdrop-blur-sm shadow-lg border-b border-gray-200/80 dark:border-gray-800">
+      <div className="sticky top-0 z-50 w-full bg-white/95 dark:bg-boxdark/95 backdrop-blur-sm shadow-lg border-b border-gray-200/80 dark:border-gray-800 mb-4">
         <div className="px-4 py-3">
           {/* Header with Breadcrumb and Compact Search */}
           <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 mb-2">
             <div className="min-w-0">
-              <Breadcrumb pageName="Master Data" />
+              <h2 className="text-lg font-medium">Master Data</h2>
+
+              <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-gradient-to-r from-blue-100 to-blue-200 dark:from-blue-900/30 dark:to-blue-800/30 text-blue-800 dark:text-blue-300 border border-blue-200 dark:border-blue-700/30 mt-2">
+                <svg
+                  className="w-4 h-4 mr-1"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth="2"
+                    d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
+                  />
+                </svg>
+                {totalItems} Leads
+              </span>
             </div>
 
             {/* Compact Search Input and Custom Record Count */}
             <div className="flex flex-col sm:flex-row gap-3 w-full sm:w-auto">
-              {/* NEW: Custom Record Count Input */}
+              {/* Custom Record Count Input */}
               <div className="w-full sm:w-48">
                 <div className="relative">
                   <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
@@ -2884,109 +4030,105 @@ useEffect(() => {
               )}
             </div>
 
-             
-<div className="flex flex-wrap items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2">
+              {/* Reset Filter Button */}
+              <button
+                onClick={clearFilters}
+                className="bg-gradient-to-r from-gray-600 to-gray-700 hover:from-gray-700 hover:to-gray-800 text-white px-4 py-2 rounded-lg text-sm font-medium flex items-center gap-2 transition-all shadow-md hover:shadow-lg whitespace-nowrap"
+              >
+                <svg
+                  className="h-4 w-4"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
+                  />
+                </svg>
+                Reset Filter
+              </button>
 
-   {/* NEW: Reset Filter Button */}
-  <button
-    onClick={clearFilters}
-    className="bg-gradient-to-r from-gray-600 to-gray-700 hover:from-gray-700 hover:to-gray-800 text-white px-4 py-2 rounded-lg text-sm font-medium flex items-center gap-2 transition-all shadow-md hover:shadow-lg"
-  >
-    <svg
-      className="h-4 w-4"
-      fill="none"
-      stroke="currentColor"
-      viewBox="0 0 24 24"
-    >
-      <path
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        strokeWidth={2}
-        d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
-      />
-    </svg>
-    Reset Filter
-  </button>
-  
-  {/* Add New Button */}
-  <button
-    onClick={() => setShowAddPopup(true)}
-    className="bg-gradient-to-r from-purple-600 to-purple-700 hover:from-purple-700 hover:to-purple-800 text-white px-4 py-2 rounded-lg text-sm font-medium flex items-center gap-2 transition-all shadow-md hover:shadow-lg"
-  >
-    <svg
-      className="h-4 w-4"
-      fill="none"
-      stroke="currentColor"
-      viewBox="0 0 24 24"
-    >
-      <path
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        strokeWidth={2}
-        d="M12 4v16m8-8H4"
-      />
-    </svg>
-    Add New
-  </button>
+              {/* Add New Button */}
+              <button
+                onClick={() => setShowAddPopup(true)}
+                className="bg-gradient-to-r from-purple-600 to-purple-700 hover:from-purple-700 hover:to-purple-800 text-white px-4 py-2 rounded-lg text-sm font-medium flex items-center gap-2 transition-all shadow-md hover:shadow-lg"
+              >
+                <svg
+                  className="h-4 w-4"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M12 4v16m8-8H4"
+                  />
+                </svg>
+                Add New
+              </button>
 
+              {/* Import Button */}
+              <button
+                onClick={() => setShowImportPopup(true)}
+                className="bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white px-4 py-2 rounded-lg text-sm font-medium flex items-center gap-2 transition-all shadow-md hover:shadow-lg"
+              >
+                <svg
+                  className="h-4 w-4"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M9 19l3 3m0 0l3-3m-3 3V10"
+                  />
+                </svg>
+                Import
+              </button>
 
-
-  {/* Import Button */}
-  <button
-    onClick={() => setShowImportPopup(true)}
-    className="bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white px-4 py-2 rounded-lg text-sm font-medium flex items-center gap-2 transition-all shadow-md hover:shadow-lg"
-  >
-    <svg
-      className="h-4 w-4"
-      fill="none"
-      stroke="currentColor"
-      viewBox="0 0 24 24"
-    >
-      <path
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        strokeWidth={2}
-        d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M9 19l3 3m0 0l3-3m-3 3V10"
-      />
-    </svg>
-    Import
-  </button>
-
-  {/* Reassign Button */}
-  <button
-    onClick={() => {
-      if (selectedMasterIds.length === 0) {
-        alert('Please select at least one record to assign/reassign');
-        return;
-      }
-      setShowAssignPopup(true);
-    }}
-    disabled={selectedMasterIds.length === 0}
-    className={`bg-gradient-to-r from-green-600 to-green-700 text-white px-4 py-2 rounded-lg text-sm font-medium flex items-center gap-2 transition-all shadow-md hover:shadow-lg ${
-      selectedMasterIds.length === 0
-        ? 'opacity-50 cursor-not-allowed'
-        : 'hover:from-green-700 hover:to-green-800'
-    }`}
-  >
-    <svg
-      className="h-4 w-4"
-      fill="none"
-      stroke="currentColor"
-      viewBox="0 0 24 24"
-    >
-      <path
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        strokeWidth={2}
-        d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197m13.5-6a3.5 3.5 0 11-7 0 3.5 3.5 0 017 0z"
-      />
-    </svg>
-    {selectedMasterIds.length > 1
-      ? `Reassign (${selectedMasterIds.length})`
-      : 'ReAssign'}
-  </button>
-</div>
-
+              {/* Reassign Button */}
+              <button
+                onClick={() => {
+                  if (selectedMasterIds.length === 0) {
+                    alert(
+                      'Please select at least one record to assign/reassign',
+                    );
+                    return;
+                  }
+                  setShowAssignPopup(true);
+                }}
+                disabled={selectedMasterIds.length === 0}
+                className={`bg-gradient-to-r from-green-600 to-green-700 text-white px-4 py-2 rounded-lg text-sm font-medium flex items-center gap-2 transition-all shadow-md hover:shadow-lg ${selectedMasterIds.length === 0
+                    ? 'opacity-50 cursor-not-allowed'
+                    : 'hover:from-green-700 hover:to-green-800'
+                  }`}
+              >
+                <svg
+                  className="h-4 w-4"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197m13.5-6a3.5 3.5 0 11-7 0 3.5 3.5 0 017 0z"
+                  />
+                </svg>
+                {selectedMasterIds.length > 1
+                  ? `Reassign (${selectedMasterIds.length})`
+                  : 'ReAssign'}
+              </button>
+            </div>
           </div>
         </div>
       </div>
@@ -3034,8 +4176,8 @@ useEffect(() => {
                                 ...assignData,
                                 assignedTo: checked
                                   ? assignData.assignedTo.filter(
-                                      (u) => u !== user.name,
-                                    )
+                                    (u) => u !== user.name,
+                                  )
                                   : [...assignData.assignedTo, user.name],
                               })
                             }
@@ -3045,9 +4187,6 @@ useEffect(() => {
                           <div className="text-sm">
                             <div className="font-medium text-black dark:text-white">
                               {user.name}
-                            </div>
-                            <div className="text-xs text-gray-500">
-                              {user.role}
                             </div>
                           </div>
                         </label>
@@ -3159,118 +4298,141 @@ useEffect(() => {
         area={area}
       />
 
+      {/* Update the duplicate modal in your RawData component */}
 
-{/* Update the duplicate modal in your RawData component */}
+      {showDuplicateModal && (
+        <div className="fixed inset-0 z-[99999] bg-black bg-opacity-75 flex justify-center items-center px-4">
+          <div className="bg-white dark:bg-boxdark p-6 rounded-lg shadow-lg w-full max-w-2xl max-h-[80vh] overflow-auto border dark:border-strokedark">
+            {/* Header */}
+            <div className="flex justify-between items-center border-b mb-4 pb-3 dark:border-strokedark">
+              <h2 className="text-xl font-bold dark:text-white text-black">
+                Duplicate Contacts Found ({duplicateEntries.length})
+              </h2>
+              <button
+                onClick={handleDuplicateModalClose}
+                className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 text-xl"
+              >
+                ×
+              </button>
+            </div>
 
+            {/* Warning Message */}
+            <div className="mb-6 p-4 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg">
+              <div className="flex items-center gap-3">
+                <svg
+                  className="w-6 h-6 text-yellow-600 dark:text-yellow-400"
+                  fill="currentColor"
+                  viewBox="0 0 20 20"
+                >
+                  <path
+                    fillRule="evenodd"
+                    d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z"
+                    clipRule="evenodd"
+                  />
+                </svg>
+                <div>
+                  <h3 className="font-semibold text-yellow-800 dark:text-yellow-300">
+                    {duplicateEntries.length} duplicate contact(s) found
+                  </h3>
+                  <p className="text-sm text-yellow-700 dark:text-yellow-400 mt-1">
+                    These contacts already exist in the system and were skipped.
+                  </p>
+                </div>
+              </div>
+            </div>
 
-{showDuplicateModal && (
-  <div className="fixed inset-0 z-[99999] bg-black bg-opacity-75 flex justify-center items-center px-4">
-    <div className="bg-white dark:bg-boxdark p-6 rounded-lg shadow-lg w-full max-w-2xl max-h-[80vh] overflow-auto border dark:border-strokedark">
-      {/* Header */}
-      <div className="flex justify-between items-center border-b mb-4 pb-3 dark:border-strokedark">
-        <h2 className="text-xl font-bold dark:text-white text-black">
-          Duplicate Contacts Found ({duplicateEntries.length})
-        </h2>
-        <button
-          onClick={handleDuplicateModalClose}
-          className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 text-xl"
-        >
-          ×
-        </button>
-      </div>
+            {/* Duplicates List */}
+            <div className="space-y-4 mb-6">
+              <h4 className="font-medium text-gray-700 dark:text-gray-300">
+                Duplicate Entries:
+              </h4>
 
-      {/* Warning Message */}
-      <div className="mb-6 p-4 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg">
-        <div className="flex items-center gap-3">
-          <svg className="w-6 h-6 text-yellow-600 dark:text-yellow-400" fill="currentColor" viewBox="0 0 20 20">
-            <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
-          </svg>
-          <div>
-            <h3 className="font-semibold text-yellow-800 dark:text-yellow-300">
-              {duplicateEntries.length} duplicate contact(s) found
-            </h3>
-            <p className="text-sm text-yellow-700 dark:text-yellow-400 mt-1">
-              These contacts already exist in the system and were skipped.
-            </p>
+              <div className="overflow-y-auto max-h-[300px]">
+                <table className="w-full text-sm">
+                  <thead className="bg-gray-100 dark:bg-gray-800">
+                    <tr>
+                      <th className="p-2 text-left">Row</th>
+                      <th className="p-2 text-left">New Name</th>
+                      <th className="p-2 text-left">Number</th>
+                      <th className="p-2 text-left">Existing Name</th>
+                      <th className="p-2 text-left">Existing ID</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
+                    {duplicateEntries.slice(0, 10).map((dup, index) => (
+                      <tr
+                        key={index}
+                        className="hover:bg-gray-50 dark:hover:bg-gray-800"
+                      >
+                        <td className="p-2 font-medium">{dup.row}</td>
+                        <td className="p-2">{dup.name}</td>
+                        <td className="p-2 font-mono text-red-600 dark:text-red-400">
+                          {dup.number}
+                        </td>
+                        <td className="p-2">{dup.existingName}</td>
+                        <td className="p-2">{dup.existingId}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+
+                {duplicateEntries.length > 10 && (
+                  <div className="text-center p-2 text-sm text-gray-500 dark:text-gray-400">
+                    + {duplicateEntries.length - 10} more duplicates...
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Action Buttons */}
+            <div className="flex flex-col sm:flex-row gap-3">
+              <button
+                onClick={() => {
+                  // Option to download duplicate list as CSV
+                  const csvContent =
+                    'data:text/csv;charset=utf-8,' +
+                    'Row,New Name,Number,Existing Name,Existing ID\n' +
+                    duplicateEntries
+                      .map(
+                        (d) =>
+                          `${d.row},"${d.name}","${d.number}","${d.existingName}",${d.existingId}`,
+                      )
+                      .join('\n');
+
+                  const encodedUri = encodeURI(csvContent);
+                  const link = document.createElement('a');
+                  link.setAttribute('href', encodedUri);
+                  link.setAttribute('download', 'duplicates.csv');
+                  document.body.appendChild(link);
+                  link.click();
+                  document.body.removeChild(link);
+                }}
+                className="flex-1 px-4 py-3 bg-blue-500 hover:bg-blue-600 text-white rounded-lg font-medium transition-colors flex items-center justify-center gap-2"
+              >
+                <svg
+                  className="w-4 h-4"
+                  fill="currentColor"
+                  viewBox="0 0 20 20"
+                >
+                  <path
+                    fillRule="evenodd"
+                    d="M3 17a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm3.293-7.707a1 1 0 011.414 0L9 10.586V3a1 1 0 112 0v7.586l1.293-1.293a1 1 0 111.414 1.414l-3 3a1 1 0 01-1.414 0l-3-3a1 1 0 010-1.414z"
+                    clipRule="evenodd"
+                  />
+                </svg>
+                Download Duplicates List
+              </button>
+
+              <button
+                onClick={handleDuplicateModalClose}
+                className="flex-1 px-4 py-3 bg-gray-200 hover:bg-gray-300 dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-800 dark:text-gray-200 rounded-lg font-medium transition-colors"
+              >
+                Close & Continue
+              </button>
+            </div>
           </div>
         </div>
-      </div>
-
-      {/* Duplicates List */}
-      <div className="space-y-4 mb-6">
-        <h4 className="font-medium text-gray-700 dark:text-gray-300">
-          Duplicate Entries:
-        </h4>
-        
-        <div className="overflow-y-auto max-h-[300px]">
-          <table className="w-full text-sm">
-            <thead className="bg-gray-100 dark:bg-gray-800">
-              <tr>
-                <th className="p-2 text-left">Row</th>
-                <th className="p-2 text-left">New Name</th>
-                <th className="p-2 text-left">Number</th>
-                <th className="p-2 text-left">Existing Name</th>
-                <th className="p-2 text-left">Existing ID</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
-              {duplicateEntries.slice(0, 10).map((dup, index) => (
-                <tr key={index} className="hover:bg-gray-50 dark:hover:bg-gray-800">
-                  <td className="p-2 font-medium">{dup.row}</td>
-                  <td className="p-2">{dup.name}</td>
-                  <td className="p-2 font-mono text-red-600 dark:text-red-400">{dup.number}</td>
-                  <td className="p-2">{dup.existingName}</td>
-                  <td className="p-2">{dup.existingId}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-          
-          {duplicateEntries.length > 10 && (
-            <div className="text-center p-2 text-sm text-gray-500 dark:text-gray-400">
-              + {duplicateEntries.length - 10} more duplicates...
-            </div>
-          )}
-        </div>
-      </div>
-
-      {/* Action Buttons */}
-      <div className="flex flex-col sm:flex-row gap-3">
-        <button
-          onClick={() => {
-            // Option to download duplicate list as CSV
-            const csvContent = "data:text/csv;charset=utf-8," 
-              + "Row,New Name,Number,Existing Name,Existing ID\n"
-              + duplicateEntries.map(d => 
-                  `${d.row},"${d.name}","${d.number}","${d.existingName}",${d.existingId}`
-                ).join("\n");
-            
-            const encodedUri = encodeURI(csvContent);
-            const link = document.createElement("a");
-            link.setAttribute("href", encodedUri);
-            link.setAttribute("download", "duplicates.csv");
-            document.body.appendChild(link);
-            link.click();
-            document.body.removeChild(link);
-          }}
-          className="flex-1 px-4 py-3 bg-blue-500 hover:bg-blue-600 text-white rounded-lg font-medium transition-colors flex items-center justify-center gap-2"
-        >
-          <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
-            <path fillRule="evenodd" d="M3 17a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm3.293-7.707a1 1 0 011.414 0L9 10.586V3a1 1 0 112 0v7.586l1.293-1.293a1 1 0 111.414 1.414l-3 3a1 1 0 01-1.414 0l-3-3a1 1 0 010-1.414z" clipRule="evenodd" />
-          </svg>
-          Download Duplicates List
-        </button>
-        
-        <button
-          onClick={handleDuplicateModalClose}
-          className="flex-1 px-4 py-3 bg-gray-200 hover:bg-gray-300 dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-800 dark:text-gray-200 rounded-lg font-medium transition-colors"
-        >
-          Close & Continue
-        </button>
-      </div>
-    </div>
-  </div>
-)}
+      )}
 
       {/* Main Data Table */}
 
@@ -3322,9 +4484,8 @@ useEffect(() => {
                       >
                         <FontAwesomeIcon
                           icon={faChevronDown}
-                          className={`h-3 w-3 transition-transform duration-200 ${
-                            showEntryDateCalendar ? 'rotate-180' : ''
-                          }`}
+                          className={`h-3 w-3 transition-transform duration-200 ${showEntryDateCalendar ? 'rotate-180' : ''
+                            }`}
                         />
                       </button>
                     </div>
@@ -3400,96 +4561,103 @@ useEffect(() => {
                     )}
                   </th>
 
-                   
-                             {/* FollowUp Date Column with Filter */}
-                             <th className="py-5 px-4 relative">
-                               <div ref={followupDateRef} className="flex items-center justify-between gap-2">
-                                 <span className="text-xs font-extrabold uppercase tracking-wider text-gray-700 dark:text-gray-300">
-                                   FollowUp Date
-                                 </span>
-                                 <button
-                                   onClick={(e) => {
-                                     e.stopPropagation();
-                                     closeAllDropdowns();
-                                     setShowFollowupDateCalendar(!showFollowupDateCalendar);
-                                   }}
-                                   className="text-gray-500 hover:text-blue-600 dark:text-gray-400 dark:hover:text-blue-400 focus:outline-none transition-colors"
-                                 >
-                                   <FontAwesomeIcon 
-                                     icon={faChevronDown} 
-                                     className={`h-3 w-3 transition-transform duration-200 ${showFollowupDateCalendar ? 'rotate-180' : ''}`}
-                                   />
-                                 </button>
-                               </div>
-                               
-                               {/* FollowUp Date Calendar Dropdown */}
-                               {showFollowupDateCalendar && (
-                                 <div className="absolute top-full left-0 mt-1 z-50 bg-white dark:bg-boxdark border border-gray-300 dark:border-gray-700 rounded-lg shadow-lg p-4 min-w-[250px]">
-                                   <div className="flex justify-between items-center mb-3">
-                                     <span className="font-semibold text-sm dark:text-white">Select Followup Date Range</span>
-                                     <button
-                                       onClick={(e) => {
-                                         e.stopPropagation();
-                                         setSelectedFollowupFromDate('');
-                                         setSelectedFollowupToDate('');
-                                         applyFilters();
-                                         setShowFollowupDateCalendar(false);
-                                       }}
-                                       className="text-xs font-medium text-blue-600 hover:text-blue-800 dark:text-blue-400 transition-colors"
-                                     >
-                                       Clear
-                                     </button>
-                                   </div>
-                                   
-                                   <div className="space-y-3">
-                                     <div>
-                                       <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">
-                                         From Date
-                                       </label>
-                                       <input
-                                         type="date"
-                                         value={selectedFollowupFromDate}
-                                         onChange={(e) => {
-                                           e.stopPropagation();
-                                           setSelectedFollowupFromDate(e.target.value);
-                                         }}
-                                         onClick={(e) => e.stopPropagation()}
-                                         className="w-full p-2 border border-gray-300 dark:border-gray-600 rounded-lg text-sm font-medium dark:bg-form-input dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                                       />
-                                     </div>
-                                     
-                                     <div>
-                                       <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">
-                                         To Date
-                                       </label>
-                                       <input
-                                         type="date"
-                                         value={selectedFollowupToDate}
-                                         onChange={(e) => {
-                                           e.stopPropagation();
-                                           setSelectedFollowupToDate(e.target.value);
-                                         }}
-                                         onClick={(e) => e.stopPropagation()}
-                                         className="w-full p-2 border border-gray-300 dark:border-gray-600 rounded-lg text-sm font-medium dark:bg-form-input dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                                       />
-                                     </div>
-                                   </div>
-                                   
-                                   <div className="mt-4">
-                                     <button
-                                       onClick={(e) => {
-                                         e.stopPropagation();
-                                         applyFilters();
-                                         setShowFollowupDateCalendar(false);
-                                       }}
-                                       className="w-full py-2.5 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white text-sm font-semibold rounded-lg transition-all duration-200 shadow-md hover:shadow-lg"
-                                     >
-                                       Apply Filter
-                                     </button>
-                                   </div>
-                                 </div>
-                               )}
-                             </th>
+                  {/* FollowUp Date Column with Filter */}
+                  <th className="py-5 px-4 relative">
+                    <div
+                      ref={followupDateRef}
+                      className="flex items-center justify-between gap-2"
+                    >
+                      <span className="text-xs font-extrabold uppercase tracking-wider text-gray-700 dark:text-gray-300">
+                        FollowUp Date
+                      </span>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          closeAllDropdowns();
+                          setShowFollowupDateCalendar(
+                            !showFollowupDateCalendar,
+                          );
+                        }}
+                        className="text-gray-500 hover:text-blue-600 dark:text-gray-400 dark:hover:text-blue-400 focus:outline-none transition-colors"
+                      >
+                        <FontAwesomeIcon
+                          icon={faChevronDown}
+                          className={`h-3 w-3 transition-transform duration-200 ${showFollowupDateCalendar ? 'rotate-180' : ''
+                            }`}
+                        />
+                      </button>
+                    </div>
+
+                    {/* FollowUp Date Calendar Dropdown */}
+                    {showFollowupDateCalendar && (
+                      <div className="absolute top-full left-0 mt-1 z-50 bg-white dark:bg-boxdark border border-gray-300 dark:border-gray-700 rounded-lg shadow-lg p-4 min-w-[250px]">
+                        <div className="flex justify-between items-center mb-3">
+                          <span className="font-semibold text-sm dark:text-white">
+                            Select Followup Date Range
+                          </span>
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setSelectedFollowupFromDate('');
+                              setSelectedFollowupToDate('');
+                              applyFilters();
+                              setShowFollowupDateCalendar(false);
+                            }}
+                            className="text-xs font-medium text-blue-600 hover:text-blue-800 dark:text-blue-400 transition-colors"
+                          >
+                            Clear
+                          </button>
+                        </div>
+
+                        <div className="space-y-3">
+                          <div>
+                            <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">
+                              From Date
+                            </label>
+                            <input
+                              type="date"
+                              value={selectedFollowupFromDate}
+                              onChange={(e) => {
+                                e.stopPropagation();
+                                setSelectedFollowupFromDate(e.target.value);
+                              }}
+                              onClick={(e) => e.stopPropagation()}
+                              className="w-full p-2 border border-gray-300 dark:border-gray-600 rounded-lg text-sm font-medium dark:bg-form-input dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                            />
+                          </div>
+
+                          <div>
+                            <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">
+                              To Date
+                            </label>
+                            <input
+                              type="date"
+                              value={selectedFollowupToDate}
+                              onChange={(e) => {
+                                e.stopPropagation();
+                                setSelectedFollowupToDate(e.target.value);
+                              }}
+                              onClick={(e) => e.stopPropagation()}
+                              className="w-full p-2 border border-gray-300 dark:border-gray-600 rounded-lg text-sm font-medium dark:bg-form-input dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                            />
+                          </div>
+                        </div>
+
+                        <div className="mt-4">
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              applyFilters();
+                              setShowFollowupDateCalendar(false);
+                            }}
+                            className="w-full py-2.5 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white text-sm font-semibold rounded-lg transition-all duration-200 shadow-md hover:shadow-lg"
+                          >
+                            Apply Filter
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                  </th>
 
                   {/* Name Column */}
                   <th className="py-5 px-4">
@@ -3505,208 +4673,232 @@ useEffect(() => {
                     </div>
                   </th>
 
- 
-                        {/* City Column with Filter */}
-                                <th className="py-5 px-4 relative">
-                                  <div ref={cityFilterRef} className="flex items-center justify-between gap-2">
-                                    <span className="text-xs font-extrabold uppercase tracking-wider text-gray-700 dark:text-gray-300">
-                                      City
-                                    </span>
-                                    <button
-                                      onClick={(e) => {
-                                        e.stopPropagation();
-                                        closeAllDropdowns();
-                                        setShowCityFilter(!showCityFilter);
-                                      }}
-                                      className="text-gray-500 hover:text-blue-600 dark:text-gray-400 dark:hover:text-blue-400 focus:outline-none transition-colors"
-                                    >
-                                      <FontAwesomeIcon 
-                                        icon={faFilter} 
-                                        className={`h-3 w-3 transition-colors duration-200 ${selectedCities.length > 0 ? 'text-blue-600' : ''} ${showCityFilter ? 'text-blue-600' : ''}`}
-                                      />
-                                    </button>
-                                  </div>
-                                  
-                                  {/* City Filter Dropdown */}
-                                  {showCityFilter && (
-                                    <div className="absolute top-full left-0 mt-1 z-50 bg-white dark:bg-boxdark border border-gray-300 dark:border-gray-700 rounded-lg shadow-lg p-4 min-w-[200px] max-h-[300px] overflow-y-auto">
-                                      <div className="flex justify-between items-center mb-3">
-                                        <span className="font-semibold text-sm dark:text-white">Filter Cities</span>
-                                        <div className="flex gap-2">
-                                          <button
-                                            onClick={(e) => {
-                                              e.stopPropagation();
-                                              setSelectedCities([]);
-                                            }}
-                                            className="text-xs font-medium text-blue-600 hover:text-blue-800 dark:text-blue-400 transition-colors"
-                                          >
-                                            Clear All
-                                          </button>
-                                          <button
-                                            onClick={(e) => {
-                                              e.stopPropagation();
-                                              setShowCityFilter(false);
-                                            }}
-                                            className="text-xs font-medium text-gray-500 hover:text-gray-700 dark:text-gray-400 transition-colors"
-                                          >
-                                            ×
-                                          </button>
-                                        </div>
-                                      </div>
-                                      
-                                      {availableCities.length > 0 ? (
-                                        <>
-                                          {availableCities.map((city) => (
-                                            <div key={city} className="flex items-center mb-2">
-                                              <input
-                                                type="checkbox"
-                                                id={`city-${city}`}
-                                                checked={selectedCities.includes(city)}
-                                                onChange={(e) => {
-                                                  e.stopPropagation();
-                                                  handleCitySelect(city);
-                                                }}
-                                                onClick={(e) => e.stopPropagation()}
-                                                className="h-3.5 w-3.5 mr-2.5 text-blue-600 rounded border-gray-300 focus:ring-2 focus:ring-blue-500"
-                                              />
-                                              <label 
-                                                htmlFor={`city-${city}`}
-                                                className="text-sm font-medium dark:text-white cursor-pointer truncate hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
-                                              >
-                                                {city}
-                                              </label>
-                                            </div>
-                                          ))}
-                                        </>
-                                      ) : (
-                                        <div className="text-sm font-medium text-gray-500 dark:text-gray-400 italic py-3 text-center">
-                                          No cities available
-                                        </div>
-                                      )}
-                                      
-                                      {selectedCities.length > 0 && (
-                                        <div className="mt-4 pt-3 border-t border-gray-200 dark:border-gray-700">
-                                          <div className="text-xs font-semibold text-gray-600 dark:text-gray-400 mb-2">
-                                            Selected ({selectedCities.length}):
-                                          </div>
-                                          <div className="flex flex-wrap gap-1.5">
-                                            {selectedCities.map(city => (
-                                              <span key={city} className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold bg-gradient-to-r from-teal-50 to-teal-100 dark:from-teal-900/30 dark:to-teal-800/20 text-teal-800 dark:text-teal-300 border border-teal-200 dark:border-teal-700/30 shadow-sm">
-                                                City: {city}
-                                                <button
-                                                  onClick={() => handleCitySelect(city)}
-                                                  className="ml-1 text-teal-600 hover:text-teal-800 dark:text-teal-400 transition-colors"
-                                                >
-                                                  ×
-                                                </button>
-                                              </span>
-                                            ))}
-                                          </div>
-                                        </div>
-                                      )}
-                                    </div>
-                                  )}
-                                </th>
+                  {/* City Column with Filter */}
+                  <th className="py-5 px-4 relative">
+                    <div
+                      ref={cityFilterRef}
+                      className="flex items-center justify-between gap-2"
+                    >
+                      <span className="text-xs font-extrabold uppercase tracking-wider text-gray-700 dark:text-gray-300">
+                        City
+                      </span>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          closeAllDropdowns();
+                          setShowCityFilter(!showCityFilter);
+                        }}
+                        className="text-gray-500 hover:text-blue-600 dark:text-gray-400 dark:hover:text-blue-400 focus:outline-none transition-colors"
+                      >
+                        <FontAwesomeIcon
+                          icon={faFilter}
+                          className={`h-3 w-3 transition-colors duration-200 ${selectedCities.length > 0 ? 'text-blue-600' : ''
+                            } ${showCityFilter ? 'text-blue-600' : ''}`}
+                        />
+                      </button>
+                    </div>
 
+                    {/* City Filter Dropdown */}
+                    {showCityFilter && (
+                      <div className="absolute top-full left-0 mt-1 z-50 bg-white dark:bg-boxdark border border-gray-300 dark:border-gray-700 rounded-lg shadow-lg p-4 min-w-[200px] max-h-[300px] overflow-y-auto">
+                        <div className="flex justify-between items-center mb-3">
+                          <span className="font-semibold text-sm dark:text-white">
+                            Filter Cities
+                          </span>
+                          <div className="flex gap-2">
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setSelectedCities([]);
+                                setShowCityFilter(false);
+                              }}
+                              className="text-xs font-medium text-blue-600 hover:text-blue-800 dark:text-blue-400 transition-colors"
+                            >
+                              Clear All
+                            </button>
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setShowCityFilter(false);
+                              }}
+                              className="text-xs font-medium text-gray-500 hover:text-gray-700 dark:text-gray-400 transition-colors"
+                            >
+                              ×
+                            </button>
+                          </div>
+                        </div>
 
-                                     {/* User Assign Column with Filter */}
-                                              <th className="py-5 px-4 relative">
-                                                <div ref={userFilterRef} className="flex items-center justify-between gap-2">
-                                                  <span className="text-xs font-extrabold uppercase tracking-wider text-gray-700 dark:text-gray-300">
-                                                    User Assign
-                                                  </span>
-                                                  <button
-                                                    onClick={(e) => {
-                                                      e.stopPropagation();
-                                                      closeAllDropdowns();
-                                                      setShowUserFilter(!showUserFilter);
-                                                    }}
-                                                    className="text-gray-500 hover:text-blue-600 dark:text-gray-400 dark:hover:text-blue-400 focus:outline-none transition-colors"
-                                                  >
-                                                    <FontAwesomeIcon
-                                                      icon={faFilter}
-                                                      className={`h-3 w-3 transition-colors duration-200 ${selectedUsers.length > 0 ? 'text-blue-600' : ''} ${showUserFilter ? 'text-blue-600' : ''}`}
-                                                    />
-                                                  </button>
-                                                </div>
-                                                
-                                                {/* Assigned User Filter Dropdown */}
-                                                {showUserFilter && (
-                                                  <div className="absolute top-full right-0 mt-1 z-50 bg-white dark:bg-boxdark border border-gray-300 dark:border-gray-700 rounded-lg shadow-lg p-4 min-w-[220px] max-h-[300px] overflow-y-auto">
-                                                    <div className="flex justify-between items-center mb-3">
-                                                      <span className="font-semibold text-sm dark:text-white">Filter Users</span>
-                                                      <div className="flex gap-2">
-                                                        <button
-                                                          onClick={(e) => {
-                                                            e.stopPropagation();
-                                                            setSelectedUsers([]);
-                                                          }}
-                                                          className="text-xs font-medium text-blue-600 hover:text-blue-800 dark:text-blue-400 transition-colors"
-                                                        >
-                                                          Clear All
-                                                        </button>
-                                                        <button
-                                                          onClick={(e) => {
-                                                            e.stopPropagation();
-                                                            setShowUserFilter(false);
-                                                          }}
-                                                          className="text-xs font-medium text-gray-500 hover:text-gray-700 dark:text-gray-400 transition-colors"
-                                                        >
-                                                          ×
-                                                        </button>
-                                                      </div>
-                                                    </div>
-                                                    
-                                                    {users.length > 0 ? (
-                                                      <>
-                                                        {users.map((user) => (
-                                                          <div key={user.id} className="flex items-center mb-2">
-                                                            <input
-                                                              type="checkbox"
-                                                              id={`user-${user.id}`}
-                                                              checked={selectedUsers.includes(user.name)}
-                                                              onChange={(e) => {
-                                                                e.stopPropagation();
-                                                                handleUserSelect(user.name);
-                                                              }}
-                                                              onClick={(e) => e.stopPropagation()}
-                                                              className="h-3.5 w-3.5 mr-2.5 text-blue-600 rounded border-gray-300 focus:ring-2 focus:ring-blue-500"
-                                                            />
-                                                            <label 
-                                                              htmlFor={`user-${user.id}`}
-                                                              className="text-sm font-medium dark:text-white cursor-pointer truncate hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
-                                                            >
-                                                              {user.name} ({user.role})
-                                                            </label>
-                                                          </div>
-                                                        ))}
-                                                      </>
-                                                    ) : (
-                                                      <div className="text-sm font-medium text-gray-500 dark:text-gray-400 italic py-3 text-center">
-                                                        Loading users...
-                                                      </div>
-                                                    )}
-                                                    
-                                                    {selectedUsers.length > 0 && (
-                                                      <div className="mt-4 pt-3 border-t border-gray-200 dark:border-gray-700">
-                                                        <div className="text-xs font-semibold text-gray-600 dark:text-gray-400 mb-2">
-                                                          Selected ({selectedUsers.length}):
-                                                        </div>
-                                                        <div className="flex flex-wrap gap-1.5">
-                                                          {selectedUsers.map(user => (
-                                                            <span 
-                                                              key={user} 
-                                                              className="inline-flex items-center px-3 py-1.5 rounded-full text-xs font-semibold bg-gradient-to-r from-purple-50 to-purple-100 dark:from-purple-900/30 dark:to-purple-800/20 text-purple-800 dark:text-purple-300 border border-purple-200 dark:border-purple-700/30 shadow-sm truncate max-w-[100px]"
-                                                            >
-                                                              {user}
-                                                            </span>
-                                                          ))}
-                                                        </div>
-                                                      </div>
-                                                    )}
-                                                  </div>
-                                                )}
-                                              </th>
+                        {availableCities.length > 0 ? (
+                          <>
+                            {availableCities.map((city) => (
+                              <div
+                                key={city}
+                                className="flex items-center mb-2"
+                              >
+                                <input
+                                  type="checkbox"
+                                  id={`city-${city}`}
+                                  checked={selectedCities.includes(city)}
+                                  onChange={(e) => {
+                                    e.stopPropagation();
+                                    handleCitySelect(city);
+                                  }}
+                                  onClick={(e) => e.stopPropagation()}
+                                  className="h-3.5 w-3.5 mr-2.5 text-blue-600 rounded border-gray-300 focus:ring-2 focus:ring-blue-500"
+                                />
+                                <label
+                                  htmlFor={`city-${city}`}
+                                  className="text-sm font-medium dark:text-white cursor-pointer truncate hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleCitySelect(city);
+                                  }}
+                                >
+                                  {city}
+                                </label>
+                              </div>
+                            ))}
+                          </>
+                        ) : (
+                          <div className="text-sm font-medium text-gray-500 dark:text-gray-400 italic py-3 text-center">
+                            No cities available
+                          </div>
+                        )}
+
+                        {selectedCities.length > 0 && (
+                          <div className="mt-4 pt-3 border-t border-gray-200 dark:border-gray-700">
+                            <div className="text-xs font-semibold text-gray-600 dark:text-gray-400 mb-2">
+                              Selected ({selectedCities.length}):
+                            </div>
+                            <div className="flex flex-wrap gap-1.5">
+                              {selectedCities.map((city) => (
+                                <span
+                                  key={city}
+                                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold bg-gradient-to-r from-teal-50 to-teal-100 dark:from-teal-900/30 dark:to-teal-800/20 text-teal-800 dark:text-teal-300 border border-teal-200 dark:border-teal-700/30 shadow-sm"
+                                >
+                                  City: {city}
+                                  <button
+                                    onClick={() => handleCitySelect(city)}
+                                    className="ml-1 text-teal-600 hover:text-teal-800 dark:text-teal-400 transition-colors"
+                                  >
+                                    ×
+                                  </button>
+                                </span>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </th>
+
+                  {/* User Assign Column with Filter */}
+                  <th className="py-5 px-4 relative">
+                    <div
+                      ref={userFilterRef}
+                      className="flex items-center justify-between gap-2"
+                    >
+                      <span className="text-xs font-extrabold uppercase tracking-wider text-gray-700 dark:text-gray-300">
+                        User Assign
+                      </span>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          closeAllDropdowns();
+                          setShowUserFilter(!showUserFilter);
+                        }}
+                        className="text-gray-500 hover:text-blue-600 dark:text-gray-400 dark:hover:text-blue-400 focus:outline-none transition-colors"
+                      >
+                        <FontAwesomeIcon
+                          icon={faFilter}
+                          className={`h-3 w-3 transition-colors duration-200 ${selectedUsers.length > 0 ? 'text-blue-600' : ''
+                            } ${showUserFilter ? 'text-blue-600' : ''}`}
+                        />
+                      </button>
+                    </div>
+
+                    {/* Assigned User Filter Dropdown */}
+                    {showUserFilter && (
+                      <div className="absolute top-full right-0 mt-1 z-50 bg-white dark:bg-boxdark border border-gray-300 dark:border-gray-700 rounded-lg shadow-lg p-4 min-w-[220px] max-h-[300px] overflow-y-auto">
+                        <div className="flex justify-between items-center mb-3">
+                          <span className="font-semibold text-sm dark:text-white">
+                            Filter Users
+                          </span>
+                          <div className="flex gap-2">
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setSelectedUsers([]);
+                              }}
+                              className="text-xs font-medium text-blue-600 hover:text-blue-800 dark:text-blue-400 transition-colors"
+                            >
+                              Clear All
+                            </button>
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setShowUserFilter(false);
+                              }}
+                              className="text-xs font-medium text-gray-500 hover:text-gray-700 dark:text-gray-400 transition-colors"
+                            >
+                              ×
+                            </button>
+                          </div>
+                        </div>
+
+                        {users.length > 0 ? (
+                          <>
+                            {users.map((user) => (
+                              <div
+                                key={user.id}
+                                className="flex items-center mb-2"
+                              >
+                                <input
+                                  type="checkbox"
+                                  id={`user-${user.id}`}
+                                  checked={selectedUsers.includes(user.name)}
+                                  onChange={(e) => {
+                                    e.stopPropagation();
+                                    handleUserSelect(user.name);
+                                  }}
+                                  onClick={(e) => e.stopPropagation()}
+                                  className="h-3.5 w-3.5 mr-2.5 text-blue-600 rounded border-gray-300 focus:ring-2 focus:ring-blue-500"
+                                />
+                                <label
+                                  htmlFor={`user-${user.id}`}
+                                  className="text-sm font-medium dark:text-white cursor-pointer truncate hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
+                                >
+                                  {user.name} ({user.role})
+                                </label>
+                              </div>
+                            ))}
+                          </>
+                        ) : (
+                          <div className="text-sm font-medium text-gray-500 dark:text-gray-400 italic py-3 text-center">
+                            Loading users...
+                          </div>
+                        )}
+
+                        {selectedUsers.length > 0 && (
+                          <div className="mt-4 pt-3 border-t border-gray-200 dark:border-gray-700">
+                            <div className="text-xs font-semibold text-gray-600 dark:text-gray-400 mb-2">
+                              Selected ({selectedUsers.length}):
+                            </div>
+                            <div className="flex flex-wrap gap-1.5">
+                              {selectedUsers.map((user) => (
+                                <span
+                                  key={user}
+                                  className="inline-flex items-center px-3 py-1.5 rounded-full text-xs font-semibold bg-gradient-to-r from-purple-50 to-purple-100 dark:from-purple-900/30 dark:to-purple-800/20 text-purple-800 dark:text-purple-300 border border-purple-200 dark:border-purple-700/30 shadow-sm truncate max-w-[100px]"
+                                >
+                                  {user}
+                                </span>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </th>
 
                   {/* Status Column */}
                   <th className="py-5 px-2">
@@ -3715,106 +4907,113 @@ useEffect(() => {
                     </div>
                   </th>
 
-                  
-                    {/* Stage Column with Filter */}
-                            <th className="py-5 px-4 relative">
-                              <div ref={stageFilterRef} className="flex items-center justify-between gap-2">
-                                <span className="text-xs font-extrabold uppercase tracking-wider text-gray-700 dark:text-gray-300">
-                                  Stage
-                                </span>
-                                <button
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    closeAllDropdowns();
-                                    setShowStageFilter(!showStageFilter);
-                                  }}
-                                  className="text-gray-500 hover:text-blue-600 dark:text-gray-400 dark:hover:text-blue-400 focus:outline-none transition-colors"
-                                >
-                                  <FontAwesomeIcon 
-                                    icon={faFilter} 
-                                    className={`h-3 w-3 transition-colors duration-200 ${selectedStages.length > 0 ? 'text-blue-600' : ''} ${showStageFilter ? 'text-blue-600' : ''}`}
-                                  />
-                                </button>
-                              </div>
-                              
-                              {/* Stage Filter Dropdown */}
-                              {showStageFilter && (
-                                <div className="absolute top-full right-0 mt-1 z-50 bg-white dark:bg-boxdark border border-gray-300 dark:border-gray-700 rounded-lg shadow-lg p-4 min-w-[220px] max-h-[300px] overflow-y-auto">
-                                  <div className="flex justify-between items-center mb-3">
-                                    <span className="font-semibold text-sm dark:text-white">Filter Stages</span>
-                                    <div className="flex gap-2">
-                                      <button
-                                        onClick={(e) => {
-                                          e.stopPropagation();
-                                          setSelectedStages([]);
-                                        }}
-                                        className="text-xs font-medium text-blue-600 hover:text-blue-800 dark:text-blue-400 transition-colors"
-                                      >
-                                        Clear All
-                                      </button>
-                                      <button
-                                        onClick={(e) => {
-                                          e.stopPropagation();
-                                          setShowStageFilter(false);
-                                        }}
-                                        className="text-xs font-medium text-gray-500 hover:text-gray-700 dark:text-gray-400 transition-colors"
-                                      >
-                                        ×
-                                      </button>
-                                    </div>
-                                  </div>
-                                  
-                                  {leadStages.length > 0 ? (
-                                    <>
-                                      {leadStages.map((stage) => (
-                                        <div key={stage} className="flex items-center mb-2">
-                                          <input
-                                            type="checkbox"
-                                            id={`stage-${stage}`}
-                                            checked={selectedStages.includes(stage)}
-                                            onChange={(e) => {
-                                              e.stopPropagation();
-                                              handleStageSelect(stage);
-                                            }}
-                                            onClick={(e) => e.stopPropagation()}
-                                            className="h-3.5 w-3.5 mr-2.5 text-blue-600 rounded border-gray-300 focus:ring-2 focus:ring-blue-500"
-                                          />
-                                          <label 
-                                            htmlFor={`stage-${stage}`}
-                                            className="text-sm font-medium dark:text-white cursor-pointer truncate hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
-                                          >
-                                            {stage || 'Unknown'}
-                                          </label>
-                                        </div>
-                                      ))}
-                                    </>
-                                  ) : (
-                                    <div className="text-sm font-medium text-gray-500 dark:text-gray-400 italic py-3 text-center">
-                                      Loading stages...
-                                    </div>
-                                  )}
-                                  
-                                  {selectedStages.length > 0 && (
-                                    <div className="mt-4 pt-3 border-t border-gray-200 dark:border-gray-700">
-                                      <div className="text-xs font-semibold text-gray-600 dark:text-gray-400 mb-2">
-                                        Selected ({selectedStages.length}):
-                                      </div>
-                                      <div className="flex flex-wrap gap-1.5">
-                                        {selectedStages.map(stage => (
-                                          <span 
-                                            key={stage} 
-                                            className="inline-flex items-center px-3 py-1.5 rounded-full text-xs font-semibold bg-gradient-to-r from-blue-50 to-blue-100 dark:from-blue-900/30 dark:to-blue-800/20 text-blue-800 dark:text-blue-300 border border-blue-200 dark:border-blue-700/30 shadow-sm truncate max-w-[100px]"
-                                          >
-                                            {stage}
-                                          </span>
-                                        ))}
-                                      </div>
-                                    </div>
-                                  )}
-                                </div>
-                              )}
-                            </th>
+                  {/* Stage Column with Filter */}
+                  <th className="py-5 px-4 relative">
+                    <div
+                      ref={stageFilterRef}
+                      className="flex items-center justify-between gap-2"
+                    >
+                      <span className="text-xs font-extrabold uppercase tracking-wider text-gray-700 dark:text-gray-300">
+                        Stage
+                      </span>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          closeAllDropdowns();
+                          setShowStageFilter(!showStageFilter);
+                        }}
+                        className="text-gray-500 hover:text-blue-600 dark:text-gray-400 dark:hover:text-blue-400 focus:outline-none transition-colors"
+                      >
+                        <FontAwesomeIcon
+                          icon={faFilter}
+                          className={`h-3 w-3 transition-colors duration-200 ${selectedStages.length > 0 ? 'text-blue-600' : ''
+                            } ${showStageFilter ? 'text-blue-600' : ''}`}
+                        />
+                      </button>
+                    </div>
 
+                    {/* Stage Filter Dropdown */}
+                    {showStageFilter && (
+                      <div className="absolute top-full right-0 mt-1 z-50 bg-white dark:bg-boxdark border border-gray-300 dark:border-gray-700 rounded-lg shadow-lg p-4 min-w-[220px] max-h-[300px] overflow-y-auto">
+                        <div className="flex justify-between items-center mb-3">
+                          <span className="font-semibold text-sm dark:text-white">
+                            Filter Stages
+                          </span>
+                          <div className="flex gap-2">
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setSelectedStages([]);
+                              }}
+                              className="text-xs font-medium text-blue-600 hover:text-blue-800 dark:text-blue-400 transition-colors"
+                            >
+                              Clear All
+                            </button>
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setShowStageFilter(false);
+                              }}
+                              className="text-xs font-medium text-gray-500 hover:text-gray-700 dark:text-gray-400 transition-colors"
+                            >
+                              ×
+                            </button>
+                          </div>
+                        </div>
+
+                        {leadStages.length > 0 ? (
+                          <>
+                            {leadStages.map((stage) => (
+                              <div
+                                key={stage}
+                                className="flex items-center mb-2"
+                              >
+                                <input
+                                  type="checkbox"
+                                  id={`stage-${stage}`}
+                                  checked={selectedStages.includes(stage)}
+                                  onChange={(e) => {
+                                    e.stopPropagation();
+                                    handleStageSelect(stage);
+                                  }}
+                                  onClick={(e) => e.stopPropagation()}
+                                  className="h-3.5 w-3.5 mr-2.5 text-blue-600 rounded border-gray-300 focus:ring-2 focus:ring-blue-500"
+                                />
+                                <label
+                                  htmlFor={`stage-${stage}`}
+                                  className="text-sm font-medium dark:text-white cursor-pointer truncate hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
+                                >
+                                  {stage || 'Unknown'}
+                                </label>
+                              </div>
+                            ))}
+                          </>
+                        ) : (
+                          <div className="text-sm font-medium text-gray-500 dark:text-gray-400 italic py-3 text-center">
+                            Loading stages...
+                          </div>
+                        )}
+
+                        {selectedStages.length > 0 && (
+                          <div className="mt-4 pt-3 border-t border-gray-200 dark:border-gray-700">
+                            <div className="text-xs font-semibold text-gray-600 dark:text-gray-400 mb-2">
+                              Selected ({selectedStages.length}):
+                            </div>
+                            <div className="flex flex-wrap gap-1.5">
+                              {selectedStages.map((stage) => (
+                                <span
+                                  key={stage}
+                                  className="inline-flex items-center px-3 py-1.5 rounded-full text-xs font-semibold bg-gradient-to-r from-blue-50 to-blue-100 dark:from-blue-900/30 dark:to-blue-800/20 text-blue-800 dark:text-blue-300 border border-blue-200 dark:border-blue-700/30 shadow-sm truncate max-w-[100px]"
+                                >
+                                  {stage}
+                                </span>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </th>
 
                   {/* Remark Column */}
                   <th className="py-5 px-4">
@@ -3853,46 +5052,44 @@ useEffect(() => {
                     {/* Entry Date */}
                     <td className="py-4 px-4">
                       <div className="font-semibold text-sm bg-gradient-to-r from-blue-50 to-blue-100 dark:from-blue-900/20 dark:to-blue-800/10 px-3 py-1.5 rounded-lg text-blue-800 dark:text-blue-300 border border-blue-100 dark:border-blue-800/30 shadow-sm">
-                        {client.assign_date}
+                        {formatDate(client.assign_date)}
                       </div>
                     </td>
 
                     {/* FollowUp Date */}
                     <td className="py-4 px-4">
                       <div
-                        className={`inline-flex items-center px-3 py-1.5 rounded-lg font-semibold text-sm border shadow-sm ${
-                          new Date(client.followup_date) < new Date()
+                        className={`inline-flex items-center px-3 py-1.5 rounded-lg font-semibold text-sm border shadow-sm ${new Date(client.followup_date) < new Date()
                             ? 'bg-gradient-to-r from-red-50 to-red-100 dark:from-red-900/20 dark:to-red-800/10 text-red-800 dark:text-red-300 border-red-200 dark:border-red-800/30'
                             : 'bg-gradient-to-r from-green-50 to-green-100 dark:from-green-900/20 dark:to-green-800/10 text-green-800 dark:text-green-300 border-green-200 dark:border-green-800/30'
-                        }`}
+                          }`}
                       >
-                        {client.followup_date}
+                        {formatDate(client.followup_date)}
                       </div>
                     </td>
-
-                                   {/* Client Name - Now with enhanced styling */}
-                   <td className="py-4 px-4">
-                     <div 
-                       onClick={() => {
-                         setSelectedClientDetails(client);
-                         setShowDetailsModal(true);
-                       }}
-                       className="group cursor-pointer"
-                     >
-                       <div className="text-sm font-bold text-gray-900 dark:text-gray-100 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors duration-200">
-                         {client.name}
-                       </div>
-                       <div className="mt-1 flex items-center">
-                         <div className="w-full h-px bg-gradient-to-r from-gray-300 to-gray-100 dark:from-gray-600 dark:to-gray-800 group-hover:from-blue-400 group-hover:to-blue-200 dark:group-hover:from-blue-500 dark:group-hover:to-blue-300 transition-all duration-300"></div>
-                         <div className="ml-2 opacity-0 group-hover:opacity-100 transform translate-x-2 group-hover:translate-x-0 transition-all duration-300">
-                           <FontAwesomeIcon 
-                             icon={faEye} 
-                             className="text-xs text-gray-400 group-hover:text-blue-500 dark:group-hover:text-blue-400" 
-                           />
-                         </div>
-                       </div>
-                     </div>
-                   </td>
+                    {/* Client Name - Now with enhanced styling */}
+                    <td className="py-4 px-4">
+                      <div
+                        onClick={() => {
+                          setSelectedClientDetails(client);
+                          setShowDetailsModal(true);
+                        }}
+                        className="group cursor-pointer"
+                      >
+                        <div className="text-sm font-bold text-gray-900 dark:text-gray-100 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors duration-200">
+                          {client.name}
+                        </div>
+                        <div className="mt-1 flex items-center">
+                          <div className="w-full h-px bg-gradient-to-r from-gray-300 to-gray-100 dark:from-gray-600 dark:to-gray-800 group-hover:from-blue-400 group-hover:to-blue-200 dark:group-hover:from-blue-500 dark:group-hover:to-blue-300 transition-all duration-300"></div>
+                          <div className="ml-2 opacity-0 group-hover:opacity-100 transform translate-x-2 group-hover:translate-x-0 transition-all duration-300">
+                            <FontAwesomeIcon
+                              icon={faEye}
+                              className="text-xs text-gray-400 group-hover:text-blue-500 dark:group-hover:text-blue-400"
+                            />
+                          </div>
+                        </div>
+                      </div>
+                    </td>
 
                     {/* Contact */}
                     <td className="py-4 px-4">
@@ -3934,15 +5131,15 @@ useEffect(() => {
                       </div>
                     </td>
 
-                  {/* Status Column (Progress Bar) */}
-<td className="py-4 px-2">
-  <ProgressStatus
-    stage={client.stage || client.lead_stage}
-    status_percentage={client.status_percentage}
-    is_drop_stage={client.is_drop_stage}
-    previous_stage={client.previous_stage}
-  />
-</td>
+                    {/* Status Column (Progress Bar) */}
+                    <td className="py-4 px-2">
+                      <ProgressStatus
+                        stage={client.stage || client.lead_stage}
+                        status_percentage={client.status_percentage}
+                        is_drop_stage={client.is_drop_stage}
+                        previous_stage={client.previous_stage}
+                      />
+                    </td>
 
                     {/* Stage Column */}
                     <td className="py-4 px-4">
@@ -3975,7 +5172,6 @@ useEffect(() => {
                     {/* Action Buttons */}
                     <td className="py-4 px-4">
                       <div className="flex justify-center gap-1">
-                
                         <ActionButton
                           onClick={() => handleEditClick(client)}
                           title="Edit"
@@ -3984,15 +5180,14 @@ useEffect(() => {
                         >
                           <FontAwesomeIcon icon={faEdit} className="text-xs" />
                         </ActionButton>
-                      <ActionButton
-  onClick={() => handleSingleDelete(client.master_id)}
-  title="Delete"
-  variant="delete"
-  className="w-8 h-8 hover:scale-105 transition-transform"
->
-  <FontAwesomeIcon icon={faTrash} className="text-xs" />
-</ActionButton>
-
+                        <ActionButton
+                          onClick={() => handleSingleDelete(client.master_id)}
+                          title="Delete"
+                          variant="delete"
+                          className="w-8 h-8 hover:scale-105 transition-transform"
+                        >
+                          <FontAwesomeIcon icon={faTrash} className="text-xs" />
+                        </ActionButton>
                       </div>
                     </td>
                   </tr>
@@ -4017,81 +5212,155 @@ useEffect(() => {
       </div>
 
       {/* Add this after your search input */}
-      {(selectedEntryDate ||
-        selectedFollowupDate ||
+      {/* Active Filters Display */}
+      {(selectedEntryFromDate ||
+        selectedEntryToDate ||
+        selectedFollowupFromDate ||
+        selectedFollowupToDate ||
         selectedStages.length > 0 ||
-        selectedUsers.length > 0) && (
-        <div className="flex items-center gap-2 mt-2 mb-4 p-2 bg-gray-50 dark:bg-gray-800 rounded">
-          <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
-            Active filters:
-          </span>
-          <div className="flex flex-wrap gap-2">
-            {selectedEntryDate && (
-              <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300">
-                Entry Date: {selectedEntryDate}
-                <button
-                  onClick={() => {
-                    setSelectedEntryDate('');
-                    handleEntryDateChange(''); // This now triggers applyFilters via useEffect
-                  }}
-                  className="ml-1 text-blue-600 hover:text-blue-800 dark:text-blue-400"
+        selectedUsers.length > 0 ||
+        selectedCities.length > 0 ||
+        location.state?.category_name) && (
+          <div className="flex items-center gap-2 mb-4 p-2 bg-gray-50 dark:bg-gray-800 rounded">
+            <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
+              Active filters:
+            </span>
+            <div className="flex flex-wrap gap-2">
+              {(selectedEntryFromDate || selectedEntryToDate) && (
+                <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300">
+                  Entry: {selectedEntryFromDate || 'Any'} to{' '}
+                  {selectedEntryToDate || 'Any'}
+                  <button
+                    onClick={() => {
+                      setSelectedEntryFromDate('');
+                      setSelectedEntryToDate('');
+                    }}
+                    className="ml-1 text-blue-600 hover:text-blue-800 dark:text-blue-400"
+                  >
+                    ×
+                  </button>
+                </span>
+              )}
+              {(selectedFollowupFromDate || selectedFollowupToDate) && (
+                <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300">
+                  Followup: {selectedFollowupFromDate || 'Any'} to{' '}
+                  {selectedFollowupToDate || 'Any'}
+                  <button
+                    onClick={() => {
+                      setSelectedFollowupFromDate('');
+                      setSelectedFollowupToDate('');
+                    }}
+                    className="ml-1 text-green-600 hover:text-green-800 dark:text-green-400"
+                  >
+                    ×
+                  </button>
+                </span>
+              )}
+              {selectedStages.map((stage) => (
+                <span
+                  key={stage}
+                  className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-300"
                 >
-                  ×
-                </button>
-              </span>
-            )}
-            {selectedFollowupDate && (
-              <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300">
-                Followup: {selectedFollowupDate}
-                <button
-                  onClick={() => {
-                    setSelectedFollowupDate('');
-                    handleFollowupDateChange(''); // This now triggers applyFilters via useEffect
-                  }}
-                  className="ml-1 text-green-600 hover:text-green-800 dark:text-green-400"
+                  Stage: {stage}
+                  <button
+                    onClick={() => handleStageSelect(stage)}
+                    className="ml-1 text-purple-600 hover:text-purple-800 dark:text-purple-400"
+                  >
+                    ×
+                  </button>
+                </span>
+              ))}
+              {selectedUsers.map((user) => (
+                <span
+                  key={user}
+                  className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-300"
                 >
-                  ×
-                </button>
-              </span>
-            )}
-            {selectedStages.map((stage) => (
-              <span
-                key={stage}
-                className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-300"
+                  User: {user}
+                  <button
+                    onClick={() => handleUserSelect(user)}
+                    className="ml-1 text-orange-600 hover:text-orange-800 dark:text-orange-400"
+                  >
+                    ×
+                  </button>
+                </span>
+              ))}
+              {selectedCities.map((city) => (
+                <span
+                  key={city}
+                  className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs bg-teal-100 text-teal-800 dark:bg-teal-900 dark:text-teal-300"
+                >
+                  City: {city}
+                  <button
+                    onClick={() => handleCitySelect(city)}
+                    className="ml-1 text-teal-600 hover:text-teal-800 dark:text-teal-400"
+                  >
+                    ×
+                  </button>
+                </span>
+              ))}
+              {location.state?.category_name && (
+                <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs bg-indigo-100 text-indigo-800 dark:bg-indigo-900 dark:text-indigo-300">
+                  Category: {location.state.category_name}
+                  <button
+                    onClick={() => {
+                      // Clear category filter
+                      window.history.replaceState({}, document.title);
+                      setSearchTerm('');
+                      setFilteredClients(rawData);
+                    }}
+                    className="ml-1 text-indigo-600 hover:text-indigo-800 dark:text-indigo-400"
+                  >
+                    ×
+                  </button>
+                </span>
+              )}
+
+{location.state?.reference_name && (
+  <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs bg-pink-100 text-pink-800 dark:bg-pink-900 dark:text-pink-300">
+    Source: {location.state.reference_name}
+    <button
+      onClick={() => {
+        // Clear reference filter completely
+        window.history.replaceState({}, document.title);
+        setSearchTerm('');
+        setFilteredClients(rawData); // Reset to all data
+      }}
+      className="ml-1 text-pink-600 hover:text-pink-800 dark:text-pink-400"
+    >
+      ×
+    </button>
+  </span>
+)}
+
+              {location.state?.budget_range && (
+                <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs bg-teal-100 text-teal-800 dark:bg-teal-900 dark:text-teal-300">
+                  Budget: {location.state.budget_range}
+                  <button
+                    onClick={() => {
+                      // Clear budget filter
+                      window.history.replaceState({}, document.title);
+                      setSearchTerm('');
+                      setFilteredClients(rawData);
+                    }}
+                    className="ml-1 text-teal-600 hover:text-teal-800 dark:text-teal-400"
+                  >
+                    ×
+                  </button>
+                </span>
+              )}
+
+
+
+
+              <button
+                onClick={clearFilters}
+                className="ml-2 text-sm text-red-600 hover:text-red-800 dark:text-red-400 dark:hover:text-red-300 font-medium"
               >
-                Stage: {stage}
-                <button
-                  onClick={() => handleStageSelect(stage)} // This removes the stage and triggers applyFilters
-                  className="ml-1 text-purple-600 hover:text-purple-800 dark:text-purple-400"
-                >
-                  ×
-                </button>
-              </span>
-            ))}
-            {/* ADDED: User Assigned Active Filters */}
-            {selectedUsers.map((user) => (
-              <span
-                key={user}
-                className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-300"
-              >
-                User: {user}
-                <button
-                  onClick={() => handleUserSelect(user)} // This removes the user and triggers applyFilters
-                  className="ml-1 text-orange-600 hover:text-orange-800 dark:text-orange-400"
-                >
-                  ×
-                </button>
-              </span>
-            ))}
-            <button
-              onClick={clearFilters}
-              className="ml-2 text-sm text-red-600 hover:text-red-800 dark:text-red-400 dark:hover:text-red-300 font-medium"
-            >
-              Clear all filters
-            </button>
+                Clear all filters
+              </button>
+            </div>
           </div>
-        </div>
-      )}
+        )}
 
       {openRemark && (
         <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50">
@@ -4109,35 +5378,46 @@ useEffect(() => {
         </div>
       )}
 
-
-{openRemark && (
-  <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-50">
-    <div className="bg-white dark:bg-gray-800 p-5 rounded-lg shadow-lg max-w-lg w-full mx-4 my-4 mt-16">
-      <div className="flex justify-between items-center mb-3">
-        <h2 className="text-lg font-bold text-gray-900 dark:text-gray-100">Full Remark</h2>
-        <button
-          className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
-          onClick={() => setOpenRemark(null)}
-        >
-          <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-          </svg>
-        </button>
-      </div>
-      <div className="max-h-[60vh] overflow-y-auto">
-        <p className="text-gray-800 dark:text-gray-300 whitespace-pre-line">
-          {openRemark || 'No remarks available'}
-        </p>
-      </div>
-      <button
-        className="mt-4 bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded-lg transition-colors"
-        onClick={() => setOpenRemark(null)}
-      >
-        Close
-      </button>
-    </div>
-  </div>
-)}
+      {openRemark && (
+        <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-50">
+          <div className="bg-white dark:bg-gray-800 p-5 rounded-lg shadow-lg max-w-lg w-full mx-4 my-4 mt-16">
+            <div className="flex justify-between items-center mb-3">
+              <h2 className="text-lg font-bold text-gray-900 dark:text-gray-100">
+                Full Remark
+              </h2>
+              <button
+                className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
+                onClick={() => setOpenRemark(null)}
+              >
+                <svg
+                  className="h-5 w-5"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M6 18L18 6M6 6l12 12"
+                  />
+                </svg>
+              </button>
+            </div>
+            <div className="max-h-[60vh] overflow-y-auto">
+              <p className="text-gray-800 dark:text-gray-300 whitespace-pre-line">
+                {openRemark || 'No remarks available'}
+              </p>
+            </div>
+            <button
+              className="mt-4 bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded-lg transition-colors"
+              onClick={() => setOpenRemark(null)}
+            >
+              Close
+            </button>
+          </div>
+        </div>
+      )}
 
       {showImportPopup && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 px-2 sm:px-4">
@@ -4206,136 +5486,164 @@ useEffect(() => {
         setSingleFormData={setSingleFormData}
         categories={categories}
         references={references}
-        area={area}
         fetchRawData={fetchRawData}
         setError={setError}
         setDuplicateEntries={setDuplicateEntries}
         setShowDuplicateModal={setShowDuplicateModal}
       />
 
-      {showDetailsModal && renderDetailsModal()} 
-
+      {showDetailsModal && renderDetailsModal()}
 
       {importErrors.length > 0 && (
-  <div className="fixed inset-0 z-[99999] bg-black bg-opacity-75 flex justify-center items-center px-4">
-    <div className="bg-white dark:bg-boxdark p-6 rounded-lg shadow-lg w-full max-w-3xl max-h-[80vh] overflow-auto border dark:border-strokedark">
-      {/* Header */}
-      <div className="flex justify-between items-center border-b mb-4 pb-3 dark:border-strokedark">
-        <h2 className="text-xl font-bold dark:text-white text-black">
-          Import Errors ({importErrors.length})
-        </h2>
-        <button
-          onClick={() => setImportErrors([])}
-          className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 text-xl"
-        >
-          ×
-        </button>
-      </div>
+        <div className="fixed inset-0 z-[99999] bg-black bg-opacity-75 flex justify-center items-center px-4">
+          <div className="bg-white dark:bg-boxdark p-6 rounded-lg shadow-lg w-full max-w-3xl max-h-[80vh] overflow-auto border dark:border-strokedark">
+            {/* Header */}
+            <div className="flex justify-between items-center border-b mb-4 pb-3 dark:border-strokedark">
+              <h2 className="text-xl font-bold dark:text-white text-black">
+                Import Errors ({importErrors.length})
+              </h2>
+              <button
+                onClick={() => setImportErrors([])}
+                className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 text-xl"
+              >
+                ×
+              </button>
+            </div>
 
-      {/* Error Message */}
-      <div className="mb-6 p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg">
-        <div className="flex items-center gap-3">
-          <svg className="w-6 h-6 text-red-600 dark:text-red-400" fill="currentColor" viewBox="0 0 20 20">
-            <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
-          </svg>
-          <div>
-            <h3 className="font-semibold text-red-800 dark:text-red-300">
-              {importErrors.length} error(s) found during import
-            </h3>
-            <p className="text-sm text-red-700 dark:text-red-400 mt-1">
-              Please fix these errors and try again.
-            </p>
+            {/* Error Message */}
+            <div className="mb-6 p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg">
+              <div className="flex items-center gap-3">
+                <svg
+                  className="w-6 h-6 text-red-600 dark:text-red-400"
+                  fill="currentColor"
+                  viewBox="0 0 20 20"
+                >
+                  <path
+                    fillRule="evenodd"
+                    d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z"
+                    clipRule="evenodd"
+                  />
+                </svg>
+                <div>
+                  <h3 className="font-semibold text-red-800 dark:text-red-300">
+                    {importErrors.length} error(s) found during import
+                  </h3>
+                  <p className="text-sm text-red-700 dark:text-red-400 mt-1">
+                    Please fix these errors and try again.
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {/* Errors List */}
+            <div className="space-y-4 mb-6">
+              <div className="overflow-y-auto max-h-[300px]">
+                <table className="w-full text-sm">
+                  <thead className="bg-gray-100 dark:bg-gray-800 sticky top-0">
+                    <tr>
+                      <th className="p-2 text-left">Row</th>
+                      <th className="p-2 text-left">Name</th>
+                      <th className="p-2 text-left">Number</th>
+                      <th className="p-2 text-left">Error Reason</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
+                    {importErrors.slice(0, 20).map((error, index) => (
+                      <tr
+                        key={index}
+                        className="hover:bg-gray-50 dark:hover:bg-gray-800"
+                      >
+                        <td className="p-2 font-medium">{error.row}</td>
+                        <td className="p-2">{error.name}</td>
+                        <td className="p-2 font-mono">{error.number}</td>
+                        <td className="p-2">
+                          <div className="flex items-center gap-2">
+                            {error.reason.includes('Telecaller') ? (
+                              <>
+                                <svg
+                                  className="w-4 h-4 text-red-500"
+                                  fill="currentColor"
+                                  viewBox="0 0 20 20"
+                                >
+                                  <path
+                                    fillRule="evenodd"
+                                    d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z"
+                                    clipRule="evenodd"
+                                  />
+                                </svg>
+                                <span className="text-red-600 dark:text-red-400 font-medium">
+                                  {error.reason}
+                                </span>
+                              </>
+                            ) : (
+                              <span className="text-gray-700 dark:text-gray-300">
+                                {error.reason}
+                              </span>
+                            )}
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+
+                {importErrors.length > 20 && (
+                  <div className="text-center p-2 text-sm text-gray-500 dark:text-gray-400">
+                    + {importErrors.length - 20} more errors...
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Action Buttons */}
+            <div className="flex flex-col sm:flex-row gap-3">
+              <button
+                onClick={() => {
+                  // Download errors as CSV
+                  const csvContent =
+                    'data:text/csv;charset=utf-8,' +
+                    'Row,Name,Number,Error Reason\n' +
+                    importErrors
+                      .map(
+                        (e) =>
+                          `${e.row},"${e.name}","${e.number}","${e.reason}"`,
+                      )
+                      .join('\n');
+
+                  const encodedUri = encodeURI(csvContent);
+                  const link = document.createElement('a');
+                  link.setAttribute('href', encodedUri);
+                  link.setAttribute('download', 'import_errors.csv');
+                  document.body.appendChild(link);
+                  link.click();
+                  document.body.removeChild(link);
+                }}
+                className="flex-1 px-4 py-3 bg-blue-500 hover:bg-blue-600 text-white rounded-lg font-medium transition-colors flex items-center justify-center gap-2"
+              >
+                <svg
+                  className="w-4 h-4"
+                  fill="currentColor"
+                  viewBox="0 0 20 20"
+                >
+                  <path
+                    fillRule="evenodd"
+                    d="M3 17a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm3.293-7.707a1 1 0 011.414 0L9 10.586V3a1 1 0 112 0v7.586l1.293-1.293a1 1 0 111.414 1.414l-3 3a1 1 0 01-1.414 0l-3-3a1 1 0 010-1.414z"
+                    clipRule="evenodd"
+                  />
+                </svg>
+                Download Error Report
+              </button>
+
+              <button
+                onClick={() => setImportErrors([])}
+                className="flex-1 px-4 py-3 bg-gray-200 hover:bg-gray-300 dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-800 dark:text-gray-200 rounded-lg font-medium transition-colors"
+              >
+                Close
+              </button>
+            </div>
           </div>
         </div>
-      </div>
-
-      {/* Errors List */}
-      <div className="space-y-4 mb-6">
-        <div className="overflow-y-auto max-h-[300px]">
-          <table className="w-full text-sm">
-            <thead className="bg-gray-100 dark:bg-gray-800 sticky top-0">
-              <tr>
-                <th className="p-2 text-left">Row</th>
-                <th className="p-2 text-left">Name</th>
-                <th className="p-2 text-left">Number</th>
-                <th className="p-2 text-left">Error Reason</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
-              {importErrors.slice(0, 20).map((error, index) => (
-                <tr key={index} className="hover:bg-gray-50 dark:hover:bg-gray-800">
-                  <td className="p-2 font-medium">{error.row}</td>
-                  <td className="p-2">{error.name}</td>
-                  <td className="p-2 font-mono">{error.number}</td>
-                  <td className="p-2">
-                    <div className="flex items-center gap-2">
-                      {error.reason.includes('Telecaller') ? (
-                        <>
-                          <svg className="w-4 h-4 text-red-500" fill="currentColor" viewBox="0 0 20 20">
-                            <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
-                          </svg>
-                          <span className="text-red-600 dark:text-red-400 font-medium">
-                            {error.reason}
-                          </span>
-                        </>
-                      ) : (
-                        <span className="text-gray-700 dark:text-gray-300">
-                          {error.reason}
-                        </span>
-                      )}
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-          
-          {importErrors.length > 20 && (
-            <div className="text-center p-2 text-sm text-gray-500 dark:text-gray-400">
-              + {importErrors.length - 20} more errors...
-            </div>
-          )}
-        </div>
-      </div>
-
-      {/* Action Buttons */}
-      <div className="flex flex-col sm:flex-row gap-3">
-        <button
-          onClick={() => {
-            // Download errors as CSV
-            const csvContent = "data:text/csv;charset=utf-8," 
-              + "Row,Name,Number,Error Reason\n"
-              + importErrors.map(e => 
-                  `${e.row},"${e.name}","${e.number}","${e.reason}"`
-                ).join("\n");
-            
-            const encodedUri = encodeURI(csvContent);
-            const link = document.createElement("a");
-            link.setAttribute("href", encodedUri);
-            link.setAttribute("download", "import_errors.csv");
-            document.body.appendChild(link);
-            link.click();
-            document.body.removeChild(link);
-          }}
-          className="flex-1 px-4 py-3 bg-blue-500 hover:bg-blue-600 text-white rounded-lg font-medium transition-colors flex items-center justify-center gap-2"
-        >
-          <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
-            <path fillRule="evenodd" d="M3 17a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm3.293-7.707a1 1 0 011.414 0L9 10.586V3a1 1 0 112 0v7.586l1.293-1.293a1 1 0 111.414 1.414l-3 3a1 1 0 01-1.414 0l-3-3a1 1 0 010-1.414z" clipRule="evenodd" />
-          </svg>
-          Download Error Report
-        </button>
-        
-        <button
-          onClick={() => setImportErrors([])}
-          className="flex-1 px-4 py-3 bg-gray-200 hover:bg-gray-300 dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-800 dark:text-gray-200 rounded-lg font-medium transition-colors"
-        >
-          Close
-        </button>
-      </div>
-    </div>
-  </div>
-)}
-
+      )}
     </div>
   );
 };

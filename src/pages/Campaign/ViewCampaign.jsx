@@ -45,16 +45,16 @@ const ViewCampaign = () => {
   );
 
   if (loading)
-    return <div className="p-6 text-center">⏳ Loading campaigns...</div>;
+    return <div className="p-6 text-center text-gray-600 dark:text-gray-300">⏳ Loading campaigns...</div>;
 
   if (error)
-    return <div className="p-6 text-center text-red-500">{error}</div>;
+    return <div className="p-6 text-center text-red-500 dark:text-red-400">{error}</div>;
 
   return (
-    <div className="p-4 bg-white rounded-lg shadow-md">
+    <div className="p-4 bg-white dark:bg-boxdark rounded-lg shadow-md border dark:border-strokedark">
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3 mb-4">
-        <h2 className="text-2xl font-semibold text-gray-800">
+        <h2 className="text-2xl font-semibold text-gray-800 dark:text-white">
           View Campaigns
         </h2>
 
@@ -64,56 +64,56 @@ const ViewCampaign = () => {
           placeholder="🔍 Search campaign..."
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          className="border rounded-lg px-3 py-2 w-full md:w-64 focus:ring focus:ring-blue-200"
+          className="border border-stroke dark:border-strokedark dark:bg-boxdark dark:text-white rounded-lg px-3 py-2 w-full md:w-64 focus:outline-none focus:ring-2 focus:ring-blue-500"
         />
       </div>
 
       {/* Desktop Table */}
       <div className="hidden md:block overflow-x-auto">
-        <table className="w-full border border-gray-200">
-          <thead className="bg-gray-100">
+        <table className="w-full border border-gray-200 dark:border-strokedark">
+          <thead className="bg-gray-100 dark:bg-meta-4">
             <tr>
-              <th className="border p-2">#</th>
-              <th className="border p-2">Campaign</th>
-              <th className="border p-2">Platform</th>
-              <th className="border p-2">Start</th>
-              <th className="border p-2">End</th>
-              <th className="border p-2">Description</th>
-              <th className="border p-2">Actions</th>
+              <th className="border border-stroke dark:border-strokedark p-2 text-black dark:text-white">#</th>
+              <th className="border border-stroke dark:border-strokedark p-2 text-black dark:text-white">Campaign</th>
+              <th className="border border-stroke dark:border-strokedark p-2 text-black dark:text-white">Platform</th>
+              <th className="border border-stroke dark:border-strokedark p-2 text-black dark:text-white">Start</th>
+              <th className="border border-stroke dark:border-strokedark p-2 text-black dark:text-white">End</th>
+              <th className="border border-stroke dark:border-strokedark p-2 text-black dark:text-white">Description</th>
+              <th className="border border-stroke dark:border-strokedark p-2 text-black dark:text-white">Actions</th>
             </tr>
           </thead>
           <tbody>
             {filteredCampaigns.map((item, index) => (
-              <tr key={item.id} className="hover:bg-gray-50">
-                <td className="border p-2 text-center">{index + 1}</td>
-                <td className="border p-2">{item.campaign_name}</td>
-                <td className="border p-2 text-center">{item.platform}</td>
-                <td className="border p-2 text-center">
+              <tr key={item.id} className="hover:bg-gray-50 dark:hover:bg-gray-800 border-b dark:border-strokedark">
+                <td className="border border-stroke dark:border-strokedark p-2 text-center text-black dark:text-white">{index + 1}</td>
+                <td className="border border-stroke dark:border-strokedark p-2 text-black dark:text-white">{item.campaign_name}</td>
+                <td className="border border-stroke dark:border-strokedark p-2 text-center text-black dark:text-white">{item.platform}</td>
+                <td className="border border-stroke dark:border-strokedark p-2 text-center text-black dark:text-white">
                   {new Date(item.start_date).toLocaleDateString()}
                 </td>
-                <td className="border p-2 text-center">
+                <td className="border border-stroke dark:border-strokedark p-2 text-center text-black dark:text-white">
                   {new Date(item.end_date).toLocaleDateString()}
                 </td>
-                <td className="border p-2">{item.description}</td>
-                <td className="border p-2">
+                <td className="border border-stroke dark:border-strokedark p-2 text-black dark:text-white">{item.description}</td>
+                <td className="border border-stroke dark:border-strokedark p-2">
                   <div className="flex justify-center gap-2">
                     <button
                       onClick={() => handlePreview(item)}
-                      className="p-2 bg-blue-500 text-white rounded"
+                      className="p-2 bg-blue-500 text-white rounded hover:bg-blue-600"
                     >
                       <FontAwesomeIcon icon={faEye} />
                     </button>
 
                     <button
                       onClick={() => handleResponses(item)}
-                      className="p-2 bg-green-500 text-white rounded"
+                      className="p-2 bg-green-500 text-white rounded hover:bg-green-600"
                     >
                       <FontAwesomeIcon icon={faMessage} />
                     </button>
 
                     <button
                       onClick={() => handleCopyLink(item)}
-                      className="p-2 bg-gray-500 text-white rounded"
+                      className="p-2 bg-gray-500 dark:bg-gray-600 text-white rounded hover:bg-gray-600 dark:hover:bg-gray-700"
                     >
                       <FontAwesomeIcon icon={faCopy} />
                     </button>
@@ -130,36 +130,36 @@ const ViewCampaign = () => {
         {filteredCampaigns.map((item) => (
           <div
             key={item.id}
-            className="border rounded-lg p-4 shadow-sm"
+            className="border border-stroke dark:border-strokedark rounded-lg p-4 shadow-sm bg-gray-50 dark:bg-gray-800"
           >
-            <h3 className="font-semibold text-lg">
+            <h3 className="font-semibold text-lg text-black dark:text-white">
               {item.campaign_name}
             </h3>
-            <p className="text-sm text-gray-600">{item.platform}</p>
+            <p className="text-sm text-gray-600 dark:text-gray-300">{item.platform}</p>
 
-            <p className="text-sm mt-1">
+            <p className="text-sm mt-1 text-black dark:text-gray-300">
               📅 {new Date(item.start_date).toLocaleDateString()} –{" "}
               {new Date(item.end_date).toLocaleDateString()}
             </p>
 
-            <p className="text-sm mt-2">{item.description}</p>
+            <p className="text-sm mt-2 text-black dark:text-gray-300">{item.description}</p>
 
             <div className="flex gap-3 mt-3">
               <button
                 onClick={() => handlePreview(item)}
-                className="flex-1 bg-blue-500 text-white py-2 rounded"
+                className="flex-1 bg-blue-500 text-white py-2 rounded hover:bg-blue-600"
               >
                 Preview
               </button>
               <button
                 onClick={() => handleResponses(item)}
-                className="flex-1 bg-green-500 text-white py-2 rounded"
+                className="flex-1 bg-green-500 text-white py-2 rounded hover:bg-green-600"
               >
                 Responses
               </button>
               <button
                 onClick={() => handleCopyLink(item)}
-                className="flex-1 bg-gray-500 text-white py-2 rounded"
+                className="flex-1 bg-gray-500 dark:bg-gray-600 text-white py-2 rounded hover:bg-gray-600 dark:hover:bg-gray-700"
               >
                 Copy
               </button>
@@ -169,7 +169,7 @@ const ViewCampaign = () => {
       </div>
 
       {filteredCampaigns.length === 0 && (
-        <p className="text-center text-gray-500 mt-4">
+        <p className="text-center text-gray-500 dark:text-gray-400 mt-4">
           No campaigns found.
         </p>
       )}

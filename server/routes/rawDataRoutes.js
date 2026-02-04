@@ -14,7 +14,9 @@ getMissedAssignedFullData ,
 getTodaysAssignedLeadsFullData ,
 getUpcomingAssignedFullData, 
 getEmployeeLeadWorkReport,
-getEmployeeWiseAssignedLeadCount, deleteDocument , getQuotationPendingLeads ,
+getEmployeeWiseAssignedLeadCount, deleteDocument , getQuotationPendingLeads , 
+getDemoLeadsFullData  ,  getQuotationFollowupLeadsFullData , getDashboardLeadOverview , 
+getSimpleLeadReport , getLeadHistory , getEmployeeLeadsWithHistory ,
  
 } from '../controllers/rawDataController.js';
 import uploadMiddleware from '../middleware/upload.js';
@@ -35,7 +37,7 @@ router.post('/master-data/:master_id', deleteClient);
 
 router.post('/master-data/delete-multiple', deleteMultipleClients);
 
-router.post('/master-data/add-single', addSingleRawData);
+router.post('/sujit-master-data/add-single', addSingleRawData);
 
 router.post('/upload/:master_id', uploadMiddleware, uploadDocuments); 
 // routes/documents.js (or your existing routes file)
@@ -72,22 +74,43 @@ router.get('/dashboard/drop-leads-fulldata', getDropLeadsFullData);
 router.get('/dashboard/close-leads-fulldata', getClosedLeadsFullData); 
 
 
+
+
+router.get('/dashboard/demo-leads-fulldata', getDemoLeadsFullData);
+
+// router.get('/dashboard/quotation-pending-leads-fulldata', getQuotationPendingLeadsFullData);
+
+router.get('/dashboard/quotation-followup-leads-fulldata', getQuotationFollowupLeadsFullData);
+
+
+
 router.get('/dashboard/miss-assign-fulldata', getMissedAssignedFullData); 
 
 
 router.get('/dashboard/todays-assign-fulldata', getTodaysAssignedLeadsFullData); 
 
 
-
- 
-
 router.get('/dashboard/upcoming-assign-fulldata', getUpcomingAssignedFullData); 
 
 
-router.get('/reports/employee-leadwork-report', getEmployeeLeadWorkReport); 
+router.get('/reports/employee-leadwork-report', getEmployeeLeadWorkReport);  
 
-router.get('/reports/employee-detailed', getEmployeeWiseAssignedLeadCount);
+router.get('/reports/leadworks-report', getDashboardLeadOverview); 
+
+router.get("/simple-lead-report", getSimpleLeadReport);
+
+router.get("/lead-history/:master_id", getLeadHistory);
+
+
+
+router.get('/reports/employee-detailed', getEmployeeWiseAssignedLeadCount); 
+router.get(
+  "/reports/employee-leads/:employee",
+  getEmployeeLeadsWithHistory
+);
+
 
 router.get('/quotation-pending', getQuotationPendingLeads);
+
 
 export default router;

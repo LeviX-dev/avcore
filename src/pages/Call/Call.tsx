@@ -25,11 +25,14 @@ import {
   faCalendarAlt,
   faTasks, 
     faTrashAlt, // Add this  
+      faPlus, // ✅ Make sure this is in your imports
+        faFolderOpen,
 } from '@fortawesome/free-solid-svg-icons';
 import Breadcrumb from '../../components/Breadcrumbs/Breadcrumb.js';
 import axios from 'axios';
 import EditTeleCallerForm from './EditCall.js';
 import EditRawDataForm from '../Rawdata/UpdateRawData.js';
+import InsertDataModal from '../Rawdata/InsertDataModal'; // Add this import
 
 // Interfaces
 interface Category {
@@ -173,19 +176,19 @@ const ActionButton = ({
   onClick: () => void;
   title: string;
   className?: string;
-  variant?: 'call' | 'edit' | 'document' | 'view';
+variant?: 'call' | 'edit' | 'document' | 'view' | 'viewDocs'; // ← ADD 'viewDocs'
   badgeCount?: number | null;
 }) => {
   const baseStyles =
     'relative inline-flex items-center justify-center rounded-xl transition-all duration-300 ease-out transform hover:scale-105 active:scale-95 shadow-lg hover:shadow-xl';
 
-  const variantStyles = {
-    call: 'bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 text-white',
-    edit: 'bg-gradient-to-r from-blue-500 to-cyan-600 hover:from-blue-600 hover:to-cyan-700 text-white',
-    document:
-      'bg-gradient-to-r from-purple-500 to-violet-600 hover:from-purple-600 hover:to-violet-700 text-white',
-    view: 'bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700 text-white',
-  };
+const variantStyles = {
+  call: 'bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 text-white',
+  edit: 'bg-gradient-to-r from-blue-500 to-cyan-600 hover:from-blue-600 hover:to-cyan-700 text-white',
+  document: 'bg-gradient-to-r from-purple-500 to-violet-600 hover:from-purple-600 hover:to-violet-700 text-white',
+  view: 'bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700 text-white',
+  viewDocs: 'bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-600 hover:to-orange-700 text-white', // ← ADD THIS
+}; 
 
   const buttonStyles = `${baseStyles} ${variantStyles[variant]} ${className}`;
 
@@ -400,11 +403,77 @@ const CallList = () => {
     images: [],
     documents: [],
     videos: [],
-  }); 
+  });
+
+  const [showViewDocsPopup, setShowViewDocsPopup] = useState(false);
+  const [viewDocsClient, setViewDocsClient] = useState<Client | null>(null);
+  const [viewDocsData, setViewDocsData] = useState<DocumentData>({
+    images: [],
+    documents: [],
+    videos: [],
+  });
+
+  const [openRemark, setOpenRemark] = useState(null); 
+
+  
+  // Add these state variables
+const [viewOnlyDocsClient, setViewOnlyDocsClient] = useState<Client | null>(null);
+const [viewOnlyDocsData, setViewOnlyDocsData] = useState<DocumentData>({
+  images: [],
+  documents: [],
+  videos: [],
+});
+const [showViewOnlyDocsPopup, setShowViewOnlyDocsPopup] = useState(false);
 
 
 
-  const [openRemark, setOpenRemark] = useState(null);
+// Add this function to handle view-only documents
+const handleViewOnlyDocuments = async (client: Client) => {
+  setViewOnlyDocsClient(client);
+  
+  try {
+    const response = await axios.get(
+      `${BASE_URL}api/documents/${client.master_id}`,
+      { withCredentials: true },
+    );
+
+    const images: DocItem[] = [];
+    const documents: DocItem[] = [];
+    const videos: DocItem[] = [];
+
+    response.data.documents.forEach((doc: any) => {
+      let filePath = doc.document_path;
+      filePath = filePath.replace(/^server\//, '').replace(/\\/g, '/');
+      if (!filePath.startsWith('uploads/')) filePath = `uploads/${filePath}`;
+
+      const fullUrl = `${BASE_URL}${filePath}`;
+
+      const docObj: DocItem = {
+        doc_id: doc.doc_id,
+        url: fullUrl,
+        link: doc.location_link,
+        remark: doc.remark,
+        document_type: doc.document_type
+      };
+
+      if (doc.document_type === 'image') {
+        images.push(docObj);
+      } else if (doc.document_type === 'video') {
+        videos.push(docObj);
+      } else {
+        documents.push(docObj);
+      }
+    });
+
+    setViewOnlyDocsData({ images, documents, videos });
+    setShowViewOnlyDocsPopup(true);
+  } catch (error) {
+    console.error('Error fetching documents:', error);
+    setViewOnlyDocsData({ images: [], documents: [], videos: [] });
+    setShowViewOnlyDocsPopup(true);
+  }
+};
+
 
 const handleShowRemark = (text) => {
   if (!text) return;
@@ -460,7 +529,10 @@ const handleShowRemark = (text) => {
     useState<Client | null>(null);
   const [showDetailsModal, setShowDetailsModal] = useState(false);
 
-  const [filteredUsers, setFilteredUsers] = useState<any[]>([]);
+  const [filteredUsers, setFilteredUsers] = useState<any[]>([]); 
+
+  const [detailedRemark, setDetailedRemark] = useState('');
+
 
   const renderDetailsModal = () => {
     if (!selectedClientDetails) return null;
@@ -1271,6 +1343,25 @@ const handleShowRemark = (text) => {
     );
   };
 
+
+const [showAddPopup, setShowAddPopup] = useState(false);
+const [singleFormData, setSingleFormData] = useState({
+  name: '',
+  number: '',
+  email: '',
+  address: '',
+  cat_id: '',
+  reference_id: '',
+  area_id: '',
+  // Add other fields as needed
+});
+
+const [error, setError] = useState('');
+const [duplicateEntries, setDuplicateEntries] = useState<any[]>([]);
+const [showDuplicateModal, setShowDuplicateModal] = useState(false);
+
+
+
   // Add these state variables near your other state declarations
   const [selectedClients, setSelectedClients] = useState<number[]>([]);
   const [selectedMasterIds, setSelectedMasterIds] = useState<number[]>([]);
@@ -1903,25 +1994,37 @@ useEffect(() => {
     selectedFollowupFromDate, selectedFollowupToDate, selectedStages, selectedUsers, selectedCities]);
 
   // Filter handlers
-  const handleStageSelect = (stage: string) => {
-    setSelectedStages((prev) =>
-      prev.includes(stage) ? prev.filter((s) => s !== stage) : [...prev, stage],
-    );
-  };
+// Stage filter handler
+const handleStageSelect = (stage: string) => {
+  setSelectedStages((prev) =>
+    prev.includes(stage) ? prev.filter((s) => s !== stage) : [...prev, stage],
+  );
+  
+  // Close dropdown after selection
+  setShowStageFilter(false);
+};
 
-  const handleUserSelect = (userName: string) => {
-    setSelectedUsers((prev) =>
-      prev.includes(userName)
-        ? prev.filter((u) => u !== userName)
-        : [...prev, userName],
-    );
-  };
+// User filter handler
+const handleUserSelect = (userName: string) => {
+  setSelectedUsers((prev) =>
+    prev.includes(userName)
+      ? prev.filter((u) => u !== userName)
+      : [...prev, userName],
+  );
+  
+  // Close dropdown after selection
+  setShowUserFilter(false);
+};
 
-  const handleCitySelect = (city: string) => {
-    setSelectedCities((prev) =>
-      prev.includes(city) ? prev.filter((c) => c !== city) : [...prev, city],
-    );
-  };
+// City filter handler
+const handleCitySelect = (city: string) => {
+  setSelectedCities((prev) =>
+    prev.includes(city) ? prev.filter((c) => c !== city) : [...prev, city],
+  );
+  
+  // Close dropdown after selection
+  setShowCityFilter(false);
+};
 
 const clearFilters = () => {
   // Clear all date filters
@@ -2198,150 +2301,162 @@ const handleFileIconClick = async (client: Client) => {
     }
 
     setUploadFiles(validFiles);
-  };
+  }; 
 
-  const handleUploadSubmit = async () => {
-    if (!docsClient || uploadFiles.length === 0) {
-      alert('Please select files to upload.');
-      return;
+const handleUploadSubmit = async () => {
+  if (!docsClient || uploadFiles.length === 0) {
+    alert('Please select files to upload.');
+    return;
+  }
+
+  const formData = new FormData();
+
+  // Add files
+  uploadFiles.forEach((file) => {
+    formData.append('files', file);
+  });
+
+  // Add additional fields
+  if (locationLink) formData.append('location_link', locationLink);
+  if (remark) formData.append('remark', remark);
+  if (followupDate) formData.append('followup_date', followupDate);
+  if (leadStage) formData.append('leadStage', leadStage);
+  
+  // 🔴 FIX: Add detailed_remark field
+  if (detailedRemark) {
+    formData.append('detailed_remark', detailedRemark);
+    console.log('📝 Sending detailed_remark:', detailedRemark);
+  }
+
+  // 🔴 CRITICAL FIX: Send assignedTo correctly
+  if (selectedUsers && selectedUsers.length > 0) {
+    // METHOD 1: Send as comma-separated string (RECOMMENDED)
+    const assignedToString = selectedUsers.join(',');
+    formData.append('assignedTo', assignedToString);
+    
+    // 🔴 ALSO send as array for backward compatibility
+    selectedUsers.forEach((userId) => {
+      formData.append('assignedTo[]', userId);
+    });
+    
+    console.log(`📤 Sending assignedTo as: ${assignedToString}`);
+    console.log(`📤 Also sending as array with ${selectedUsers.length} users`);
+  } else {
+    formData.append('assignedTo', '');
+    console.log('📤 Sending empty assignedTo');
+  }
+
+  // 🔴 DEBUG: Log all form data entries
+  console.log('\n📤 ALL FORM DATA ENTRIES:');
+  console.log('-'.repeat(40));
+  const formDataEntries = Array.from(formData.entries());
+  formDataEntries.forEach(([key, value]) => {
+    if (key === 'files') {
+      console.log(`${key}: File object - ${value.name}`);
+    } else {
+      console.log(`${key}: ${value}`);
+    }
+  });
+  console.log('-'.repeat(40));
+
+  try {
+    const response = await axios.post(
+      `${BASE_URL}api/upload/${docsClient.master_id}`,
+      formData,
+      {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
+        withCredentials: true,
+      },
+    );
+
+    // Show success message
+    let successMsg = '✅ Files uploaded successfully!\n\n';
+
+    if (response.data.summary) {
+      const { summary } = response.data;
+      successMsg += `📁 Files Uploaded: ${summary.files_uploaded}\n`;
+      successMsg += `👥 Reassignments Added: ${summary.reassignments_added}\n`;
+      if (summary.duplicates_skipped > 0) {
+        successMsg += `⚠️ Duplicates Skipped: ${summary.duplicates_skipped}\n`;
+      }
     }
 
-    const formData = new FormData();
+    if (response.data.updated_fields) {
+      const fields = response.data.updated_fields;
+      successMsg += '\n📊 Updates:\n';
+      if (fields.raw_data_followup_date) successMsg += '• Follow-up date updated\n';
+      if (fields.raw_data_lead_stage) successMsg += '• Lead stage updated\n';
+      if (fields.raw_data_detailed_remark) successMsg += '• Detailed remark updated\n';
+      if (fields.reassignments_created > 0) {
+        successMsg += `• ${fields.reassignments_created} reassignment(s) created\n`;
+      } else {
+        successMsg += '• No reassignments created\n';
+      }
+    }
 
-    // Add files
-    uploadFiles.forEach((file) => {
-      formData.append('files', file);
+    alert(successMsg);
+    console.log('✅ Server response:', response.data);
+
+    // Refresh document list
+    const refreshResponse = await axios.get(
+      `${BASE_URL}api/documents/${docsClient.master_id}`,
+      { withCredentials: true },
+    );
+
+    const processFilePath = (filePath: string) => {
+      filePath = filePath.replace(/^server\//, '').replace(/\\/g, '/');
+      if (!filePath.startsWith('uploads/')) filePath = `uploads/${filePath}`;
+      return `${BASE_URL}${filePath}`;
+    };
+
+    const images: DocItem[] = [];
+    const documents: DocItem[] = [];
+    const videos: DocItem[] = [];
+
+    refreshResponse.data.documents.forEach((doc: any) => {
+      const docObj: DocItem = {
+        doc_id: doc.doc_id,
+        url: processFilePath(doc.document_path),
+        link: doc.location_link,
+        remark: doc.remark,
+        document_type: doc.document_type
+      };
+
+      if (doc.document_type === 'image') images.push(docObj);
+      else if (doc.document_type === 'video') videos.push(docObj);
+      else documents.push(docObj);
     });
 
-    // Add additional fields
-    if (locationLink) formData.append('location_link', locationLink);
-    if (remark) formData.append('remark', remark);
-    if (followupDate) formData.append('followup_date', followupDate);
-    if (leadStage) formData.append('leadStage', leadStage);
+    // Update state
+    setDocsData({ images, documents, videos });
 
-    // DEBUG: Check what we're sending
-    console.log('🧪 DEBUG - Selected users before sending:', selectedUsers);
-    console.log('🧪 DEBUG - leadStage:', leadStage);
-    console.log('🧪 DEBUG - followupDate:', followupDate);
+    // Clear the form
+    setUploadFiles([]);
+    setLocationLink('');
+    setRemark('');
+    setDetailedRemark('');
+    setFollowupDate('');
+    setSelectedUsers([]);
+    setLeadStage('');
 
-    // CRITICAL FIX: Ensure assignedTo is always sent, even if empty array
-    if (selectedUsers && selectedUsers.length > 0) {
-      // Method 1: Send as array (preferred)
-      selectedUsers.forEach((userId) => {
-        formData.append('assignedTo[]', userId);
-      });
-      console.log(`📤 Sending ${selectedUsers.length} users as assignedTo[]`);
+    // Refresh the main table data
+    fetchTaleCallerData();
+  } catch (error: any) {
+    console.error('❌ Upload error:', error);
+
+    if (error.response?.data?.message) {
+      alert(`❌ Upload failed: ${error.response.data.message}`);
+      if (error.response.data.error) {
+        console.error('Server error details:', error.response.data.error);
+      }
     } else {
-      // Send empty array to avoid undefined
-      formData.append('assignedTo[]', '');
-      console.log('📤 Sending empty assignedTo[]');
+      alert('❌ Error uploading files. Please check console for details.');
     }
-
-    // For debugging - log all form data entries
-    console.log('📤 All form data entries:');
-    const formDataEntries = Array.from(formData.entries());
-    for (let pair of formDataEntries) {
-      console.log(pair[0] + ': ', pair[1]);
-    }
-
-    try {
-      const response = await axios.post(
-        `${BASE_URL}api/upload/${docsClient.master_id}`,
-        formData,
-        {
-          headers: {
-            'Content-Type': 'multipart/form-data',
-          },
-          withCredentials: true,
-        },
-      );
-
-      // Show success message
-      let successMsg = '✅ Files uploaded successfully!\n\n';
-
-      if (response.data.summary) {
-        const { summary } = response.data;
-        successMsg += `📁 Files Uploaded: ${summary.files_uploaded}\n`;
-        successMsg += `👥 Reassignments Added: ${summary.reassignments_added}\n`;
-        if (summary.duplicates_skipped > 0) {
-          successMsg += `⚠️ Duplicates Skipped: ${summary.duplicates_skipped}\n`;
-        }
-      }
-
-      if (response.data.updated_fields) {
-        const fields = response.data.updated_fields;
-        successMsg += '\n📊 Updates:\n';
-        if (fields.followup_date) successMsg += '• Follow-up date updated\n';
-        if (fields.lead_stage) successMsg += '• Lead stage updated\n';
-        if (fields.detailed_remark) successMsg += '• Remarks updated\n';
-        if (fields.reassignment_count > 0) {
-          successMsg += `• Reassigned to ${fields.reassignment_count} user(s)\n`;
-        } else {
-          successMsg +=
-            '• No reassignments added (check if users were selected)\n';
-        }
-      }
-
-      alert(successMsg);
-      console.log('✅ Server response:', response.data);
-
-      // Refresh document list
-      const refreshResponse = await axios.get(
-        `${BASE_URL}api/documents/${docsClient.master_id}`,
-        { withCredentials: true },
-      );
-
-// In handleUploadSubmit function, update the document processing part:
-const processFilePath = (filePath: string) => {
-  filePath = filePath.replace(/^server\//, '').replace(/\\/g, '/');
-  if (!filePath.startsWith('uploads/')) filePath = `uploads/${filePath}`;
-  return `${BASE_URL}${filePath}`;
+  }
 };
 
-const images: DocItem[] = [];
-const documents: DocItem[] = [];
-const videos: DocItem[] = [];
-
-refreshResponse.data.documents.forEach((doc: any) => {
-  const docObj: DocItem = {
-    doc_id: doc.doc_id, // Add this
-    url: processFilePath(doc.document_path),
-    link: doc.location_link,
-    remark: doc.remark,
-    document_type: doc.document_type
-  };
-
-  if (doc.document_type === 'image') images.push(docObj);
-  else if (doc.document_type === 'video') videos.push(docObj);
-  else documents.push(docObj);
-});
-
-      // Update state
-      setDocsData({ images, documents, videos });
-
-      // Clear the form
-      setUploadFiles([]);
-      setLocationLink('');
-      setRemark('');
-      setFollowupDate('');
-      setSelectedUsers([]);
-      setLeadStage('');
-
-      // Refresh the main table data
-      fetchTaleCallerData();
-    } catch (error: any) {
-      console.error('❌ Upload error:', error);
-
-      if (error.response?.data?.message) {
-        alert(`❌ Upload failed: ${error.response.data.message}`);
-        if (error.response.data.error) {
-          console.error('Server error details:', error.response.data.error);
-        }
-      } else {
-        alert('❌ Error uploading files. Please check console for details.');
-      }
-    }
-  };
 
   const getFileIcon = (fileName: string) => {
     const ext = fileName.split('.').pop()?.toLowerCase() || '';
@@ -2525,6 +2640,9 @@ const handleDeleteDocument = async (docId: number) => {
                 </div>
               </div>
 
+<div className="flex flex-wrap items-center gap-2">
+
+
               {/* NEW: Reset Filter Button */}
               <button
                 onClick={clearFilters}
@@ -2545,6 +2663,15 @@ const handleDeleteDocument = async (docId: number) => {
                 </svg>
                 Reset Filter
               </button>
+
+  <button
+    onClick={() => setShowAddPopup(true)}
+    className="bg-gradient-to-r from-purple-600 to-purple-700 hover:from-purple-700 hover:to-purple-800 text-white px-4 py-2 rounded-lg text-sm font-medium flex items-center gap-2 transition-all shadow-md hover:shadow-lg"
+  >
+    <FontAwesomeIcon icon={faPlus} className="h-4 w-4" />
+    Add New
+  </button>
+
 
               {/* Reassign Button */}
               <button
@@ -2580,7 +2707,8 @@ const handleDeleteDocument = async (docId: number) => {
                 {selectedMasterIds.length > 1
                   ? `Reassign (${selectedMasterIds.length})`
                   : 'ReAssign'}
-              </button>
+              </button> 
+              </div>
             </div>
           </div>
         </div>
@@ -2985,15 +3113,16 @@ const handleDeleteDocument = async (docId: number) => {
                           Filter Cities
                         </span>
                         <div className="flex gap-2">
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setSelectedCities([]);
-                            }}
-                            className="text-xs font-medium text-blue-600 hover:text-blue-800 dark:text-blue-400 transition-colors"
-                          >
-                            Clear All
-                          </button>
+                        <button
+  onClick={(e) => {
+    e.stopPropagation();
+    setSelectedCities([]);
+    setShowCityFilter(false); // Close dropdown
+  }}
+  className="text-xs font-medium text-blue-600 hover:text-blue-800 dark:text-blue-400 transition-colors"
+>
+  Clear All
+</button>
                           <button
                             onClick={(e) => {
                               e.stopPropagation();
@@ -3009,25 +3138,31 @@ const handleDeleteDocument = async (docId: number) => {
                       {availableCities.length > 0 ? (
                         <>
                           {availableCities.map((city) => (
-                            <div key={city} className="flex items-center mb-2">
-                              <input
-                                type="checkbox"
-                                id={`city-${city}`}
-                                checked={selectedCities.includes(city)}
-                                onChange={(e) => {
-                                  e.stopPropagation();
-                                  handleCitySelect(city);
-                                }}
-                                onClick={(e) => e.stopPropagation()}
-                                className="h-3.5 w-3.5 mr-2.5 text-blue-600 rounded border-gray-300 focus:ring-2 focus:ring-blue-500"
-                              />
-                              <label
-                                htmlFor={`city-${city}`}
-                                className="text-sm font-medium dark:text-white cursor-pointer truncate hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
-                              >
-                                {city}
-                              </label>
-                            </div>
+                         <div className="flex items-center mb-2">
+  <input
+    type="checkbox"
+    id={`city-${city}`}
+    checked={selectedCities.includes(city)}
+    onChange={(e) => {
+      e.stopPropagation();
+      handleCitySelect(city);
+    }}
+    onClick={(e) => {
+      e.stopPropagation();
+    }}
+    className="h-3.5 w-3.5 mr-2.5 text-blue-600 rounded border-gray-300 focus:ring-2 focus:ring-blue-500"
+  />
+  <label
+    htmlFor={`city-${city}`}
+    className="text-sm font-medium dark:text-white cursor-pointer truncate hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
+    onClick={(e) => {
+      e.stopPropagation();
+      handleCitySelect(city);
+    }}
+  >
+    {city}
+  </label>
+</div>
                           ))}
                         </>
                       ) : (
@@ -3103,15 +3238,16 @@ const handleDeleteDocument = async (docId: number) => {
                           Filter Users
                         </span>
                         <div className="flex gap-2">
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setSelectedUsers([]);
-                            }}
-                            className="text-xs font-medium text-blue-600 hover:text-blue-800 dark:text-blue-400 transition-colors"
-                          >
-                            Clear All
-                          </button>
+                         <button
+  onClick={(e) => {
+    e.stopPropagation();
+    setSelectedUsers([]);
+    setShowUserFilter(false); // Close dropdown
+  }}
+  className="text-xs font-medium text-blue-600 hover:text-blue-800 dark:text-blue-400 transition-colors"
+>
+  Clear All
+</button>
                           <button
                             onClick={(e) => {
                               e.stopPropagation();
@@ -3127,28 +3263,31 @@ const handleDeleteDocument = async (docId: number) => {
                       {users.length > 0 ? (
                         <>
                           {users.map((user) => (
-                            <div
-                              key={user.id}
-                              className="flex items-center mb-2"
-                            >
-                              <input
-                                type="checkbox"
-                                id={`user-${user.id}`}
-                                checked={selectedUsers.includes(user.name)}
-                                onChange={(e) => {
-                                  e.stopPropagation();
-                                  handleUserSelect(user.name);
-                                }}
-                                onClick={(e) => e.stopPropagation()}
-                                className="h-3.5 w-3.5 mr-2.5 text-blue-600 rounded border-gray-300 focus:ring-2 focus:ring-blue-500"
-                              />
-                              <label
-                                htmlFor={`user-${user.id}`}
-                                className="text-sm font-medium dark:text-white cursor-pointer truncate hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
-                              >
-                                {user.name} ({user.role})
-                              </label>
-                            </div>
+                           <div className="flex items-center mb-2">
+  <input
+    type="checkbox"
+    id={`user-${user.id}`}
+    checked={selectedUsers.includes(user.name)}
+    onChange={(e) => {
+      e.stopPropagation();
+      handleUserSelect(user.name);
+    }}
+    onClick={(e) => {
+      e.stopPropagation();
+    }}
+    className="h-3.5 w-3.5 mr-2.5 text-blue-600 rounded border-gray-300 focus:ring-2 focus:ring-blue-500"
+  />
+  <label
+    htmlFor={`user-${user.id}`}
+    className="text-sm font-medium dark:text-white cursor-pointer truncate hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
+    onClick={(e) => {
+      e.stopPropagation();
+      handleUserSelect(user.name);
+    }}
+  >
+    {user.name} ({user.role})
+  </label>
+</div>
                           ))}
                         </>
                       ) : (
@@ -3212,15 +3351,16 @@ const handleDeleteDocument = async (docId: number) => {
                           Filter Stages
                         </span>
                         <div className="flex gap-2">
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setSelectedStages([]);
-                            }}
-                            className="text-xs font-medium text-blue-600 hover:text-blue-800 dark:text-blue-400 transition-colors"
-                          >
-                            Clear All
-                          </button>
+                        <button
+  onClick={(e) => {
+    e.stopPropagation();
+    setSelectedStages([]);
+    setShowStageFilter(false); // Close dropdown
+  }}
+  className="text-xs font-medium text-blue-600 hover:text-blue-800 dark:text-blue-400 transition-colors"
+>
+  Clear All
+</button>
                           <button
                             onClick={(e) => {
                               e.stopPropagation();
@@ -3236,25 +3376,31 @@ const handleDeleteDocument = async (docId: number) => {
                       {leadStages.length > 0 ? (
                         <>
                           {leadStages.map((stage) => (
-                            <div key={stage} className="flex items-center mb-2">
-                              <input
-                                type="checkbox"
-                                id={`stage-${stage}`}
-                                checked={selectedStages.includes(stage)}
-                                onChange={(e) => {
-                                  e.stopPropagation();
-                                  handleStageSelect(stage);
-                                }}
-                                onClick={(e) => e.stopPropagation()}
-                                className="h-3.5 w-3.5 mr-2.5 text-blue-600 rounded border-gray-300 focus:ring-2 focus:ring-blue-500"
-                              />
-                              <label
-                                htmlFor={`stage-${stage}`}
-                                className="text-sm font-medium dark:text-white cursor-pointer truncate hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
-                              >
-                                {stage || 'Unknown'}
-                              </label>
-                            </div>
+                            <div className="flex items-center mb-2">
+  <input
+    type="checkbox"
+    id={`stage-${stage}`}
+    checked={selectedStages.includes(stage)}
+    onChange={(e) => {
+      e.stopPropagation();
+      handleStageSelect(stage);
+    }}
+    onClick={(e) => {
+      e.stopPropagation();
+    }}
+    className="h-3.5 w-3.5 mr-2.5 text-blue-600 rounded border-gray-300 focus:ring-2 focus:ring-blue-500"
+  />
+  <label
+    htmlFor={`stage-${stage}`}
+    className="text-sm font-medium dark:text-white cursor-pointer truncate hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
+    onClick={(e) => {
+      e.stopPropagation();
+      handleStageSelect(stage);
+    }}
+  >
+    {stage || 'Unknown'}
+  </label>
+</div>
                           ))}
                         </>
                       ) : (
@@ -3269,14 +3415,59 @@ const handleDeleteDocument = async (docId: number) => {
                             Selected ({selectedStages.length}):
                           </div>
                           <div className="flex flex-wrap gap-1.5">
-                            {selectedStages.map((stage) => (
-                              <span
-                                key={stage}
-                                className="inline-flex items-center px-3 py-1.5 rounded-full text-xs font-semibold bg-gradient-to-r from-blue-50 to-blue-100 dark:from-blue-900/30 dark:to-blue-800/20 text-blue-800 dark:text-blue-300 border border-blue-200 dark:border-blue-700/30 shadow-sm truncate max-w-[100px]"
-                              >
-                                {stage}
-                              </span>
-                            ))}
+{selectedStages.map((stage) => (
+  <span
+    key={stage}
+    className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-300"
+  >
+    Stage: {stage}
+    <button
+      onClick={() => {
+        handleStageSelect(stage);
+        setShowStageFilter(false); // Close dropdown
+      }}
+      className="ml-1 text-purple-600 hover:text-purple-800 dark:text-purple-400"
+    >
+      ×
+    </button>
+  </span>
+))}
+
+{selectedUsers.map((user) => (
+  <span
+    key={user}
+    className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-300"
+  >
+    User: {user}
+    <button
+      onClick={() => {
+        handleUserSelect(user);
+        setShowUserFilter(false); // Close dropdown
+      }}
+      className="ml-1 text-orange-600 hover:text-orange-800 dark:text-orange-400"
+    >
+      ×
+    </button>
+  </span>
+))}
+
+{selectedCities.map((city) => (
+  <span
+    key={city}
+    className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs bg-teal-100 text-teal-800 dark:bg-teal-900 dark:text-teal-300"
+  >
+    City: {city}
+    <button
+      onClick={() => {
+        handleCitySelect(city);
+        setShowCityFilter(false); // Close dropdown
+      }}
+      className="ml-1 text-teal-600 hover:text-teal-800 dark:text-teal-400"
+    >
+      ×
+    </button>
+  </span>
+))}
                           </div>
                         </div>
                       )}
@@ -3521,7 +3712,20 @@ const handleDeleteDocument = async (docId: number) => {
                           icon={faFileUpload}
                           className="text-xs"
                         />
-                      </ActionButton>
+                      </ActionButton> 
+
+                     
+<ActionButton
+  onClick={() => handleViewOnlyDocuments(client)}
+  title="View Documents"
+  variant="viewDocs"
+  badgeCount={client.document_count}
+  className="w-8 h-8 hover:scale-105 transition-transform relative"
+>
+  <FontAwesomeIcon icon={faFolderOpen} className="text-xs" />
+</ActionButton>
+
+
                     </div>
                   </td>
                 </tr>
@@ -3558,20 +3762,21 @@ const handleDeleteDocument = async (docId: number) => {
                   Manage documents, links, and remarks in one place
                 </p>
               </div>
-              <button
-                onClick={() => {
-                  setShowDocsPopup(false);
-                  setUploadFiles([]);
-                  setLocationLink('');
-                  setRemark('');
-                  setFollowupDate('');
-                  setSelectedUsers([]);
-                  setLeadStage('');
-                }}
-                className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 text-2xl p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-full transition-colors"
-              >
-                <FontAwesomeIcon icon={faTimes} />
-              </button>
+<button
+  onClick={() => {
+    setShowDocsPopup(false);
+    setUploadFiles([]);
+    setLocationLink('');
+    setRemark('');
+    setDetailedRemark(''); // 🔴 ADD THIS
+    setFollowupDate('');
+    setSelectedUsers([]);
+    setLeadStage('');
+  }}
+  className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 text-2xl p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-full transition-colors"
+>
+  <FontAwesomeIcon icon={faTimes} />
+</button>
             </div>
 
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
@@ -3765,10 +3970,7 @@ const handleDeleteDocument = async (docId: number) => {
                         {user.name}
                       </div>
 
-                      {/* ROLE – secondary, clipped */}
-                      <div className="text-xs text-gray-500 dark:text-gray-400 mt-0.5 line-clamp-1">
-                        {user.role || 'No role'}
-                      </div>
+                  
                     </label>
                   </div>
                 );
@@ -3836,209 +4038,22 @@ const handleDeleteDocument = async (docId: number) => {
           onChange={(e) => setLocationLink(e.target.value)}
           className="w-full p-2.5 border border-gray-300 rounded-lg text-sm dark:text-white dark:bg-gray-800 focus:ring-2 focus:ring-blue-500 outline-none"
         />
-      </div>
+      </div> 
 
-     {/* Reassign To (Multiple Users) - UPDATED WITH DEFAULT CHECKED */}
+
+
+      {/* Detailed Remark Field - NEW */}
 <div>
   <label className="block mb-1.5 text-xs font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400">
-    Reassign To (Multiple Users)
+    Detailed Remark 
   </label>
-
-  {/* Search Box */}
-  <div className="mb-2">
-    <div className="relative">
-      <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-        <svg
-          className="h-4 w-4 text-gray-400"
-          fill="none"
-          stroke="currentColor"
-          viewBox="0 0 24 24"
-        >
-          <path
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            strokeWidth={2}
-            d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
-          />
-        </svg>
-      </div>
-      <input
-        type="text"
-        value={searchTerm}
-        onChange={(e) => setSearchTerm(e.target.value)}
-        className="w-full pl-9 pr-8 py-2 border border-gray-300 dark:border-gray-600 rounded text-sm dark:bg-form-input dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-        placeholder="Search users by name or role..."
-      />
-      {searchTerm && (
-        <button
-          type="button"
-          onClick={() => setSearchTerm('')}
-          className="absolute inset-y-0 right-0 pr-2 flex items-center text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
-        >
-          <svg
-            className="h-4 w-4"
-            fill="none"
-            stroke="currentColor"
-            viewBox="0 0 24 24"
-          >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth={2}
-              d="M6 18L18 6M6 6l12 12"
-            />
-          </svg>
-        </button>
-      )}
-    </div>
-
-    {searchTerm && (
-      <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-        Showing {filteredUsers.length} of {users.length} users
-      </p>
-    )}
-  </div>
-
-  {/* Checkbox Selection Area */}
-  <div className="border border-gray-300 dark:border-gray-600 rounded p-3 max-h-40 overflow-y-auto">
-    {/* Select All Filtered */}
-    <div className="mb-2 pb-2 border-b dark:border-gray-700 flex items-center justify-between">
-      <button
-        type="button"
-        onClick={() => {
-          const allFilteredSelected = filteredUsers.every((user) =>
-            selectedUsers.includes(user.user_id || user.id),
-          );
-
-          if (allFilteredSelected) {
-            setSelectedUsers((prev) =>
-              prev.filter(
-                (userId) =>
-                  !filteredUsers.some(
-                    (user) =>
-                      user.user_id === userId || user.id === userId,
-                  ),
-              ),
-            );
-          } else {
-            const filteredUserIds = filteredUsers.map(
-              (user) => user.user_id || user.id,
-            );
-            setSelectedUsers((prev) => [
-              ...new Set([...prev, ...filteredUserIds]),
-            ]);
-          }
-        }}
-        className="text-xs px-3 py-1.5 bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300 rounded hover:bg-blue-200 dark:hover:bg-blue-800 transition-colors"
-      >
-        {filteredUsers.length > 0 &&
-        filteredUsers.every((user) =>
-          selectedUsers.includes(user.user_id || user.id),
-        )
-          ? 'Deselect All Filtered'
-          : 'Select All Filtered'
-        }
-      </button>
-
-      <span className="text-xs text-gray-500 dark:text-gray-400">
-        {selectedUsers.length} selected
-      </span>
-    </div>
-
-    {/* Users List - AUTO-CHECK THE CURRENTLY ASSIGNED USER */}
-    {filteredUsers.length > 0 ? (
-      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-2">
-        {filteredUsers.map((user) => {
-          // Check if this user is the currently assigned one
-          const isCurrentlyAssigned = docsClient && (
-            user.name === docsClient.telecaller_name ||
-            user.name === docsClient.assigned_to ||
-            user.user_id === docsClient.assigned_to ||
-            user.id === docsClient.assigned_to
-          );
-          
-          // Include in selectedUsers if currently assigned
-          const shouldBeChecked = isCurrentlyAssigned || 
-            selectedUsers.includes(user.user_id || user.id);
-
-          return (
-            <div
-              key={user.user_id || user.id}
-              className={`flex items-start p-2 rounded transition-colors min-h-[60px] ${
-                shouldBeChecked
-                  ? 'bg-blue-50 dark:bg-blue-900/30 border border-blue-200 dark:border-blue-700'
-                  : 'border border-transparent hover:bg-gray-50 dark:hover:bg-gray-800 hover:border-gray-200 dark:hover:border-gray-700'
-              }`}
-            >
-              <input
-                type="checkbox"
-                id={`user-${user.user_id || user.id}`}
-                checked={shouldBeChecked}
-                onChange={() => {
-                  const userId = user.user_id || user.id;
-                  if (selectedUsers.includes(userId)) {
-                    setSelectedUsers((prev) =>
-                      prev.filter((id) => id !== userId),
-                    );
-                  } else {
-                    setSelectedUsers((prev) => [...prev, userId]);
-                  }
-                }}
-                className="h-4 w-4 text-blue-600 rounded focus:ring-blue-500 focus:ring-offset-0 mt-1 flex-shrink-0"
-              />
-
-              <label
-                htmlFor={`user-${user.user_id || user.id}`}
-                className="ml-2 text-sm text-gray-700 dark:text-gray-300 cursor-pointer flex-1 min-w-0"
-              >
-                {/* NAME – highest priority */}
-                <div className="font-semibold text-sm truncate">
-                  {user.name}
-                  {isCurrentlyAssigned && (
-                    <span className="ml-1 text-[10px] bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300 px-1 py-0.5 rounded">
-                      Current
-                    </span>
-                  )}
-                </div>
-
-                {/* ROLE – secondary, clipped */}
-                <div className="text-xs text-gray-500 dark:text-gray-400 mt-0.5 line-clamp-1">
-                  {user.role || 'No role'}
-                </div>
-              </label>
-            </div>
-          );
-        })}
-      </div>
-    ) : (
-      <div className="text-center py-4 text-gray-500 dark:text-gray-400">
-        <div className="text-2xl mb-2">🔍</div>
-        <p className="text-sm">No users found</p>
-        <p className="text-xs mt-1">Try a different search term</p>
-      </div>
-    )}
-  </div>
-
-  {/* Selected Users Preview */}
-  {selectedUsers.length > 0 && (
-    <div className="mt-2 p-2 bg-blue-50 dark:bg-blue-900/30 rounded border border-blue-200 dark:border-blue-800">
-      <div className="text-xs text-blue-700 dark:text-blue-300 mb-1 font-medium">
-        Selected Users ({selectedUsers.length}):
-      </div>
-      <div className="text-xs text-gray-600 dark:text-gray-400 break-words">
-        {selectedUsers
-          .map((userId) => {
-            const user = users.find(
-              (u) => u.user_id === userId || u.id === userId,
-            );
-            return user
-              ? `${user.name}${user.role ? ` (${user.role})` : ''}`
-              : userId;
-          })
-          .join(', ')}
-      </div>
-    </div>
-  )}
+  <textarea
+    placeholder="Enter detailed remark for this update..."
+    value={detailedRemark}
+    onChange={(e) => setDetailedRemark(e.target.value)}
+    className="w-full p-2.5 border border-gray-300 rounded-lg text-sm dark:text-white dark:bg-gray-800 focus:ring-2 focus:ring-blue-500 outline-none"
+    rows={3}
+  />
 </div>
 
       {/* File Upload Area */}
@@ -4417,85 +4432,78 @@ const handleDeleteDocument = async (docId: number) => {
             </div>
 
             {/* FORM */}
-            <form
-              onSubmit={async (e) => {
-                e.preventDefault();
+<form
+  onSubmit={async (e) => {
+    e.preventDefault();
 
-                if (!assignData.assignedTo.length || !assignData.leadStage) {
-                  alert('Please select at least one user and a lead stage');
-                  return;
-                }
+    if (
+      !assignData.assignedTo.length ||
+      !assignData.leadStage ||
+      !assignData.reassignmentDate
+    ) {
+      alert('Please fill all required fields');
+      return;
+    }
 
-                try {
-                  const assignments = [];
+    try {
+      // ✅ ONE request per master_id
+      const requests = selectedMasterIds.map((master_id) =>
+        fetch(`${BASE_URL}api/add`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify({
+            master_id,
 
-                  selectedMasterIds.forEach((masterId) => {
-                    assignData.assignedTo.forEach((user) => {
-                      assignments.push({
-                        master_id: masterId,
-                        assignedTo: user,
-                        leadStage: assignData.leadStage,
-                        remark: assignData.remark,
-                        reassignment_date: assignData.reassignmentDate,
-                      });
-                    });
-                  });
+            // IMPORTANT: array (backend handles loop)
+            assignedTo: assignData.assignedTo,
 
-                  const responses = await Promise.all(
-                    assignments.map((assignment) =>
-                      fetch(`${BASE_URL}api/add`, {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        credentials: 'include',
-                        body: JSON.stringify(assignment),
-                      }),
-                    ),
-                  );
+            leadStage: assignData.leadStage,
+            remark: assignData.remark,
 
-                  const results = await Promise.all(
-                    responses.map((r) => r.json()),
-                  );
+            // IMPORTANT: sync both
+            reassignment_date: assignData.reassignmentDate,
+            followup_date: assignData.reassignmentDate,
+          }),
+        })
+      );
 
-                  let totalInserted = 0;
-                  let skippedDetails = [];
+      const responses = await Promise.all(requests);
+      const results = await Promise.all(responses.map(r => r.json()));
 
-                  results.forEach((result) => {
-                    if (result.success) {
-                      if (result.inserted?.length)
-                        totalInserted += result.inserted.length;
-                      if (result.skipped?.length) {
-                        result.skipped.forEach((s) => {
-                          skippedDetails.push(
-                            `"${s.finalName}" for stage "${assignData.leadStage}"`,
-                          );
-                        });
-                      }
-                    }
-                  });
+      let inserted = 0;
+      let skipped = 0;
 
-                  alert(
-                    `✅ ${totalInserted} assignment(s) created` +
-                      (skippedDetails.length
-                        ? `\n⚠ Skipped:\n- ${skippedDetails.join('\n- ')}`
-                        : ''),
-                  );
+      results.forEach(r => {
+        inserted += r.inserted_count || 0;
+        skipped += r.skipped_count || 0;
+      });
 
-                  setAssignData({
-                    assignedTo: [],
-                    leadStage: '',
-                    remark: '',
-                    reassignmentDate: new Date().toISOString().split('T')[0],
-                  });
-                  setSelectedMasterIds([]);
-                  setSelectedClients([]);
-                  setShowAssignPopup(false);
-                  fetchTaleCallerData();
-                } catch (err) {
-                  alert('❌ Submission failed');
-                }
-              }}
-              className="space-y-4"
-            >
+      alert(
+        `✅ Assignment completed\nInserted: ${inserted}\nSkipped: ${skipped}`
+      );
+
+      // RESET
+      setAssignData({
+        assignedTo: [],
+        leadStage: '',
+        remark: '',
+        reassignmentDate: new Date().toISOString().split('T')[0],
+      });
+
+      setSelectedMasterIds([]);
+      setSelectedClients([]);
+      setShowAssignPopup(false);
+      fetchTaleCallerData();
+
+    } catch (err) {
+      console.error(err);
+      alert('❌ Submission failed');
+    }
+  }}
+  className="space-y-4"
+>
+
               {/* ASSIGN TO */}
               <div>
                 <label className="block font-semibold text-green-600 mb-2">
@@ -4530,7 +4538,6 @@ const handleDeleteDocument = async (docId: number) => {
                             <div className="font-medium text-black dark:text-white">
                               {user.name}
                             </div>
-                            <div className="text-gray-500">{user.role}</div>
                           </div>
                         </label>
                       );
@@ -4543,47 +4550,43 @@ const handleDeleteDocument = async (docId: number) => {
                 </p>
               </div>
 
-              {/* LEAD STAGE + FOLLOWUP DATE */}
-              <div>
-                <label className="block font-semibold text-green-600 mb-2">
-                  Lead Details
-                </label>
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  {/* Lead Stage */}
+                  <div>
+                    <label className="block mb-1 text-sm font-medium text-black dark:text-white">
+                      Lead Stage *
+                    </label>
+                    <select
+                      name="leadStage"
+                      value={assignData.leadStage}
+                      onChange={handleChange}
+                      required
+                      className="w-full border rounded p-2 dark:border-form-strokedark dark:bg-form-input dark:text-white"
+                    >
+                      <option value="">Select Lead Stage</option>
+                      {leadStages.map((stage, i) => (
+                        <option key={i} value={stage}>
+                          {stage}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  <select
-                    name="leadStage"
-                    value={assignData.leadStage}
-                    onChange={(e) =>
-                      setAssignData({
-                        ...assignData,
-                        leadStage: e.target.value,
-                      })
-                    }
-                    required
-                    className="border rounded p-2 dark:border-form-strokedark dark:bg-form-input dark:text-white"
-                  >
-                    <option value="">Select Lead Stage</option>
-                    {leadStages.map((stage, i) => (
-                      <option key={i} value={stage}>
-                        {stage}
-                      </option>
-                    ))}
-                  </select>
-
-                  <input
-                    type="date"
-                    value={assignData.reassignmentDate}
-                    onChange={(e) =>
-                      setAssignData({
-                        ...assignData,
-                        reassignmentDate: e.target.value,
-                      })
-                    }
-                    required
-                    className="border rounded p-2 dark:border-form-strokedark dark:bg-form-input dark:text-white"
-                  />
+                  {/* Followup Date */}
+                  <div>
+                    <label className="block mb-1 text-sm font-medium text-black dark:text-white">
+                      Followup Date *
+                    </label>
+                    <input
+                      type="date"
+                      name="reassignmentDate"
+                      value={assignData.reassignmentDate}
+                      onChange={handleChange}
+                      required
+                      className="w-full border rounded p-2 dark:border-form-strokedark dark:bg-form-input dark:text-white"
+                    />
+                  </div>
                 </div>
-              </div>
 
               {/* REMARK */}
               <div>
@@ -4625,7 +4628,7 @@ const handleDeleteDocument = async (docId: number) => {
             </form>
           </div>
         </div>
-      )}  \
+      )} 
 
 
       {openRemark && (
@@ -4650,7 +4653,290 @@ const handleDeleteDocument = async (docId: number) => {
 )}
 
 
+{/* Add Single Data Popup */}
+<InsertDataModal
+  showAddPopup={showAddPopup}
+  setShowAddPopup={setShowAddPopup}
+  singleFormData={singleFormData}
+  setSingleFormData={setSingleFormData}
+  categories={categories}
+  references={references}
+  area={area}
+  fetchRawData={fetchTaleCallerData} // Use your fetch function
+  setError={setError}
+  setDuplicateEntries={setDuplicateEntries}
+  setShowDuplicateModal={setShowDuplicateModal}
+/>
 
+{/* Add Duplicate Modal (similar to RawData) */}
+{showDuplicateModal && (
+  <div className="fixed inset-0 z-[99999] bg-black bg-opacity-75 flex justify-center items-center px-4">
+    <div className="bg-white dark:bg-boxdark p-6 rounded-lg shadow-lg w-full max-w-2xl max-h-[80vh] overflow-auto border dark:border-strokedark">
+      {/* Duplicate modal content - same as RawData */}
+      <div className="flex justify-between items-center border-b mb-4 pb-3 dark:border-strokedark">
+        <h2 className="text-xl font-bold dark:text-white text-black">
+          Duplicate Contacts Found ({duplicateEntries.length})
+        </h2>
+        <button
+          onClick={() => {
+            setShowDuplicateModal(false);
+            setDuplicateEntries([]);
+            setShowAddPopup(false);
+          }}
+          className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 text-xl"
+        >
+          ×
+        </button>
+      </div>
+
+      <div className="mb-6 p-4 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg">
+        <div className="flex items-center gap-3">
+          <svg className="w-6 h-6 text-yellow-600 dark:text-yellow-400" fill="currentColor" viewBox="0 0 20 20">
+            <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+          </svg>
+          <div>
+            <h3 className="font-semibold text-yellow-800 dark:text-yellow-300">
+              {duplicateEntries.length} duplicate contact(s) found
+            </h3>
+            <p className="text-sm text-yellow-700 dark:text-yellow-400 mt-1">
+              This contact already exists in the system.
+            </p>
+          </div>
+        </div>
+      </div>
+
+      <div className="space-y-4 mb-6">
+        <h4 className="font-medium text-gray-700 dark:text-gray-300">
+          Duplicate Entry:
+        </h4>
+        <div className="overflow-y-auto">
+          <table className="w-full text-sm">
+            <thead className="bg-gray-100 dark:bg-gray-800">
+              <tr>
+                <th className="p-2 text-left">Name</th>
+                <th className="p-2 text-left">Number</th>
+                <th className="p-2 text-left">Existing Name</th>
+                <th className="p-2 text-left">Existing ID</th>
+              </tr>
+            </thead>
+            <tbody>
+              {duplicateEntries.map((dup, index) => (
+                <tr key={index} className="hover:bg-gray-50 dark:hover:bg-gray-800">
+                  <td className="p-2">{dup.name}</td>
+                  <td className="p-2 font-mono text-red-600 dark:text-red-400">{dup.number}</td>
+                  <td className="p-2">{dup.existingName}</td>
+                  <td className="p-2">{dup.existingId}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <div className="flex gap-3">
+        <button
+          onClick={() => {
+            setShowDuplicateModal(false);
+            setDuplicateEntries([]);
+            setShowAddPopup(false);
+          }}
+          className="flex-1 px-4 py-3 bg-gray-200 hover:bg-gray-300 dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-800 dark:text-gray-200 rounded-lg font-medium transition-colors"
+        >
+          Close & Try Again
+        </button>
+      </div>
+    </div>
+  </div>
+)}
+
+
+{/* View Only Documents Modal */}
+{showViewOnlyDocsPopup && viewOnlyDocsClient && (
+  <div className="fixed inset-0 bg-black/70 flex justify-center items-start z-[9999] overflow-y-auto p-4 sm:p-10">
+    <div className="bg-white dark:bg-boxdark p-6 rounded-xl shadow-2xl w-full max-w-5xl max-h-[90vh] overflow-y-auto border border-gray-300 dark:border-gray-700">
+      {/* Header */}
+      <div className="flex justify-between items-center border-b pb-4 mb-6 dark:border-gray-700">
+        <div>
+          <h2 className="text-2xl font-bold text-gray-800 dark:text-white">
+            📁 Documents for {viewOnlyDocsClient.name}
+          </h2>
+          <p className="text-sm text-gray-600 dark:text-gray-400">
+            View-only mode 
+          </p>
+        </div>
+        <button
+          onClick={() => {
+            setShowViewOnlyDocsPopup(false);
+            setViewOnlyDocsClient(null);
+          }}
+          className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 text-2xl p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-full transition-colors"
+        >
+          <FontAwesomeIcon icon={faTimes} />
+        </button>
+      </div>
+
+      <div className="space-y-8">
+        {/* Images Section */}
+        {viewOnlyDocsData.images.length > 0 && (
+          <section>
+            <h3 className="text-sm font-bold uppercase tracking-widest text-gray-400 mb-4 flex items-center gap-2">
+              <FontAwesomeIcon icon={faImages} className="text-purple-500" /> Images
+            </h3>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              {viewOnlyDocsData.images.map((doc, index) => (
+                <div
+                  key={index}
+                  className="group bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl overflow-hidden hover:shadow-xl transition-all"
+                >
+                  <div className="aspect-video bg-gray-100 dark:bg-black/20 relative">
+                    <img
+                      src={doc.url}
+                      alt="img"
+                      className="w-full h-full object-cover"
+                    />
+                    <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-3">
+                      <a
+                        href={doc.url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="p-2 bg-white rounded-full text-blue-600 hover:scale-110 transition-transform"
+                        title="View"
+                      >
+                        <FontAwesomeIcon icon={faEye} />
+                      </a>
+                      <a
+                        href={doc.url}
+                        download
+                        className="p-2 bg-white rounded-full text-green-600 hover:scale-110 transition-transform"
+                        title="Download"
+                      >
+                        <FontAwesomeIcon icon={faDownload} />
+                      </a>
+                    </div>
+                  </div>
+                  <div className="p-3">
+                    <p className="text-xs font-medium truncate dark:text-gray-200 mb-2">
+                      {doc.url.split('/').pop()}
+                    </p>
+                    <div className="space-y-2">
+                     
+                   
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </section>
+        )}
+
+        {/* Documents Section */}
+        {viewOnlyDocsData.documents.length > 0 && (
+          <section>
+            <h3 className="text-sm font-bold uppercase tracking-widest text-gray-400 mb-4 flex items-center gap-2">
+              <FontAwesomeIcon icon={faFile} className="text-blue-500" /> Documents
+            </h3>
+            <div className="space-y-3">
+              {viewOnlyDocsData.documents.map((doc, index) => (
+                <div
+                  key={index}
+                  className="p-4 bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 hover:border-blue-400 transition-colors"
+                >
+                  <div className="flex items-start justify-between gap-4">
+                    <div className="flex items-start gap-3 flex-1">
+                      <div className="text-2xl mt-1">
+                        {getFileIcon(doc.url)}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="font-semibold text-sm dark:text-white truncate">
+                          {doc.url.split('/').pop()}
+                        </p>
+                 
+                      </div>
+                    </div>
+                    <div className="flex gap-2">
+                      <a
+                        href={doc.url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="p-2 text-gray-400 hover:text-blue-500"
+                        title="View"
+                      >
+                        <FontAwesomeIcon icon={faEye} />
+                      </a>
+                      <a
+                        href={doc.url}
+                        download
+                        className="p-2 text-gray-400 hover:text-green-500"
+                        title="Download"
+                      >
+                        <FontAwesomeIcon icon={faDownload} />
+                      </a>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </section>
+        )}
+
+        {/* Videos Section */}
+        {viewOnlyDocsData.videos.length > 0 && (
+          <section>
+            <h3 className="text-sm font-bold uppercase tracking-widest text-gray-400 mb-4 flex items-center gap-2">
+              <FontAwesomeIcon icon={faVideo} className="text-red-500" /> Videos
+            </h3>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              {viewOnlyDocsData.videos.map((doc, index) => (
+                <div
+                  key={index}
+                  className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl overflow-hidden"
+                >
+                  <video controls className="w-full h-40 bg-black">
+                  </video>
+                  <div className="p-3">
+                    <div className="flex justify-between items-start mb-2">
+                      <p className="text-xs font-bold truncate dark:text-gray-200">
+                        {doc.url.split('/').pop()}
+                      </p>
+                      <div className="flex gap-2">
+                        <a
+                          href={doc.url}
+                          download
+                          className="p-1 text-gray-400 hover:text-green-500"
+                          title="Download"
+                        >
+                          <FontAwesomeIcon icon={faDownload} className="text-xs" />
+                        </a>
+                      </div>
+                    </div>
+                  
+                   
+                  </div>
+                </div>
+              ))}
+            </div>
+          </section>
+        )}
+
+        {/* Empty State */}
+        {viewOnlyDocsData.images.length === 0 &&
+          viewOnlyDocsData.documents.length === 0 &&
+          viewOnlyDocsData.videos.length === 0 && (
+            <div className="text-center py-20 bg-gray-50 dark:bg-white/5 rounded-2xl border-2 border-dashed border-gray-200 dark:border-gray-800">
+              <FontAwesomeIcon
+                icon={faFile}
+                className="text-5xl text-gray-300 mb-4"
+              />
+              <p className="text-gray-500 font-medium">No documents found.</p>
+              <p className="text-sm text-gray-400 mt-2">
+                This client has no uploaded documents yet.
+              </p>
+            </div>
+          )}
+      </div>
+    </div>
+  </div>
+)}
 
     </div>
   );

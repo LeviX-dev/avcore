@@ -62,7 +62,7 @@ const Area = () => {
   };
 
   return (
-    <div className="w-full">
+    <div className="w-full px-2 sm:px-4 dark:bg-boxdark">
       <Breadcrumb pageName="Manage Areas" />
 
       {/* Top Controls */}
@@ -84,12 +84,12 @@ const Area = () => {
             type="text"
             value={searchTerm}
             onChange={e => setSearchTerm(e.target.value)}
-            className="w-full sm:w-64 border rounded px-4 py-2"
+            className="w-full sm:w-64 border border-stroke dark:border-strokedark dark:bg-boxdark dark:text-white rounded px-4 py-2"
             placeholder="Search Areas..."
           />
           <button
             onClick={handleSearch}
-            className="w-full sm:w-auto bg-blue-500 text-white px-4 py-2 rounded"
+            className="w-full sm:w-auto bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600"
           >
             Search
           </button>
@@ -98,7 +98,7 @@ const Area = () => {
 
       {/* Success message */}
       {successMessage && (
-        <p className="mb-2 text-green-600 font-medium">
+        <p className="mb-2 text-green-600 dark:text-green-400 font-medium">
           {successMessage}
         </p>
       )}
@@ -138,22 +138,22 @@ const Area = () => {
       )}
 
       {/* Table */}
-     <div className="overflow-x-auto rounded-sm border border-stroke bg-white shadow-default dark:border-strokedark dark:bg-boxdark">
-<table className="w-full table-auto sm:min-w-[600px]">
+      <div className="overflow-x-auto rounded-sm border border-stroke bg-white shadow-default dark:border-strokedark dark:bg-boxdark">
+        <table className="w-full table-auto sm:min-w-[600px]">
           <thead>
-            <tr className="bg-gray-200 text-left">
-              <th className="py-3 px-4 font-medium">Area ID</th>
-              <th className="py-3 px-4 font-medium">Area</th>
-              <th className="py-3 px-4 font-medium">Actions</th>
+            <tr className="bg-gray-200 dark:bg-meta-4 text-left">
+              <th className="py-3 px-4 font-medium text-black dark:text-white">Area ID</th>
+              <th className="py-3 px-4 font-medium text-black dark:text-white">Area</th>
+              <th className="py-3 px-4 font-medium text-black dark:text-white">Actions</th>
             </tr>
           </thead>
 
           <tbody>
             {filteredData.length > 0 ? (
               filteredData.map(a => (
-                <tr key={a.area_id} className="border-b">
-                  <td className="py-3 px-4">{a.area_id}</td>
-                  <td className="py-3 px-4">{a.area_name}</td>
+                <tr key={a.area_id} className="border-b border-stroke dark:border-strokedark">
+                  <td className="py-3 px-4 text-black dark:text-white">{a.area_id}</td>
+                  <td className="py-3 px-4 text-black dark:text-white">{a.area_name}</td>
                   <td className="py-3 px-4">
                     <div className="flex gap-2">
                       <button
@@ -178,7 +178,7 @@ const Area = () => {
               ))
             ) : (
               <tr>
-                <td colSpan={3} className="text-center py-5">
+                <td colSpan={3} className="text-center py-5 text-black dark:text-white">
                   No Area found
                 </td>
               </tr>

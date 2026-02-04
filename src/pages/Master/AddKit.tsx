@@ -180,7 +180,8 @@ const AddKitForm = ({ onClose, onKitAdded }) => {
         })),
       });
 
-      navigate('/master/kit');
+navigate('/quotation-template');
+
     } catch (err) {
       console.error(err);
       alert(err?.response?.data?.message || 'Failed to add kit');
@@ -194,7 +195,7 @@ const AddKitForm = ({ onClose, onKitAdded }) => {
   }, [products, currentProduct]);
 
   const handleCancel = () => {
-    navigate('/master/kit');
+  navigate('/quotation-template');
   };
 
   const totalPrice =

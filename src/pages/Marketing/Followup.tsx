@@ -461,7 +461,6 @@ const ProgressStatus: React.FC<{
 const Followup: React.FC = () => {
   // State declarations
   const [missedLeads, setMissedLeads] = useState<MissedLead[]>([]);
-  const [filteredLeads, setFilteredLeads] = useState<MissedLead[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedClient, setSelectedClient] = useState<MissedLead | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -562,206 +561,217 @@ const handleAssignChange = (
 };
 
 
-  // Fetch missed leads
-  const fetchMissedLeads = async () => {
-    try {
-      setLoading(true);
-      const response = await axios.get(
-        `${BASE_URL}api/dashboard/miss-assign-fulldata`,
-        {
-          params: {
-            page: currentPage,
-            limit: itemsPerPage,
-          },
-          withCredentials: true,
+const handlePageChange = (page: number) => {
+  if (page >= 1 && page <= Math.ceil(totalLeads / itemsPerPage)) {
+    setCurrentPage(page);
+  }
+};
+
+
+// Replace your fetchMissedLeads function with this:
+const fetchMissedLeads = async () => {
+  try {
+    setLoading(true);
+    const response = await axios.get(
+      `${BASE_URL}api/dashboard/miss-assign-fulldata`,
+      {
+        params: {
+          page: currentPage,     // Send current page
+          limit: itemsPerPage,   // Send items per page
+        },
+        withCredentials: true,
+      }
+    );
+
+    const data = response.data;
+
+    if (data.success) {
+      const missedLeadsArray = data.missedLeads || [];
+      
+      // Create an object to track the last non-Drop stage for each client
+      const lastNonDropStages: Record<number, string> = {};
+      
+      // First pass: Identify and store last non-Drop stages for all clients
+      missedLeadsArray.forEach((item: any) => {
+        const clientId = item.master_id;
+        const currentStage = item.lead_stage || item.latest_leadStage || item.current_stage || '';
+        const cleanStage = currentStage ? currentStage.trim() : '';
+        
+        if (cleanStage && cleanStage !== 'Drop') {
+          lastNonDropStages[clientId] = cleanStage;
         }
+      });
+
+      const parseValue = (value: any) => {
+        if (value === 'Not Available' || value === null || value === undefined || value === '') {
+          return '';
+        }
+        return value;
+      };
+
+      const parseIdValue = (value: any) => {
+        if (value === 'Not Available' || value === null || value === undefined) {
+          return '';
+        }
+        return isNaN(value) ? value : Number(value);
+      };
+
+      const processedData = missedLeadsArray.map((item: any) => {
+        const currentStage = parseValue(item.lead_stage || item.latest_leadStage || item.current_stage);
+        const cleanStage = currentStage ? currentStage.trim() : '';
+        
+        // Get the last non-Drop stage for this client
+        let previousStage = lastNonDropStages[item.master_id] || '';
+        
+        // Special handling for Drop stage
+        if (cleanStage === 'Drop' && !previousStage) {
+          // Try to infer from other fields
+          if (item.quotation_date || item.site_visit_date) {
+            previousStage = 'Quotation Pending';
+          } else if (item.demo_date) {
+            previousStage = 'Demo';
+          } else {
+            previousStage = 'Positive Lead';
+          }
+        }
+        
+        // Calculate percentage based on stage (for Drop, use previous stage)
+        const stageForPercentage = cleanStage === 'Drop' ? previousStage : cleanStage;
+        const status_percentage = stageForPercentage ? 
+          (STAGE_PERCENTAGE_MAP[stageForPercentage] || 0) : 0;
+
+        // Process reassignment_remarks
+        let reassignmentRemarks = [];
+        if (item.reassignment_remarks) {
+          if (Array.isArray(item.reassignment_remarks)) {
+            reassignmentRemarks = item.reassignment_remarks.map((remark: any) => {
+              if (typeof remark === 'string') {
+                return remark;
+              } else if (remark && typeof remark === 'object') {
+                return {
+                  remark: remark.remark || '',
+                  created_by_user: remark.created_by_user || 0,
+                  created_at: remark.created_at || '',
+                  name: remark.name || '',
+                  role: remark.role || '',
+                  assignedTo: remark.assignedTo || '',
+                  leadStage: remark.leadStage || '',
+                  reassignment_date: remark.reassignment_date || ''
+                };
+              }
+              return '';
+            });
+          } else if (typeof item.reassignment_remarks === 'string') {
+            try {
+              const parsedRemarks = JSON.parse(item.reassignment_remarks);
+              if (Array.isArray(parsedRemarks)) {
+                reassignmentRemarks = parsedRemarks;
+              }
+            } catch (e) {
+              reassignmentRemarks = [item.reassignment_remarks];
+            }
+          }
+        }
+
+        return {
+          master_id: item.master_id,
+          name: parseValue(item.name),
+          number: parseValue(item.number),
+          email: parseValue(item.email),
+          address: parseValue(item.address),
+          city: parseValue(item.city),
+          cat_id: parseIdValue(item.cat_id),
+          status: parseValue(item.status),
+          lead_status: parseValue(item.lead_status),
+          lead_stage: cleanStage,
+          created_at: parseValue(item.created_at),
+          quick_remark: parseValue(item.quick_remark),
+          detailed_remark: parseValue(item.detailed_remark),
+          followup_date: parseValue(item.followup_date),
+          assign_date: parseValue(item.assign_date),
+          assigned_to: parseValue(item.reassigned_to || item.assigned_user_name),
+          assigned_user_name: parseValue(item.reassigned_to || item.assigned_user_name),
+          reassignment_id: parseIdValue(item.reassignment_id),
+          reassignment_date: parseValue(item.reassignment_date),
+          reassigned_to: parseValue(item.reassigned_to),
+          telecaller_name: parseValue(item.reassigned_to || item.assigned_user_name),
+          document_count: item.document_count || 0,
+          area: parseValue(item.area_name),
+          cat_name: parseValue(item.cat_name),
+          reference_name: parseValue(item.reference_name),
+          room_length: parseValue(item.room_length),
+          room_width: parseValue(item.room_width),
+          room_height: parseValue(item.room_height),
+          location_link: parseValue(item.location_link),
+          p_type: parseValue(item.p_type),
+          budget_range: parseValue(item.budget_range),
+          current_stage: parseValue(item.current_stage),
+          room_ready: parseValue(item.room_ready),
+          time_to_complete: parseValue(item.time_to_complete),
+          site_visit_date: parseValue(item.site_visit_date),
+          demo_date: parseValue(item.demo_date),
+          ar_number: parseValue(item.ar_number),
+          ca_number: parseValue(item.ca_number),
+          e_number: parseValue(item.e_number),
+          sm_number: parseValue(item.sm_number),
+          pop_number: parseValue(item.pop_number),
+          other_number: parseValue(item.other_number),
+          reassignment_remarks: reassignmentRemarks,
+          latest_assignedTo: parseValue(item.latest_assignedTo),
+          latest_leadStage: parseValue(item.latest_leadStage),
+          
+          // Battery-related fields
+          status_percentage: status_percentage,
+          is_drop_stage: cleanStage === 'Drop',
+          previous_stage: previousStage,
+          
+          // Additional fields for EditRawData
+          category_other: parseValue(item.category_other),
+          reference_other: parseValue(item.reference_other),
+          architect_name: parseValue(item.architect_name),
+          alternate_number: parseValue(item.alternate_number),
+          reference_id: parseIdValue(item.reference_id),
+          area_id: parseIdValue(item.area_id),
+          assign_id: parseIdValue(item.assign_id),
+          document_location_link: parseValue(item.document_location_link),
+        };
+      });
+
+      const sortedData = processedData.sort(
+        (a: MissedLead, b: MissedLead) => b.master_id - a.master_id,
       );
 
-      const data = response.data;
-
-      if (data.success) {
-        const missedLeadsArray = data.missedLeads || [];
-        
-        // Create an object to track the last non-Drop stage for each client
-        const lastNonDropStages: Record<number, string> = {};
-        
-        // First pass: Identify and store last non-Drop stages for all clients
-        missedLeadsArray.forEach((item: any) => {
-          const clientId = item.master_id;
-          const currentStage = item.lead_stage || item.latest_leadStage || item.current_stage || '';
-          const cleanStage = currentStage ? currentStage.trim() : '';
-          
-          if (cleanStage && cleanStage !== 'Drop') {
-            lastNonDropStages[clientId] = cleanStage;
-          }
-        });
-
-        const parseValue = (value: any) => {
-          if (value === 'Not Available' || value === null || value === undefined || value === '') {
-            return '';
-          }
-          return value;
-        };
-
-        const parseIdValue = (value: any) => {
-          if (value === 'Not Available' || value === null || value === undefined) {
-            return '';
-          }
-          return isNaN(value) ? value : Number(value);
-        };
-
-        const processedData = missedLeadsArray.map((item: any) => {
-          const currentStage = parseValue(item.lead_stage || item.latest_leadStage || item.current_stage);
-          const cleanStage = currentStage ? currentStage.trim() : '';
-          
-          // Get the last non-Drop stage for this client
-          let previousStage = lastNonDropStages[item.master_id] || '';
-          
-          // Special handling for Drop stage
-          if (cleanStage === 'Drop' && !previousStage) {
-            // Try to infer from other fields
-            if (item.quotation_date || item.site_visit_date) {
-              previousStage = 'Quotation Pending';
-            } else if (item.demo_date) {
-              previousStage = 'Demo';
-            } else {
-              previousStage = 'Positive Lead';
-            }
-          }
-          
-          // Calculate percentage based on stage (for Drop, use previous stage)
-          const stageForPercentage = cleanStage === 'Drop' ? previousStage : cleanStage;
-          const status_percentage = stageForPercentage ? 
-            (STAGE_PERCENTAGE_MAP[stageForPercentage] || 0) : 0;
-
-          // Process reassignment_remarks
-          let reassignmentRemarks = [];
-          if (item.reassignment_remarks) {
-            if (Array.isArray(item.reassignment_remarks)) {
-              reassignmentRemarks = item.reassignment_remarks.map((remark: any) => {
-                if (typeof remark === 'string') {
-                  return remark;
-                } else if (remark && typeof remark === 'object') {
-                  return {
-                    remark: remark.remark || '',
-                    created_by_user: remark.created_by_user || 0,
-                    created_at: remark.created_at || '',
-                    name: remark.name || '',
-                    role: remark.role || '',
-                    assignedTo: remark.assignedTo || '',
-                    leadStage: remark.leadStage || '',
-                    reassignment_date: remark.reassignment_date || ''
-                  };
-                }
-                return '';
-              });
-            } else if (typeof item.reassignment_remarks === 'string') {
-              try {
-                const parsedRemarks = JSON.parse(item.reassignment_remarks);
-                if (Array.isArray(parsedRemarks)) {
-                  reassignmentRemarks = parsedRemarks;
-                }
-              } catch (e) {
-                reassignmentRemarks = [item.reassignment_remarks];
-              }
-            }
-          }
-
-          return {
-            master_id: item.master_id,
-            name: parseValue(item.name),
-            number: parseValue(item.number),
-            email: parseValue(item.email),
-            address: parseValue(item.address),
-            city: parseValue(item.city),
-            cat_id: parseIdValue(item.cat_id),
-            status: parseValue(item.status),
-            lead_status: parseValue(item.lead_status),
-            lead_stage: cleanStage,
-            created_at: parseValue(item.created_at),
-            quick_remark: parseValue(item.quick_remark),
-            detailed_remark: parseValue(item.detailed_remark),
-            followup_date: parseValue(item.followup_date),
-            assign_date: parseValue(item.assign_date),
-            assigned_to: parseValue(item.reassigned_to || item.assigned_user_name),
-            assigned_user_name: parseValue(item.reassigned_to || item.assigned_user_name),
-            reassignment_id: parseIdValue(item.reassignment_id),
-            reassignment_date: parseValue(item.reassignment_date),
-            reassigned_to: parseValue(item.reassigned_to),
-            telecaller_name: parseValue(item.reassigned_to || item.assigned_user_name),
-            document_count: item.document_count || 0,
-            area: parseValue(item.area_name),
-            cat_name: parseValue(item.cat_name),
-            reference_name: parseValue(item.reference_name),
-            room_length: parseValue(item.room_length),
-            room_width: parseValue(item.room_width),
-            room_height: parseValue(item.room_height),
-            location_link: parseValue(item.location_link),
-            p_type: parseValue(item.p_type),
-            budget_range: parseValue(item.budget_range),
-            current_stage: parseValue(item.current_stage),
-            room_ready: parseValue(item.room_ready),
-            time_to_complete: parseValue(item.time_to_complete),
-            site_visit_date: parseValue(item.site_visit_date),
-            demo_date: parseValue(item.demo_date),
-            ar_number: parseValue(item.ar_number),
-            ca_number: parseValue(item.ca_number),
-            e_number: parseValue(item.e_number),
-            sm_number: parseValue(item.sm_number),
-            pop_number: parseValue(item.pop_number),
-            other_number: parseValue(item.other_number),
-            reassignment_remarks: reassignmentRemarks,
-            latest_assignedTo: parseValue(item.latest_assignedTo),
-            latest_leadStage: parseValue(item.latest_leadStage),
-            
-            // Battery-related fields
-            status_percentage: status_percentage,
-            is_drop_stage: cleanStage === 'Drop',
-            previous_stage: previousStage,
-            
-            // Additional fields for EditRawData
-            category_other: parseValue(item.category_other),
-            reference_other: parseValue(item.reference_other),
-            architect_name: parseValue(item.architect_name),
-            alternate_number: parseValue(item.alternate_number),
-            reference_id: parseIdValue(item.reference_id),
-            area_id: parseIdValue(item.area_id),
-            assign_id: parseIdValue(item.assign_id),
-            document_location_link: parseValue(item.document_location_link),
-          };
-        });
-
-        const sortedData = processedData.sort(
-          (a: MissedLead, b: MissedLead) => b.master_id - a.master_id,
-        );
-
-        setMissedLeads(sortedData);
-        setFilteredLeads(sortedData);
-        setTotalLeads(data.total || 0);
-        
-        // Extract unique cities
-        const cities = sortedData
-          .map(lead => lead.city?.trim())
-          .filter(city => city && city !== '' && city !== 'Not Available' && city !== 'N/A')
-          .filter((city, index, self) => self.indexOf(city) === index)
-          .sort() as string[];
-        setAvailableCities(cities);
-        
-      } else {
-        console.error('Error fetching missed leads:', data);
-        setMissedLeads([]);
-        setFilteredLeads([]);
-        setTotalLeads(0);
-      }
-    } catch (error) {
-      console.error('Error fetching missed leads:', error);
+      // Update total leads from backend response
+      setTotalLeads(data.total || 0);
+      
+      // Set the data - DON'T set filteredLeads here anymore
+      setMissedLeads(sortedData);
+      // Remove this line: setFilteredLeads(sortedData);
+      
+      // Extract unique cities from the current page data
+      const cities = sortedData
+        .map(lead => lead.city?.trim())
+        .filter(city => city && city !== '' && city !== 'Not Available' && city !== 'N/A')
+        .filter((city, index, self) => self.indexOf(city) === index)
+        .sort() as string[];
+      setAvailableCities(cities);
+      
+    } else {
+      console.error('Error fetching missed leads:', data);
       setMissedLeads([]);
-      setFilteredLeads([]);
+      // Remove this line: setFilteredLeads([]);
       setTotalLeads(0);
-    } finally {
-      setLoading(false);
     }
-  };
+  } catch (error) {
+    console.error('Error fetching missed leads:', error);
+    setMissedLeads([]);
+    // Remove this line: setFilteredLeads([]);
+    setTotalLeads(0);
+  } finally {
+    setLoading(false);
+  }
+};  
+
 
   // Fetch other data
   const fetchCategories = async () => {
@@ -813,135 +823,249 @@ const handleAssignChange = (
   };
 
   // Apply filters function
-  const applyFilters = () => {
-    let filtered = [...missedLeads];
-    const lowerSearch = searchTerm.toLowerCase();
+const applyFilters = async () => {
+  try {
+    setLoading(true);
+    
+    // Build filter parameters for server-side
+    const filterParams: any = {
+      page: currentPage,
+      limit: itemsPerPage,
+    };
 
-    // Apply Search Term Filter
-    if (searchTerm) {
-      filtered = filtered.filter((lead) => {
-        const searchFields = [
-          lead.name?.toLowerCase() || '',
-          lead.number?.toString() || '',
-          lead.email?.toLowerCase() || '',
-          lead.address?.toLowerCase() || '',
-          lead.area?.toLowerCase() || '',
-          lead.cat_name?.toLowerCase() || '',
-          lead.master_id?.toString() || '',
-          lead.status?.toLowerCase() || '',
-          lead.assigned_to?.toLowerCase() || '',
-          lead.city?.toLowerCase() || '',
-          lead.lead_stage?.toLowerCase() || '',
-          lead.telecaller_name?.toLowerCase() || '',
-        ];
-        return searchFields.some(field => field.includes(lowerSearch));
+    // Add search term if exists
+    if (searchTerm.trim()) {
+      filterParams.search = searchTerm;
+    }
+
+    // Add date filters
+    if (selectedEntryFromDate) filterParams.entryFromDate = selectedEntryFromDate;
+    if (selectedEntryToDate) filterParams.entryToDate = selectedEntryToDate;
+    if (selectedFollowupFromDate) filterParams.followupFromDate = selectedFollowupFromDate;
+    if (selectedFollowupToDate) filterParams.followupToDate = selectedFollowupToDate;
+    
+    // Add array filters
+    if (selectedStages.length > 0) filterParams.stages = selectedStages.join(',');
+    if (selectedUsersFilter.length > 0) filterParams.users = selectedUsersFilter.join(',');
+    if (selectedCities.length > 0) filterParams.cities = selectedCities.join(',');
+    
+    // Call API with filters
+    const response = await axios.get(
+      `${BASE_URL}api/dashboard/miss-assign-fulldata`,
+      {
+        params: filterParams,
+        withCredentials: true,
+      }
+    );
+
+    const data = response.data;
+
+    if (data.success) {
+      const missedLeadsArray = data.missedLeads || [];
+      
+      // Create an object to track the last non-Drop stage for each client
+      const lastNonDropStages: Record<number, string> = {};
+      
+      // First pass: Identify and store last non-Drop stages for all clients
+      missedLeadsArray.forEach((item: any) => {
+        const clientId = item.master_id;
+        const currentStage = item.lead_stage || item.latest_leadStage || item.current_stage || '';
+        const cleanStage = currentStage ? currentStage.trim() : '';
+        
+        if (cleanStage && cleanStage !== 'Drop') {
+          lastNonDropStages[clientId] = cleanStage;
+        }
       });
-    }
 
-    // Apply Entry Date Range Filter
-    if (selectedEntryFromDate || selectedEntryToDate) {
-      filtered = filtered.filter(lead => {
-        if (!lead.assign_date) return false;
+      const parseValue = (value: any) => {
+        if (value === 'Not Available' || value === null || value === undefined || value === '') {
+          return '';
+        }
+        return value;
+      };
+
+      const parseIdValue = (value: any) => {
+        if (value === 'Not Available' || value === null || value === undefined) {
+          return '';
+        }
+        return isNaN(value) ? value : Number(value);
+      };
+
+      const processedData = missedLeadsArray.map((item: any) => {
+        const currentStage = parseValue(item.lead_stage || item.latest_leadStage || item.current_stage);
+        const cleanStage = currentStage ? currentStage.trim() : '';
         
-        const leadDate = new Date(lead.assign_date);
+        // Get the last non-Drop stage for this client
+        let previousStage = lastNonDropStages[item.master_id] || '';
         
-        if (isNaN(leadDate.getTime())) return false;
-        
-        let fromDateValid = true;
-        let toDateValid = true;
-        
-        if (selectedEntryFromDate) {
-          const fromDate = new Date(selectedEntryFromDate);
-          fromDateValid = leadDate >= fromDate;
+        // Special handling for Drop stage
+        if (cleanStage === 'Drop' && !previousStage) {
+          // Try to infer from other fields
+          if (item.quotation_date || item.site_visit_date) {
+            previousStage = 'Quotation Pending';
+          } else if (item.demo_date) {
+            previousStage = 'Demo';
+          } else {
+            previousStage = 'Positive Lead';
+          }
         }
         
-        if (selectedEntryToDate) {
-          const toDate = new Date(selectedEntryToDate);
-          toDateValid = leadDate <= toDate;
+        // Calculate percentage based on stage (for Drop, use previous stage)
+        const stageForPercentage = cleanStage === 'Drop' ? previousStage : cleanStage;
+        const status_percentage = stageForPercentage ? 
+          (STAGE_PERCENTAGE_MAP[stageForPercentage] || 0) : 0;
+
+        // Process reassignment_remarks
+        let reassignmentRemarks = [];
+        if (item.reassignment_remarks) {
+          if (Array.isArray(item.reassignment_remarks)) {
+            reassignmentRemarks = item.reassignment_remarks.map((remark: any) => {
+              if (typeof remark === 'string') {
+                return remark;
+              } else if (remark && typeof remark === 'object') {
+                return {
+                  remark: remark.remark || '',
+                  created_by_user: remark.created_by_user || 0,
+                  created_at: remark.created_at || '',
+                  name: remark.name || '',
+                  role: remark.role || '',
+                  assignedTo: remark.assignedTo || '',
+                  leadStage: remark.leadStage || '',
+                  reassignment_date: remark.reassignment_date || ''
+                };
+              }
+              return '';
+            });
+          } else if (typeof item.reassignment_remarks === 'string') {
+            try {
+              const parsedRemarks = JSON.parse(item.reassignment_remarks);
+              if (Array.isArray(parsedRemarks)) {
+                reassignmentRemarks = parsedRemarks;
+              }
+            } catch (e) {
+              reassignmentRemarks = [item.reassignment_remarks];
+            }
+          }
         }
-        
-        return fromDateValid && toDateValid;
+
+        return {
+          master_id: item.master_id,
+          name: parseValue(item.name),
+          number: parseValue(item.number),
+          email: parseValue(item.email),
+          address: parseValue(item.address),
+          city: parseValue(item.city),
+          cat_id: parseIdValue(item.cat_id),
+          status: parseValue(item.status),
+          lead_status: parseValue(item.lead_status),
+          lead_stage: cleanStage,
+          created_at: parseValue(item.created_at),
+          quick_remark: parseValue(item.quick_remark),
+          detailed_remark: parseValue(item.detailed_remark),
+          followup_date: parseValue(item.followup_date),
+          assign_date: parseValue(item.assign_date),
+          assigned_to: parseValue(item.reassigned_to || item.assigned_user_name),
+          assigned_user_name: parseValue(item.reassigned_to || item.assigned_user_name),
+          reassignment_id: parseIdValue(item.reassignment_id),
+          reassignment_date: parseValue(item.reassignment_date),
+          reassigned_to: parseValue(item.reassigned_to),
+          telecaller_name: parseValue(item.reassigned_to || item.assigned_user_name),
+          document_count: item.document_count || 0,
+          area: parseValue(item.area_name),
+          cat_name: parseValue(item.cat_name),
+          reference_name: parseValue(item.reference_name),
+          room_length: parseValue(item.room_length),
+          room_width: parseValue(item.room_width),
+          room_height: parseValue(item.room_height),
+          location_link: parseValue(item.location_link),
+          p_type: parseValue(item.p_type),
+          budget_range: parseValue(item.budget_range),
+          current_stage: parseValue(item.current_stage),
+          room_ready: parseValue(item.room_ready),
+          time_to_complete: parseValue(item.time_to_complete),
+          site_visit_date: parseValue(item.site_visit_date),
+          demo_date: parseValue(item.demo_date),
+          ar_number: parseValue(item.ar_number),
+          ca_number: parseValue(item.ca_number),
+          e_number: parseValue(item.e_number),
+          sm_number: parseValue(item.sm_number),
+          pop_number: parseValue(item.pop_number),
+          other_number: parseValue(item.other_number),
+          reassignment_remarks: reassignmentRemarks,
+          latest_assignedTo: parseValue(item.latest_assignedTo),
+          latest_leadStage: parseValue(item.latest_leadStage),
+          
+          // Battery-related fields
+          status_percentage: status_percentage,
+          is_drop_stage: cleanStage === 'Drop',
+          previous_stage: previousStage,
+          
+          // Additional fields for EditRawData
+          category_other: parseValue(item.category_other),
+          reference_other: parseValue(item.reference_other),
+          architect_name: parseValue(item.architect_name),
+          alternate_number: parseValue(item.alternate_number),
+          reference_id: parseIdValue(item.reference_id),
+          area_id: parseIdValue(item.area_id),
+          assign_id: parseIdValue(item.assign_id),
+          document_location_link: parseValue(item.document_location_link),
+        };
       });
-    }
 
-    // Apply Followup Date Range Filter
-    if (selectedFollowupFromDate || selectedFollowupToDate) {
-      filtered = filtered.filter(lead => {
-        if (!lead.followup_date) return false;
-        
-        const leadDate = new Date(lead.followup_date);
-        
-        if (isNaN(leadDate.getTime())) return false;
-        
-        let fromDateValid = true;
-        let toDateValid = true;
-        
-        if (selectedFollowupFromDate) {
-          const fromDate = new Date(selectedFollowupFromDate);
-          fromDateValid = leadDate >= fromDate;
-        }
-        
-        if (selectedFollowupToDate) {
-          const toDate = new Date(selectedFollowupToDate);
-          toDateValid = leadDate <= toDate;
-        }
-        
-        return fromDateValid && toDateValid;
-      });
-    }
-
-    // Apply Stage Filter
-    if (selectedStages.length > 0) {
-      filtered = filtered.filter(lead => 
-        lead.lead_stage && selectedStages.includes(lead.lead_stage)
+      const sortedData = processedData.sort(
+        (a: MissedLead, b: MissedLead) => b.master_id - a.master_id,
       );
-    }
 
-    // Apply Assigned User Filter
-    if (selectedUsersFilter.length > 0) {
-      filtered = filtered.filter(lead => 
-        lead.assigned_to && selectedUsersFilter.includes(lead.assigned_to)
-      );
-    }
-
-    // Apply City Filter
-    if (selectedCities.length > 0) {
-      filtered = filtered.filter(lead => 
-        lead.city && selectedCities.includes(lead.city)
-      );
-    }
-
-    setFilteredLeads(filtered);
-    setCurrentPage(1);
-  };
-
-  // Apply filters when any filter changes
-  useEffect(() => {
-    applyFilters();
-  }, [
-    searchTerm,
-    selectedEntryFromDate,
-    selectedEntryToDate,
-    selectedFollowupFromDate,
-    selectedFollowupToDate,
-    selectedStages,
-    selectedUsersFilter,
-    selectedCities,
-    missedLeads
-  ]);
-
-  // Handle custom record count
-  useEffect(() => {
-    if (customRecordCount && typeof customRecordCount === 'number' && customRecordCount > 0) {
-      const limitedLeads = missedLeads.slice(0, customRecordCount);
-      setFilteredLeads(limitedLeads);
-      setCurrentPage(1);
-      setItemsPerPage(customRecordCount);
+      // Set the data from server response
+      setMissedLeads(sortedData);
+      setTotalLeads(data.total || 0);
+      
+      // Extract unique cities for filter dropdown
+      const cities = sortedData
+        .map(lead => lead.city?.trim())
+        .filter(city => city && city !== '' && city !== 'Not Available' && city !== 'N/A')
+        .filter((city, index, self) => self.indexOf(city) === index)
+        .sort() as string[];
+      setAvailableCities(cities);
+      
     } else {
-      applyFilters();
-      setItemsPerPage(10);
+      console.error('Error fetching filtered leads:', data);
+      setMissedLeads([]);
+      setTotalLeads(0);
     }
-  }, [customRecordCount, missedLeads]);
+  } catch (error) {
+    console.error('Error applying filters:', error);
+    setMissedLeads([]);
+    setTotalLeads(0);
+  } finally {
+    setLoading(false);
+  }
+};
+
+
+useEffect(() => {
+  applyFilters();
+}, [
+  currentPage,
+  searchTerm,
+  selectedEntryFromDate,
+  selectedEntryToDate,
+  selectedFollowupFromDate,
+  selectedFollowupToDate,
+  selectedStages,
+  selectedUsersFilter,
+  selectedCities
+]);  
+
+
+// Handle itemsPerPage changes - refetch data when itemsPerPage changes
+useEffect(() => {
+  // Reset to page 1 and trigger fetch
+  setCurrentPage(1);
+  // The useEffect will trigger applyFilters which calls fetchMissedLeads
+}, [itemsPerPage]); // Only run when itemsPerPage changes
+
+
 
   // Filter user search
   useEffect(() => {
@@ -958,86 +1082,100 @@ const handleAssignChange = (
   }, [searchUserTerm, users]);
 
   // Filter handlers
-  const handleStageSelect = (stage: string) => {
-    setSelectedStages(prev => 
-      prev.includes(stage) ? prev.filter(s => s !== stage) : [...prev, stage]
-    );
-  };
+// Filter handlers
+const handleStageSelect = (stage: string) => {
+  setSelectedStages(prev =>
+    prev.includes(stage) ? prev.filter(s => s !== stage) : [...prev, stage]
+  );
+  setShowStageFilter(false);
+};
 
-  const handleUserSelect = (userName: string) => {
-    setSelectedUsersFilter(prev => 
-      prev.includes(userName) ? prev.filter(u => u !== userName) : [...prev, userName]
-    );
-  };
+const handleUserSelect = (userName: string) => {
+  setSelectedUsersFilter(prev =>
+    prev.includes(userName) ? prev.filter(u => u !== userName) : [...prev, userName]
+  );
+  setShowUserFilter(false);
+};
 
-  const handleCitySelect = (city: string) => {
-    setSelectedCities(prev => 
-      prev.includes(city) ? prev.filter(c => c !== city) : [...prev, city]
-    );
-  };
+const handleCitySelect = (city: string) => {
+  setSelectedCities(prev =>
+    prev.includes(city) ? prev.filter(c => c !== city) : [...prev, city]
+  );
+  setShowCityFilter(false);
+};
 
-  const clearFilters = () => {
-    setSelectedEntryFromDate('');
-    setSelectedEntryToDate('');
-    setSelectedFollowupFromDate('');
-    setSelectedFollowupToDate('');
-    setSelectedStages([]);
-    setSelectedUsersFilter([]);
-    setSelectedCities([]);
-    
-    setShowEntryDateCalendar(false);
-    setShowFollowupDateCalendar(false);
-    setShowStageFilter(false);
-    setShowUserFilter(false);
-    setShowCityFilter(false);
-    
-    setFilteredLeads(missedLeads);
-    setCurrentPage(1);
-  };
+const clearFilters = async () => {
+  // Clear all date filters
+  setSelectedEntryFromDate('');
+  setSelectedEntryToDate('');
+  setSelectedFollowupFromDate('');
+  setSelectedFollowupToDate('');
 
-  const closeAllDropdowns = () => {
-    setShowEntryDateCalendar(false);
-    setShowFollowupDateCalendar(false);
-    setShowStageFilter(false);
-    setShowUserFilter(false);
-    setShowCityFilter(false);
-  };
+  // Clear all selection filters
+  setSelectedStages([]);
+  setSelectedUsersFilter([]);
+  setSelectedCities([]);
 
-  const handleCustomRecordInput = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const value = e.target.value;
-    if (value === '') {
-      setCustomRecordCount('');
-      return;
-    }
-    
-    const numValue = parseInt(value);
-    if (!isNaN(numValue) && numValue > 0) {
-      setCustomRecordCount(numValue);
-    }
-  };
+  // Clear search term
+  setSearchTerm('');
 
-  const clearCustomRecordCount = () => {
+  // Clear custom record count
+  setCustomRecordCount('');
+  setItemsPerPage(10);
+
+  // Close all dropdowns
+  setShowEntryDateCalendar(false);
+  setShowFollowupDateCalendar(false);
+  setShowStageFilter(false);
+  setShowUserFilter(false);
+  setShowCityFilter(false);
+
+  // Reset to page 1
+  setCurrentPage(1);
+  
+  // Refetch data without filters
+  await fetchMissedLeads();
+}; 
+
+const closeAllDropdowns = () => {
+  setShowEntryDateCalendar(false);
+  setShowFollowupDateCalendar(false);
+  setShowStageFilter(false);
+  setShowUserFilter(false);
+  setShowCityFilter(false);
+};
+
+
+const handleCustomRecordInput = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const value = e.target.value;
+  if (value === '') {
     setCustomRecordCount('');
     setItemsPerPage(10);
-  };
+    setCurrentPage(1);
+    // Trigger refetch when clearing
+    setRefreshTrigger(prev => prev + 1);
+    return;
+  }
 
-  // Pagination calculations
-  const totalItems = filteredLeads.length;
-  const totalPages = Math.ceil(totalItems / itemsPerPage);
+  const numValue = parseInt(value);
+  if (!isNaN(numValue) && numValue > 0) {
+    setCustomRecordCount(numValue);
+    setItemsPerPage(numValue);
+    setCurrentPage(1); // Reset to page 1
+    // Trigger immediate refetch
+    setRefreshTrigger(prev => prev + 1);
+  }
+};
+// Update the clearCustomRecordCount function
+const clearCustomRecordCount = () => {
+  setCustomRecordCount('');
+  setItemsPerPage(10);
+  setCurrentPage(1);
+  // Trigger refetch
+  setRefreshTrigger(prev => prev + 1);
+};
 
-  // Get current items
-  const indexOfLastItem = currentPage * itemsPerPage;
-  const indexOfFirstItem = indexOfLastItem - itemsPerPage;
-  const currentItems = filteredLeads.slice(indexOfFirstItem, indexOfLastItem);
 
-  const showingStart = totalItems === 0 ? 0 : indexOfFirstItem + 1;
-  const showingEnd = Math.min(indexOfLastItem, totalItems);
-
-  const handlePageChange = (page: number) => {
-    if (page >= 1 && page <= totalPages) {
-      setCurrentPage(page);
-    }
-  };
 
   // Initial data fetch
   useEffect(() => {
@@ -1152,6 +1290,10 @@ const handleFileIconClick = async (lead: MissedLead) => {
     setUploadFiles(validFiles);
   };
 
+  // Add this state variable for detailed remark
+const [detailedRemark, setDetailedRemark] = useState('');
+
+
 const handleUploadSubmit = async () => {
   if (!docsClient || uploadFiles.length === 0) {
     alert('Please select files to upload.');
@@ -1171,15 +1313,42 @@ const handleUploadSubmit = async () => {
   if (followupDate) formData.append("followup_date", followupDate);
   if (leadStage) formData.append("leadStage", leadStage);
   
-  // CRITICAL FIX: Ensure assignedTo is always sent, even if empty array
-  if (selectedUsers && selectedUsers.length > 0) {
-    selectedUsers.forEach(userId => {
-      formData.append("assignedTo[]", userId);
-    });
-  } else {
-    // Send empty array to avoid undefined
-    formData.append("assignedTo[]", "");
+  // 🔴 ADD: Detailed remark field
+  if (detailedRemark) {
+    formData.append('detailed_remark', detailedRemark);
+    console.log('📝 Sending detailed_remark:', detailedRemark);
   }
+
+  // 🔴 UPDATED: Enhanced assignedTo handling
+  if (selectedUsers && selectedUsers.length > 0) {
+    // METHOD 1: Send as comma-separated string (RECOMMENDED)
+    const assignedToString = selectedUsers.join(',');
+    formData.append('assignedTo', assignedToString);
+    
+    // 🔴 ALSO send as array for backward compatibility
+    selectedUsers.forEach((userId) => {
+      formData.append('assignedTo[]', userId);
+    });
+    
+    console.log(`📤 Sending assignedTo as: ${assignedToString}`);
+    console.log(`📤 Also sending as array with ${selectedUsers.length} users`);
+  } else {
+    formData.append('assignedTo', '');
+    console.log('📤 Sending empty assignedTo');
+  }
+
+  // 🔴 DEBUG: Log all form data entries (optional)
+  console.log('\n📤 ALL FORM DATA ENTRIES:');
+  console.log('-'.repeat(40));
+  const formDataEntries = Array.from(formData.entries());
+  formDataEntries.forEach(([key, value]) => {
+    if (key === 'files') {
+      console.log(`${key}: File object - ${value.name}`);
+    } else {
+      console.log(`${key}: ${value}`);
+    }
+  });
+  console.log('-'.repeat(40));
 
   try {
     const response = await axios.post(
@@ -1190,7 +1359,7 @@ const handleUploadSubmit = async () => {
           'Content-Type': 'multipart/form-data',
         },
         withCredentials: true,    
-        }
+      }
     );
 
     let successMsg = '✅ Files uploaded successfully!\n\n';
@@ -1207,13 +1376,15 @@ const handleUploadSubmit = async () => {
     if (response.data.updated_fields) {
       const fields = response.data.updated_fields;
       successMsg += '\n📊 Updates:\n';
-      if (fields.followup_date) successMsg += '• Follow-up date updated\n';
-      if (fields.lead_stage) successMsg += '• Lead stage updated\n';
-      if (fields.detailed_remark) successMsg += '• Remarks updated\n';
-      if (fields.reassignment_count > 0) {
-        successMsg += `• Reassigned to ${fields.reassignment_count} user(s)\n`;
+      if (fields.raw_data_followup_date || fields.followup_date) successMsg += '• Follow-up date updated\n';
+      if (fields.raw_data_lead_stage || fields.lead_stage) successMsg += '• Lead stage updated\n';
+      // 🔴 ADD: Check for detailed remark update
+      if (fields.raw_data_detailed_remark || fields.detailed_remark) successMsg += '• Detailed remark updated\n';
+      if (fields.reassignments_created > 0 || fields.reassignment_count > 0) {
+        const count = fields.reassignments_created || fields.reassignment_count;
+        successMsg += `• ${count} reassignment(s) created\n`;
       } else {
-        successMsg += '• No reassignments added (check if users were selected)\n';
+        successMsg += '• No reassignments created\n';
       }
     }
 
@@ -1225,10 +1396,11 @@ const handleUploadSubmit = async () => {
     // Refresh the document list
     await refreshDocumentList();
     
-    // Clear the form
+    // Clear the form - 🔴 ADD: clear detailedRemark
     setUploadFiles([]);
     setLocationLink("");
     setRemark("");
+    setDetailedRemark(""); // 🔴 ADD THIS
     setFollowupDate("");
     setSelectedUsers([]);
     setLeadStage("");
@@ -1241,11 +1413,15 @@ const handleUploadSubmit = async () => {
     
     if (error.response?.data?.message) {
       alert(`❌ Upload failed: ${error.response.data.message}`);
+      if (error.response.data.error) {
+        console.error('Server error details:', error.response.data.error);
+      }
     } else {
       alert("❌ Error uploading files. Please check console for details.");
     }
   }
 };
+
   const getFileIcon = (fileName: string) => {
     const ext = fileName.split('.').pop()?.toLowerCase() || '';
     switch (ext) {
@@ -2025,316 +2201,315 @@ const renderDetailsModal = () => {
   const renderDocsModal = () => {
     if (!showDocsPopup || !docsClient) return null;
 
-    return (
-      <div className="fixed inset-0 bg-black/70 flex justify-center items-start z-[9999] overflow-y-auto p-4 sm:p-10">
-        <div className="bg-white dark:bg-boxdark p-6 rounded-xl shadow-2xl w-full max-w-5xl max-h-[90vh] overflow-y-auto border border-gray-300 dark:border-gray-700">
-          {/* Header */}
-          <div className="flex justify-between items-center border-b pb-4 mb-6 dark:border-gray-700">
-            <div>
-              <h2 className="text-2xl font-bold text-gray-800 dark:text-white">
-                📁 Files for {docsClient.name}
-              </h2>
-              <p className="text-sm text-gray-600 dark:text-gray-400">
-                Manage documents, links, and remarks in one place
-              </p>
-            </div>
-            <button
-              onClick={() => {
-                setShowDocsPopup(false);
-                setUploadFiles([]);
-                setLocationLink("");
-                setRemark("");
-                setFollowupDate("");
-                setSelectedUsers([]);
-                setLeadStage("");
-              }}
-              className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 text-2xl p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-full transition-colors"
-            >
-              <FontAwesomeIcon icon={faTimes} />
-            </button>
+  return (
+    <div className="fixed inset-0 bg-black/70 flex justify-center items-start z-[9999] overflow-y-auto p-4 sm:p-10">
+      <div className="bg-white dark:bg-boxdark p-6 rounded-xl shadow-2xl w-full max-w-5xl max-h-[90vh] overflow-y-auto border border-gray-300 dark:border-gray-700">
+        {/* Header */}
+        <div className="flex justify-between items-center border-b pb-4 mb-6 dark:border-gray-700">
+          <div>
+            <h2 className="text-2xl font-bold text-gray-800 dark:text-white">
+              📁 Files for {docsClient.name}
+            </h2>
+            <p className="text-sm text-gray-600 dark:text-gray-400">
+              Manage documents, links, and remarks in one place
+            </p>
           </div>
+          <button
+            onClick={() => {
+              setShowDocsPopup(false);
+              setUploadFiles([]);
+              setLocationLink("");
+              setRemark("");
+              setDetailedRemark(""); // 🔴 ADD THIS
+              setFollowupDate("");
+              setSelectedUsers([]);
+              setLeadStage("");
+            }}
+            className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 text-2xl p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-full transition-colors"
+          >
+            <FontAwesomeIcon icon={faTimes} />
+          </button>
+        </div>
 
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-            {/* Left Column - Upload Section */}
-            <div className="lg:col-span-1">
-              <div className="bg-gray-50 dark:bg-white/5 p-5 rounded-xl border border-gray-200 dark:border-gray-700 sticky top-0">
-                <h3 className="text-lg font-semibold mb-4 text-gray-800 dark:text-white flex items-center gap-2">
-                  <FontAwesomeIcon icon={faFileUpload} className="text-blue-500" />
-                  Upload New
-                </h3>
-                
-                <div className="space-y-4">
-                  {/* File Type */}
-                  <div>
-                    <label className="block mb-1.5 text-xs font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400">
-                      Type
-                    </label>
-                    <select
-                      value={uploadType}
-                      onChange={(e) => setUploadType(e.target.value as any)}
-                      className="w-full p-2.5 border border-gray-300 rounded-lg text-sm dark:text-white dark:bg-gray-800 focus:ring-2 focus:ring-blue-500 outline-none"
-                    >
-                      <option value="documents">📄 Document</option>
-                      <option value="image">🖼️ Image</option>
-                      <option value="video">🎥 Video</option>
-                    </select>
-                  </div>
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+          {/* Left Column - Upload Section */}
+          <div className="lg:col-span-1">
+            <div className="bg-gray-50 dark:bg-white/5 p-5 rounded-xl border border-gray-200 dark:border-gray-700 sticky top-0">
+              <h3 className="text-lg font-semibold mb-4 text-gray-800 dark:text-white flex items-center gap-2">
+                <FontAwesomeIcon icon={faFileUpload} className="text-blue-500" />
+                Upload New
+              </h3>
+              
+              <div className="space-y-4">
+                {/* File Type */}
+                <div>
+                  <label className="block mb-1.5 text-xs font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400">
+                    Type
+                  </label>
+                  <select
+                    value={uploadType}
+                    onChange={(e) => setUploadType(e.target.value as any)}
+                    className="w-full p-2.5 border border-gray-300 rounded-lg text-sm dark:text-white dark:bg-gray-800 focus:ring-2 focus:ring-blue-500 outline-none"
+                  >
+                    <option value="documents">📄 Document</option>
+                    <option value="image">🖼️ Image</option>
+                    <option value="video">🎥 Video</option>
+                  </select>
+                </div>
 
-                  {/* Follow-up Date Field */}
-                  <div>
-                    <label className="block mb-1.5 text-xs font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400">
-                      Follow-up Date
-                    </label>
-                    <input
-                      type="date"
-                      value={followupDate}
-                      onChange={(e) => setFollowupDate(e.target.value)}
-                      className="w-full p-2.5 border border-gray-300 rounded-lg text-sm dark:text-white dark:bg-gray-800 focus:ring-2 focus:ring-blue-500 outline-none"
-                    />
-                  </div>
+                {/* Follow-up Date Field */}
+                <div>
+                  <label className="block mb-1.5 text-xs font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400">
+                    Follow-up Date
+                  </label>
+                  <input
+                    type="date"
+                    value={followupDate}
+                    onChange={(e) => setFollowupDate(e.target.value)}
+                    className="w-full p-2.5 border border-gray-300 rounded-lg text-sm dark:text-white dark:bg-gray-800 focus:ring-2 focus:ring-blue-500 outline-none"
+                  />
+                </div>
 
-                  {/* Reassign To (Multiple) Users */}
-                  <div>
-                    <label className="block mb-1.5 text-xs font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400">
-                      Reassign To (Multiple Users)
-                    </label>
-                    
-                    {/* Search Box */}
-                    <div className="mb-2">
-                      <div className="relative">
-                        <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                          <svg className="h-4 w-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                          </svg>
-                        </div>
-                        <input
-                          type="text"
-                          value={searchUserTerm}
-                          onChange={(e) => setSearchUserTerm(e.target.value)}
-                          className="w-full pl-9 pr-8 py-2 border border-gray-300 dark:border-gray-600 rounded text-sm dark:bg-form-input dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                          placeholder="Search users by name or role..."
-                        />
-                        {searchUserTerm && (
-                          <button
-                            type="button"
-                            onClick={() => setSearchUserTerm('')}
-                            className="absolute inset-y-0 right-0 pr-2 flex items-center text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
-                          >
-                            <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                            </svg>
-                          </button>
-                        )}
+                {/* Reassign To (Multiple) Users */}
+                <div>
+                  <label className="block mb-1.5 text-xs font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400">
+                    Reassign To (Multiple Users)
+                  </label>
+                  
+                  {/* Search Box */}
+                  <div className="mb-2">
+                    <div className="relative">
+                      <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                        <svg className="h-4 w-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                        </svg>
                       </div>
+                      <input
+                        type="text"
+                        value={searchUserTerm}
+                        onChange={(e) => setSearchUserTerm(e.target.value)}
+                        className="w-full pl-9 pr-8 py-2 border border-gray-300 dark:border-gray-600 rounded text-sm dark:bg-form-input dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                        placeholder="Search users by name or role..."
+                      />
                       {searchUserTerm && (
-                        <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                          Showing {filteredUsers.length} of {users.length} users
-                        </p>
-                      )}
-                    </div>
-                    
-                    {/* Checkbox Selection Area - 3 Columns */}
-                    <div className="border border-gray-300 dark:border-gray-600 rounded p-3 max-h-40 overflow-y-auto">
-                      {/* Select All Filtered Button */}
-                      <div className="mb-2 pb-2 border-b dark:border-gray-700">
                         <button
                           type="button"
-                          onClick={() => {
-                            // Handle select all filtered users
-                            const allFilteredSelected = filteredUsers.every(user => 
-                              selectedUsers.includes(user.user_id || user.id)
-                            );
-                            
-                            if (allFilteredSelected) {
-                              // Deselect all filtered users
-                              setSelectedUsers(prev => 
-                                prev.filter(userId => 
-                                  !filteredUsers.some(user => user.user_id === userId || user.id === userId)
-                                )
-                              );
-                            } else {
-                              // Add all filtered users
-                              const filteredUserIds = filteredUsers.map(user => user.user_id || user.id);
-                              setSelectedUsers(prev => [...new Set([...prev, ...filteredUserIds])]);
-                            }
-                          }}
-                          className="text-xs px-3 py-1.5 bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300 rounded hover:bg-blue-200 dark:hover:bg-blue-800 transition-colors"
+                          onClick={() => setSearchUserTerm('')}
+                          className="absolute inset-y-0 right-0 pr-2 flex items-center text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
                         >
-                          {filteredUsers.length > 0 && 
-                          filteredUsers.every(user => 
-                            selectedUsers.includes(user.user_id || user.id)
-                          ) 
-                            ? 'Deselect All Filtered' 
-                            : 'Select All Filtered'}
+                          <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                          </svg>
                         </button>
-                        <span className="text-xs text-gray-500 dark:text-gray-400 ml-2">
-                          {selectedUsers.length} selected
-                        </span>
-                      </div>
-                      
-                      {/* Users List - 3 Columns */}
-                      {filteredUsers.length > 0 ? (
-                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2">
-                          {filteredUsers.map((user) => {
-                            const isSelected = selectedUsers.includes(user.user_id || user.id);
-                            return (
-                              <div 
-                                key={user.user_id || user.id} 
-                                className={`flex items-start p-2 rounded transition-colors ${
-                                  isSelected 
-                                    ? 'bg-blue-50 dark:bg-blue-900/30 border border-blue-200 dark:border-blue-700' 
-                                    : 'border border-transparent hover:bg-gray-50 dark:hover:bg-gray-800 hover:border-gray-200 dark:hover:border-gray-700'
-                                }`}
-                              >
-                                <input
-                                  type="checkbox"
-                                  id={`user-${user.user_id || user.id}`}
-                                  checked={isSelected}
-                                  onChange={() => {
-                                    const userId = user.user_id || user.id;
-                                    if (selectedUsers.includes(userId)) {
-                                      setSelectedUsers(prev => prev.filter(id => id !== userId));
-                                    } else {
-                                      setSelectedUsers(prev => [...prev, userId]);
-                                    }
-                                  }}
-                                  className="h-4 w-4 text-blue-600 rounded focus:ring-blue-500 focus:ring-offset-0 mt-1"
-                                />
-                                <label 
-                                  htmlFor={`user-${user.user_id || user.id}`}
-                                  className="ml-2 text-sm text-gray-700 dark:text-gray-300 cursor-pointer flex-1"
-                                >
-                                  <div className="font-medium line-clamp-1">{user.name}</div>
-                                  <div className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
-                                    {user.role || 'No role'}
-                                  </div>
-                                </label>
-                              </div>
-                            );
-                          })}
-                        </div>
-                      ) : (
-                        <div className="text-center py-4 text-gray-500 dark:text-gray-400">
-                          <div className="text-2xl mb-2">🔍</div>
-                          <p className="text-sm">No users found</p>
-                          <p className="text-xs mt-1">Try a different search term</p>
-                        </div>
                       )}
                     </div>
+                    {searchUserTerm && (
+                      <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                        Showing {filteredUsers.length} of {users.length} users
+                      </p>
+                    )}
+                  </div>
+                  
+                  {/* Checkbox Selection Area - 3 Columns */}
+                  <div className="border border-gray-300 dark:border-gray-600 rounded p-3 max-h-40 overflow-y-auto">
+                    {/* Select All Filtered Button */}
+                    <div className="mb-2 pb-2 border-b dark:border-gray-700">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          // Handle select all filtered users
+                          const allFilteredSelected = filteredUsers.every(user => 
+                            selectedUsers.includes(user.user_id || user.id)
+                          );
+                          
+                          if (allFilteredSelected) {
+                            // Deselect all filtered users
+                            setSelectedUsers(prev => 
+                              prev.filter(userId => 
+                                !filteredUsers.some(user => user.user_id === userId || user.id === userId)
+                              )
+                            );
+                          } else {
+                            // Add all filtered users
+                            const filteredUserIds = filteredUsers.map(user => user.user_id || user.id);
+                            setSelectedUsers(prev => [...new Set([...prev, ...filteredUserIds])]);
+                          }
+                        }}
+                        className="text-xs px-3 py-1.5 bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300 rounded hover:bg-blue-200 dark:hover:bg-blue-800 transition-colors"
+                      >
+                        {filteredUsers.length > 0 && 
+                        filteredUsers.every(user => 
+                          selectedUsers.includes(user.user_id || user.id)
+                        ) 
+                          ? 'Deselect All Filtered' 
+                          : 'Select All Filtered'}
+                      </button>
+                      <span className="text-xs text-gray-500 dark:text-gray-400 ml-2">
+                        {selectedUsers.length} selected
+                      </span>
+                    </div>
                     
-                    {/* Selected Users Preview */}
-                    {selectedUsers.length > 0 && (
-                      <div className="mt-2 p-2 bg-blue-50 dark:bg-blue-900/30 rounded border border-blue-200 dark:border-blue-800">
-                        <div className="text-xs text-blue-700 dark:text-blue-300 mb-1 font-medium">
-                          Selected Users ({selectedUsers.length}):
-                        </div>
-                        <div className="text-xs text-gray-600 dark:text-gray-400">
-                          {selectedUsers.map(userId => {
-                            const user = users.find(u => u.user_id === userId || u.id === userId);
-                            return user ? `${user.name}${user.role ? ` (${user.role})` : ''}` : userId;
-                          }).join(', ')}
-                        </div>
+                    {/* Users List - 3 Columns */}
+                    {filteredUsers.length > 0 ? (
+                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2">
+                        {filteredUsers.map((user) => {
+                          const isSelected = selectedUsers.includes(user.user_id || user.id);
+                          return (
+                            <div 
+                              key={user.user_id || user.id} 
+                              className={`flex items-start p-2 rounded transition-colors ${
+                                isSelected 
+                                  ? 'bg-blue-50 dark:bg-blue-900/30 border border-blue-200 dark:border-blue-700' 
+                                  : 'border border-transparent hover:bg-gray-50 dark:hover:bg-gray-800 hover:border-gray-200 dark:hover:border-gray-700'
+                              }`}
+                            >
+                              <input
+                                type="checkbox"
+                                id={`user-${user.user_id || user.id}`}
+                                checked={isSelected}
+                                onChange={() => {
+                                  const userId = user.user_id || user.id;
+                                  if (selectedUsers.includes(userId)) {
+                                    setSelectedUsers(prev => prev.filter(id => id !== userId));
+                                  } else {
+                                    setSelectedUsers(prev => [...prev, userId]);
+                                  }
+                                }}
+                                className="h-4 w-4 text-blue-600 rounded focus:ring-blue-500 focus:ring-offset-0 mt-1"
+                              />
+                              <label 
+                                htmlFor={`user-${user.user_id || user.id}`}
+                                className="ml-2 text-sm text-gray-700 dark:text-gray-300 cursor-pointer flex-1"
+                              >
+                                <div className="font-medium line-clamp-1">{user.name}</div>
+                              </label>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    ) : (
+                      <div className="text-center py-4 text-gray-500 dark:text-gray-400">
+                        <div className="text-2xl mb-2">🔍</div>
+                        <p className="text-sm">No users found</p>
+                        <p className="text-xs mt-1">Try a different search term</p>
                       </div>
                     )}
                   </div>
-
-                  {/* Lead Stage */}
-                  <div>
-                    <label className="block mb-1.5 text-xs font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400">
-                      Lead Stage
-                    </label>
-                    <select
-                      value={leadStage}
-                      onChange={(e) => setLeadStage(e.target.value)}
-                      className="w-full p-2.5 border border-gray-300 rounded-lg text-sm dark:text-white dark:bg-gray-800 focus:ring-2 focus:ring-blue-500 outline-none"
-                    >
-                      <option value="">Select Lead Stage</option>
-                      {leadStages.map((stage, index) => (
-                        <option key={index} value={stage}>
-                          {stage}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-
-                  {/* Location Link */}
-                  <div>
-                    <label className="block mb-1.5 text-xs font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400">
-                      Location Link
-                    </label>
-                    <input
-                      type="text"
-                      placeholder="https://example.com"
-                      value={locationLink}
-                      onChange={(e) => setLocationLink(e.target.value)}
-                      className="w-full p-2.5 border border-gray-300 rounded-lg text-sm dark:text-white dark:bg-gray-800 focus:ring-2 focus:ring-blue-500 outline-none"
-                    />
-                  </div>
-
-                  {/* Remark */}
-                  <div>
-                    <label className="block mb-1.5 text-xs font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400">
-                      Remark
-                    </label>
-                    <textarea
-                      placeholder="Add a note..."
-                      value={remark}
-                      onChange={(e) => setRemark(e.target.value)}
-                      className="w-full p-2.5 border border-gray-300 rounded-lg text-sm dark:text-white dark:bg-gray-800 focus:ring-2 focus:ring-blue-500 outline-none"
-                      rows={3}
-                    ></textarea>
-                  </div>
-
-                  {/* File Upload Area */}
-                  <div className="border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-lg p-4 text-center hover:border-blue-500 transition-colors bg-white dark:bg-gray-800/50">
-                    <input
-                      type="file" 
-                      multiple 
-                      id="file-upload" 
-                      className="hidden"
-                      onChange={handleFileChange}
-                    />
-                    <label htmlFor="file-upload" className="cursor-pointer block">
-                      <FontAwesomeIcon icon={faFileUpload} className="text-2xl text-gray-400 mb-1" />
-                      <p className="text-xs text-gray-600 dark:text-gray-400 font-medium">Click to browse files</p>
-                    </label>
-                  </div>
-
-                  {/* Selected Files Preview */}
-                  {uploadFiles.length > 0 && (
-                    <div className="bg-blue-50 dark:bg-blue-900/20 p-2 rounded-lg border border-blue-100 dark:border-blue-800">
-                      <p className="text-xs font-bold text-blue-700 dark:text-blue-400 mb-1">
-                        Selected ({uploadFiles.length})
-                      </p>
-                      <div className="max-h-20 overflow-y-auto space-y-1">
-                        {uploadFiles.map((f, i) => (
-                          <div key={i} className="text-[11px] truncate dark:text-gray-300 flex justify-between">
-                            <span>{f.name}</span>
-                            <button 
-                              onClick={() => setUploadFiles(prev => prev.filter((_, idx) => idx !== i))} 
-                              className="text-red-500 ml-1 hover:text-red-700"
-                            >
-                              ×
-                            </button>
-                          </div>
-                        ))}
+                  
+                  {/* Selected Users Preview */}
+                  {selectedUsers.length > 0 && (
+                    <div className="mt-2 p-2 bg-blue-50 dark:bg-blue-900/30 rounded border border-blue-200 dark:border-blue-800">
+                      <div className="text-xs text-blue-700 dark:text-blue-300 mb-1 font-medium">
+                        Selected Users ({selectedUsers.length}):
+                      </div>
+                      <div className="text-xs text-gray-600 dark:text-gray-400">
+                        {selectedUsers.map(userId => {
+                          const user = users.find(u => u.user_id === userId || u.id === userId);
+                          return user ? `${user.name}${user.role ? ` (${user.role})` : ''}` : userId;
+                        }).join(', ')}
                       </div>
                     </div>
                   )}
-
-                  {/* Submit Button */}
-                  <button
-                    onClick={handleUploadSubmit}
-                    disabled={uploadFiles.length === 0}
-                    className={`w-full py-3 rounded-lg font-bold text-sm transition-all shadow-md ${
-                      uploadFiles.length > 0 
-                      ? 'bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white active:scale-95' 
-                      : 'bg-gray-200 dark:bg-gray-700 text-gray-400 cursor-not-allowed'
-                    }`}
-                  >
-                    UPLOAD & UPDATE
-                  </button>
                 </div>
+
+                {/* Lead Stage */}
+                <div>
+                  <label className="block mb-1.5 text-xs font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400">
+                    Lead Stage
+                  </label>
+                  <select
+                    value={leadStage}
+                    onChange={(e) => setLeadStage(e.target.value)}
+                    className="w-full p-2.5 border border-gray-300 rounded-lg text-sm dark:text-white dark:bg-gray-800 focus:ring-2 focus:ring-blue-500 outline-none"
+                  >
+                    <option value="">Select Lead Stage</option>
+                    {leadStages.map((stage, index) => (
+                      <option key={index} value={stage}>
+                        {stage}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* Location Link */}
+                <div>
+                  <label className="block mb-1.5 text-xs font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400">
+                    Location Link
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="https://example.com"
+                    value={locationLink}
+                    onChange={(e) => setLocationLink(e.target.value)}
+                    className="w-full p-2.5 border border-gray-300 rounded-lg text-sm dark:text-white dark:bg-gray-800 focus:ring-2 focus:ring-blue-500 outline-none"
+                  />
+                </div>
+
+                {/* 🔴 ADD: Detailed Remark Field */}
+                <div>
+                  <label className="block mb-1.5 text-xs font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400">
+                    Detailed Remark
+                  </label>
+                  <textarea
+                    placeholder="Enter detailed remark for this update..."
+                    value={detailedRemark}
+                    onChange={(e) => setDetailedRemark(e.target.value)}
+                    className="w-full p-2.5 border border-gray-300 rounded-lg text-sm dark:text-white dark:bg-gray-800 focus:ring-2 focus:ring-blue-500 outline-none"
+                    rows={3}
+                  />
+                </div>
+
+          
+                {/* File Upload Area */}
+                <div className="border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-lg p-4 text-center hover:border-blue-500 transition-colors bg-white dark:bg-gray-800/50">
+                  <input
+                    type="file" 
+                    multiple 
+                    id="file-upload" 
+                    className="hidden"
+                    onChange={handleFileChange}
+                  />
+                  <label htmlFor="file-upload" className="cursor-pointer block">
+                    <FontAwesomeIcon icon={faFileUpload} className="text-2xl text-gray-400 mb-1" />
+                    <p className="text-xs text-gray-600 dark:text-gray-400 font-medium">Click to browse files</p>
+                  </label>
+                </div>
+
+                {/* Selected Files Preview */}
+                {uploadFiles.length > 0 && (
+                  <div className="bg-blue-50 dark:bg-blue-900/20 p-2 rounded-lg border border-blue-100 dark:border-blue-800">
+                    <p className="text-xs font-bold text-blue-700 dark:text-blue-400 mb-1">
+                      Selected ({uploadFiles.length})
+                    </p>
+                    <div className="max-h-20 overflow-y-auto space-y-1">
+                      {uploadFiles.map((f, i) => (
+                        <div key={i} className="text-[11px] truncate dark:text-gray-300 flex justify-between">
+                          <span>{f.name}</span>
+                          <button 
+                            onClick={() => setUploadFiles(prev => prev.filter((_, idx) => idx !== i))} 
+                            className="text-red-500 ml-1 hover:text-red-700"
+                          >
+                            ×
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Submit Button */}
+                <button
+                  onClick={handleUploadSubmit}
+                  disabled={uploadFiles.length === 0}
+                  className={`w-full py-3 rounded-lg font-bold text-sm transition-all shadow-md ${
+                    uploadFiles.length > 0 
+                    ? 'bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white active:scale-95' 
+                    : 'bg-gray-200 dark:bg-gray-700 text-gray-400 cursor-not-allowed'
+                  }`}
+                >
+                  UPLOAD & UPDATE
+                </button>
+              </div>
               </div>
             </div>
 
@@ -2496,192 +2671,194 @@ const renderDetailsModal = () => {
   return (
     <div className="p-4">
       {/* Sticky Header with Filters */}
-      <div className="sticky top-0 z-50 w-full bg-white/95 dark:bg-boxdark/95 backdrop-blur-sm shadow-lg border-b border-gray-200/80 dark:border-gray-800 mb-4">  
-        <div className="px-4 py-3">
-          {/* Header with Breadcrumb and Compact Search */}
-          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 mb-2">
-              <h2 className="text-lg font-medium">
-  Missed Assignments
-</h2>
-
-
-
-            
-            {/* Compact Search Input and Custom Record Count */}
-            <div className="flex flex-col sm:flex-row gap-3 w-full sm:w-auto">
-              {/* Custom Record Count Input */}
-              <div className="w-full sm:w-48">
-                <div className="relative">
-                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                    <svg className="h-4 w-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                    </svg>
-                  </div>
-                  <input
-                    type="number"
-                    className="w-full pl-10 pr-10 py-2 text-sm border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
-                    placeholder="Show N records"
-                    value={customRecordCount}
-                    onChange={handleCustomRecordInput}
-                    min="1"
-                  />
-                  {customRecordCount && (
-                    <button
-                      onClick={clearCustomRecordCount}
-                      className="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
-                      title="Clear limit"
-                    >
-                      <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                      </svg>
-                    </button>
-                  )}
-                </div>
-                {customRecordCount && (
-                  <div className="text-xs text-blue-600 dark:text-blue-400 mt-1 ml-1">
-                    Showing first {customRecordCount} records
-                  </div>
-                )}
-              </div>
-              
-              {/* Compact Search Input */}
-              <div className="w-full sm:w-72">
-                <div className="relative">
-                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                    <svg className="h-4 w-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                    </svg>
-                  </div>
-                  <input
-                    type="text"
-                    className="w-full pl-10 pr-4 py-2 text-sm border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all"
-                    placeholder="Search name, category, status..."
-                    value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
-                  />
-                </div>
-              </div> 
-                          <button
-    onClick={() => {
-      if (selectedMasterIds.length === 0) {
-        alert('Please select at least one record to assign/reassign');
-        return;
-      }
-      setShowAssignPopup(true);
-    }}
-    disabled={selectedMasterIds.length === 0}
-    className={`bg-gradient-to-r from-green-600 to-green-700 text-white px-4 py-2 rounded-lg text-sm font-medium flex items-center gap-2 transition-all shadow-md hover:shadow-lg ${
-      selectedMasterIds.length === 0
-        ? 'opacity-50 cursor-not-allowed'
-        : 'hover:from-green-700 hover:to-green-800'
-    }`}
-  >
-    <svg
-      className="h-4 w-4"
-      fill="none"
-      stroke="currentColor"
-      viewBox="0 0 24 24"
-    >
-      <path
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        strokeWidth={2}
-        d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197m13.5-6a3.5 3.5 0 11-7 0 3.5 3.5 0 017 0z"
-      />
-    </svg>
-    {selectedMasterIds.length > 1
-      ? `Reassign (${selectedMasterIds.length})`
-      : 'ReAssign'}
-  </button>
-  
-            </div> 
-            
-
-  
-
-          </div> 
-
-        </div>
+<div className="sticky top-0 z-50 w-full bg-white/95 dark:bg-boxdark/95 backdrop-blur-sm shadow-lg border-b border-gray-200/80 dark:border-gray-800 mb-4">
+  <div className="px-4 py-3">
+    <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 mb-2">
+      <div className="flex items-center gap-3">
+        <h2 className="text-lg font-medium">Missed Assignments</h2>
+        <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-gradient-to-r from-blue-100 to-blue-200 dark:from-blue-900/30 dark:to-blue-800/30 text-blue-800 dark:text-blue-300 border border-blue-200 dark:border-blue-700/30">
+          <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+          </svg>
+          {totalLeads} Leads
+        </span>
       </div>
 
+      <div className="flex flex-col sm:flex-row gap-3 w-full sm:w-auto">
+        {/* Custom Record Count Input */}
+<div className="w-full sm:w-48">
+  <div className="relative">
+    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+      <svg className="h-4 w-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+      </svg>
+    </div>
+    <input
+      type="number"
+      className="w-full pl-10 pr-10 py-2 text-sm border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+      placeholder="Records per page"
+      value={customRecordCount}
+      onChange={handleCustomRecordInput}
+      min="1"
+      max="1000"
+    />
+    {customRecordCount && (
+      <button
+        onClick={clearCustomRecordCount}
+        className="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
+        title="Clear limit"
+      >
+        <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+        </svg>
+      </button>
+    )}
+  </div>
+  {customRecordCount ? (
+    <div className="text-xs text-blue-600 dark:text-blue-400 mt-1 ml-1 font-medium">
+      Showing {customRecordCount} records per page
+    </div>
+  ) : (
+    <div className="text-xs text-gray-500 dark:text-gray-400 mt-1 ml-1">
+      Default: 10 records per page
+    </div>
+  )}
+</div>
 
-
-      {/* Active Filters Display */}
-      {(selectedEntryFromDate || selectedEntryToDate || selectedFollowupFromDate || selectedFollowupToDate || selectedStages.length > 0 || selectedUsersFilter.length > 0 || selectedCities.length > 0) && (
-        <div className="flex items-center gap-2 mb-4 p-2 bg-gray-50 dark:bg-gray-800 rounded">
-          <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Active filters:</span>
-          <div className="flex flex-wrap gap-2">
-            {(selectedEntryFromDate || selectedEntryToDate) && (
-              <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300">
-                Entry: {selectedEntryFromDate || 'Any'} to {selectedEntryToDate || 'Any'}
-                <button
-                  onClick={() => {
-                    setSelectedEntryFromDate('');
-                    setSelectedEntryToDate('');
-                  }}
-                  className="ml-1 text-blue-600 hover:text-blue-800 dark:text-blue-400"
-                >
-                  ×
-                </button>
-              </span>
-            )}
-            {(selectedFollowupFromDate || selectedFollowupToDate) && (
-              <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300">
-                Followup: {selectedFollowupFromDate || 'Any'} to {selectedFollowupToDate || 'Any'}
-                <button
-                  onClick={() => {
-                    setSelectedFollowupFromDate('');
-                    setSelectedFollowupToDate('');
-                  }}
-                  className="ml-1 text-green-600 hover:text-green-800 dark:text-green-400"
-                >
-                  ×
-                </button>
-              </span>
-            )}
-            {selectedStages.map(stage => (
-              <span key={stage} className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-300">
-                Stage: {stage}
-                <button
-                  onClick={() => handleStageSelect(stage)}
-                  className="ml-1 text-purple-600 hover:text-purple-800 dark:text-purple-400"
-                >
-                  ×
-                </button>
-              </span>
-            ))}
-            {selectedUsersFilter.map(user => (
-              <span key={user} className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-300">
-                User: {user}
-                <button
-                  onClick={() => handleUserSelect(user)}
-                  className="ml-1 text-orange-600 hover:text-orange-800 dark:text-orange-400"
-                >
-                  ×
-                </button>
-              </span>
-            ))}
-            {selectedCities.map(city => (
-              <span key={city} className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs bg-teal-100 text-teal-800 dark:bg-teal-900 dark:text-teal-300">
-                City: {city}
-                <button
-                  onClick={() => handleCitySelect(city)}
-                  className="ml-1 text-teal-600 hover:text-teal-800 dark:text-teal-400"
-                >
-                  ×
-                </button>
-              </span>
-            ))}
-            <button
-              onClick={clearFilters}
-              className="ml-2 text-sm text-red-600 hover:text-red-800 dark:text-red-400 dark:hover:text-red-300 font-medium"
-            >
-              Clear all filters
-            </button>
+        {/* Search Input */}
+        <div className="w-full sm:w-72">
+          <div className="relative">
+            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+              <svg className="h-4 w-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+              </svg>
+            </div>
+            <input
+              type="text"
+              className="w-full pl-10 pr-4 py-2 text-sm border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all"
+              placeholder="Search name, category, status..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+            />
           </div>
         </div>
-      )}
 
+        {/* Reset Filter Button */}
+        <button
+          onClick={clearFilters}
+          className="bg-gradient-to-r from-gray-600 to-gray-700 hover:from-gray-700 hover:to-gray-800 text-white px-4 py-2 rounded-lg text-sm font-medium flex items-center gap-2 transition-all shadow-md hover:shadow-lg whitespace-nowrap"
+        >
+          <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+          </svg>
+          Reset Filter
+        </button>
+
+        {/* Reassign Button (already exists) */}
+        <button
+          onClick={() => {
+            if (selectedMasterIds.length === 0) {
+              alert('Please select at least one record to assign/reassign');
+              return;
+            }
+            setShowAssignPopup(true);
+          }}
+          disabled={selectedMasterIds.length === 0}
+          className={`bg-gradient-to-r from-green-600 to-green-700 text-white px-4 py-2 rounded-lg text-sm font-medium flex items-center gap-2 transition-all shadow-md hover:shadow-lg ${
+            selectedMasterIds.length === 0
+              ? 'opacity-50 cursor-not-allowed'
+              : 'hover:from-green-700 hover:to-green-800'
+          }`}
+        >
+          <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197m13.5-6a3.5 3.5 0 11-7 0 3.5 3.5 0 017 0z" />
+          </svg>
+          {selectedMasterIds.length > 1
+            ? `Reassign (${selectedMasterIds.length})`
+            : 'ReAssign'}
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+
+
+    {/* Active Filters Display */} 
+{(selectedEntryFromDate || selectedEntryToDate || selectedFollowupFromDate || selectedFollowupToDate || selectedStages.length > 0 || selectedUsersFilter.length > 0 || selectedCities.length > 0) && (
+  <div className="flex items-center gap-2 mb-4 p-2 bg-gray-50 dark:bg-gray-800 rounded">
+    <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Active filters:</span>
+    <div className="flex flex-wrap gap-2">
+      {(selectedEntryFromDate || selectedEntryToDate) && (
+        <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300">
+          Entry: {selectedEntryFromDate || 'Any'} to {selectedEntryToDate || 'Any'}
+          <button
+            onClick={() => {
+              setSelectedEntryFromDate('');
+              setSelectedEntryToDate('');
+            }}
+            className="ml-1 text-blue-600 hover:text-blue-800 dark:text-blue-400"
+          >
+            ×
+          </button>
+        </span>
+      )}
+      {(selectedFollowupFromDate || selectedFollowupToDate) && (
+        <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300">
+          Followup: {selectedFollowupFromDate || 'Any'} to {selectedFollowupToDate || 'Any'}
+          <button
+            onClick={() => {
+              setSelectedFollowupFromDate('');
+              setSelectedFollowupToDate('');
+            }}
+            className="ml-1 text-green-600 hover:text-green-800 dark:text-green-400"
+          >
+            ×
+          </button>
+        </span>
+      )}
+      {selectedStages.map(stage => (
+        <span key={stage} className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-300">
+          Stage: {stage}
+          <button
+            onClick={() => handleStageSelect(stage)}
+            className="ml-1 text-purple-600 hover:text-purple-800 dark:text-purple-400"
+          >
+            ×
+          </button>
+        </span>
+      ))}
+      {selectedUsersFilter.map(user => (
+        <span key={user} className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-300">
+          User: {user}
+          <button
+            onClick={() => handleUserSelect(user)}
+            className="ml-1 text-orange-600 hover:text-orange-800 dark:text-orange-400"
+          >
+            ×
+          </button>
+        </span>
+      ))}
+      {selectedCities.map(city => (
+        <span key={city} className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs bg-teal-100 text-teal-800 dark:bg-teal-900 dark:text-teal-300">
+          City: {city}
+          <button
+            onClick={() => handleCitySelect(city)}
+            className="ml-1 text-teal-600 hover:text-teal-800 dark:text-teal-400"
+          >
+            ×
+          </button>
+        </span>
+      ))}
+      <button
+        onClick={clearFilters}
+        className="ml-2 text-sm text-red-600 hover:text-red-800 dark:text-red-400 dark:hover:text-red-300 font-medium"
+      >
+        Clear all filters
+      </button>
+    </div>
+  </div>
+)}
       {/* Loading State */}
       {loading ? (
         <div className="flex justify-center items-center h-64">
@@ -2698,48 +2875,40 @@ const renderDetailsModal = () => {
 
                 {/* Add Checkbox Column */}
     <th className="py-5 px-4">
-      <input
-        type="checkbox"
-        checked={(() => {
-          const currentEntries = filteredLeads.slice(
-            (currentPage - 1) * itemsPerPage,
-            currentPage * itemsPerPage,
-          );
-          return (
-            currentEntries.length > 0 &&
-            currentEntries.every((lead) =>
-              selectedLeads.includes(lead.master_id),
-            )
-          );
-        })()}
-        onChange={(e) => {
-          const isChecked = e.target.checked;
-          const currentEntries = filteredLeads.slice(
-            (currentPage - 1) * itemsPerPage,
-            currentPage * itemsPerPage,
-          );
-          const currentIds = currentEntries.map((lead) => lead.master_id);
-          
-          if (isChecked) {
-            setSelectedLeads((prev) => {
-              const combined = [...prev, ...currentIds];
-              return combined.filter((id, index) => combined.indexOf(id) === index);
-            });
-            setSelectedMasterIds((prev) => {
-              const combined = [...prev, ...currentIds];
-              return combined.filter((id, index) => combined.indexOf(id) === index);
-            });
-          } else {
-            setSelectedLeads((prev) =>
-              prev.filter((id) => !currentIds.includes(id)),
-            );
-            setSelectedMasterIds((prev) =>
-              prev.filter((id) => !currentIds.includes(id)),
-            );
-          }
-        }}
-        className="h-4.5 w-4.5 text-blue-600 rounded border-gray-300 focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-boxdark"
-      />
+    <input
+  type="checkbox"
+  checked={(() => {
+    return (
+      missedLeads.length > 0 &&  // Change from filteredLeads to missedLeads
+      missedLeads.every((lead) =>  // Change from filteredLeads to missedLeads
+        selectedLeads.includes(lead.master_id),
+      )
+    );
+  })()}
+  onChange={(e) => {
+    const isChecked = e.target.checked;
+    const currentIds = missedLeads.map((lead) => lead.master_id);  // Change from filteredLeads to missedLeads
+    
+    if (isChecked) {
+      setSelectedLeads((prev) => {
+        const combined = [...prev, ...currentIds];
+        return combined.filter((id, index) => combined.indexOf(id) === index);
+      });
+      setSelectedMasterIds((prev) => {
+        const combined = [...prev, ...currentIds];
+        return combined.filter((id, index) => combined.indexOf(id) === index);
+      });
+    } else {
+      setSelectedLeads((prev) =>
+        prev.filter((id) => !currentIds.includes(id)),
+      );
+      setSelectedMasterIds((prev) =>
+        prev.filter((id) => !currentIds.includes(id)),
+      );
+    }
+  }}
+  className="h-4.5 w-4.5 text-blue-600 rounded border-gray-300 focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-boxdark"
+/>
     </th>
 
 
@@ -3146,105 +3315,118 @@ const renderDetailsModal = () => {
             )}
           </th>
           
-          {/* Stage Column with Filter */}
-          <th className="py-5 px-4 relative">
-            <div ref={stageFilterRef} className="flex items-center justify-between gap-2">
-              <span className="text-xs font-extrabold uppercase tracking-wider text-gray-700 dark:text-gray-300">
-                Stage
-              </span>
-              <button
+     {/* Stage Column with Filter */}
+<th className="py-5 px-4 relative">
+  <div ref={stageFilterRef} className="flex items-center justify-between gap-2">
+    <span className="text-xs font-extrabold uppercase tracking-wider text-gray-700 dark:text-gray-300">
+      Stage
+    </span>
+    <button
+      onClick={(e) => {
+        e.stopPropagation();
+        closeAllDropdowns();
+        setShowStageFilter(!showStageFilter);
+      }}
+      className="text-gray-500 hover:text-blue-600 dark:text-gray-400 dark:hover:text-blue-400 focus:outline-none transition-colors"
+    >
+      <FontAwesomeIcon 
+        icon={faFilter} 
+        className={`h-3 w-3 transition-colors duration-200 ${selectedStages.length > 0 ? 'text-blue-600' : ''} ${showStageFilter ? 'text-blue-600' : ''}`}
+      />
+    </button>
+  </div>
+  
+  {/* Stage Filter Dropdown */}
+  {showStageFilter && (
+    <div className="absolute top-full right-0 mt-1 z-50 bg-white dark:bg-boxdark border border-gray-300 dark:border-gray-700 rounded-lg shadow-lg p-4 min-w-[220px] max-h-[300px] overflow-y-auto">
+      <div className="flex justify-between items-center mb-3">
+        <span className="font-semibold text-sm dark:text-white">Filter Stages</span>
+        <div className="flex gap-2">
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              setSelectedStages([]);
+              setShowStageFilter(false);
+            }}
+            className="text-xs font-medium text-blue-600 hover:text-blue-800 dark:text-blue-400 transition-colors"
+          >
+            Clear All
+          </button>
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              setShowStageFilter(false);
+            }}
+            className="text-xs font-medium text-gray-500 hover:text-gray-700 dark:text-gray-400 transition-colors"
+          >
+            ×
+          </button>
+        </div>
+      </div>
+      
+      {leadStages.length > 0 ? (
+        <>
+          {leadStages.map((stage) => (
+            <div key={stage} className="flex items-center mb-2">
+              <input
+                type="checkbox"
+                id={`stage-${stage}`}
+                checked={selectedStages.includes(stage)}
+                onChange={(e) => {
+                  e.stopPropagation();
+                  handleStageSelect(stage);
+                }}
+                onClick={(e) => e.stopPropagation()}
+                className="h-3.5 w-3.5 mr-2.5 text-blue-600 rounded border-gray-300 focus:ring-2 focus:ring-blue-500"
+              />
+              <label
+                htmlFor={`stage-${stage}`}
+                className="text-sm font-medium dark:text-white cursor-pointer truncate hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
                 onClick={(e) => {
                   e.stopPropagation();
-                  closeAllDropdowns();
-                  setShowStageFilter(!showStageFilter);
+                  handleStageSelect(stage);
                 }}
-                className="text-gray-500 hover:text-blue-600 dark:text-gray-400 dark:hover:text-blue-400 focus:outline-none transition-colors"
               >
-                <FontAwesomeIcon 
-                  icon={faFilter} 
-                  className={`h-3 w-3 transition-colors duration-200 ${selectedStages.length > 0 ? 'text-blue-600' : ''} ${showStageFilter ? 'text-blue-600' : ''}`}
-                />
-              </button>
+                {stage || 'Unknown'}
+              </label>
             </div>
-            
-            {/* Stage Filter Dropdown */}
-            {showStageFilter && (
-              <div className="absolute top-full right-0 mt-1 z-50 bg-white dark:bg-boxdark border border-gray-300 dark:border-gray-700 rounded-lg shadow-lg p-4 min-w-[220px] max-h-[300px] overflow-y-auto">
-                <div className="flex justify-between items-center mb-3">
-                  <span className="font-semibold text-sm dark:text-white">Filter Stages</span>
-                  <div className="flex gap-2">
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setSelectedStages([]);
-                      }}
-                      className="text-xs font-medium text-blue-600 hover:text-blue-800 dark:text-blue-400 transition-colors"
-                    >
-                      Clear All
-                    </button>
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setShowStageFilter(false);
-                      }}
-                      className="text-xs font-medium text-gray-500 hover:text-gray-700 dark:text-gray-400 transition-colors"
-                    >
-                      ×
-                    </button>
-                  </div>
-                </div>
-                
-                {leadStages.length > 0 ? (
-                  <>
-                    {leadStages.map((stage) => (
-                      <div key={stage} className="flex items-center mb-2">
-                        <input
-                          type="checkbox"
-                          id={`stage-${stage}`}
-                          checked={selectedStages.includes(stage)}
-                          onChange={(e) => {
-                            e.stopPropagation();
-                            handleStageSelect(stage);
-                          }}
-                          onClick={(e) => e.stopPropagation()}
-                          className="h-3.5 w-3.5 mr-2.5 text-blue-600 rounded border-gray-300 focus:ring-2 focus:ring-blue-500"
-                        />
-                        <label 
-                          htmlFor={`stage-${stage}`}
-                          className="text-sm font-medium dark:text-white cursor-pointer truncate hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
-                        >
-                          {stage || 'Unknown'}
-                        </label>
-                      </div>
-                    ))}
-                  </>
-                ) : (
-                  <div className="text-sm font-medium text-gray-500 dark:text-gray-400 italic py-3 text-center">
-                    Loading stages...
-                  </div>
-                )}
-                
-                {selectedStages.length > 0 && (
-                  <div className="mt-4 pt-3 border-t border-gray-200 dark:border-gray-700">
-                    <div className="text-xs font-semibold text-gray-600 dark:text-gray-400 mb-2">
-                      Selected ({selectedStages.length}):
-                    </div>
-                    <div className="flex flex-wrap gap-1.5">
-                      {selectedStages.map(stage => (
-                        <span 
-                          key={stage} 
-                          className="inline-flex items-center px-3 py-1.5 rounded-full text-xs font-semibold bg-gradient-to-r from-blue-50 to-blue-100 dark:from-blue-900/30 dark:to-blue-800/20 text-blue-800 dark:text-blue-300 border border-blue-200 dark:border-blue-700/30 shadow-sm truncate max-w-[100px]"
-                        >
-                          {stage}
-                        </span>
-                      ))}
-                    </div>
-                  </div>
-                )}
-              </div>
-            )}
-          </th> 
-
+          ))}
+        </>
+      ) : (
+        <div className="text-sm font-medium text-gray-500 dark:text-gray-400 italic py-3 text-center">
+          Loading stages...
+        </div>
+      )}
+      
+      {selectedStages.length > 0 && (
+        <div className="mt-4 pt-3 border-t border-gray-200 dark:border-gray-700">
+          <div className="text-xs font-semibold text-gray-600 dark:text-gray-400 mb-2">
+            Selected ({selectedStages.length}):
+          </div>
+          <div className="flex flex-wrap gap-1.5">
+            {selectedStages.map((stage) => (
+              <span
+                key={stage}
+                className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-300"
+              >
+                Stage: {stage}
+                <button
+                  onClick={() => {
+                    handleStageSelect(stage);
+                    setShowStageFilter(false);
+                  }}
+                  className="ml-1 text-purple-600 hover:text-purple-800 dark:text-purple-400"
+                >
+                  ×
+                </button>
+              </span>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  )}
+</th>
 
           
                     <th className="py-5 px-4">
@@ -3262,9 +3444,10 @@ const renderDetailsModal = () => {
         </tr>
       </thead>
 
-      <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
-        {currentItems.map((lead, index) => (
-          <tr key={index} className="border-b border-gray-100 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors duration-150 last:border-b-0">
+<tbody className="divide-y divide-gray-100 dark:divide-gray-700">
+  {missedLeads.map((lead, index) => (  // Change from currentItems to missedLeads
+    <tr key={index} className="border-b border-gray-100 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors duration-150 last:border-b-0">
+         
            {/* Select Checkbox */}
       <td className="py-4 px-4">
         <input
@@ -3480,18 +3663,18 @@ const renderDetailsModal = () => {
 </div>
 
 
-          {/* Pagination */}
-          {totalItems > 0 && (
-            <Pagination
-              currentPage={currentPage}
-              totalPages={totalPages}
-              onPageChange={handlePageChange}
-              totalItems={totalItems}
-              itemsPerPage={itemsPerPage}
-              showingStart={showingStart}
-              showingEnd={showingEnd}
-            />
-          )}
+        {/* Pagination - Update the props being passed */}
+{totalLeads > 0 && (
+  <Pagination
+    currentPage={currentPage}
+    totalPages={Math.ceil(totalLeads / itemsPerPage)}
+    onPageChange={handlePageChange}
+    totalItems={totalLeads}  // Use totalLeads from backend
+    itemsPerPage={itemsPerPage}
+    showingStart={((currentPage - 1) * itemsPerPage) + 1}
+    showingEnd={Math.min(currentPage * itemsPerPage, totalLeads)}
+  />
+)}
         </>
       )}
 
@@ -3546,120 +3729,80 @@ const renderDetailsModal = () => {
         </button>
       </div>
 
-      {/* SELECTED RECORDS SUMMARY */}
-      <div className="mb-4 p-3 bg-gray-50 dark:bg-gray-800 rounded text-sm">
-        <span className="font-medium dark:text-white text-black">
-          Selected Records:
-        </span>{' '}
-        <span className="text-blue-600 font-semibold">
-          {selectedMasterIds.length}
-        </span>
-        {filteredLeads && filteredLeads.length > 0 && (
-          <div className="mt-2 max-h-32 overflow-y-auto">
-            {filteredLeads
-              .filter((lead) => selectedMasterIds.includes(lead.master_id))
-              .slice(0, 10)
-              .map((lead) => (
-                <div key={lead.master_id} className="flex items-center gap-2 p-1 text-sm">
-                  <span className="font-medium">{lead.name}</span>
-                  <span className="text-gray-500">(ID: {lead.master_id})</span>
-                  <span className="text-gray-500">- {lead.number}</span>
-                </div>
-              ))}
-            {selectedMasterIds.length > 10 && (
-              <div className="text-gray-500 text-sm italic p-1">
-                ... and {selectedMasterIds.length - 10} more records
-              </div>
-            )}
-          </div>
-        )}
-      </div>
+    
 
       {/* FORM */}
-      <form onSubmit={async (e) => {
-        e.preventDefault();
+<form
+  onSubmit={async (e) => {
+    e.preventDefault();
 
-        if (!assignData.assignedTo.length || !assignData.leadStage) {
-          alert('Please select at least one user and a lead stage');
-          return;
-        }
+    if (
+      !assignData.assignedTo.length ||
+      !assignData.leadStage ||
+      !assignData.reassignmentDate
+    ) {
+      alert('Please select users, lead stage, and followup date');
+      return;
+    }
 
-        try {
-          const assignments = [];
+    try {
+      // ✅ ONE request per master_id (backend loops users)
+      const requests = selectedMasterIds.map((master_id) =>
+        fetch(`${BASE_URL}api/add`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify({
+            master_id,
 
-          selectedMasterIds.forEach((masterId) => {
-            assignData.assignedTo.forEach((user) => {
-              assignments.push({
-                master_id: masterId,
-                assignedTo: user,
-                leadStage: assignData.leadStage,
-                remark: assignData.remark,
-                reassignment_date: assignData.reassignmentDate,
-              });
-            });
-          });
+            // IMPORTANT: array
+            assignedTo: assignData.assignedTo,
 
-       const responses = await Promise.all(
-  assignments.map((assignment) =>
-    fetch(`${BASE_URL}api/add`, {
-      method: 'POST',
-      headers: { 
-        'Content-Type': 'application/json',
-      },
-      credentials: 'include', // IMPORTANT: This is fetch equivalent of withCredentials
-      body: JSON.stringify(assignment),
-    }),
-  ),
-);
+            leadStage: assignData.leadStage,
+            remark: assignData.remark,
 
-          const results = await Promise.all(responses.map((r) => r.json()));
+            // IMPORTANT: sync both
+            reassignment_date: assignData.reassignmentDate,
+            followup_date: assignData.reassignmentDate,
+          }),
+        })
+      );
 
-          let totalInserted = 0;
-          let skippedDetails = [];
+      const responses = await Promise.all(requests);
+      const results = await Promise.all(responses.map((r) => r.json()));
 
-          results.forEach((result) => {
-            if (result.success) {
-              if (result.inserted?.length) totalInserted += result.inserted.length;
-              if (result.skipped?.length) {
-                result.skipped.forEach((s) => {
-                  skippedDetails.push(
-                    `"${s.finalName}" for stage "${assignData.leadStage}"`,
-                  );
-                });
-              }
-            } else {
-              skippedDetails.push(result.message || 'Unknown error');
-            }
-          });
+      let totalInserted = 0;
+      let totalSkipped = 0;
 
-          let alertMessage = '';
-          if (totalInserted > 0) {
-            alertMessage = `✅ ${totalInserted} assignment(s) created`;
-            if (skippedDetails.length > 0) {
-              alertMessage += `\n⚠ Skipped:\n- ${skippedDetails.join('\n- ')}`;
-            }
-          } else if (skippedDetails.length > 0) {
-            alertMessage = `⚠ All assignments were skipped:\n- ${skippedDetails.join('\n- ')}`;
-          }
+      results.forEach((r) => {
+        totalInserted += r.inserted_count || 0;
+        totalSkipped += r.skipped_count || 0;
+      });
 
-          alert(alertMessage || 'No assignments were processed');
+      alert(
+        `✅ Assignment completed\nInserted: ${totalInserted}\nSkipped: ${totalSkipped}`
+      );
 
-          // Reset
-          setAssignData({
-            assignedTo: [],
-            leadStage: '',
-            remark: '',
-            reassignmentDate: new Date().toISOString().split('T')[0],
-          });
-          setSelectedMasterIds([]);
-          setSelectedLeads([]);
-          setShowAssignPopup(false);
-          setRefreshTrigger(prev => prev + 1);
-        } catch (error) {
-          console.error('Network error:', error);
-          alert('❌ Submission failed');
-        }
-      }} className="space-y-4">
+      // RESET
+      setAssignData({
+        assignedTo: [],
+        leadStage: '',
+        remark: '',
+        reassignmentDate: new Date().toISOString().split('T')[0],
+      });
+
+      setSelectedMasterIds([]);
+      setSelectedLeads([]);
+      setShowAssignPopup(false);
+      setRefreshTrigger((prev) => prev + 1);
+
+    } catch (error) {
+      console.error('Network error:', error);
+      alert('❌ Submission failed');
+    }
+  }}
+  className="space-y-4"
+>
 
         {/* ASSIGN TO - WITH SELECT/CLEAR ALL BUTTONS */}
         <div>
@@ -3733,9 +3876,7 @@ const renderDetailsModal = () => {
                         <div className="font-medium text-black dark:text-white">
                           {user.name}
                         </div>
-                        <div className="text-gray-500 dark:text-gray-400">
-                          {user.role}
-                        </div>
+
                       </div>
                       <div className="text-xs px-1.5 py-0.5 rounded bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300">
                         {user.id}
@@ -3752,60 +3893,75 @@ const renderDetailsModal = () => {
           </p>
         </div>
 
-        {/* LEAD DETAILS - STAGE + FOLLOWUP DATE */}
-        <div>
-          <label className="block font-semibold text-green-600 dark:text-green-400 mb-2">
-            Lead Details
-          </label>
+       
+       {/* LEAD DETAILS - STAGE + FOLLOWUP DATE */}
+<div>
+  <label className="block font-semibold text-green-600 dark:text-green-400 mb-2">
+    Lead Details
+  </label>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <select
-              name="leadStage"
-              value={assignData.leadStage}
-              onChange={(e) =>
-                setAssignData({ ...assignData, leadStage: e.target.value })
-              }
-              required
-              className="border rounded p-2 dark:border-form-strokedark dark:bg-form-input dark:text-white text-black"
-            >
-              <option value="">Select Lead Stage</option>
-              {leadStages.map((stage, i) => (
-                <option key={i} value={stage}>
-                  {stage}
-                </option>
-              ))}
-            </select>
+  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+    {/* Lead Stage */}
+    <div>
+      <label className="block mb-1 text-sm font-medium text-black dark:text-white">
+        Lead Stage *
+      </label>
+      <select
+        name="leadStage"
+        value={assignData.leadStage}
+        onChange={(e) =>
+          setAssignData({ ...assignData, leadStage: e.target.value })
+        }
+        required
+        className="w-full border rounded p-2 dark:border-form-strokedark dark:bg-form-input dark:text-white text-black"
+      >
+        <option value="">Select Lead Stage</option>
+        {leadStages.map((stage, i) => (
+          <option key={i} value={stage}>
+            {stage}
+          </option>
+        ))}
+      </select>
+    </div>
 
-            <div className="flex gap-3">
-              <input
-                type="date"
-                value={assignData.reassignmentDate || ''}
-                onChange={(e) =>
-                  setAssignData({
-                    ...assignData,
-                    reassignmentDate: e.target.value,
-                  })
-                }
-                required
-                className="border rounded p-2 flex-1 dark:border-form-strokedark dark:bg-form-input dark:text-white text-black"
-                min="2020-01-01"
-                max="2030-12-31"
-              />
-              <button
-                type="button"
-                onClick={() => {
-                  setAssignData({
-                    ...assignData,
-                    reassignmentDate: new Date().toISOString().split('T')[0],
-                  });
-                }}
-                className="px-3 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 text-sm whitespace-nowrap"
-              >
-                Today
-              </button>
-            </div>
-          </div>
-        </div>
+    {/* Followup Date */}
+    <div>
+      <label className="block mb-1 text-sm font-medium text-black dark:text-white">
+        Followup Date *
+      </label>
+      <div className="flex gap-3">
+        <input
+          type="date"
+          name="reassignmentDate"
+          value={assignData.reassignmentDate || ''}
+          onChange={(e) =>
+            setAssignData({
+              ...assignData,
+              reassignmentDate: e.target.value,
+            })
+          }
+          required
+          className="w-full border rounded p-2 dark:border-form-strokedark dark:bg-form-input dark:text-white text-black"
+          min="2020-01-01"
+          max="2030-12-31"
+        />
+        <button
+          type="button"
+          onClick={() => {
+            setAssignData({
+              ...assignData,
+              reassignmentDate: new Date().toISOString().split('T')[0],
+            });
+          }}
+          className="px-3 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 text-sm whitespace-nowrap"
+        >
+          Today
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
 
         {/* REMARK */}
         <div>

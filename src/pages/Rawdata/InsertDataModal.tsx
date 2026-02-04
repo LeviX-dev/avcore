@@ -285,7 +285,7 @@ const InsertDataModal: React.FC<InsertDataModalProps> = ({
   };
 
 
-const handleAddSingleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
+  const handleAddSingleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
   event.preventDefault();
 
   // Basic validation
@@ -301,32 +301,61 @@ const handleAddSingleSubmit = async (event: React.FormEvent<HTMLFormElement>) =>
   }
 
   try {
-    // 🔹 pick FIRST assigned user only (backend supports one)
-    const assignedUserId =
-      Array.isArray(singleFormData.assigned_to) &&
-      singleFormData.assigned_to.length > 0
-        ? singleFormData.assigned_to[0]
-        : null;
+    // 🔹 CRITICAL FIX: Get ONE user ID (not array) for backend
+    let assignedUserId = null;
+    
+    if (Array.isArray(singleFormData.assigned_to) && singleFormData.assigned_to.length > 0) {
+      // Take the FIRST user ID only (backend only accepts one)
+      const firstUserId = singleFormData.assigned_to[0];
+      
+      // Try to convert to number if needed
+      assignedUserId = parseInt(firstUserId);
+      
+      if (isNaN(assignedUserId)) {
+        assignedUserId = firstUserId; // Keep as string if not a number
+      }
+      
+      console.log("Selected user ID for assignment:", assignedUserId);
+    } else {
+      // Optional: You can either require a user or allow null
+      // const confirmContinue = window.confirm(
+      //   "No user selected. The lead will be unassigned. Continue?"
+      // );
+      // if (!confirmContinue) return;
+      
+      // Or simply proceed without assignment
+      console.log("No user selected, lead will be unassigned");
+    }
 
     const payload = {
-      // Required
+      // MANDATORY FIELDS (as per backend)
       name: singleFormData.name,
       number: singleFormData.number,
-      cat_id: singleFormData.cat_id,
-      reference_id: singleFormData.reference_id,
+      cat_id: parseInt(singleFormData.cat_id),
+      reference_id: parseInt(singleFormData.reference_id),
+      
+      // 🔹 CRITICAL: Send SINGLE user ID, not array
+      assigned_to_user_id: assignedUserId,
+      
+      // 🔹 REMOVE THESE - backend doesn't accept them
+      // client_ids: [],
+      // assigned_user_ids: [],
+      // assigned_to_names: [],
+      // user_ids: [],
+      // master_id: null,
 
-      // Optional basic
-      email: singleFormData.email || "",
-      address: singleFormData.address || "",
-      area_id: singleFormData.area_id || "",
-      alternate_number: singleFormData.alternate_number || "",
-      city: singleFormData.city || "",
-      location_link: singleFormData.location_link || "",
-
-      // Room / project
-      room_length: singleFormData.room_length || null,
-      room_width: singleFormData.room_width || null,
-      room_height: singleFormData.room_height || null,
+      // Optional fields
+      email: singleFormData.email || null,
+      address: singleFormData.address || null,
+      area_id: singleFormData.area_id ? parseInt(singleFormData.area_id) : null,
+      alternate_number: singleFormData.alternate_number || null,
+      city: singleFormData.city || null,
+      location_link: singleFormData.location_link || null,
+      
+      // Room/project details
+      room_length: singleFormData.room_length ? parseFloat(singleFormData.room_length) : null,
+      room_width: singleFormData.room_width ? parseFloat(singleFormData.room_width) : null,
+      room_height: singleFormData.room_height ? parseFloat(singleFormData.room_height) : null,
       p_type: singleFormData.p_type || null,
       budget_range: singleFormData.budget_range || null,
       current_stage: singleFormData.current_stage || null,
@@ -336,16 +365,16 @@ const handleAddSingleSubmit = async (event: React.FormEvent<HTMLFormElement>) =>
       site_visit_date: singleFormData.site_visit_date || null,
       demo_date: singleFormData.demo_date || null,
       followup_date: singleFormData.followup_date || null,
-      assign_date: singleFormData.assign_date || null,
+      assign_date: singleFormData.assign_date || new Date().toISOString().split('T')[0],
 
-      // Numbers
-      ar_number: singleFormData.ar_number || "",
-      architect_name: singleFormData.architect_name || "",
-      ca_number: singleFormData.ca_number || "",
-      e_number: singleFormData.e_number || "",
-      sm_number: singleFormData.sm_number || "",
-      pop_number: singleFormData.pop_number || "",
-      other_number: singleFormData.other_number || "",
+      // Contact numbers
+      ar_number: singleFormData.ar_number || null,
+      architect_name: singleFormData.architect_name || null,
+      ca_number: singleFormData.ca_number || null,
+      e_number: singleFormData.e_number || null,
+      sm_number: singleFormData.sm_number || null,
+      pop_number: singleFormData.pop_number || null,
+      other_number: singleFormData.other_number || null,
 
       // Lead info
       lead_stage: singleFormData.lead_stage || "Fresh Lead",
@@ -354,30 +383,30 @@ const handleAddSingleSubmit = async (event: React.FormEvent<HTMLFormElement>) =>
 
       // Other inputs
       category_other: singleFormData.category_other || null,
-      reference_other: singleFormData.reference_other || null,
-
-      // Assignment (ONLY THIS)
-      assigned_to_user_id: assignedUserId
+      reference_other: singleFormData.reference_other || null
     };
 
-    console.log("📤 Sending payload:", payload);
+    console.log("📤 FINAL payload to create new lead:", JSON.stringify(payload, null, 2));
 
     const response = await axios.post(
-      `${BASE_URL}api/master-data/add-single`,
+      `${BASE_URL}api/sujit-master-data/add-single`,
       payload,
       {
         withCredentials: true,
-        headers: { "Content-Type": "application/json" }
+        headers: { 
+          "Content-Type": "application/json",
+          "Accept": "application/json"
+        }
       }
     );
 
     console.log("✅ Response from backend:", response.data);
 
-    if (response.status === 200) {
+    if (response.status === 200 || response.status === 201) {
       alert("✅ Client added successfully");
 
       // Reset form
-      const today = new Date().toISOString().split("T")[0];
+      const today = new Date().toISOString().split('T')[0];
       setSingleFormData({
         name: "",
         number: "",
@@ -421,13 +450,16 @@ const handleAddSingleSubmit = async (event: React.FormEvent<HTMLFormElement>) =>
     }
   } catch (err: any) {
     console.error("❌ API Error:", err);
-    console.error("Error response:", err.response);
+    console.error("Error details:", {
+      status: err.response?.status,
+      data: err.response?.data,
+      headers: err.response?.headers
+    });
 
     // 🔥 HANDLE DUPLICATE CONTACT ERROR
     if (err.response?.status === 409) {
       const duplicateData = err.response.data;
       
-      // Show duplicate modal
       setDuplicateEntries([{
         name: singleFormData.name,
         number: singleFormData.number,
@@ -436,12 +468,19 @@ const handleAddSingleSubmit = async (event: React.FormEvent<HTMLFormElement>) =>
         reason: "Contact number already exists"
       }]);
       setShowDuplicateModal(true);
-      setShowAddPopup(false); // Close the add popup
+      setShowAddPopup(false);
+      return;
+    }
+
+    // Handle validation errors
+    if (err.response?.status === 400) {
+      const errorMsg = err.response.data.message || "Validation failed";
+      alert(`Validation Error: ${errorMsg}`);
       return;
     }
 
     // Handle other errors
-    const backendMessage = err.response?.data?.message || "Failed to add data.";
+    const backendMessage = err.response?.data?.message || err.response?.data?.error || "Failed to add data.";
     alert(`Error: ${backendMessage}`);
   }
 };
@@ -482,7 +521,7 @@ const handleAddSingleSubmit = async (event: React.FormEvent<HTMLFormElement>) =>
 
               {/* Contact No. */}
               <div>
-                <label className="block mb-1 text-sm dark:text-white">
+                <label className="block mb-1 text-base font-semibold text-green-700 dark:text-green-600">
                   Contact No. *
                 </label>
                 <input
@@ -1062,9 +1101,7 @@ const handleAddSingleSubmit = async (event: React.FormEvent<HTMLFormElement>) =>
                               className="ml-2 text-sm text-gray-700 dark:text-gray-300 cursor-pointer flex-1"
                             >
                               <div className="font-medium line-clamp-1">{user.name}</div>
-                              <div className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
-                                {user.role || 'No role'}
-                              </div>
+                            
                             </label>
                           </div>
                         );

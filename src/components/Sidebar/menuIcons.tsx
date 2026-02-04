@@ -24,6 +24,9 @@ import {
   MapPin,
   TrendingUp,
   // Add any other icons you need
+  ShieldCheck,   // ✅ for Role Permission
+  UserCog        // ✅ for Employee Reports
+
 } from 'lucide-react';
 
 export const menuIcons = {

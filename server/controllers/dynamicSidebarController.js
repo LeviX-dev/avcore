@@ -155,6 +155,55 @@ export const getRoleMenuPermissions = async (req, res) => {
   }
 };
 
+// export const saveRolePermissions = async (req, res) => {
+//   try {
+//     const { role, permissions } = req.body;
+
+//     if (!role || !Array.isArray(permissions)) {
+//       return res.status(400).json({ message: 'Invalid data' });
+//     }
+
+//     /**
+//      * 1️⃣ Disable ONLY LEAF menus (menus that have path)
+//      */
+//     await db.query(
+//       `
+//       UPDATE role_menu_permission r
+//       INNER JOIN sidebar_menu m
+//         ON m.menu_key = r.menu_key
+//       SET r.can_view = 0
+//       WHERE r.role = ?
+//         AND m.path IS NOT NULL
+//       `,
+//       [role]
+//     );
+
+//     /**
+//      * 2️⃣ Enable selected leaf menus
+//      */
+//     if (permissions.length > 0) {
+//       await db.query(
+//         `
+//         UPDATE role_menu_permission r
+//         SET r.can_view = 1
+//         WHERE r.role = ?
+//           AND r.menu_key IN (?)
+//         `,
+//         [role, permissions]
+//       );
+//     }
+
+//     res.json({
+//       success: true,
+//       message: 'Permissions updated successfully',
+//     });
+//   } catch (err) {
+//     console.error('❌ Permission save error:', err);
+//     res.status(500).json({ message: 'Failed to save permissions' });
+//   }
+// };
+
+
 export const saveRolePermissions = async (req, res) => {
   try {
     const { role, permissions } = req.body;
@@ -163,42 +212,34 @@ export const saveRolePermissions = async (req, res) => {
       return res.status(400).json({ message: 'Invalid data' });
     }
 
-    /**
-     * 1️⃣ Disable ONLY LEAF menus (menus that have path)
-     */
-    await db.query(
-      `
+    // 1️⃣ Turn OFF all leaf menus for this role
+    await db.query(`
       UPDATE role_menu_permission r
-      INNER JOIN sidebar_menu m
-        ON m.menu_key = r.menu_key
+      INNER JOIN sidebar_menu m ON m.menu_key = r.menu_key
       SET r.can_view = 0
       WHERE r.role = ?
         AND m.path IS NOT NULL
-      `,
-      [role]
-    );
+    `, [role]);
 
-    /**
-     * 2️⃣ Enable selected leaf menus
-     */
-    if (permissions.length > 0) {
-      await db.query(
-        `
-        UPDATE role_menu_permission r
-        SET r.can_view = 1
-        WHERE r.role = ?
-          AND r.menu_key IN (?)
-        `,
-        [role, permissions]
-      );
+    // 2️⃣ Insert missing rows for selected permissions
+    if (permissions.length) {
+      await db.query(`
+        INSERT INTO role_menu_permission (role, menu_key, can_view, created_at)
+        SELECT ?, m.menu_key, 1, NOW()
+        FROM sidebar_menu m
+        WHERE m.menu_key IN (?)
+        ON DUPLICATE KEY UPDATE can_view = 1
+      `, [role, permissions]);
     }
 
     res.json({
       success: true,
-      message: 'Permissions updated successfully',
+      message: 'Permissions updated successfully'
     });
+
   } catch (err) {
     console.error('❌ Permission save error:', err);
     res.status(500).json({ message: 'Failed to save permissions' });
   }
 };
+

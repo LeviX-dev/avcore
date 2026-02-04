@@ -370,6 +370,11 @@ showToast(errorMessage, 'error', 5000);
     }
   };
 
+
+  const [isNewRemark, setIsNewRemark] = useState(false);
+
+
+
   const handleInputChange = (
     e: React.ChangeEvent<
       HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement
@@ -563,36 +568,38 @@ if (result.success) {
           {/* Required Fields Section */}
           <div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-              <div>
-                <label className="block mb-1 text-base font-semibold text-green-700 dark:text-green-600">
-                  Full Name *
-                </label>
-                <input
-                  type="text"
-                  name="name"
-                  value={editingClient.name}
-                  onChange={handleInputChange}
-                  required
-                  className="w-full p-2 border rounded text-sm dark:border-form-strokedark dark:bg-form-input dark:text-white"
-                />
-              </div>
+<div>
+  <label className="block mb-1 text-base font-semibold text-green-700 dark:text-green-600">
+    Full Name *
+  </label>
+  <input
+    type="text"
+    name="name"
+    value={editingClient.name}
+    onChange={handleInputChange}
+    required
+    pattern="^[A-Za-z\s]+$"
+    title="Only alphabets and spaces allowed"
+    className="w-full p-2 border rounded text-sm dark:border-form-strokedark dark:bg-form-input dark:text-white"
+  />
+</div>
 
-              {/* Contact No. (was WhatsApp Number) */}
-              <div>
-                <label className="block mb-1 text-sm dark:text-white">
-                  Contact No. *
-                </label>
-                <input
-                  type="text"
-                  name="number"
-                  value={editingClient.number}
-                  onChange={handleInputChange}
-                  required
-                  pattern="\d*"
-                  title="Only digits are allowed"
-                  className="w-full p-2 border rounded text-sm dark:border-form-strokedark dark:bg-form-input dark:text-white"
-                />
-              </div>
+<div>
+  <label className="block mb-1 text-base font-semibold text-green-700 dark:text-green-600">
+    Contact No. *
+  </label>
+  <input
+    type="text"
+    name="number"
+    value={editingClient.number}
+    onChange={handleInputChange}
+    required
+    pattern="^[0-9]{10}$"
+    maxLength={10}
+    title="Enter valid 10 digit number"
+    className="w-full p-2 border rounded text-sm dark:border-form-strokedark dark:bg-form-input dark:text-white"
+  />
+</div>
 
               {/* Alternate No. */}
               <div>
@@ -610,18 +617,18 @@ if (result.success) {
                 />
               </div>
 
-              <div>
-                <label className="block mb-1 text-sm dark:text-white">
-                  Email
-                </label>
-                <input
-                  type="email"
-                  name="email"
-                  value={editingClient.email}
-                  onChange={handleInputChange}
-                  className="w-full p-2 border rounded text-sm dark:border-form-strokedark dark:bg-form-input dark:text-white"
-                />
-              </div>
+<div>
+  <label className="block mb-1 text-sm dark:text-white">
+    Email
+  </label>
+  <input
+    type="email"
+    name="email"
+    value={editingClient.email}
+    onChange={handleInputChange}
+    className="w-full p-2 border rounded text-sm dark:border-form-strokedark dark:bg-form-input dark:text-white"
+  />
+</div>
 
               <div>
                 <label className="block mb-1 text-base font-semibold text-green-700 dark:text-green-600">
@@ -656,10 +663,10 @@ if (result.success) {
                       type="text"
                       name="category_other"
                       value={editingClient.category_other || ''}
-                      onChange={handleInputChange}
-                      placeholder="Enter other category"
-                      className="w-full p-2 mt-2 border rounded text-sm
-                             dark:border-form-strokedark dark:bg-form-input dark:text-white"
+  onChange={handleInputChange}
+  pattern="^[A-Za-z\s]+$"
+  title="Only alphabets and spaces allowed"
+  className="w-full p-2 border rounded text-sm"
                     />
                   )}
               </div>
@@ -723,11 +730,10 @@ if (result.success) {
                       type="text"
                       name="reference_other"
                       value={editingClient.reference_other || ''}
-                      onChange={handleInputChange}
-                      placeholder={placeholderText}
-                      className="w-full p-2 mt-2 border rounded-md text-sm
-                               focus:ring-2 focus:ring-blue-500
-                               dark:border-form-strokedark dark:bg-form-input dark:text-white"
+  onChange={handleInputChange}
+  pattern="^[A-Za-z\s]+$"
+  title="Only alphabets and spaces allowed"
+  className="w-full p-2 border rounded text-sm"
                     />
                   );
                 })()}
@@ -744,18 +750,20 @@ if (result.success) {
               <div className="md:col-span-2">
                 <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
                   {/* City Field */}
-                  <div className="md:col-span-2">
-                    <label className="block mb-1 text-sm dark:text-white">
-                      City
-                    </label>
-                    <input
-                      type="text"
-                      name="city"
-                      value={editingClient.city}
-                      onChange={handleInputChange}
-                      className="w-full p-2 border rounded text-sm dark:border-form-strokedark dark:bg-form-input dark:text-white"
-                    />
-                  </div>
+                 <div className="md:col-span-2">
+  <label className="block mb-1 text-sm dark:text-white">
+    City
+  </label>
+  <input
+    type="text"
+    name="city"
+    value={editingClient.city}
+    onChange={handleInputChange}
+    pattern="^[A-Za-z\s]+$"
+    title="City must contain only alphabets"
+    className="w-full p-2 border rounded text-sm dark:border-form-strokedark dark:bg-form-input dark:text-white"
+  />
+</div>
 
                   {/* Room Dimensions (L / W / H) */}
                   <div className="md:col-span-2">
@@ -986,18 +994,20 @@ if (result.success) {
                   className="w-full p-2 border rounded text-sm dark:border-form-strokedark dark:bg-form-input dark:text-white"
                 />
               </div>
-              <div>
-                <label className="block mb-1 text-sm dark:text-white">
-                  Architect Name
-                </label>
-                <input
-                  type="text"
-                  name="architect_name"
-                  value={editingClient.architect_name || ''}
-                  onChange={handleInputChange}
-                  className="w-full p-2 border rounded text-sm dark:border-form-strokedark dark:bg-form-input dark:text-white"
-                />
-              </div>
+         <div>
+  <label className="block mb-1 text-sm dark:text-white">
+    Architect Name
+  </label>
+  <input
+    type="text"
+    name="architect_name"
+    value={editingClient.architect_name || ''}
+    onChange={handleInputChange}
+    pattern="^[A-Za-z\s]+$"
+    title="Only alphabets and spaces allowed"
+    className="w-full p-2 border rounded text-sm dark:border-form-strokedark dark:bg-form-input dark:text-white"
+  />
+</div>
               <div>
                 <label className="block mb-1 text-sm dark:text-white">
                   Carpenter Number
@@ -1174,12 +1184,7 @@ if (result.success) {
                 >
                   {user.name}
                 </div>
-                <div 
-                  className="text-xs text-gray-500 dark:text-gray-400 truncate w-full"
-                  title={user.role || 'No role'}
-                >
-                  {formatRoleForDisplay(user.role || 'No role')}
-                </div>
+              
               </label>
             </div>
           );
@@ -1361,11 +1366,12 @@ if (result.success) {
                   )}
 
                   {/* Remark */}
-                  {remarkObj.remark && (
-                    <div className="bg-white dark:bg-gray-900 px-2 py-1 rounded text-gray-800 dark:text-gray-200">
-                      {remarkObj.remark}
-                    </div>
-                  )}
+{remarkObj.remark && (
+  <div className="bg-white dark:bg-gray-900 px-3 py-2 rounded text-base text-gray-800 dark:text-gray-200">
+    {remarkObj.remark}
+  </div>
+)}
+
                 </div>
               );
             }
@@ -1398,22 +1404,30 @@ if (result.success) {
   )}
 
 
-
-
-            <div className="mt-3">
-              <label className="block mb-1 text-base font-semibold text-green-700 dark:text-green-600">
-                Detailed Remark (New)
-              </label>
-              <textarea
-                name="detailed_remark"
-                value={editingClient.detailed_remark || ''}
-                onChange={handleInputChange}
-                rows={3}
-                placeholder="Add new detailed remark here..."
-                className="w-full p-2 border rounded text-sm
-               dark:border-form-strokedark dark:bg-form-input dark:text-white"
-              />
-            </div>
+{/* Simplified version without extra state */}
+<div className="mt-3">
+  <label className="block mb-1 text-sm italic font-medium text-emerald-600 dark:text-emerald-400">
+    Detailed Remark (New)
+  </label>
+  
+  <textarea
+    name="detailed_remark"
+    value={editingClient.detailed_remark || ''}
+    onChange={handleInputChange}
+    onFocus={(e) => {
+      // Clear the field when user focuses on it
+      setEditingClient(prev => ({
+        ...prev,
+        detailed_remark: ''
+      }));
+    }}
+    rows={3}
+    placeholder="Click to write a new remark (existing remark will be cleared)"
+    className="w-full p-2 text-xs border rounded placeholder:italic
+               dark:border-form-strokedark dark:bg-form-input dark:text-white
+               focus:ring-1 focus:ring-blue-400 focus:border-blue-400"
+  />
+</div>
           </div>
 
           {/* Submit Buttons */}

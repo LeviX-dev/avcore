@@ -41,25 +41,23 @@ const AddBrandForm: React.FC<AddBrandFormProps> = ({
       setError("");
       setSuccessMsg("");
 
-
       if (editBrandId) {
-  await axios.put(
-    `${BASE_URL}api/brand/${editBrandId}`,
-    { brand_name: brandName.trim() }
-  );
-  alert("Brand updated successfully ✅");
-} else {
-  await axios.post(
-    `${BASE_URL}api/product/${productTypeId}/brand`,
-    { brand_name: brandName.trim() }
-  );
-  alert("Brand added successfully ✅");
-}
+        await axios.put(
+          `${BASE_URL}api/brand/${editBrandId}`,
+          { brand_name: brandName.trim() }
+        );
+        alert("Brand updated successfully ✅");
+      } else {
+        await axios.post(
+          `${BASE_URL}api/product/${productTypeId}/brand`,
+          { brand_name: brandName.trim() }
+        );
+        alert("Brand added successfully ✅");
+      }
 
-setBrandName("");
-setEditBrandId(null);
-onSuccess(productTypeId);
-
+      setBrandName("");
+      setEditBrandId(null);
+      onSuccess(productTypeId);
 
       // ✅ Auto-hide success message
       setTimeout(() => setSuccessMsg(""), 2000);
@@ -73,14 +71,14 @@ onSuccess(productTypeId);
 
   return (
     <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50 p-2">
-      <div className="bg-white rounded-2xl shadow-xl w-full max-w-md">
+      <div className="bg-white dark:bg-boxdark rounded-2xl shadow-xl w-full max-w-md">
 
         {/* HEADER */}
-        <div className="border-b px-5 py-4 flex justify-between items-center">
-          <h2 className="text-lg font-semibold">
+        <div className="border-b dark:border-strokedark px-5 py-4 flex justify-between items-center">
+          <h2 className="text-lg font-semibold text-black dark:text-white">
             {editBrandId ? "Edit Brand" : "Add Brand"}
           </h2>
-          <button onClick={onClose} className="text-gray-500 hover:text-black">
+          <button onClick={onClose} className="text-gray-500 dark:text-gray-300 hover:text-black dark:hover:text-white">
             ✕
           </button>
         </div>
@@ -90,14 +88,14 @@ onSuccess(productTypeId);
 
           {/* ❌ ERROR MESSAGE */}
           {error && (
-            <div className="bg-red-100 text-red-700 px-3 py-2 rounded text-sm">
+            <div className="bg-red-100 dark:bg-red-900/20 text-red-700 dark:text-red-300 px-3 py-2 rounded text-sm">
               {error}
             </div>
           )}
 
           {/* ✅ SUCCESS MESSAGE */}
           {successMsg && (
-            <div className="bg-green-100 text-green-700 px-3 py-2 rounded text-sm">
+            <div className="bg-green-100 dark:bg-green-900/20 text-green-700 dark:text-green-300 px-3 py-2 rounded text-sm">
               {successMsg}
             </div>
           )}
@@ -105,7 +103,7 @@ onSuccess(productTypeId);
           <input
             value={brandName}
             onChange={(e) => setBrandName(e.target.value)}
-            className="w-full border rounded px-3 py-2"
+            className="w-full border border-gray-300 dark:border-strokedark dark:bg-boxdark dark:text-white rounded px-3 py-2"
             placeholder="Brand name"
           />
 
@@ -113,7 +111,7 @@ onSuccess(productTypeId);
             <button
               type="submit"
               disabled={loading}
-              className="bg-green-600 text-white px-4 py-2 rounded"
+              className="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700"
             >
               {loading
                 ? "Saving..."
@@ -126,8 +124,8 @@ onSuccess(productTypeId);
 
         {/* 🔥 EXISTING BRANDS LIST */}
         {brands.length > 0 && (
-          <div className="border-t px-5 py-4">
-            <h4 className="text-sm font-semibold text-gray-700 mb-2">
+          <div className="border-t dark:border-strokedark px-5 py-4">
+            <h4 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
               Existing Brands
             </h4>
 
@@ -135,9 +133,9 @@ onSuccess(productTypeId);
               {brands.map((brand) => (
                 <div
                   key={brand.brand_id}
-                  className="flex justify-between items-center bg-gray-50 px-3 py-2 rounded"
+                  className="flex justify-between items-center bg-gray-50 dark:bg-gray-800 px-3 py-2 rounded"
                 >
-                  <span className="text-sm">{brand.brand_name}</span>
+                  <span className="text-sm text-black dark:text-white">{brand.brand_name}</span>
 
                   <button
                     onClick={() => {
@@ -146,7 +144,7 @@ onSuccess(productTypeId);
                       setError("");
                       setSuccessMsg("");
                     }}
-                    className="text-blue-600 text-xs flex items-center gap-1"
+                    className="text-blue-600 dark:text-blue-400 text-xs flex items-center gap-1"
                   >
                     <FontAwesomeIcon icon={faEdit} />
                     Edit

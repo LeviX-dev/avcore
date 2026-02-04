@@ -38,7 +38,12 @@ const AddQuotation = () => {
   const [selectedSingleModel, setSelectedSingleModel] = useState(null);
 
   const [spQty, setSpQty] = useState(1);
-  const [spPrice, setSpPrice] = useState(0);
+  const [spPrice, setSpPrice] = useState(0); 
+
+  const [framingBy, setFramingBy] = useState('');
+const [fabricBy, setFabricBy] = useState('');
+const [ceilingBy, setCeilingBy] = useState('');
+
 
   /* Global additional prices */
   const [additionalPrices, setAdditionalPrices] = useState([
@@ -173,59 +178,47 @@ const AddQuotation = () => {
   };
 
   /* ---------------- CALCULATE TOTAL ---------------- */
-  const categoriesTotal = queuedCategories.reduce(
-    (sum, c) => sum + c.category_total,
-    0,
-  );
 
-  const additionalTotal = additionalPrices.reduce(
-    (sum, a) => sum + Number(a.price || 0),
-    0,
-  );
+  /* ---------------- CALCULATE TOTAL ---------------- */
 
-  const totalQuotationPrice = categoriesTotal + additionalTotal;
+  // Calculate subtotal from queued categories
+  const subtotal = queuedCategories.reduce((catSum, category) => {
+    const productsTotal = category.products.reduce((prodSum, product) => {
+      const qty = Number(product.model_qty ?? 1); // ensure numeric
+      const price = Number(product.model_price ?? 0);
+      const kitQty = Number(category.kit_qty ?? 1);
+      return prodSum + qty * price * kitQty;
+    }, 0);
 
-  const totalWithGST =
-    quoteType === 'with_gst' ? totalQuotationPrice * 1.18 : totalQuotationPrice;
+    return catSum + productsTotal;
+  }, 0);
+
+  // Calculate total of additional prices
+  const additionalTotal = additionalPrices.reduce((sum, a) => {
+    return sum + Number(a.price ?? 0);
+  }, 0);
+
+  // Total before GST
+  const totalWithoutGST = subtotal + additionalTotal;
+
+  // GST amount (18% if 'with_gst' is selected)
+  const gstAmount = quoteType === 'with_gst' ? totalWithoutGST * 0.18 : 0;
+
+  // Total including GST
+  const totalWithGST = totalWithoutGST + gstAmount;
 
   /* ---------------- SUBMIT ---------------- */
 
-  // const handleSubmit = async (e) => {
-  //   e.preventDefault();
+  const acousticTerms =
+  framingBy && fabricBy && ceilingBy
+    ? `ALL FRAMING WILL BE DONE BY ${framingBy}.
+• FABRIC & FLOOR CARPET WILL BE PROVIDED BY ${fabricBy}
+• ALL CEILING-RELATED WORK WILL BE PROVIDED BY ${ceilingBy}.
+• FABRIC STITCHING CHARGES WILL BE EXTRA AS PER THE DESIGN`
+    : null;
 
-  //   if (!queuedCategories.length) {
-  //     alert('Please add at least one category to quotation');
-  //     return;
-  //   }
 
-  //   const payload = {
-  //     qt_number: qtNumber || null,
-  //     type: quoteType,
-  //     master_id,
-  //     items: queuedCategories.map((item) => ({
-  //       cat_id: item.cat_id,
-  //       kit_id: item.kit_id || null,
-  //       kit_qty: item.kit_id ? Number(item.kit_qty || 1) : 1,
-  //       products: item.products.map((p) => ({
-  //         model_id: p.model_id,
-  //         model_qty: Number(p.model_qty || 1),
-  //         model_price: Number(p.model_price || 0),
-  //       })),
-  //     })),
-  //     additional_prices: additionalPrices.filter(
-  //       (a) => a.add_price_name && a.price,
-  //     ),
-  //   };
-
-  //   console.log('payload', payload);
-
-  //   await axios.post(`${BASE_URL}api/quotation`, payload);
-
-  //   alert('Quotation created successfully ✅');
-  //   navigate('/quatation-pending');
-  // };
-
-const handleSubmit = async (e) => {
+    const handleSubmit = async (e) => {
   e.preventDefault();
 
   if (!queuedCategories.length) {
@@ -233,10 +226,33 @@ const handleSubmit = async (e) => {
     return;
   }
 
+  // Check if ACOUSTIC category exists
+const isAcoustic = queuedCategories.some(
+  (q) => q.cat_name?.toLowerCase() === 'acoustic',
+);
+
+  // Validate acoustic dropdowns
+  if (isAcoustic && (!framingBy || !fabricBy || !ceilingBy)) {
+    alert('Please select all Acoustic options');
+    return;
+  }
+
+  // Build acoustic full text
+  const acousticTerms =
+    framingBy && fabricBy && ceilingBy
+      ? `ALL FRAMING WILL BE DONE BY ${framingBy}.
+• FABRIC & FLOOR CARPET WILL BE PROVIDED BY ${fabricBy}
+• ALL CEILING-RELATED WORK WILL BE PROVIDED BY ${ceilingBy}.
+• FABRIC STITCHING CHARGES WILL BE EXTRA AS PER THE DESIGN`
+      : null;
+
   const payload = {
-    qt_number: qtNumber || null,
     type: quoteType,
     master_id,
+
+    // ✅ NEW FIELD
+    acoustic_terms: acousticTerms,
+
     items: queuedCategories.map((item) => ({
       cat_id: item.cat_id,
       kit_id: item.kit_id || null,
@@ -247,21 +263,18 @@ const handleSubmit = async (e) => {
         model_price: Number(p.model_price || 0),
       })),
     })),
+
     additional_prices: additionalPrices.filter(
-      (a) => a.add_price_name && a.price
+      (a) => a.add_price_name && a.price,
     ),
   };
 
   console.log('payload', payload);
 
   try {
-    await axios.post(
-      `${BASE_URL}api/quotation`,
-      payload,
-      {
-        withCredentials: true,   // 👈 IMPORTANT LINE
-      }
-    );
+    await axios.post(`${BASE_URL}api/quotation`, payload, {
+      withCredentials: true,
+    });
 
     alert('Quotation created successfully ✅');
     navigate('/quatation-pending');
@@ -394,83 +407,134 @@ const handleSubmit = async (e) => {
               <label className="font-medium text-sm">Lead</label>
               <div className="font-medium">{state?.name || master_id}</div>
             </div>
-            <div className="flex flex-col">
-              <label className="font-medium text-sm">Quotation No.</label>
-              <input
-                type="text"
-                value={qtNumber}
-                onChange={(e) => setQtNumber(e.target.value)}
-                placeholder="Enter Quotation No"
-                className="border px-3 py-1 rounded"
-                required
-              />
-            </div>
+          
           </div>
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-5">
-          {/* CATEGORY & KIT SELECTION */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-            <div>
-              <label className="block mb-1 font-medium">Category</label>
-              <select
-                className="w-full border px-4 py-2 rounded"
-                value={selectedCategory}
-                onChange={(e) => setSelectedCategory(e.target.value)}
-              >
-                <option value="">Select category</option>
-                {categories.map((c) => (
-                  <option key={c.cat_id} value={c.cat_id}>
-                    {c.cat_name}
-                  </option>
-                ))}
-              </select>
-            </div>
 
-            <div>
-              <label className="block mb-1 font-medium">Kit</label>
-              <select
-                className="w-full border px-4 py-2 rounded"
-                value={selectedKit}
-                onChange={(e) => setSelectedKit(e.target.value)}
-              >
-                <option value="">Select kit</option>
-                {kits.map((k) => (
-                  <option key={k.kit_id} value={k.kit_id}>
-                    {k.kit_name} (₹{k.kit_price})
-                  </option>
-                ))}
-              </select>
-            </div>
-          </div>
+      {/* CATEGORY & KIT SELECTION */}
+<div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+  <div>
+    <label className="block mb-1 font-medium">Category</label>
+    <select
+      className="w-full border px-4 py-2 rounded"
+      value={selectedCategory}
+      onChange={(e) => setSelectedCategory(e.target.value)}
+    >
+      <option value="">Select category</option>
+      {categories.map((c) => (
+        <option key={c.cat_id} value={c.cat_id}>
+          {c.cat_name}
+        </option>
+      ))}
+    </select>
+  </div>
 
-          {/* QUOTE TYPE + KIT QTY */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-            <div className="flex flex-col">
-              <label className="font-medium text-sm">Quotation Type</label>
-              <select
-                className="border px-3 py-2 rounded"
-                value={quoteType}
-                onChange={(e) => setQuoteType(e.target.value)}
-              >
-                <option value="">Select</option>
-                <option value="with_gst">With GST</option>
-                <option value="without_gst">Without GST</option>
-              </select>
-            </div>
+  <div>
+    <label className="block mb-1 font-medium">Kit</label>
+    <select
+      className="w-full border px-4 py-2 rounded"
+      value={selectedKit}
+      onChange={(e) => setSelectedKit(e.target.value)}
+    >
+      <option value="">Select kit</option>
+      {kits.map((k) => (
+        <option key={k.kit_id} value={k.kit_id}>
+          {k.kit_name} (₹{k.kit_price})
+        </option>
+      ))}
+    </select>
+  </div>
+</div>
 
-            <div className="flex flex-col">
-              <label className="font-medium text-sm">Kit Quantity</label>
-              <input
-                type="number"
-                min={1}
-                value={kitQty}
-                onChange={(e) => handleKitQtyChange(e.target.value)}
-                placeholder="Qty"
-                className="border px-3 py-2 rounded w-full"
-              />
-            </div>
-          </div>
+{/* ACOUSTIC SPECIAL TERMS - MOVED HERE TO BE DIRECTLY BELOW CATEGORY */}
+{selectedCategory &&
+  categories.find((c) => c.cat_id == selectedCategory)?.cat_name?.toUpperCase() ===
+    'ACOUSTIC' && (
+    <div className="border rounded bg-gray-50 p-4 space-y-3 mb-4">
+<h2 className="font-semibold text-blue-600">Acoustic Special Terms</h2>
+      
+    <div>
+  <label className="text-base font-semibold text-gray-500">
+    All Framing Will Be Done By
+  </label>
+  <select
+    className="border px-3 py-2 rounded w-full mt-1"
+    value={framingBy}
+    onChange={(e) => setFramingBy(e.target.value)}
+  >
+    <option value="">Select</option>
+    <option value="AV CORE">BY AV CORE</option>
+    <option value="THE CLIENT">BY THE CLIENT</option>
+  </select>
+</div>
+
+<div>
+  <label className="text-base font-semibold text-gray-500">
+    Fabric & Floor Carpet Provided By
+  </label>
+  <select
+    className="border px-3 py-2 rounded w-full mt-1"
+    value={fabricBy}
+    onChange={(e) => setFabricBy(e.target.value)}
+  >
+    <option value="">Select</option>
+    <option value="AV CORE">BY AV CORE</option>
+    <option value="THE CLIENT">BY THE CLIENT</option>
+  </select>
+</div>
+
+<div>
+  <label className="text-base font-semibold text-gray-500">
+    Ceiling Related Work Provided By
+  </label>
+  <select
+    className="border px-3 py-2 rounded w-full mt-1"
+    value={ceilingBy}
+    onChange={(e) => setCeilingBy(e.target.value)}
+  >
+    <option value="">Select</option>
+    <option value="AV CORE">BY AV CORE</option>
+    <option value="THE CLIENT">BY THE CLIENT</option>
+  </select>
+</div>
+
+
+      <div className="text-base font-semibold text-gray-500">
+        • FABRIC STITCHING CHARGES WILL BE EXTRA AS PER THE DESIGN
+      </div>
+    </div>
+  )}
+
+{/* QUOTE TYPE + KIT QTY - MOVED AFTER ACOUSTIC SECTION */}
+<div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+  <div className="flex flex-col">
+    <label className="font-medium text-sm">Quotation Type</label>
+    <select
+      className="border px-3 py-2 rounded"
+      value={quoteType}
+      onChange={(e) => setQuoteType(e.target.value)}
+    >
+      <option value="">Select</option>
+      <option value="with_gst">With GST</option>
+      <option value="without_gst">Without GST</option>
+    </select>
+  </div>
+
+  <div className="flex flex-col">
+    <label className="font-medium text-sm">Kit Quantity</label>
+    <input
+      type="number"
+      min={1}
+      value={kitQty}
+      onChange={(e) => handleKitQtyChange(e.target.value)}
+      placeholder="Qty"
+      className="border px-3 py-2 rounded w-full"
+    />
+  </div>
+</div>
+
 
           {/* SELECTED KIT ITEMS */}
           {selectedKitData && (
@@ -546,18 +610,6 @@ const handleSubmit = async (e) => {
             </div>
           )}
 
-          {/* ADD CATEGORY BUTTON */}
-          {/* {selectedKitData && (
-            <div className="flex justify-end">
-              <button
-                type="button"
-                onClick={handleAddCategory}
-                className="bg-blue-600 text-white px-4 py-2 rounded"
-              >
-                Add Kit to Quotation
-              </button>
-            </div>
-          )} */}
 
           <div className="flex justify-end gap-3">
             {selectedKitData && (
@@ -578,31 +630,6 @@ const handleSubmit = async (e) => {
               Add Single Product
             </button>
           </div>
-
-          {/* QUEUED CATEGORIES */}
-          {/* {queuedCategories.length > 0 && (
-            <div className="bg-gray-100 p-4 rounded mt-4">
-              <h4 className="font-semibold mb-2">Queued Categories</h4>
-              {queuedCategories.map((item, i) => (
-                <div
-                  key={i}
-                  className="p-3 border rounded bg-white mb-2 flex justify-between items-center"
-                >
-                  <div>
-                    <b>Category:</b> {item.cat_name} | <b>Kit:</b>{' '}
-                    {item.kit_name} | <b>Qty:</b> {item.kit_qty} | <b>Total:</b>{' '}
-                    ₹{item.category_total.toFixed(2)}
-                  </div>
-                  <button
-                    onClick={() => removeCategory(i)}
-                    className="text-red-500 font-bold"
-                  >
-                    Remove
-                  </button>
-                </div>
-              ))}
-            </div>
-          )} */}
 
           {queuedCategories.length > 0 && (
             <div className="bg-gray-100 p-4 rounded mt-4">
@@ -747,13 +774,18 @@ const handleSubmit = async (e) => {
 
           {/* GRAND TOTAL */}
           <div className="text-right font-semibold text-lg bg-green-100 text-green-800 px-4 py-2 rounded mt-4">
-            TOTAL COST OF PROJECT IN Rs: ₹{totalWithGST.toFixed(2)}
+            TOTAL COST OF PROJECT IN Rs: ₹{totalWithoutGST.toFixed(2)}
             {quoteType === 'with_gst' && (
               <span className="text-sm font-normal block">
-                (including GST ₹{(totalQuotationPrice * 0.18).toFixed(2)})
+                (including GST ₹{gstAmount.toFixed(2)})
               </span>
             )}
           </div>
+
+          {/* TOTAL AMOUNT INCLUDING GST OR AS IS */}
+<div className="text-right font-semibold text-lg bg-blue-100 text-blue-800 px-4 py-2 rounded mt-2">
+  TOTAL AMOUNT: ₹{totalWithGST.toFixed(2)}
+</div>
 
           {/* ACTIONS */}
           <div className="flex justify-end gap-3 border-t pt-4">
@@ -784,7 +816,7 @@ const handleSubmit = async (e) => {
                 value={spCategory}
                 onChange={(e) => {
                   setSpCategory(e.target.value);
-                  fetchProductsByCategory(e.target.value); // reuse your existing fetch
+                  fetchProductsByCategory(e.target.value);
                   setSpType('');
                   setSpBrand('');
                   setSpModel('');
@@ -853,8 +885,8 @@ const handleSubmit = async (e) => {
                       type="number"
                       min={1}
                       className="border px-3 py-2 rounded w-full"
-                      value={spQty} 
-                      onChange={(e) => setSpQty(Number(e.target.value))} 
+                      value={spQty}
+                      onChange={(e) => setSpQty(Number(e.target.value))}
                     />
                   </div>
 

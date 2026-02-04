@@ -12,7 +12,6 @@ interface Category {
   cat_name: string;
 }
 
-
 const AddProductTypeForm: React.FC<AddProductTypeFormProps> = ({ onClose, onSuccess }) => {
   const [formData, setFormData] = useState({
     product_type_name: "",
@@ -32,23 +31,21 @@ const AddProductTypeForm: React.FC<AddProductTypeFormProps> = ({ onClose, onSucc
     "Other",
   ];
 
-
   const [categories, setCategories] = useState<Category[]>([]);
-const [catId, setCatId] = useState<number | "">("");
-useEffect(() => {
-  fetchCategories();
-}, []);
+  const [catId, setCatId] = useState<number | "">("");
+  
+  useEffect(() => {
+    fetchCategories();
+  }, []);
 
-const fetchCategories = async () => {
-  try {
-    const res = await axios.get(`${BASE_URL}api/category`);
-    setCategories(res.data);
-  } catch (err) {
-    console.error("Failed to fetch categories");
-  }
-};
-
-
+  const fetchCategories = async () => {
+    try {
+      const res = await axios.get(`${BASE_URL}api/category`);
+      setCategories(res.data);
+    } catch (err) {
+      console.error("Failed to fetch categories");
+    }
+  };
 
   const handleQuotationTypeChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     const value = e.target.value;
@@ -62,13 +59,10 @@ const fetchCategories = async () => {
   };
 
   const validateForm = (): boolean => {
-
     if (!catId) {
-  setError("Category is required");
-  return false;
-}
-
-
+      setError("Category is required");
+      return false;
+    }
 
     if (!formData.product_type_name.trim()) {
       setError("Product Type Name is required");
@@ -89,7 +83,7 @@ const fetchCategories = async () => {
       
       const requestData = {
         product_type_name: formData.product_type_name.trim(),
-     cat_id: catId
+        cat_id: catId
       };
 
       const response = await axios.post(`${BASE_URL}api/product/type`, requestData);
@@ -117,13 +111,13 @@ const fetchCategories = async () => {
 
   return (
     <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50 p-2">
-      <div className="bg-white rounded-2xl shadow-2xl border border-gray-100 w-full max-w-md">
-        <div className="sticky top-0 bg-white/90 backdrop-blur border-b px-5 py-4 rounded-t-2xl">
+      <div className="bg-white dark:bg-boxdark rounded-2xl shadow-2xl border border-gray-100 dark:border-strokedark w-full max-w-md">
+        <div className="sticky top-0 bg-white/90 dark:bg-boxdark backdrop-blur border-b dark:border-strokedark px-5 py-4 rounded-t-2xl">
           <div className="flex justify-between items-center">
-            <h2 className="text-lg font-semibold text-gray-800">Add Product Type</h2>
+            <h2 className="text-lg font-semibold text-gray-800 dark:text-white">Add Product Type</h2>
             <button
               onClick={onClose}
-              className="h-8 w-8 flex items-center justify-center rounded-full hover:bg-gray-100 text-gray-500"
+              className="h-8 w-8 flex items-center justify-center rounded-full hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-500 dark:text-gray-300"
               disabled={loading}
             >
               ✕
@@ -133,36 +127,34 @@ const fetchCategories = async () => {
 
         <form onSubmit={handleSubmit} className="px-5 py-4 space-y-4">
           {error && (
-            <div className="px-3 py-2 rounded-md bg-red-50 text-red-700 border border-red-200 text-sm">
+            <div className="px-3 py-2 rounded-md bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-300 border border-red-200 dark:border-red-800 text-sm">
               {error}
             </div>
           )}
 
           <div>
-         <label className="text-sm font-medium text-gray-700">
-  Product Category *
-</label>
-
-<select
-  value={catId}
-  onChange={(e) => setCatId(Number(e.target.value))}
-  className="mt-1 w-full border rounded-lg px-3 py-2 text-sm"
->
-  <option value="">Select Category</option>
-  {categories.map(cat => (
-    <option key={cat.cat_id} value={cat.cat_id}>
-      {cat.cat_name}
-    </option>
-  ))}
-</select>
-
+            <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
+              Product Category *
+            </label>
+            <select
+              value={catId}
+              onChange={(e) => setCatId(Number(e.target.value))}
+              className="mt-1 w-full border border-gray-300 dark:border-strokedark dark:bg-boxdark dark:text-white rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            >
+              <option value="">Select Category</option>
+              {categories.map(cat => (
+                <option key={cat.cat_id} value={cat.cat_id}>
+                  {cat.cat_name}
+                </option>
+              ))}
+            </select>
 
             {showCustomInput && (
               <input
                 type="text"
                 value={customQuotationType}
                 onChange={(e) => setCustomQuotationType(e.target.value)}
-                className="mt-2 w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="mt-2 w-full border border-gray-300 dark:border-strokedark dark:bg-boxdark dark:text-white rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                 placeholder="Enter custom Products type"
                 disabled={loading}
               />
@@ -170,7 +162,7 @@ const fetchCategories = async () => {
           </div>
 
           <div>
-            <label className="text-sm font-medium text-gray-700">
+            <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
               Product Type Name *
             </label>
             <input
@@ -178,7 +170,7 @@ const fetchCategories = async () => {
               name="product_type_name"
               value={formData.product_type_name}
               onChange={handleInput}
-              className="mt-1 w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="mt-1 w-full border border-gray-300 dark:border-strokedark dark:bg-boxdark dark:text-white rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
               placeholder="Enter product category or type"
               disabled={loading}
             />
@@ -188,7 +180,7 @@ const fetchCategories = async () => {
             <button
               type="button"
               onClick={onClose}
-              className="px-4 py-2 border border-gray-300 rounded-lg text-sm hover:bg-gray-50"
+              className="px-4 py-2 border border-gray-300 dark:border-strokedark dark:text-gray-300 rounded-lg text-sm hover:bg-gray-50 dark:hover:bg-gray-700"
               disabled={loading}
             >
               Cancel

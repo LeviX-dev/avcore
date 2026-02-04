@@ -23,39 +23,46 @@ const EditCategoryForm = ({ category, onClose, onCategoryUpdated }) => {
   };
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center">
-      <div className="bg-white p-6 rounded shadow-md w-full max-w-md">
-        <h2 className="text-xl font-bold mb-4">Edit Category</h2>
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center z-50">
+      <div className="bg-white dark:bg-boxdark p-6 rounded-lg shadow-lg w-full max-w-md">
+        <h2 className="text-xl font-bold mb-4 text-black dark:text-white">
+          Edit Category
+        </h2>
         <form onSubmit={handleSubmit}>
-          <label className="block mb-2">Category Name</label>
+          <label className="block mb-2 text-black dark:text-white">
+            Category Name
+          </label>
           <input
             type="text"
             value={catName}
             onChange={(e) => setCatName(e.target.value)}
-            className="border w-full p-2 mb-4"
+            className="border border-stroke dark:border-strokedark w-full p-3 rounded-lg mb-4 bg-transparent text-black dark:text-white"
+            required
           />
 
-          <label className="block mb-2">Status</label>
+          <label className="block mb-2 text-black dark:text-white">
+            Status
+          </label>
           <select
             value={status}
             onChange={(e) => setStatus(e.target.value)}
-            className="border w-full p-2 mb-4"
+            className="border border-stroke dark:border-strokedark w-full p-3 rounded-lg mb-6 bg-transparent text-black dark:text-white"
           >
             <option value="active">Active</option>
             <option value="inactive">Inactive</option>
           </select>
 
-          <div className="flex justify-end gap-2">
+          <div className="flex justify-end gap-3">
             <button
               type="button"
               onClick={onClose}
-              className="bg-gray-300 text-black px-4 py-2 rounded"
+              className="bg-gray-300 dark:bg-gray-600 text-black dark:text-white px-5 py-2.5 rounded-lg hover:bg-gray-400 dark:hover:bg-gray-700 transition"
             >
               Cancel
             </button>
             <button
               type="submit"
-              className="bg-blue-500 text-white px-4 py-2 rounded"
+              className="bg-blue-500 text-white px-5 py-2.5 rounded-lg hover:bg-blue-600 transition"
             >
               Update
             </button>

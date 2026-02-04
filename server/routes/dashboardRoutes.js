@@ -10,6 +10,7 @@ import { getTotalLeadCount, getAssignedLeadCount, getfollowups,
 getCategorySummary ,
 getReferenceSummary ,
 getBudgetRangeSummary,
+getQuotationPendingLeads , getQuotationFollowupLeads , getDemoLeads ,  getProjectionLeads , 
 
 
      } from "../controllers/dashboardController.js";
@@ -40,7 +41,16 @@ router.get("/master-data/campaign-count", getTotalCampaignCount);
 router.get('/leads/inactive-count', getInactiveLeadCount);
 
 router.get('/leads/drop', getDropLeads);
-router.get('/leads/closed', getClosedLeads); 
+router.get('/leads/closed', getClosedLeads);  
+router.get('/leads/projectionlist', getProjectionLeads); 
+
+
+router.get('/leads/quotation-pending', getQuotationPendingLeads);
+router.get('/leads/quotation-followup', getQuotationFollowupLeads);
+router.get('/leads/demo', getDemoLeads);
+
+
+
 
 router.get('/lead-summary', getLeadStageSummary);
 router.get('/category-summary', getCategorySummary);

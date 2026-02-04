@@ -183,8 +183,8 @@ const EditKitForm = ({ kit, onClose, onKitUpdated }) => {
     await axios.put(`${BASE_URL}api/kit/${kit.kit_id}`, {
       kit_name: kitName,
       description,
-      cat_id: Number(catId), // ✅ REQUIRED
-      status,
+cat_id: Number(catId || kit.cat_id),  
+    status,
       items: items.map((i) => ({
         product_type_id: i.product_type_id,
         brand_id: i.brand_id || null,
