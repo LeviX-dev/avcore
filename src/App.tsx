@@ -60,6 +60,36 @@ import EditQuotation from './pages/Rawdata/EditQuotation';
 import DailyReportsTasks from './pages/Report/DailyReportsTasks';
 import AttendanceReport from './pages/Report/AttendanceReport';
 
+import Type from './pages/Execution/ExecutionType.js';
+import Schedule from './pages/Execution/ScheduleMaster.js';
+
+import ExecutionPending from './pages/Execution/Pending';
+import PreExecution from './pages/Execution/PreExecution';
+import ExecutionCompleted from './pages/Execution/Completed';
+import ScheduleSettings from './pages/Execution/ScheduleSettingsModal.js';
+import ProcessSettings from './pages/Execution/ProcessSettings';
+
+import Inword from './pages/Rawdata/Inword';
+import AddVendorPage from './pages/Rawdata/AddVendorPage';
+import Stock from "./pages/Rawdata/Stock"; 
+
+
+import GenerateMrn from './pages/Inventory/GenerateMrn.js';
+import VerifyMRN from './pages/Inventory/VerifyMrn';
+import ApproveMRN from './pages/Inventory/ApproveMrn';
+import ManageMrn from './pages/Inventory/ManageMrn';
+import ManagedExecution from './pages/Execution/DailyOperations.js';
+import DailyExecution from './pages/Execution/AssignProcress.js';
+
+import MetaLeadsReport from "./pages/Report/MetaLeadsReport";
+import EmployeeWorkReport from './pages/Report/EmployeeWorkReport';
+import ExecutionDashboard from './pages/Dashboard/ExecutionDashboard';
+import StatisticsDashboard from './pages/Dashboard/StatisticsDashboard';
+
+import Checklist from './pages/Execution/Checklist';
+import ChecklistSettings from "./pages/Execution/ChecklistSettings";
+
+import ExecutionChecklist from './pages/Execution/ExecutionChecklist';
 
 function App() {
   const [loading, setLoading] = useState<boolean>(true);
@@ -180,7 +210,7 @@ function App() {
             <Route
               path="/upload-document/:product_id"
               element={
-                <ProtectedRoute menuKey="master.product">
+              <ProtectedRoute menuKey="product">
                   <DefaultLayout userRole={userRole}>
                     <PageTitle title="Upload Document" />
                     <UploadDocument />
@@ -190,6 +220,30 @@ function App() {
             />
 
             <Route
+              path="/master/reference"
+              element={
+                <ProtectedRoute menuKey="master.reference">
+                  <DefaultLayout userRole={userRole}>
+                    <PageTitle title="Reference" />
+                    <Reference />
+                  </DefaultLayout>
+                </ProtectedRoute>
+              }
+            />
+
+<Route
+  path="/execution/process-settings/:typeId"
+  element={
+    <ProtectedRoute menuKey="execution.type">
+      <DefaultLayout userRole={userRole}>
+        <PageTitle title="Process Settings" />
+        <ProcessSettings />
+      </DefaultLayout>
+    </ProtectedRoute>
+  }
+/>
+
+         <Route
               path="/master/reference"
               element={
                 <ProtectedRoute menuKey="master.reference">
@@ -592,6 +646,277 @@ function App() {
 />
 
 
+
+<Route
+  path="/execution/type"
+  element={
+    <ProtectedRoute menuKey="execution.type">
+      <DefaultLayout userRole={userRole}>
+        <PageTitle title="Process Type" />
+        <Type />
+      </DefaultLayout>
+    </ProtectedRoute>
+  }
+/>
+
+<Route
+  path="/execution/schedule"
+  element={
+    <ProtectedRoute menuKey="execution.schedule">
+      <DefaultLayout userRole={userRole}>
+        <PageTitle title="Schedule" />
+        <Schedule />
+      </DefaultLayout>
+    </ProtectedRoute>
+  }
+/>
+
+
+
+
+<Route
+  path="/execution/pending"
+  element={
+    <ProtectedRoute menuKey="execution.pending">
+      <DefaultLayout userRole={userRole}>
+        <PageTitle title="Pending for Execution" />
+        <ExecutionPending />
+      </DefaultLayout>
+    </ProtectedRoute>
+  }
+/>
+<Route
+  path="/execution/pre-execution"
+  element={
+    <ProtectedRoute menuKey="execution.pre">
+      <DefaultLayout userRole={userRole}>
+        <PageTitle title="Pre Execution" />
+        <PreExecution />
+      </DefaultLayout>
+    </ProtectedRoute>
+  }
+/>
+
+<Route
+  path="/execution/completed"
+  element={
+    <ProtectedRoute menuKey="execution.completed">
+      <DefaultLayout userRole={userRole}>
+        <PageTitle title="Execution Complete" />
+        <ExecutionCompleted />
+      </DefaultLayout>
+    </ProtectedRoute>
+  }
+/>
+
+<Route
+path="/schedule/settings/:id"
+  element={
+    <ProtectedRoute menuKey="execution.schedule">
+      <DefaultLayout userRole={userRole}>
+        <PageTitle title="Schedule Settings" />
+        <ScheduleSettings />
+      </DefaultLayout>
+    </ProtectedRoute>
+  }
+/>
+
+<Route
+              path="/stock"
+              element={
+                <ProtectedRoute menuKey="stock">
+                  <DefaultLayout userRole={userRole}>
+                    <PageTitle title="Stock" />
+                    <Stock />
+                  </DefaultLayout>
+                </ProtectedRoute>
+              }
+            />
+
+            <Route
+              path="/inword"
+              element={
+                <ProtectedRoute menuKey="inword">
+                  <DefaultLayout userRole={userRole}>
+                    <PageTitle title="Inword" />
+                    <Inword/>
+                  </DefaultLayout>
+                </ProtectedRoute>
+              }
+
+              
+            />
+            <Route
+  path="/add-vendor"
+  element={
+    <ProtectedRoute menuKey="inword">
+      <DefaultLayout userRole={userRole}>
+        <PageTitle title="Add Vendor" />
+        <AddVendorPage />
+      </DefaultLayout>
+    </ProtectedRoute>
+  }
+/>
+
+
+       <Route
+              path="/generatemrn"
+              element={
+                <ProtectedRoute menuKey="mrn.generatemrn">
+                  <DefaultLayout userRole={userRole}>
+                    <PageTitle title="Outward" />
+                    <GenerateMrn />
+                  </DefaultLayout>
+                </ProtectedRoute>
+              }
+            />
+
+            <Route
+              path="/verifymrn"
+              element={
+                <ProtectedRoute menuKey="mrn.verifymrn">
+                  <DefaultLayout userRole={userRole}>
+                    <PageTitle title="VerifyMRN" />
+                    <VerifyMRN />
+                  </DefaultLayout>
+                </ProtectedRoute>
+              }
+            />
+
+            <Route
+              path="/approvemrn"
+              element={
+                <ProtectedRoute menuKey="mrn.approvemrn">
+                  <DefaultLayout userRole={userRole}>
+                    <PageTitle title="Approvemrn" />
+                    <ApproveMRN />
+                  </DefaultLayout>
+                </ProtectedRoute>
+              }
+            />
+
+            <Route
+              path="/managemrn"
+              element={
+                <ProtectedRoute menuKey="mrn.managemrn">
+                  <DefaultLayout userRole={userRole}>
+                    <PageTitle title="ManageMrn" />
+                    <ManageMrn />
+                  </DefaultLayout>
+                </ProtectedRoute>
+              }
+            />
+
+<Route
+  path="/execution/daily"
+  element={
+    <ProtectedRoute menuKey="execution.daily">
+      <DefaultLayout userRole={userRole}>
+        <PageTitle title="Daily Process Execution" />
+        <DailyExecution />
+      </DefaultLayout>
+    </ProtectedRoute>
+  }
+/>
+
+<Route
+  path="/execution/manage"
+  element={
+    <ProtectedRoute menuKey="execution.manage">
+      <DefaultLayout userRole={userRole}>
+        <PageTitle title="Managed Execution" />
+        <ManagedExecution />
+      </DefaultLayout>
+    </ProtectedRoute>
+  }
+/>
+
+
+<Route
+  path="/report/meta-leads"
+  element={
+    <ProtectedRoute menuKey="report.meta">
+      <DefaultLayout userRole={userRole}>
+        <PageTitle title="Meta Leads Report" />
+        <MetaLeadsReport />
+      </DefaultLayout>
+    </ProtectedRoute>
+  }
+/>
+
+
+<Route
+  path="/report/employee-work"
+  element={
+    <ProtectedRoute menuKey="report.employee_work">
+      <DefaultLayout userRole={userRole}>
+        <PageTitle title="Employee Work Report" />
+        <EmployeeWorkReport />
+      </DefaultLayout>
+    </ProtectedRoute>
+  }
+/>
+
+
+<Route
+  path="/execution-dashboard"
+  element={
+    <ProtectedRoute menuKey="execution_dashboard">
+      <DefaultLayout userRole={userRole}>
+        <PageTitle title="Execution Dashboard" />
+        <ExecutionDashboard />
+      </DefaultLayout>
+    </ProtectedRoute>
+  }
+/>
+
+<Route
+  path="/statistics-dashboard"
+  element={
+    <ProtectedRoute menuKey="statistics_dashboard">
+      <DefaultLayout userRole={userRole}>
+        <PageTitle title="Statistics Dashboard" />
+        <StatisticsDashboard />
+      </DefaultLayout>
+    </ProtectedRoute>
+  }
+/>
+
+<Route
+  path="/execution/checklist"
+  element={
+    <ProtectedRoute menuKey="execution.checklist">
+      <DefaultLayout userRole={userRole}>
+        <PageTitle title="Execution Checklist" />
+        <Checklist />
+      </DefaultLayout>
+    </ProtectedRoute>
+  }
+/>
+
+<Route
+ path="/execution/checklist-settings/:checklistId"
+ element={
+  <ProtectedRoute menuKey="execution.checklist">
+   <DefaultLayout userRole={userRole}>
+    <PageTitle title="Checklist Items"/>
+    <ChecklistSettings/>
+   </DefaultLayout>
+  </ProtectedRoute>
+ }
+/>
+
+<Route
+  path="/execution-checklist/:master_id"
+  element={
+    <ProtectedRoute menuKey="execution.checklist">
+      <DefaultLayout userRole={userRole}>
+        <PageTitle title="Execution Checklist" />
+        <ExecutionChecklist />
+      </DefaultLayout>
+    </ProtectedRoute>
+  }
+/>
 
 
           </>

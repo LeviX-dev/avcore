@@ -636,201 +636,226 @@ const DropLeadsPage: React.FC = () => {
     }));
   };
 
-  // Fetch drop leads with server-side pagination and filtering
-  const fetchDropLeads = async () => {
-    try {
-      setLoading(true);
-      
-      // Build filter parameters
-      const filterParams: any = {
-        page: currentPage,
-        limit: itemsPerPage,
-      };
+// Fetch drop leads with server-side pagination and filtering
+const fetchDropLeads = async () => {
+  try {
+    setLoading(true);
+    
+    // Build filter parameters
+    const filterParams: any = {
+      page: currentPage,
+      limit: itemsPerPage,
+    };
 
-      // Add search term if exists
-      if (searchTerm.trim()) {
-        filterParams.search = searchTerm;
+    // Add search term if exists
+    if (searchTerm.trim()) {
+      filterParams.search = searchTerm;
+    }
+
+    // Add date filters
+    if (selectedEntryFromDate) filterParams.entryFromDate = selectedEntryFromDate;
+    if (selectedEntryToDate) filterParams.entryToDate = selectedEntryToDate;
+    if (selectedFollowupFromDate) filterParams.followupFromDate = selectedFollowupFromDate;
+    if (selectedFollowupToDate) filterParams.followupToDate = selectedFollowupToDate;
+    
+    // Add array filters
+    if (selectedStages.length > 0) filterParams.stages = selectedStages.join(',');
+    if (selectedUsersFilter.length > 0) filterParams.users = selectedUsersFilter.join(',');
+    if (selectedCities.length > 0) filterParams.cities = selectedCities.join(',');
+
+    const response = await axios.get(
+      `${BASE_URL}api/dashboard/drop-leads-fulldata`,
+      {
+        params: filterParams,
+        withCredentials: true,
       }
+    );
 
-      // Add date filters
-      if (selectedEntryFromDate) filterParams.entryFromDate = selectedEntryFromDate;
-      if (selectedEntryToDate) filterParams.entryToDate = selectedEntryToDate;
-      if (selectedFollowupFromDate) filterParams.followupFromDate = selectedFollowupFromDate;
-      if (selectedFollowupToDate) filterParams.followupToDate = selectedFollowupToDate;
+    const data = response.data;
+
+    if (data.success) {
+      const dropLeadsArray = data.dropLeads || [];
       
-      // Add array filters
-      if (selectedStages.length > 0) filterParams.stages = selectedStages.join(',');
-      if (selectedUsersFilter.length > 0) filterParams.users = selectedUsersFilter.join(',');
-      if (selectedCities.length > 0) filterParams.cities = selectedCities.join(',');
+      const processedData = dropLeadsArray.map((item: any) => {
+        // For drop leads, the current stage is always "Drop"
+        const currentStage = 'Drop';
+        const cleanStage = 'Drop';
 
-      const response = await axios.get(
-        `${BASE_URL}api/dashboard/drop-leads-fulldata`,
-        {
-          params: filterParams,
-          withCredentials: true,
-        }
-      );
-
-      const data = response.data;
-
-      if (data.success) {
-        const dropLeadsArray = data.dropLeads || [];
-        
-        const processedData = dropLeadsArray.map((item: any) => {
-          // For drop leads, the current stage is always "Drop"
-          const currentStage = 'Drop';
-          const cleanStage = 'Drop';
-
-          // Find previous stage from reassignment remarks
-          let previousStage = '';
-          const reassignmentRemarks = processReassignmentRemarks(
-            item.reassignment_remarks,
-          );
-
-          // Find the most recent non-drop stage from reassignment remarks
-          if (reassignmentRemarks.length > 0) {
-            const nonDropRemarks = reassignmentRemarks.filter(
-              (remark: any) =>
-                remark.leadStage && remark.leadStage.trim() !== 'Drop',
-            );
-
-            if (nonDropRemarks.length > 0) {
-              // Sort by date to get most recent
-              const sorted = nonDropRemarks.sort((a: any, b: any) => {
-                const dateA = a.reassignment_date
-                  ? new Date(a.reassignment_date).getTime()
-                  : 0;
-                const dateB = b.reassignment_date
-                  ? new Date(b.reassignment_date).getTime()
-                  : 0;
-                return dateB - dateA; // Most recent first
-              });
-              previousStage = sorted[0]?.leadStage?.trim() || '';
-            }
-          }
-
-          // If no previous stage found, use default
-          if (!previousStage) {
-            previousStage = 'Positive Lead'; // Default for drop leads
-          }
-
-          // Calculate percentage based on previous stage
-          const status_percentage = previousStage
-            ? STAGE_PERCENTAGE_MAP[previousStage] || 0
-            : 0;
-
-          // Get assigned user info
-          const assignedTo = parseValue(
-            item.reassigned_to ||
-              item.telecaller_name ||
-              item.latest_assignedTo ||
-              item.assigned_to,
-          );
-
-          const assignDate = parseDateValue(
-            item.assign_date ||
-              item.reassignment_date ||
-              item.created_at,
-          );
-
-          const followupDate = parseValue(item.followup_date);
-
-          return {
-            master_id: item.master_id,
-            name: parseValue(item.name),
-            number: parseValue(item.number),
-            email: parseValue(item.email),
-            address: parseValue(item.address),
-            city: parseValue(item.city),
-            cat_id: parseIdValue(item.cat_id),
-            status: parseValue(item.status),
-            lead_status: parseValue(item.lead_status),
-            lead_stage: cleanStage,
-            created_at: parseValue(item.created_at),
-            quick_remark: parseValue(item.quick_remark),
-            detailed_remark: parseValue(item.detailed_remark),
-            followup_date: followupDate,
-            assign_date: assignDate,
-            assigned_to: assignedTo,
-            assigned_user_name: assignedTo,
-            reassignment_id: parseIdValue(item.reassignment_id),
-            reassignment_date: parseValue(item.reassignment_date),
-            reassigned_to: parseValue(item.reassigned_to),
-            telecaller_name: assignedTo,
-            document_count: item.document_count || 0,
-            area_name: parseValue(item.area_name),
-            area: parseValue(item.area_name),
-            cat_name: parseValue(item.cat_name),
-            reference_name: parseValue(item.reference_name),
-            room_length: parseValue(item.room_length),
-            room_width: parseValue(item.room_width),
-            room_height: parseValue(item.room_height),
-            location_link: parseValue(item.location_link),
-            p_type: parseValue(item.p_type),
-            budget_range: parseValue(item.budget_range),
-            current_stage: parseValue(item.current_stage),
-            room_ready: parseValue(item.room_ready),
-            time_to_complete: parseValue(item.time_to_complete),
-            site_visit_date: parseValue(item.site_visit_date),
-            demo_date: parseValue(item.demo_date),
-            ar_number: parseValue(item.ar_number),
-            ca_number: parseValue(item.ca_number),
-            e_number: parseValue(item.e_number),
-            sm_number: parseValue(item.sm_number),
-            pop_number: parseValue(item.pop_number),
-            other_number: parseValue(item.other_number),
-            reassignment_remarks: reassignmentRemarks,
-            latest_assignedTo: parseValue(item.latest_assignedTo),
-            latest_leadStage: parseValue(item.latest_leadStage),
-
-            // Battery-related fields
-            status_percentage: status_percentage,
-            is_drop_stage: true,
-            previous_stage: previousStage,
-
-            // Additional fields for EditRawData
-            category_other: parseValue(item.category_other),
-            reference_other: parseValue(item.reference_other),
-            architect_name: parseValue(item.architect_name),
-            alternate_number: parseValue(item.alternate_number),
-            reference_id: parseIdValue(item.reference_id),
-            area_id: parseIdValue(item.area_id),
-            assign_id: parseIdValue(item.assign_id),
-            document_location_link: parseValue(item.document_location_link),
-          };
-        });
-
-        const sortedData = processedData.sort(
-          (a: DropLead, b: DropLead) => b.master_id - a.master_id,
+        // Find previous stage from reassignment remarks
+        let previousStage = '';
+        const reassignmentRemarks = processReassignmentRemarks(
+          item.reassignment_remarks,
         );
 
-        // Update total leads from backend response
-        setTotalLeads(data.total || 0);
+        // Find the most recent non-drop stage from reassignment remarks
+        if (reassignmentRemarks.length > 0) {
+          const nonDropRemarks = reassignmentRemarks.filter(
+            (remark: any) =>
+              remark.leadStage && remark.leadStage.trim() !== 'Drop',
+          );
+
+          if (nonDropRemarks.length > 0) {
+            // Sort by date to get most recent
+            const sorted = nonDropRemarks.sort((a: any, b: any) => {
+              const dateA = a.reassignment_date
+                ? new Date(a.reassignment_date).getTime()
+                : 0;
+              const dateB = b.reassignment_date
+                ? new Date(b.reassignment_date).getTime()
+                : 0;
+              return dateB - dateA; // Most recent first
+            });
+            previousStage = sorted[0]?.leadStage?.trim() || '';
+          }
+        }
+
+        // If no previous stage found, use default
+        if (!previousStage) {
+          previousStage = 'Positive Lead'; // Default for drop leads
+        }
+
+        // Calculate percentage based on previous stage
+        const status_percentage = previousStage
+          ? STAGE_PERCENTAGE_MAP[previousStage] || 0
+          : 0;
+
+        // Get assigned user info
+        const assignedTo = parseValue(
+          item.reassigned_to ||
+            item.telecaller_name ||
+            item.latest_assignedTo ||
+            item.assigned_to,
+        );
+
+        const assignDate = parseDateValue(
+          item.assign_date ||
+            item.reassignment_date ||
+            item.created_at,
+        );
+
+        const followupDate = parseValue(item.followup_date);
+
+        // 🔥 IMPORTANT: Determine display city with priority: area_name first, then city
+        let displayCity = '';
+        const areaName = parseValue(item.area_name);
+        const cityName = parseValue(item.city);
         
-        // Set the data
-        setDropLeads(sortedData);
-        
-        // Extract unique cities from the current page data
-        const cities = sortedData
-          .map(lead => lead.city?.trim())
-          .filter(city => city && city !== '' && city !== 'Not Available' && city !== 'N/A')
-          .filter((city, index, self) => self.indexOf(city) === index)
-          .sort() as string[];
-        setAvailableCities(cities);
-        
-      } else {
-        console.error('Error fetching drop leads:', data);
-        setDropLeads([]);
-        setTotalLeads(0);
-      }
-    } catch (error) {
-      console.error('Error fetching drop leads:', error);
+        if (areaName && areaName !== '' && areaName !== 'Not Available') {
+          displayCity = areaName; // Use area_name if available
+        } else if (cityName && cityName !== '' && cityName !== 'Not Available') {
+          displayCity = cityName; // Fallback to city if area_name not available
+        } else {
+          displayCity = ''; // Empty if neither available
+        }
+
+        return {
+          master_id: item.master_id,
+          name: parseValue(item.name),
+          number: parseValue(item.number),
+          email: parseValue(item.email),
+          address: parseValue(item.address),
+          city: displayCity, // 🔥 THIS IS THE KEY CHANGE - Use the prioritized display city
+          original_city: parseValue(item.city), // Keep original if needed elsewhere
+          original_area: parseValue(item.area_name), // Keep original if needed elsewhere
+          cat_id: parseIdValue(item.cat_id),
+          status: parseValue(item.status),
+          lead_status: parseValue(item.lead_status),
+          lead_stage: cleanStage,
+          created_at: parseValue(item.created_at),
+          quick_remark: parseValue(item.quick_remark),
+          detailed_remark: parseValue(item.detailed_remark),
+          followup_date: followupDate,
+          assign_date: assignDate,
+          assigned_to: assignedTo,
+          assigned_user_name: assignedTo,
+          reassignment_id: parseIdValue(item.reassignment_id),
+          reassignment_date: parseValue(item.reassignment_date),
+          reassigned_to: parseValue(item.reassigned_to),
+          telecaller_name: assignedTo,
+          document_count: item.document_count || 0,
+          area_name: parseValue(item.area_name),
+          area: parseValue(item.area_name),
+          cat_name: parseValue(item.cat_name),
+          reference_name: parseValue(item.reference_name),
+          room_length: parseValue(item.room_length),
+          room_width: parseValue(item.room_width),
+          room_height: parseValue(item.room_height),
+          location_link: parseValue(item.location_link),
+          p_type: parseValue(item.p_type),
+          budget_range: parseValue(item.budget_range),
+          current_stage: parseValue(item.current_stage),
+          room_ready: parseValue(item.room_ready),
+          time_to_complete: parseValue(item.time_to_complete),
+          site_visit_date: parseValue(item.site_visit_date),
+          demo_date: parseValue(item.demo_date),
+          ar_number: parseValue(item.ar_number),
+          ca_number: parseValue(item.ca_number),
+          e_number: parseValue(item.e_number),
+          sm_number: parseValue(item.sm_number),
+          pop_number: parseValue(item.pop_number),
+          other_number: parseValue(item.other_number),
+          reassignment_remarks: reassignmentRemarks,
+          latest_assignedTo: parseValue(item.latest_assignedTo),
+          latest_leadStage: parseValue(item.latest_leadStage),
+
+          // Battery-related fields
+          status_percentage: status_percentage,
+          is_drop_stage: true,
+          previous_stage: previousStage,
+
+          // Additional fields for EditRawData
+          category_other: parseValue(item.category_other),
+          reference_other: parseValue(item.reference_other),
+          architect_name: parseValue(item.architect_name),
+          alternate_number: parseValue(item.alternate_number),
+          reference_id: parseIdValue(item.reference_id),
+          area_id: parseIdValue(item.area_id),
+          assign_id: parseIdValue(item.assign_id),
+          document_location_link: parseValue(item.document_location_link),
+        };
+      });
+
+      const sortedData = processedData.sort(
+        (a: DropLead, b: DropLead) => b.master_id - a.master_id,
+      );
+
+      // Update total leads from backend response
+      setTotalLeads(data.total || 0);
+      
+      // Set the data
+      setDropLeads(sortedData);
+      
+      // 🔥 UPDATED: Extract unique cities from the prioritized displayCity field
+      const cities = sortedData
+        .map(lead => lead.city?.trim()) // This now uses the prioritized displayCity
+        .filter(city => city && city !== '' && city !== 'Not Available' && city !== 'N/A')
+        .filter((city, index, self) => self.indexOf(city) === index)
+        .sort() as string[];
+      setAvailableCities(cities);
+
+      // Debug log to verify the changes
+      console.log('📊 Drop Leads Processed:', {
+        totalLeads: sortedData.length,
+        sampleLead: sortedData[0],
+        city: sortedData[0]?.city, // Should show area_name first
+        original_city: sortedData[0]?.original_city,
+        original_area: sortedData[0]?.original_area,
+      });
+      
+    } else {
+      console.error('Error fetching drop leads:', data);
       setDropLeads([]);
       setTotalLeads(0);
-    } finally {
-      setLoading(false);
     }
-  };
+  } catch (error) {
+    console.error('Error fetching drop leads:', error);
+    setDropLeads([]);
+    setTotalLeads(0);
+  } finally {
+    setLoading(false);
+  }
+};
+
 
   // Apply filters function (server-side)
   const applyFilters = async () => {
@@ -1901,176 +1926,7 @@ const clearCustomRecordCount = () => {
                 </div>
               )}
 
-              {/* Stage & Assignment */}
-              {(hasLeadStages || hasAssignmentInfo) && (
-                <div className="grid grid-cols-2 gap-4">
-                  {/* Lead Stages */}
-                  {hasLeadStages && (
-                    <div className="bg-gradient-to-r from-purple-50 to-pink-50 dark:from-purple-900/20 dark:to-pink-900/20 p-3 rounded-lg border border-purple-100 dark:border-purple-800/30">
-                      <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2 flex items-center gap-2">
-                        <FontAwesomeIcon
-                          icon={faUser}
-                          className="h-4 w-4 text-purple-500"
-                        />
-                        Lead Stages
-                      </h3>
-                      <div className="space-y-2">
-                        {hasField('lead_stage') && (
-                          <div>
-                            <div className="text-xs text-gray-500 dark:text-gray-400">
-                              Lead Stage
-                            </div>
-                            <div className="font-medium text-black dark:text-white">
-                              {formatValue(selectedLeadDetails.lead_stage)}
-                            </div>
-                          </div>
-                        )}
-                        {hasField('current_stage') && (
-                          <div>
-                            <div className="text-xs text-gray-500 dark:text-gray-400">
-                              Current Stage
-                            </div>
-                            <div className="font-medium text-black dark:text-white">
-                              {formatValue(selectedLeadDetails.current_stage)}
-                            </div>
-                          </div>
-                        )}
-                        {hasField('latest_leadStage') && (
-                          <div>
-                            <div className="text-xs text-gray-500 dark:text-gray-400">
-                              Latest Lead Stage
-                            </div>
-                            <div className="font-medium text-black dark:text-white">
-                              {formatValue(
-                                selectedLeadDetails.latest_leadStage,
-                              )}
-                            </div>
-                          </div>
-                        )}
-                        {hasField('status_percentage') && (
-                          <div>
-                            <div className="text-xs text-gray-500 dark:text-gray-400">
-                              Progress
-                            </div>
-                            <div className="mt-0.5">
-                              <ProgressStatus
-                                stage={
-                                  selectedLeadDetails.lead_stage ||
-                                  selectedLeadDetails.latest_leadStage
-                                }
-                                status_percentage={
-                                  selectedLeadDetails.status_percentage
-                                }
-                                is_drop_stage={
-                                  selectedLeadDetails.is_drop_stage
-                                }
-                                previous_stage={
-                                  selectedLeadDetails.previous_stage
-                                }
-                              />
-                            </div>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Assignment Info */}
-                  {hasAssignmentInfo && (
-                    <div className="bg-gradient-to-r from-teal-50 to-cyan-50 dark:from-teal-900/20 dark:to-cyan-900/20 p-3 rounded-lg border border-teal-100 dark:border-teal-800/30">
-                      <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2 flex items-center gap-2">
-                        <FontAwesomeIcon
-                          icon={faTasks}
-                          className="h-4 w-4 text-teal-500"
-                        />
-                        Assignment
-                      </h3>
-                      <div className="space-y-2">
-                        {hasField('assigned_to') && (
-                          <div>
-                            <div className="text-xs text-gray-500 dark:text-gray-400">
-                              Assigned To
-                            </div>
-                            <div className="font-medium text-black dark:text-white truncate">
-                              {formatValue(selectedLeadDetails.assigned_to)}
-                            </div>
-                          </div>
-                        )}
-                        {hasField('telecaller_name') && (
-                          <div>
-                            <div className="text-xs text-gray-500 dark:text-gray-400">
-                              Telecaller
-                            </div>
-                            <div className="font-medium text-black dark:text-white truncate">
-                              {formatValue(
-                                selectedLeadDetails.telecaller_name ||
-                                  selectedLeadDetails.assigned_user_name,
-                              )}
-                            </div>
-                          </div>
-                        )}
-                        {hasField('latest_assignedTo') && (
-                          <div>
-                            <div className="text-xs text-gray-500 dark:text-gray-400">
-                              Latest Assigned To
-                            </div>
-                            <div className="font-medium text-black dark:text-white truncate">
-                              {formatValue(
-                                selectedLeadDetails.latest_assignedTo ||
-                                  selectedLeadDetails.assigned_user_name,
-                              )}
-                            </div>
-                          </div>
-                        )}
-                        {hasField('reassigned_to') && (
-                          <div>
-                            <div className="text-xs text-gray-500 dark:text-gray-400">
-                              Reassigned To
-                            </div>
-                            <div className="font-medium text-black dark:text-white truncate">
-                              {formatValue(selectedLeadDetails.reassigned_to)}
-                            </div>
-                          </div>
-                        )}
-                        {hasField('status') && (
-                          <div>
-                            <div className="text-xs text-gray-500 dark:text-gray-400">
-                              Status
-                            </div>
-                            <div
-                              className={`font-medium ${
-                                selectedLeadDetails.status === 'Assigned'
-                                  ? 'text-green-600 dark:text-green-400'
-                                  : selectedLeadDetails.status === 'Unassigned'
-                                  ? 'text-red-600 dark:text-red-400'
-                                  : 'text-blue-600 dark:text-blue-400'
-                              }`}
-                            >
-                              {formatValue(selectedLeadDetails.status)}
-                            </div>
-                          </div>
-                        )}
-                        {hasField('lead_status') && (
-                          <div>
-                            <div className="text-xs text-gray-500 dark:text-gray-400">
-                              Lead Status
-                            </div>
-                            <div
-                              className={`font-medium ${
-                                selectedLeadDetails.lead_status === 'Active'
-                                  ? 'text-green-600 dark:text-green-400'
-                                  : 'text-gray-600 dark:text-gray-400'
-                              }`}
-                            >
-                              {formatValue(selectedLeadDetails.lead_status)}
-                            </div>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  )}
-                </div>
-              )}
+          
 
               {/* Dates Information */}
               {hasDates && (
@@ -3034,7 +2890,6 @@ const clearCustomRecordCount = () => {
         <div className="px-4 py-3">
           <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 mb-2">
             <div className="flex items-center gap-3">
-              <h2 className="text-lg font-medium">Drop Leads</h2>
               <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-gradient-to-r from-blue-100 to-blue-200 dark:from-blue-900/30 dark:to-blue-800/30 text-blue-800 dark:text-blue-300 border border-blue-200 dark:border-blue-700/30">
                 <svg
                   className="w-4 h-4 mr-1"
@@ -3103,15 +2958,7 @@ const clearCustomRecordCount = () => {
       </button>
     )}
   </div>
-  {customRecordCount ? (
-    <div className="text-xs text-blue-600 dark:text-blue-400 mt-1 ml-1 font-medium">
-      Showing {customRecordCount} records per page
-    </div>
-  ) : (
-    <div className="text-xs text-gray-500 dark:text-gray-400 mt-1 ml-1">
-      Default: 10 records per page
-    </div>
-  )}
+
 </div>
 
               {/* Search Input */}
@@ -4115,7 +3962,7 @@ const clearCustomRecordCount = () => {
                       <td className="py-4 px-4">
                         <div className="flex justify-center gap-1">
                           {/* Call Button */}
-                          <ActionButton
+                          {/* <ActionButton
                             onClick={() =>
                               handleEdit({
                                 ...lead,
@@ -4134,7 +3981,7 @@ const clearCustomRecordCount = () => {
                               icon={faPhone}
                               className="text-xs"
                             />
-                          </ActionButton>
+                          </ActionButton> */}
 
                           {/* Edit Button */}
                           <ActionButton

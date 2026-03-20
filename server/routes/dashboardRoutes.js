@@ -1,6 +1,6 @@
 
 import express from "express";
-import { getTotalLeadCount, getAssignedLeadCount, getfollowups, 
+import { getTotalLeadsCount, getAssignedLeadCount, getfollowups, 
     getMeetingScheduled, getcategory, getProducts,getConvertedLeads,
      getTotalCampaignCount, getInactiveLeadCount , getTodaysAssignedLeads ,
      getUpcomingAssignedCount , getMissedAssignedCount ,
@@ -11,22 +11,31 @@ getCategorySummary ,
 getReferenceSummary ,
 getBudgetRangeSummary,
 getQuotationPendingLeads , getQuotationFollowupLeads , getDemoLeads ,  getProjectionLeads , 
+getTodaysMissedCombinedCount ,getClosedLeadsCount ,  getClosedLeadsExeCount , getManagerProcessesCount ,getDailyExecutionProcessesCount ,
 
+getDashboardLeadCounts , getExecutionDashboardCounts , 
 
      } from "../controllers/dashboardController.js";
 
 const router = express.Router();
 
-router.get("/dashboard/lead-count", getTotalLeadCount);
+router.get("/dashboard/lead-count", getTotalLeadsCount);
 router.get("/master-data/assigned-count", getAssignedLeadCount);
 
+
+router.get("/dashboard/lead-counts", getDashboardLeadCounts);
+
 router.get("/master-data/todays-assigned-count", getTodaysAssignedLeads);
+router.get("/master-data/missed-assigned-count", getMissedAssignedCount); 
+
 
 
 router.get("/master-data/upcoming-assigned-count", getUpcomingAssignedCount); 
 
 
-router.get("/master-data/missed-assigned-count", getMissedAssignedCount); 
+router.get("/master-data/todays-missed-combined", getTodaysMissedCombinedCount);
+
+
 
 
 router.get("/master-data/fllowups", getfollowups);
@@ -60,6 +69,19 @@ router.get(
   '/budget-range-summary',
   getBudgetRangeSummary
 );
+
+
+
+router.get("/closed-leads-count", getClosedLeadsCount);
+
+router.get("/closed-execution-leads-count", getClosedLeadsExeCount);
+
+router.get("/manager-processes-count", getManagerProcessesCount); 
+
+router.get("/daily-execution-processes-count", getDailyExecutionProcessesCount);
+
+
+router.get("/execution-dashboard-counts", getExecutionDashboardCounts);
 
 
 export default router;

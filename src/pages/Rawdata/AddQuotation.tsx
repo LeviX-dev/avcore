@@ -22,11 +22,7 @@ const AddQuotation = () => {
   const [quoteType, setQuoteType] = useState('with_gst');
   const [expandedIndex, setExpandedIndex] = useState(null);
   const [queuedCategories, setQueuedCategories] = useState([]);
-
-  // Single Product Popup
-  /* ---------------- SINGLE PRODUCT POPUP STATE ---------------- */
   const [openSingleProductPopup, setOpenSingleProductPopup] = useState(false);
-
   const [spCategory, setSpCategory] = useState('');
   const [productTypes, setProductTypes] = useState([]);
   const [spType, setSpType] = useState('');
@@ -36,14 +32,12 @@ const AddQuotation = () => {
   const [spModel, setSpModel] = useState('');
   const [selectedModel, setSelectedModel] = useState(null);
   const [selectedSingleModel, setSelectedSingleModel] = useState(null);
-
   const [spQty, setSpQty] = useState(1);
-  const [spPrice, setSpPrice] = useState(0); 
-
+  const [spPrice, setSpPrice] = useState(0);
   const [framingBy, setFramingBy] = useState('');
-const [fabricBy, setFabricBy] = useState('');
-const [ceilingBy, setCeilingBy] = useState('');
-
+  const [fabricBy, setFabricBy] = useState('');
+  const [ceilingBy, setCeilingBy] = useState('');
+  const [gstBaseAmount, setGstBaseAmount] = useState('');
 
   /* Global additional prices */
   const [additionalPrices, setAdditionalPrices] = useState([
@@ -171,73 +165,35 @@ const [ceilingBy, setCeilingBy] = useState('');
     setKitQty(1);
   };
 
-  /* ---------------- REMOVE CATEGORY FROM QUEUE ---------------- */
   const removeCategory = (index) => {
     const updated = queuedCategories.filter((_, i) => i !== index);
     setQueuedCategories(updated);
   };
 
-  /* ---------------- CALCULATE TOTAL ---------------- */
-
-  /* ---------------- CALCULATE TOTAL ---------------- */
-
-  // Calculate subtotal from queued categories
-  const subtotal = queuedCategories.reduce((catSum, category) => {
-    const productsTotal = category.products.reduce((prodSum, product) => {
-      const qty = Number(product.model_qty ?? 1); // ensure numeric
-      const price = Number(product.model_price ?? 0);
-      const kitQty = Number(category.kit_qty ?? 1);
-      return prodSum + qty * price * kitQty;
-    }, 0);
-
-    return catSum + productsTotal;
+  // ✅ SUBTOTAL (use stored category_total)
+  const subtotal = queuedCategories.reduce((sum, category) => {
+    return sum + Number(category.category_total || 0);
   }, 0);
 
-  // Calculate total of additional prices
-  const additionalTotal = additionalPrices.reduce((sum, a) => {
-    return sum + Number(a.price ?? 0);
+  // ✅ ADDITIONAL TOTAL
+  const additionalTotal = additionalPrices.reduce((sum, row) => {
+    return sum + (Number(row.price) || 0);
   }, 0);
 
-  // Total before GST
+  // ✅ TOTAL BEFORE GST
   const totalWithoutGST = subtotal + additionalTotal;
 
-  // GST amount (18% if 'with_gst' is selected)
-  const gstAmount = quoteType === 'with_gst' ? totalWithoutGST * 0.18 : 0;
+  // ✅ GST ONLY ON ENTERED BASE
+  const gstAmount =
+    quoteType === 'with_gst' && Number(gstBaseAmount) > 0
+      ? Number(gstBaseAmount) * 0.18
+      : 0;
 
-  // Total including GST
+  // ✅ FINAL TOTAL
   const totalWithGST = totalWithoutGST + gstAmount;
 
   /* ---------------- SUBMIT ---------------- */
 
-  const acousticTerms =
-  framingBy && fabricBy && ceilingBy
-    ? `ALL FRAMING WILL BE DONE BY ${framingBy}.
-• FABRIC & FLOOR CARPET WILL BE PROVIDED BY ${fabricBy}
-• ALL CEILING-RELATED WORK WILL BE PROVIDED BY ${ceilingBy}.
-• FABRIC STITCHING CHARGES WILL BE EXTRA AS PER THE DESIGN`
-    : null;
-
-
-    const handleSubmit = async (e) => {
-  e.preventDefault();
-
-  if (!queuedCategories.length) {
-    alert('Please add at least one category to quotation');
-    return;
-  }
-
-  // Check if ACOUSTIC category exists
-const isAcoustic = queuedCategories.some(
-  (q) => q.cat_name?.toLowerCase() === 'acoustic',
-);
-
-  // Validate acoustic dropdowns
-  if (isAcoustic && (!framingBy || !fabricBy || !ceilingBy)) {
-    alert('Please select all Acoustic options');
-    return;
-  }
-
-  // Build acoustic full text
   const acousticTerms =
     framingBy && fabricBy && ceilingBy
       ? `ALL FRAMING WILL BE DONE BY ${framingBy}.
@@ -246,44 +202,93 @@ const isAcoustic = queuedCategories.some(
 • FABRIC STITCHING CHARGES WILL BE EXTRA AS PER THE DESIGN`
       : null;
 
-  const payload = {
-    type: quoteType,
-    master_id,
+  const handleSubmit = async (e) => {
+    e.preventDefault();
 
-    // ✅ NEW FIELD
-    acoustic_terms: acousticTerms,
+    if (!queuedCategories.length) {
+      alert('Please add at least one category to quotation');
+      return;
+    }
 
-    items: queuedCategories.map((item) => ({
-      cat_id: item.cat_id,
-      kit_id: item.kit_id || null,
-      kit_qty: item.kit_id ? Number(item.kit_qty || 1) : 1,
-      products: item.products.map((p) => ({
-        model_id: p.model_id,
-        model_qty: Number(p.model_qty || 1),
-        model_price: Number(p.model_price || 0),
+    // Check if ACOUSTIC category exists
+    const isAcoustic = queuedCategories.some(
+      (q) => q.cat_name?.toLowerCase() === 'acoustic',
+    );
+
+    // Validate acoustic dropdowns
+    if (isAcoustic && (!framingBy || !fabricBy || !ceilingBy)) {
+      alert('Please select all Acoustic options');
+      return;
+    }
+
+    // Build acoustic full text
+    const acousticTerms =
+      framingBy && fabricBy && ceilingBy
+        ? `ALL FRAMING WILL BE DONE BY ${framingBy}.
+• FABRIC & FLOOR CARPET WILL BE PROVIDED BY ${fabricBy}
+• ALL CEILING-RELATED WORK WILL BE PROVIDED BY ${ceilingBy}.
+• FABRIC STITCHING CHARGES WILL BE EXTRA AS PER THE DESIGN`
+        : null;
+
+    const payload1 = {
+      type: quoteType,
+      master_id,
+
+      // ✅ NEW FIELD
+      acoustic_terms: acousticTerms,
+
+      items: queuedCategories.map((item) => ({
+        cat_id: item.cat_id,
+        kit_id: item.kit_id || null,
+        kit_qty: item.kit_id ? Number(item.kit_qty || 1) : 1,
+        products: item.products.map((p) => ({
+          model_id: p.model_id,
+          model_qty: Number(p.model_qty || 1),
+          model_price: Number(p.model_price || 0),
+        })),
       })),
-    })),
 
-    additional_prices: additionalPrices.filter(
-      (a) => a.add_price_name && a.price,
-    ),
+      additional_prices: additionalPrices.filter(
+        (a) => a.add_price_name && a.price,
+      ),
+    };
+    const payload = {
+      type: quoteType,
+      master_id,
+      acoustic_terms: acousticTerms,
+
+      gst_app_amt: quoteType === 'with_gst' ? Number(gstBaseAmount || 0) : 0,
+
+      items: queuedCategories.map((item) => ({
+        cat_id: item.cat_id,
+        kit_id: item.kit_id || null,
+        kit_qty: item.kit_id ? Number(item.kit_qty || 1) : 1,
+        products: item.products.map((p) => ({
+          model_id: p.model_id,
+          model_qty: Number(p.model_qty || 1),
+          model_price: Number(p.model_price || 0),
+        })),
+      })),
+
+      additional_prices: additionalPrices.filter(
+        (a) => a.add_price_name && a.price,
+      ),
+    };
+
+    console.log('payload', payload);
+
+    try {
+      await axios.post(`${BASE_URL}api/quotation`, payload, {
+        withCredentials: true,
+      });
+
+      alert('Quotation created successfully ✅');
+      navigate('/quatation-pending');
+    } catch (err) {
+      console.error(err);
+      alert('Failed to create quotation ❌');
+    }
   };
-
-  console.log('payload', payload);
-
-  try {
-    await axios.post(`${BASE_URL}api/quotation`, payload, {
-      withCredentials: true,
-    });
-
-    alert('Quotation created successfully ✅');
-    navigate('/quatation-pending');
-  } catch (err) {
-    console.error(err);
-    alert('Failed to create quotation ❌');
-  }
-};
-
 
   const toggleExpand = (index) => {
     setExpandedIndex(expandedIndex === index ? null : index);
@@ -407,134 +412,155 @@ const isAcoustic = queuedCategories.some(
               <label className="font-medium text-sm">Lead</label>
               <div className="font-medium">{state?.name || master_id}</div>
             </div>
-          
           </div>
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-5">
+          {/* CATEGORY & KIT SELECTION */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+            <div>
+              <label className="block mb-1 font-medium">Category</label>
+              <select
+                className="w-full border px-4 py-2 rounded"
+                value={selectedCategory}
+                onChange={(e) => setSelectedCategory(e.target.value)}
+              >
+                <option value="">Select category</option>
+                {categories.map((c) => (
+                  <option key={c.cat_id} value={c.cat_id}>
+                    {c.cat_name}
+                  </option>
+                ))}
+              </select>
+            </div>
 
-      {/* CATEGORY & KIT SELECTION */}
-<div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-  <div>
-    <label className="block mb-1 font-medium">Category</label>
-    <select
-      className="w-full border px-4 py-2 rounded"
-      value={selectedCategory}
-      onChange={(e) => setSelectedCategory(e.target.value)}
-    >
-      <option value="">Select category</option>
-      {categories.map((c) => (
-        <option key={c.cat_id} value={c.cat_id}>
-          {c.cat_name}
-        </option>
-      ))}
-    </select>
-  </div>
+            <div>
+              <label className="block mb-1 font-medium">Kit</label>
+              <select
+                className="w-full border px-4 py-2 rounded"
+                value={selectedKit}
+                onChange={(e) => setSelectedKit(e.target.value)}
+              >
+                <option value="">Select kit</option>
+                {kits.map((k) => (
+                  <option key={k.kit_id} value={k.kit_id}>
+                    {k.kit_name} (₹{k.kit_price})
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
 
-  <div>
-    <label className="block mb-1 font-medium">Kit</label>
-    <select
-      className="w-full border px-4 py-2 rounded"
-      value={selectedKit}
-      onChange={(e) => setSelectedKit(e.target.value)}
-    >
-      <option value="">Select kit</option>
-      {kits.map((k) => (
-        <option key={k.kit_id} value={k.kit_id}>
-          {k.kit_name} (₹{k.kit_price})
-        </option>
-      ))}
-    </select>
-  </div>
-</div>
+          {/* ACOUSTIC SPECIAL TERMS - MOVED HERE TO BE DIRECTLY BELOW CATEGORY */}
+          {selectedCategory &&
+            categories
+              .find((c) => c.cat_id == selectedCategory)
+              ?.cat_name?.toUpperCase() === 'ACOUSTIC' && (
+              <div className="border rounded bg-gray-50 p-4 space-y-3 mb-4">
+                <h2 className="font-semibold text-blue-600">
+                  Acoustic Special Terms
+                </h2>
 
-{/* ACOUSTIC SPECIAL TERMS - MOVED HERE TO BE DIRECTLY BELOW CATEGORY */}
-{selectedCategory &&
-  categories.find((c) => c.cat_id == selectedCategory)?.cat_name?.toUpperCase() ===
-    'ACOUSTIC' && (
-    <div className="border rounded bg-gray-50 p-4 space-y-3 mb-4">
-<h2 className="font-semibold text-blue-600">Acoustic Special Terms</h2>
-      
-    <div>
-  <label className="text-base font-semibold text-gray-500">
-    All Framing Will Be Done By
-  </label>
-  <select
-    className="border px-3 py-2 rounded w-full mt-1"
-    value={framingBy}
-    onChange={(e) => setFramingBy(e.target.value)}
-  >
-    <option value="">Select</option>
-    <option value="AV CORE">BY AV CORE</option>
-    <option value="THE CLIENT">BY THE CLIENT</option>
-  </select>
-</div>
+                <div>
+                  <label className="text-base font-semibold text-gray-500">
+                    All Framing Will Be Done By
+                  </label>
+                  <select
+                    className="border px-3 py-2 rounded w-full mt-1"
+                    value={framingBy}
+                    onChange={(e) => setFramingBy(e.target.value)}
+                  >
+                    <option value="">Select</option>
+                    <option value="AV CORE">BY AV CORE</option>
+                    <option value="THE CLIENT">BY THE CLIENT</option>
+                  </select>
+                </div>
 
-<div>
-  <label className="text-base font-semibold text-gray-500">
-    Fabric & Floor Carpet Provided By
-  </label>
-  <select
-    className="border px-3 py-2 rounded w-full mt-1"
-    value={fabricBy}
-    onChange={(e) => setFabricBy(e.target.value)}
-  >
-    <option value="">Select</option>
-    <option value="AV CORE">BY AV CORE</option>
-    <option value="THE CLIENT">BY THE CLIENT</option>
-  </select>
-</div>
+                <div>
+                  <label className="text-base font-semibold text-gray-500">
+                    Fabric & Floor Carpet Provided By
+                  </label>
+                  <select
+                    className="border px-3 py-2 rounded w-full mt-1"
+                    value={fabricBy}
+                    onChange={(e) => setFabricBy(e.target.value)}
+                  >
+                    <option value="">Select</option>
+                    <option value="AV CORE">BY AV CORE</option>
+                    <option value="THE CLIENT">BY THE CLIENT</option>
+                  </select>
+                </div>
 
-<div>
-  <label className="text-base font-semibold text-gray-500">
-    Ceiling Related Work Provided By
-  </label>
-  <select
-    className="border px-3 py-2 rounded w-full mt-1"
-    value={ceilingBy}
-    onChange={(e) => setCeilingBy(e.target.value)}
-  >
-    <option value="">Select</option>
-    <option value="AV CORE">BY AV CORE</option>
-    <option value="THE CLIENT">BY THE CLIENT</option>
-  </select>
-</div>
+                <div>
+                  <label className="text-base font-semibold text-gray-500">
+                    Ceiling Related Work Provided By
+                  </label>
+                  <select
+                    className="border px-3 py-2 rounded w-full mt-1"
+                    value={ceilingBy}
+                    onChange={(e) => setCeilingBy(e.target.value)}
+                  >
+                    <option value="">Select</option>
+                    <option value="AV CORE">BY AV CORE</option>
+                    <option value="THE CLIENT">BY THE CLIENT</option>
+                  </select>
+                </div>
 
+                <div className="text-base font-semibold text-gray-500">
+                  • FABRIC STITCHING CHARGES WILL BE EXTRA AS PER THE DESIGN
+                </div>
+              </div>
+            )}
 
-      <div className="text-base font-semibold text-gray-500">
-        • FABRIC STITCHING CHARGES WILL BE EXTRA AS PER THE DESIGN
-      </div>
-    </div>
-  )}
+          {/* QUOTE TYPE + KIT QTY - MOVED AFTER ACOUSTIC SECTION */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+            <div className="flex flex-col">
+              <label className="font-medium text-sm">Quotation Type</label>
+              <select
+                className="border px-3 py-2 rounded"
+                value={quoteType}
+                onChange={(e) => {
+                  setQuoteType(e.target.value);
+                  if (e.target.value === 'without_gst') {
+                    setGstBaseAmount(0);
+                  }
+                }}
+              >
+                <option value="">Select</option>
+                <option value="with_gst">With GST</option>
+                <option value="without_gst">Without GST</option>
+              </select>
+            </div>
 
-{/* QUOTE TYPE + KIT QTY - MOVED AFTER ACOUSTIC SECTION */}
-<div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-  <div className="flex flex-col">
-    <label className="font-medium text-sm">Quotation Type</label>
-    <select
-      className="border px-3 py-2 rounded"
-      value={quoteType}
-      onChange={(e) => setQuoteType(e.target.value)}
-    >
-      <option value="">Select</option>
-      <option value="with_gst">With GST</option>
-      <option value="without_gst">Without GST</option>
-    </select>
-  </div>
+            <div className="flex flex-col">
+              <label className="font-medium text-sm">Kit Quantity</label>
+              <input
+                type="number"
+                min={1}
+                value={kitQty}
+                onChange={(e) => handleKitQtyChange(e.target.value)}
+                className="border px-3 py-2 rounded w-full"
+              />
+            </div>
 
-  <div className="flex flex-col">
-    <label className="font-medium text-sm">Kit Quantity</label>
-    <input
-      type="number"
-      min={1}
-      value={kitQty}
-      onChange={(e) => handleKitQtyChange(e.target.value)}
-      placeholder="Qty"
-      className="border px-3 py-2 rounded w-full"
-    />
-  </div>
-</div>
-
+            {/* ✅ GST BASE AMOUNT FIELD */}
+            {quoteType === 'with_gst' && (
+              <div className="flex flex-col">
+                <label className="font-medium text-sm">
+                  GST Applicable Amount
+                </label>
+                <input
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  value={gstBaseAmount}
+                  onChange={(e) => setGstBaseAmount(e.target.value)}
+                  className="border px-3 py-2 rounded w-full"
+                  placeholder="Enter amount on which GST applies"
+                />
+              </div>
+            )}
+          </div>
 
           {/* SELECTED KIT ITEMS */}
           {selectedKitData && (
@@ -609,7 +635,6 @@ const isAcoustic = queuedCategories.some(
               </div>
             </div>
           )}
-
 
           <div className="flex justify-end gap-3">
             {selectedKitData && (
@@ -718,12 +743,12 @@ const isAcoustic = queuedCategories.some(
               ))}
             </div>
           )}
-
           {/* GLOBAL ADDITIONAL PRICES */}
           <div className="bg-blue-50 p-4 rounded mt-4">
             <h4 className="font-semibold mb-2">
               Additional Charges (applied to entire quotation)
             </h4>
+
             {additionalPrices.map((row, idx) => (
               <div
                 key={idx}
@@ -732,21 +757,25 @@ const isAcoustic = queuedCategories.some(
                 <input
                   className="border px-2 py-1 rounded w-full"
                   placeholder="Name"
-                  value={row.add_price_name}
+                  value={row.add_price_name || ''}
                   onChange={(e) =>
                     updateAdditionalPrice(idx, 'add_price_name', e.target.value)
                   }
                 />
+
                 <div className="flex gap-2 items-center">
                   <input
                     type="number"
+                    min="0"
+                    step="0.01"
                     className="border px-2 py-1 rounded w-full"
                     placeholder="Price"
-                    value={row.price}
+                    value={row.price || ''}
                     onChange={(e) =>
                       updateAdditionalPrice(idx, 'price', e.target.value)
                     }
                   />
+
                   <div className="flex gap-1">
                     {idx === additionalPrices.length - 1 && (
                       <button
@@ -757,6 +786,7 @@ const isAcoustic = queuedCategories.some(
                         +
                       </button>
                     )}
+
                     {additionalPrices.length > 1 && (
                       <button
                         type="button"
@@ -774,18 +804,20 @@ const isAcoustic = queuedCategories.some(
 
           {/* GRAND TOTAL */}
           <div className="text-right font-semibold text-lg bg-green-100 text-green-800 px-4 py-2 rounded mt-4">
-            TOTAL COST OF PROJECT IN Rs: ₹{totalWithoutGST.toFixed(2)}
+            TOTAL COST OF PROJECT IN Rs: ₹
+            {Number(totalWithoutGST || 0).toFixed(2)}
             {quoteType === 'with_gst' && (
               <span className="text-sm font-normal block">
-                (including GST ₹{gstAmount.toFixed(2)})
+                GST (18%) on ₹{Number(gstBaseAmount || 0).toFixed(2)} = ₹
+                {Number(gstAmount || 0).toFixed(2)}
               </span>
             )}
           </div>
 
-          {/* TOTAL AMOUNT INCLUDING GST OR AS IS */}
-<div className="text-right font-semibold text-lg bg-blue-100 text-blue-800 px-4 py-2 rounded mt-2">
-  TOTAL AMOUNT: ₹{totalWithGST.toFixed(2)}
-</div>
+          {/* TOTAL AMOUNT INCLUDING GST */}
+          <div className="text-right font-bold text-xl bg-blue-100 text-blue-800 px-4 py-2 rounded mt-2">
+            TOTAL AMOUNT: ₹{Number(totalWithGST || 0).toFixed(2)}
+          </div>
 
           {/* ACTIONS */}
           <div className="flex justify-end gap-3 border-t pt-4">

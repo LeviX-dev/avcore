@@ -1,48 +1,139 @@
 import bcrypt from 'bcrypt';
 import { getUserByUsername  } from '../models/signinModel.js';
+import { sendOtpMail } from '../utils/sendOtpMail.js';
+import db from '../database/db.js';
+
+
+
+// export const signIn = async (req, res) => {
+//   try {
+//     const { username, password } = req.body;
+
+//     if (!username || !password) {
+//       return res.status(400).json({ message: 'Please provide both username and password' });
+//     }
+
+//     // Fetch user from the database
+//     const user = await getUserByUsername(username);
+//     if (!user) {
+//       return res.status(401).json({ message: 'Invalid username' });
+//     }
+
+//     // Check if the password is valid
+//     const isPasswordValid = await bcrypt.compare(password, user.password);
+//     if (!isPasswordValid) {
+//       return res.status(401).json({ message: 'Invalid password' });
+//     }
+
+//     // Set session data
+//     req.session.user = {
+//       id: user.user_id,
+//       username: user.username,
+//       role: user.role,
+//     };
+
+//     console.log('session:', req.session.user);
+
+//     // Return username and role along with success message
+//     res.status(200).json({
+//       message: 'Sign-in successful',
+//       user: {
+//         username: user.username,
+//         role: user.role,
+//       },
+//     });
+//   } catch (error) {
+//     res.status(500).json({ message: 'Server error', error: error.message });
+//   }
+// };
+
 
 
 export const signIn = async (req, res) => {
   try {
+
     const { username, password } = req.body;
 
     if (!username || !password) {
-      return res.status(400).json({ message: 'Please provide both username and password' });
+      return res.status(400).json({ message: 'Please provide username and password' });
     }
 
-    // Fetch user from the database
     const user = await getUserByUsername(username);
+
     if (!user) {
       return res.status(401).json({ message: 'Invalid username' });
     }
 
-    // Check if the password is valid
     const isPasswordValid = await bcrypt.compare(password, user.password);
+
     if (!isPasswordValid) {
       return res.status(401).json({ message: 'Invalid password' });
     }
 
-    // Set session data
-    req.session.user = {
-      id: user.user_id,
-      username: user.username,
-      role: user.role,
-    };
+    // generate otp
+    const otp = Math.floor(100000 + Math.random() * 900000).toString();
 
-    console.log('session:', req.session.user);
+    const expiry = new Date(Date.now() + 5 * 60 * 1000);
 
-    // Return username and role along with success message
-    res.status(200).json({
-      message: 'Sign-in successful',
-      user: {
-        username: user.username,
-        role: user.role,
-      },
+    await db.query(
+      "UPDATE users SET otp=?, otp_expiry=? WHERE user_id=?",
+      [otp, expiry, user.user_id]
+    );
+
+    await sendOtpMail(user, otp);
+
+    return res.status(200).json({
+      message: "OTP sent to your email",
+      otpRequired: true,
+      username: user.username
     });
+
   } catch (error) {
     res.status(500).json({ message: 'Server error', error: error.message });
   }
 };
+
+
+export const verifyOtp = async (req, res) => {
+
+  const { username, otp } = req.body;
+
+  const [rows] = await db.query(
+    "SELECT * FROM users WHERE username=?",
+    [username]
+  );
+
+  const user = rows[0];
+
+  if (!user) {
+    return res.status(401).json({ message: "User not found" });
+  }
+
+  if (user.otp !== otp) {
+    return res.status(401).json({ message: "Invalid OTP" });
+  }
+
+  if (new Date() > new Date(user.otp_expiry)) {
+    return res.status(401).json({ message: "OTP expired" });
+  }
+
+req.session.user = {
+  id: user.user_id,
+  username: user.username,
+  role: user.role,
+  name: user.name,
+  loginTime: new Date()
+};
+
+  res.status(200).json({
+    message: "Login successful",
+    user: {
+      username: user.username,
+      role: user.role
+    }
+  });
+};
+
 
 
 export const checkSession = (req, res) => {

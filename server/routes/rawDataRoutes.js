@@ -13,11 +13,14 @@ getClosedLeadsFullData ,
 getMissedAssignedFullData ,
 getTodaysAssignedLeadsFullData ,
 getUpcomingAssignedFullData, 
-getEmployeeLeadWorkReport,
-getEmployeeWiseAssignedLeadCount, deleteDocument , getQuotationPendingLeads , 
+getEmployeeLeadWorkReport, deleteDocument , getQuotationPendingLeads , 
 getDemoLeadsFullData  ,  getQuotationFollowupLeadsFullData , getDashboardLeadOverview , 
-getSimpleLeadReport , getLeadHistory , getEmployeeLeadsWithHistory ,
+getSimpleLeadReport , getLeadHistory , getEmployeeLeadsWithHistory ,getAssignedMissTodaysLeadsFullData ,
  
+getEmployeeWorkReport , getEmployeeWorkReportFilters , 
+getEmployeeLeadList ,getEmployeeDetailedReport  ,getQuotationClosedLeads ,
+
+
 } from '../controllers/rawDataController.js';
 import uploadMiddleware from '../middleware/upload.js';
 
@@ -44,8 +47,6 @@ router.post('/upload/:master_id', uploadMiddleware, uploadDocuments);
 
 router.delete('/document/:doc_id', deleteDocument);
 
-
-
 router.get('/documents/:master_id', getDocumentsByMasterId);
 
 router.get('/leadstage', getLeadStage);
@@ -62,18 +63,10 @@ router.get("/history/:master_id", getReassignmentByMaster);
 
 // 📌 🔥 NEW — DROP & CLOSED LEADS
 
-
-
-
-
-
 router.get('/dashboard/drop-leads-fulldata', getDropLeadsFullData); 
 
 
-
 router.get('/dashboard/close-leads-fulldata', getClosedLeadsFullData); 
-
-
 
 
 router.get('/dashboard/demo-leads-fulldata', getDemoLeadsFullData);
@@ -102,15 +95,26 @@ router.get("/simple-lead-report", getSimpleLeadReport);
 router.get("/lead-history/:master_id", getLeadHistory);
 
 
+router.get("/reports/employee-detailed", getEmployeeDetailedReport);
 
-router.get('/reports/employee-detailed', getEmployeeWiseAssignedLeadCount); 
-router.get(
-  "/reports/employee-leads/:employee",
-  getEmployeeLeadsWithHistory
-);
+router.get("/reports/employee-leads/:employee/:type", getEmployeeLeadList);
+
+router.get("/reports/employee-leads/:employee", getEmployeeLeadsWithHistory);
 
 
 router.get('/quotation-pending', getQuotationPendingLeads);
+
+
+router.get('/dashboard/assigned-miss-todays-leads-fulldata', getAssignedMissTodaysLeadsFullData);
+
+
+router.get("/employee-work-report", getEmployeeWorkReport);
+
+router.get('/employee-work-report/filters', getEmployeeWorkReportFilters);
+
+router.get('/getQuotationClosedLeads', getQuotationClosedLeads); 
+
+
 
 
 export default router;

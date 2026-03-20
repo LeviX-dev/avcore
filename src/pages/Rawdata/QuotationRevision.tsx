@@ -1,175 +1,13 @@
-
-// import React, { useEffect, useState } from 'react';
-// import { useParams, useNavigate } from 'react-router-dom';
-// import axios from 'axios';
-// import { FaArrowLeft, FaEdit, FaEye } from 'react-icons/fa';
-// import Breadcrumb from '../../components/Breadcrumbs/Breadcrumb';
-// import { BASE_URL } from '../../../public/config';
-
-// const QuotationRevisionPage = () => {
-//   const { master_id, revision } = useParams();
-//   const navigate = useNavigate();
-
-//   const [data, setData] = useState(null);
-
-//   useEffect(() => {
-//     fetchRevisions();
-//   }, []);
-
-//   const fetchRevisions = async () => {
-//     try {
-//       const res = await axios.get(`${BASE_URL}api/revisions/${master_id}`);
-//       setData(res.data);
-//     } catch (error) {
-//       console.error('Error fetching quotation revisions', error);
-//     }
-//   };
-
-//   if (!data) return null;
-
-//   const quotation = data.quotations[0];
-//   const latestRevisionNumber =
-//     quotation.revisions[quotation.revisions.length - 1]?.revision;
-
-//   const calculateRevisionTotal = (rev) => {
-//     let total = 0;
-//     rev.kits.forEach((kit) => {
-//       kit.items.forEach((item) => {
-//         total +=
-//           Number(item.model_qty) *
-//           Number(item.model_price) *
-//           Number(kit.kit_qty || 1);
-//       });
-//     });
-//     return total.toFixed(2);
-//   };
-
-//   return (
-//     <div>
-//       {/* TOP BAR */}
-//       <div className="flex justify-between mb-4">
-//         <button
-//           onClick={() => navigate('/quatation-pending')}
-//           className="flex items-center gap-2 bg-gray-500 text-white px-4 py-2 rounded hover:bg-gray-600"
-//         >
-//           <FaArrowLeft />
-//           Back
-//         </button>
-//       </div>
-
-//       <Breadcrumb pageName="Quotation Version" />
-
-//       {/* QUOTATION REVISIONS TABLE */}
-//       {/* QUOTATION REVISIONS TABLE */}
-//       <div className="bg-white rounded shadow mb-6 overflow-x-auto">
-//         <table className="w-full table-auto border border-gray-200">
-//           <thead className="bg-gray-100">
-//             <tr>
-//               <th className="px-4 py-3 text-center font-medium">Revision</th>
-//               <th className="px-4 py-3 text-left font-medium">
-//                 Kits / Products
-//               </th>
-//               <th className="px-4 py-3 text-right font-medium">Total</th>
-//               <th className="px-4 py-3 text-left font-medium">Created By</th>
-//               <th className="px-4 py-3 text-left font-medium">Updated By</th>
-//               <th className="px-4 py-3 text-left font-medium">Actions</th>
-//             </tr>
-//           </thead>
-//           <tbody>
-//             {quotation.revisions.map((rev) => (
-//               <tr
-//                 key={rev.revision}
-//                 className="border-t hover:bg-gray-50 align-top"
-//               >
-//                 <td className="px-4 py-3 text-center font-semibold">
-//                   Version {rev.revision}
-//                 </td>
-
-//                 <td className="px-4 py-3 text-left">
-//                   {rev.kits.map((kit) => (
-//                     <div
-//                       key={kit.kit_id || `single_${kit.cat_id}`}
-//                       className="mb-2"
-//                     >
-//                       <div className="font-medium">
-//                         {kit.kit_name || 'Single Product'} (Category:{' '}
-//                         {kit.cat_name})
-//                         {kit.kit_qty > 1 && ` | Kit Qty: ${kit.kit_qty}`}
-//                       </div>
-//                       <ul className="ml-4 list-disc">
-//                         {kit.items.map((item) => (
-//                           <li key={item.model_id}>
-//                             {item.model} - {item.brand_name} | Qty:{' '}
-//                             {item.model_qty} | ₹ {item.model_price}
-//                           </li>
-//                         ))}
-//                       </ul>
-//                     </div>
-//                   ))}
-//                 </td>
-
-//                 <td className="px-4 py-3 text-right font-semibold text-green-600">
-//                   ₹{' '}
-//                   {rev.totals
-//                     ? quotation.type === 'with_gst'
-//                       ? Number(rev.totals.with_gst ?? 0).toFixed(2)
-//                       : Number(rev.totals.without_gst ?? 0).toFixed(2)
-//                     : calculateRevisionTotal(rev)}
-//                 </td>
-
-//                 <td className="px-4 py-3 text-left">
-//                   {quotation.created_by_name || '-'}
-//                 </td>
-
-//                 <td className="px-4 py-3 text-left">
-//                   {quotation.updated_by_name || '-'}
-//                 </td>
-
-//                 <td className="px-4 py-3 text-left">
-//                   <div className="flex gap-2">
-//                     <button
-//                       className={`bg-blue-600 hover:bg-blue-700 text-white px-3 py-1.5 rounded flex items-center gap-1 ${
-//                         rev.revision !== latestRevisionNumber
-//                           ? 'opacity-50 cursor-not-allowed'
-//                           : ''
-//                       }`}
-//                       title="Edit Quotation"
-//                       disabled={rev.revision !== latestRevisionNumber}
-//                       onClick={() =>
-//                         navigate(`/quotation/edit/${quotation.qt_id}`, {
-//                           state: { revision: rev.revision },
-//                         })
-//                       }
-//                     >
-//                       <FaEdit />
-//                     </button>
-
-//                     <button
-//                       className="bg-green-600 hover:bg-green-700 text-white px-3 py-1.5 rounded flex items-center gap-1"
-//                       title="View Lead"
-//                       onClick={() => navigate(`/lead/view/${master_id}/${rev.revision}`)}
-//                     >
-//                       <FaEye />
-//                     </button>
-//                   </div>
-//                 </td>
-//               </tr>
-//             ))}
-//           </tbody>
-//         </table>
-//       </div>
-//     </div>
-//   );
-// };
-
-// export default QuotationRevisionPage;
-
-
-
 import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import axios from 'axios';
-import { FaArrowLeft, FaEdit, FaEye, FaFileInvoiceDollar, FaInfoCircle } from 'react-icons/fa';
+import {
+  FaArrowLeft,
+  FaEdit,
+  FaEye,
+  FaFileInvoiceDollar,
+  FaInfoCircle,
+} from 'react-icons/fa';
 import { MdAttachMoney, MdDateRange } from 'react-icons/md';
 import Breadcrumb from '../../components/Breadcrumbs/Breadcrumb';
 import { BASE_URL } from '../../../public/config';
@@ -200,7 +38,8 @@ const QuotationRevisionPage = () => {
   if (!data) return null;
 
   const quotation = data.quotations[0];
-  const latestRevisionNumber = quotation.revisions[quotation.revisions.length - 1]?.revision;
+  const latestRevisionNumber =
+    quotation.revisions[quotation.revisions.length - 1]?.revision;
 
   const calculateRevisionTotal = (rev) => {
     let total = 0;
@@ -220,7 +59,7 @@ const QuotationRevisionPage = () => {
     return new Date(dateString).toLocaleDateString('en-GB', {
       day: '2-digit',
       month: 'short',
-      year: 'numeric'
+      year: 'numeric',
     });
   };
 
@@ -247,13 +86,17 @@ const QuotationRevisionPage = () => {
                 </h3>
                 <div className="flex flex-wrap gap-4 mt-2">
                   <div className="flex items-center gap-2 text-sm">
-                    <span className="text-gray-600 dark:text-gray-400">Contact:</span>
+                    <span className="text-gray-600 dark:text-gray-400">
+                      Contact:
+                    </span>
                     <span className="font-semibold text-gray-900 dark:text-white bg-gray-100 dark:bg-gray-800 px-2 py-1 rounded">
                       {leadDetails.number}
                     </span>
                   </div>
                   <div className="flex items-center gap-2 text-sm">
-                    <span className="text-gray-600 dark:text-gray-400">City:</span>
+                    <span className="text-gray-600 dark:text-gray-400">
+                      City:
+                    </span>
                     <span className="font-semibold text-gray-900 dark:text-white bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 px-2 py-1 rounded">
                       {leadDetails.city}
                     </span>
@@ -261,7 +104,9 @@ const QuotationRevisionPage = () => {
                 </div>
               </div>
               <div className="bg-gradient-to-r from-blue-50 to-blue-100 dark:from-blue-900/20 dark:to-blue-800/10 border border-blue-200 dark:border-blue-800/30 rounded-lg px-3 py-2">
-                <div className="text-xs text-gray-600 dark:text-gray-400">Quotation No.</div>
+                <div className="text-xs text-gray-600 dark:text-gray-400">
+                  Quotation No.
+                </div>
                 <div className="text-sm font-bold text-blue-700 dark:text-blue-300">
                   {quotation.qt_number}
                 </div>
@@ -282,43 +127,57 @@ const QuotationRevisionPage = () => {
                 <th className="py-3 px-4 text-left">
                   <div className="flex items-center gap-2">
                     <FaFileInvoiceDollar className="text-gray-600 dark:text-gray-400 text-sm" />
-                    <span className="font-semibold text-gray-900 dark:text-white text-sm">Version</span>
+                    <span className="font-semibold text-gray-900 dark:text-white text-sm">
+                      Version
+                    </span>
                   </div>
                 </th>
                 <th className="py-3 px-4 text-left">
-                  <span className="font-semibold text-gray-900 dark:text-white text-sm">Kits</span>
+                  <span className="font-semibold text-gray-900 dark:text-white text-sm">
+                    Kits
+                  </span>
                 </th>
                 <th className="py-3 px-4 text-left">
                   <div className="flex items-center gap-2">
                     <MdAttachMoney className="text-gray-600 dark:text-gray-400 text-sm" />
-                    <span className="font-semibold text-gray-900 dark:text-white text-sm">Total</span>
+                    <span className="font-semibold text-gray-900 dark:text-white text-sm">
+                      Total
+                    </span>
                   </div>
                 </th>
                 <th className="py-3 px-4 text-left">
-                  <span className="font-semibold text-gray-900 dark:text-white text-sm">Created By</span>
+                  <span className="font-semibold text-gray-900 dark:text-white text-sm">
+                    Created By
+                  </span>
                 </th>
                 <th className="py-3 px-4 text-left">
-                  <span className="font-semibold text-gray-900 dark:text-white text-sm">Updated By</span>
+                  <span className="font-semibold text-gray-900 dark:text-white text-sm">
+                    Updated By
+                  </span>
                 </th>
                 <th className="py-3 px-4 text-left">
-                  <span className="font-semibold text-gray-900 dark:text-white text-sm">Actions</span>
+                  <span className="font-semibold text-gray-900 dark:text-white text-sm">
+                    Actions
+                  </span>
                 </th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
               {quotation.revisions.map((rev) => (
-                <tr 
-                  key={rev.revision} 
+                <tr
+                  key={rev.revision}
                   className="hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors duration-150"
                 >
                   {/* Version */}
                   <td className="py-3 px-4">
                     <div className="flex flex-col items-start">
-                      <div className={`inline-flex items-center justify-center px-3 py-1 rounded-lg font-bold text-xs mb-1 ${
-                        rev.revision === latestRevisionNumber 
-                          ? 'bg-gradient-to-r from-green-100 to-green-50 dark:from-green-900/30 dark:to-green-800/20 text-green-800 dark:text-green-300 border border-green-200 dark:border-green-700/30 shadow-sm' 
-                          : 'bg-gradient-to-r from-blue-100 to-blue-50 dark:from-blue-900/30 dark:to-blue-800/20 text-blue-800 dark:text-blue-300 border border-blue-200 dark:border-blue-700/30 shadow-sm'
-                      }`}>
+                      <div
+                        className={`inline-flex items-center justify-center px-3 py-1 rounded-lg font-bold text-xs mb-1 ${
+                          rev.revision === latestRevisionNumber
+                            ? 'bg-gradient-to-r from-green-100 to-green-50 dark:from-green-900/30 dark:to-green-800/20 text-green-800 dark:text-green-300 border border-green-200 dark:border-green-700/30 shadow-sm'
+                            : 'bg-gradient-to-r from-blue-100 to-blue-50 dark:from-blue-900/30 dark:to-blue-800/20 text-blue-800 dark:text-blue-300 border border-blue-200 dark:border-blue-700/30 shadow-sm'
+                        }`}
+                      >
                         V{rev.revision}
                         {rev.revision === latestRevisionNumber && (
                           <span className="ml-1 px-1.5 py-0.5 text-[10px] bg-green-200 dark:bg-green-800 text-green-800 dark:text-green-300 rounded-full">
@@ -337,7 +196,7 @@ const QuotationRevisionPage = () => {
                   <td className="py-3 px-4">
                     <div className="space-y-2 max-w-xs">
                       {rev.kits.map((kit) => (
-                        <div 
+                        <div
                           key={kit.kit_id || `single_${kit.cat_id}`}
                           className="bg-gray-50 dark:bg-gray-800/50 rounded p-2 border border-gray-100 dark:border-gray-700"
                         >
@@ -368,14 +227,23 @@ const QuotationRevisionPage = () => {
                   <td className="py-3 px-4">
                     <div className="flex flex-col items-start">
                       <div className="text-lg font-bold text-green-600 dark:text-green-400 mb-0.5">
-                        ₹ {rev.totals
-                          ? quotation.type === 'with_gst'
-                            ? Number(rev.totals.with_gst ?? 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })
-                            : Number(rev.totals.without_gst ?? 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })
+                        ₹{' '}
+                        {rev.totals
+                          ? Number(
+                              rev.totals.with_gst &&
+                                rev.totals.with_gst !== '0.00'
+                                ? rev.totals.with_gst
+                                : rev.totals.without_gst,
+                            ).toLocaleString('en-IN', {
+                              minimumFractionDigits: 2,
+                            })
                           : calculateRevisionTotal(rev)}
                       </div>
+
                       <div className="text-[11px] text-gray-600 dark:text-gray-400">
-                        {quotation.type === 'with_gst' ? 'Incl. GST' : 'Excl. GST'}
+                        {rev.totals?.with_gst && rev.totals.with_gst !== '0.00'
+                          ? 'Incl. GST'
+                          : 'Excl. GST'}
                       </div>
                     </div>
                   </td>
@@ -427,7 +295,10 @@ const QuotationRevisionPage = () => {
                       <button
                         className="flex items-center justify-center p-2 rounded-lg font-medium bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800 text-white shadow-md hover:shadow-lg transition-all duration-200"
                         title="View Lead"
-                        onClick={() => navigate(`/lead/view/${master_id}/${rev.revision}`)}
+                        onClick={() =>
+                          navigate(`/lead/view/${master_id}/${rev.revision}`)
+                          
+                        }
                       >
                         <FaEye className="text-sm" />
                       </button>
@@ -443,17 +314,25 @@ const QuotationRevisionPage = () => {
         <div className="bg-gray-50 dark:bg-gray-800 border-t border-gray-200 dark:border-gray-700 px-6 py-3">
           <div className="flex items-center justify-between">
             <div className="text-sm text-gray-600 dark:text-gray-400">
-              Showing <span className="font-semibold">{quotation.revisions.length}</span> versions
+              Showing{' '}
+              <span className="font-semibold">
+                {quotation.revisions.length}
+              </span>{' '}
+              versions
             </div>
             <div className="flex items-center gap-4">
               <div className="text-sm">
-                <span className="text-gray-600 dark:text-gray-400">Latest Version:</span>
+                <span className="text-gray-600 dark:text-gray-400">
+                  Latest Version:
+                </span>
                 <span className="ml-2 font-bold text-blue-600 dark:text-blue-400">
                   Version {latestRevisionNumber}
                 </span>
               </div>
               <div className="text-sm">
-                <span className="text-gray-600 dark:text-gray-400">Quotation Type:</span>
+                <span className="text-gray-600 dark:text-gray-400">
+                  Quotation Type:
+                </span>
                 <span className="ml-2 font-bold text-purple-600 dark:text-purple-400">
                   {quotation.type === 'with_gst' ? 'With GST' : 'Without GST'}
                 </span>

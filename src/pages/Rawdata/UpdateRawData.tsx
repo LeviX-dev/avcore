@@ -33,9 +33,10 @@ interface Client {
   cat_id: number;
   reference_name: string;
   reference_id: number;
-
   reference?: string | number;
   city?: string;
+  original_city?: string;
+  original_area?: string;
   location_link?: string;
   room_length: string;
   room_width: string;
@@ -58,7 +59,6 @@ interface Client {
   detailed_remark?: string;
   followup_date?: string;
   assign_date?: string; // Entry Date (read-only)
-
   assigned_to: string[];
   reassignment_date?: string;
   category_other?: string;
@@ -67,12 +67,9 @@ interface Client {
 }
 
 interface ReassignmentRemark {
-  // New reassignment format
-  assignedTo?: string;            // user names or ids (comma separated)
+  assignedTo?: string;
   leadStage?: string;
   reassignment_date?: string;
-
-  // Common fields
   remark?: string;
   created_by_user?: number;
   created_at?: string;
@@ -111,88 +108,108 @@ const UpdateRawData: React.FC<UpdateDataModalProps> = ({
   const [quickRemarks, setQuickRemarks] = useState([]);
   const [users, setUsers] = useState([]);
   const [filteredUsers, setFilteredUsers] = useState([]);
-  const [searchTerm, setSearchTerm] = useState(''); 
+  const [searchTerm, setSearchTerm] = useState('');
+  const [currentUserRole, setCurrentUserRole] = useState('');
+  const [allowedRoles, setAllowedRoles] = useState([]);
 
   const [toast, setToast] = useState<{
-  type: 'success' | 'error' | 'warning';
-  message: string;
-} | null>(null);
+    type: 'success' | 'error' | 'warning';
+    message: string;
+  } | null>(null);
 
-const showToast = (
-  message: string,
-  type: 'success' | 'error' | 'warning' = 'success',
-  duration = 9000
-) => {
-  setToast({ message, type });
+  const showToast = (
+    message: string,
+    type: 'success' | 'error' | 'warning' = 'success',
+    duration = 9000
+  ) => {
+    setToast({ message, type });
 
-  setTimeout(() => {
-    setToast(null);
-  }, duration);
-};
+    setTimeout(() => {
+      setToast(null);
+    }, duration);
+  };
 
-
-
+  // Fetch users with role-based filtering
   useEffect(() => {
     const fetchUsers = async () => {
       try {
-        const response = await axios.get(`${BASE_URL}api/users`);
-        setUsers(response.data);
-        setFilteredUsers(response.data);
+        const response = await axios.get(`${BASE_URL}api/users/by-role`, {
+          withCredentials: true
+        });
+        
+        console.log('API Response:', response.data);
+        
+        if (response.data.success) {
+          // Extract users array from the response
+          const usersData = response.data.users || [];
+          setUsers(usersData);
+          setFilteredUsers(usersData);
+          setCurrentUserRole(response.data.currentUserRole);
+          setAllowedRoles(response.data.allowedRoles || []);
+        } else {
+          setUsers([]);
+          setFilteredUsers([]);
+        }
       } catch (error) {
         console.error('Failed to fetch users:', error);
+        setUsers([]);
+        setFilteredUsers([]);
+        
+        // Show error toast
+        showToast('Failed to load users', 'error');
       }
     };
-    fetchUsers();
-  }, []);
+    
+    if (showEditPopup) {
+      fetchUsers();
+    }
+  }, [showEditPopup]);
 
+  useEffect(() => {
+    if (!showEditPopup || !editingClient || users.length === 0) return;
 
+    const resolvedUserIds: string[] = [];
 
-useEffect(() => {
-  if (!showEditPopup || !editingClient || users.length === 0) return;
+    if (Array.isArray(editingClient.reassignment_remarks)) {
+      editingClient.reassignment_remarks.forEach((r: any) => {
+        if (r?.assignedTo) {
+          r.assignedTo
+            .toString()
+            .split(',')
+            .map((n: string) => n.trim())
+            .forEach((name: string) => {
+              const matchedUser = users.find(
+                (u: any) =>
+                  u.name?.toLowerCase() === name.toLowerCase()
+              );
 
-  const resolvedUserIds: string[] = [];
-
-  if (Array.isArray(editingClient.reassignment_remarks)) {
-    editingClient.reassignment_remarks.forEach((r: any) => {
-      if (r?.assignedTo) {
-        r.assignedTo
-          .toString()
-          .split(',')
-          .map((n: string) => n.trim())
-          .forEach((name: string) => {
-            const matchedUser = users.find(
-              (u: any) =>
-                u.name?.toLowerCase() === name.toLowerCase()
-            );
-
-            if (matchedUser && !resolvedUserIds.includes(matchedUser.user_id)) {
-              resolvedUserIds.push(matchedUser.user_id);
-            }
-          });
-      }
-    });
-  }
-
-  const mergedAssigned = Array.from(
-    new Set([
-      ...(Array.isArray(editingClient.assigned_to)
-        ? editingClient.assigned_to.filter(v => typeof v !== 'string' || isNaN(Number(v)))
-        : []),
-      ...resolvedUserIds,
-    ])
-  );
-
-  setEditingClient(prev =>
-    prev
-      ? {
-          ...prev,
-          assigned_to: mergedAssigned,
+              if (matchedUser && !resolvedUserIds.includes(matchedUser.user_id)) {
+                resolvedUserIds.push(matchedUser.user_id);
+              }
+            });
         }
-      : prev
-  );
-}, [showEditPopup, users]);
+      });
+    }
 
+    const mergedAssigned = Array.from(
+      new Set([
+        ...(Array.isArray(editingClient.assigned_to)
+          ? editingClient.assigned_to.filter(v => typeof v !== 'string' || isNaN(Number(v)))
+          : []),
+        ...resolvedUserIds,
+      ])
+    );
 
+    setEditingClient(prev =>
+      prev
+        ? {
+            ...prev,
+            assigned_to: mergedAssigned,
+          }
+        : prev
+    );
+
+  }, [showEditPopup, users, editingClient]);
 
   // Filter users based on search term
   useEffect(() => {
@@ -202,7 +219,8 @@ useEffect(() => {
       const term = searchTerm.toLowerCase();
       const filtered = users.filter(user =>
         user.name.toLowerCase().includes(term) ||
-        (user.role && user.role.toLowerCase().includes(term))
+        (user.role && user.role.toLowerCase().includes(term)) ||
+        (user.role_label && user.role_label.toLowerCase().includes(term))
       );
       setFilteredUsers(filtered);
     }
@@ -220,6 +238,7 @@ useEffect(() => {
         cat_id: editingClient.cat_id,
         reference_id: editingClient.reference_id || editingClient.reference,
         area_id: editingClient.area_id,
+        // 🔥 MODIFIED: Send the appropriate value based on what's being shown
         city: editingClient.city,
         location_link: editingClient.location_link,
         room_length: editingClient.room_length,
@@ -321,7 +340,7 @@ useEffect(() => {
           alertMsg += `\n\n📊 Summary: ${(data.inserted?.length || 0) + (data.skipped?.length || 0)} total reassignment attempts.`;
         }
 
-showToast(alertMsg, 'success', 2000);
+        showToast(alertMsg, 'success', 2000);
 
         fetchRawData(); // Refresh the table
         return { success: true };
@@ -361,7 +380,7 @@ showToast(alertMsg, 'success', 2000);
         errorMessage = `❌ Error: ${error.message}`;
       }
 
-showToast(errorMessage, 'error', 5000);
+      showToast(errorMessage, 'error', 5000);
       return {
         success: false,
         message: errorMessage,
@@ -370,10 +389,7 @@ showToast(errorMessage, 'error', 5000);
     }
   };
 
-
   const [isNewRemark, setIsNewRemark] = useState(false);
-
-
 
   const handleInputChange = (
     e: React.ChangeEvent<
@@ -441,17 +457,14 @@ showToast(errorMessage, 'error', 5000);
     }
 
     // Auto-copy quick_remark to detailed_remark when quick_remark is selected
-     
-    // Auto-copy quick_remark to detailed_remark when quick_remark is selected
-if (name === 'quick_remark' && value) {
-  setEditingClient({
-    ...editingClient,
-    [name]: processedValue,
-    detailed_remark: value, // ALWAYS copy, even if detailed_remark already has content
-  });
-  return;
-}
-
+    if (name === 'quick_remark' && value) {
+      setEditingClient({
+        ...editingClient,
+        [name]: processedValue,
+        detailed_remark: value,
+      });
+      return;
+    }
 
     setEditingClient({
       ...editingClient,
@@ -532,7 +545,9 @@ if (name === 'quick_remark' && value) {
       });
     } else {
       // Add all filtered users (avoiding duplicates)
-      const newAssigned = [...new Set([...currentAssigned, ...filteredUserIds])];
+      const newAssigned = Array.from(
+        new Set([...currentAssigned, ...filteredUserIds])
+      );
       setEditingClient({
         ...editingClient,
         assigned_to: newAssigned
@@ -558,48 +573,47 @@ if (name === 'quick_remark' && value) {
         <form onSubmit={async (e) => {
           e.preventDefault();
           const result = await handleUpdateClient(editingClient);
-if (result.success) {
-  setTimeout(() => {
-    closeEditPopup();
-  }, 2200); // slightly more than toast duration
-}
-
+          if (result.success) {
+            setTimeout(() => {
+              closeEditPopup();
+            }, 2200);
+          }
         }}>
           {/* Required Fields Section */}
           <div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-<div>
-  <label className="block mb-1 text-base font-semibold text-green-700 dark:text-green-600">
-    Full Name *
-  </label>
-  <input
-    type="text"
-    name="name"
-    value={editingClient.name}
-    onChange={handleInputChange}
-    required
-    pattern="^[A-Za-z\s]+$"
-    title="Only alphabets and spaces allowed"
-    className="w-full p-2 border rounded text-sm dark:border-form-strokedark dark:bg-form-input dark:text-white"
-  />
-</div>
+              <div>
+                <label className="block mb-1 text-base font-semibold text-green-700 dark:text-green-600">
+                  Full Name *
+                </label>
+                <input
+                  type="text"
+                  name="name"
+                  value={editingClient.name}
+                  onChange={handleInputChange}
+                  required
+                  pattern="^[A-Za-z\s]+$"
+                  title="Only alphabets and spaces allowed"
+                  className="w-full p-2 border rounded text-sm dark:border-form-strokedark dark:bg-form-input dark:text-white"
+                />
+              </div>
 
-<div>
-  <label className="block mb-1 text-base font-semibold text-green-700 dark:text-green-600">
-    Contact No. *
-  </label>
-  <input
-    type="text"
-    name="number"
-    value={editingClient.number}
-    onChange={handleInputChange}
-    required
-    pattern="^[0-9]{10}$"
-    maxLength={10}
-    title="Enter valid 10 digit number"
-    className="w-full p-2 border rounded text-sm dark:border-form-strokedark dark:bg-form-input dark:text-white"
-  />
-</div>
+              <div>
+                <label className="block mb-1 text-base font-semibold text-green-700 dark:text-green-600">
+                  Contact No. *
+                </label>
+                <input
+                  type="text"
+                  name="number"
+                  value={editingClient.number}
+                  onChange={handleInputChange}
+                  required
+                  pattern="^[0-9]{10}$"
+                  maxLength={10}
+                  title="Enter valid 10 digit number"
+                  className="w-full p-2 border rounded text-sm dark:border-form-strokedark dark:bg-form-input dark:text-white"
+                />
+              </div>
 
               {/* Alternate No. */}
               <div>
@@ -617,18 +631,18 @@ if (result.success) {
                 />
               </div>
 
-<div>
-  <label className="block mb-1 text-sm dark:text-white">
-    Email
-  </label>
-  <input
-    type="email"
-    name="email"
-    value={editingClient.email}
-    onChange={handleInputChange}
-    className="w-full p-2 border rounded text-sm dark:border-form-strokedark dark:bg-form-input dark:text-white"
-  />
-</div>
+              <div>
+                <label className="block mb-1 text-sm dark:text-white">
+                  Email
+                </label>
+                <input
+                  type="email"
+                  name="email"
+                  value={editingClient.email}
+                  onChange={handleInputChange}
+                  className="w-full p-2 border rounded text-sm dark:border-form-strokedark dark:bg-form-input dark:text-white"
+                />
+              </div>
 
               <div>
                 <label className="block mb-1 text-base font-semibold text-green-700 dark:text-green-600">
@@ -659,16 +673,16 @@ if (result.success) {
                 {categories.find(
                   (c) => c.cat_id === editingClient.cat_id
                 )?.cat_name === 'Other' && (
-                    <input
-                      type="text"
-                      name="category_other"
-                      value={editingClient.category_other || ''}
-  onChange={handleInputChange}
-  pattern="^[A-Za-z\s]+$"
-  title="Only alphabets and spaces allowed"
-  className="w-full p-2 border rounded text-sm"
-                    />
-                  )}
+                  <input
+                    type="text"
+                    name="category_other"
+                    value={editingClient.category_other || ''}
+                    onChange={handleInputChange}
+                    pattern="^[A-Za-z\s]+$"
+                    title="Only alphabets and spaces allowed"
+                    className="w-full p-2 border rounded text-sm"
+                  />
+                )}
               </div>
 
               <div>
@@ -708,21 +722,11 @@ if (result.success) {
                   )?.reference_name;
 
                   if (
-                    !['Architect', 'Existing Client Reference', 'Other' , 'other'].includes(
+                    !['Architect', 'Existing Client Reference', 'Other', 'other'].includes(
                       selectedRef || ''
                     )
                   ) {
                     return null;
-                  }
-
-                  // Dynamic placeholder text
-                  let placeholderText = 'Enter details';
-                  if (selectedRef === 'Architect') {
-                    placeholderText = 'Enter architect name';
-                  } else if (selectedRef === 'Existing Client Reference') {
-                    placeholderText = 'Enter client reference name';
-                  } else if (selectedRef === 'Other') {
-                    placeholderText = 'Enter other reference';
                   }
 
                   return (
@@ -730,10 +734,10 @@ if (result.success) {
                       type="text"
                       name="reference_other"
                       value={editingClient.reference_other || ''}
-  onChange={handleInputChange}
-  pattern="^[A-Za-z\s]+$"
-  title="Only alphabets and spaces allowed"
-  className="w-full p-2 border rounded text-sm"
+                      onChange={handleInputChange}
+                      pattern="^[A-Za-z\s]+$"
+                      title="Only alphabets and spaces allowed"
+                      className="w-full p-2 border rounded text-sm"
                     />
                   );
                 })()}
@@ -749,32 +753,52 @@ if (result.success) {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
               <div className="md:col-span-2">
                 <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
-                  {/* City Field */}
-                 <div className="md:col-span-2">
-  <label className="block mb-1 text-sm dark:text-white">
-    City
-  </label>
-  <input
-    type="text"
-    name="city"
-    value={editingClient.city}
-    onChange={handleInputChange}
-    pattern="^[A-Za-z\s]+$"
-    title="City must contain only alphabets"
-    className="w-full p-2 border rounded text-sm dark:border-form-strokedark dark:bg-form-input dark:text-white"
-  />
-</div>
+                  {/* 🔥 MODIFIED: City as Dropdown from Area Table */}
+                  <div className="md:col-span-2">
+                    <label className="block mb-1 text-base font-semibold text-green-700 dark:text-green-600">
+                      City
+                    </label>
+                    
+                    <select
+                      name="area_id"
+                      value={editingClient.area_id || ''}
+                      onChange={handleInputChange}
+                      className="w-full p-2 border rounded text-sm dark:border-form-strokedark dark:bg-form-input dark:text-white"
+                    >
+                      <option value="">Select City</option>
+                      {area && area.length > 0 ? (
+                        area.map((areaItem) => (
+                          <option key={areaItem.area_id} value={areaItem.area_id}>
+                            {areaItem.area_name}
+                          </option>
+                        ))
+                      ) : (
+                        <option value="" disabled>
+                          Loading cities...
+                        </option>
+                      )}
+                    </select>
+                    
+                    {/* Show original city value as reference if different from selected area */}
+                    {editingClient.original_city && 
+                     editingClient.original_city !== '' && 
+                     editingClient.original_city !== (area.find(a => a.area_id === Number(editingClient.area_id))?.area_name || '') && (
+                      <p className="text-xs text-gray-500 mt-1">
+                        Original City: {editingClient.original_city}
+                      </p>
+                    )}
+                  </div>
 
                   {/* Room Dimensions (L / W / H) */}
                   <div className="md:col-span-2">
-                    <label className="block mb-1 text-sm dark:text-white">
+                    <label className="block mb-1 text-base font-semibold text-green-700 dark:text-green-600">
                       Room Dimensions
                     </label>
 
                     <div className="grid grid-cols-3 gap-3">
                       {/* Length */}
                       <div>
-                        <label className="block mb-1 text-xs dark:text-white text-gray-500">
+                        <label className="block mb-1 text-xs text-gray-800 dark:text-gray-200">
                           Length (L) ft
                         </label>
                         <input
@@ -784,14 +808,13 @@ if (result.success) {
                           onChange={handleInputChange}
                           placeholder="e.g., 12.5"
                           pattern="\d*\.?\d*"
-                          title="Only digits and decimal point allowed"
                           className="w-full p-2 border rounded text-sm dark:border-form-strokedark dark:bg-form-input dark:text-white"
                         />
                       </div>
 
                       {/* Width */}
                       <div>
-                        <label className="block mb-1 text-xs dark:text-white text-gray-500">
+                        <label className="block mb-1 text-xs text-gray-800 dark:text-gray-200">
                           Width (W) ft
                         </label>
                         <input
@@ -801,14 +824,13 @@ if (result.success) {
                           onChange={handleInputChange}
                           placeholder="e.g., 10.75"
                           pattern="\d*\.?\d*"
-                          title="Only digits and decimal point allowed"
                           className="w-full p-2 border rounded text-sm dark:border-form-strokedark dark:bg-form-input dark:text-white"
                         />
                       </div>
 
                       {/* Height */}
                       <div>
-                        <label className="block mb-1 text-xs dark:text-white text-gray-500">
+                        <label className="block mb-1 text-xs text-gray-800 dark:text-gray-200">
                           Height (H) ft
                         </label>
                         <input
@@ -818,7 +840,6 @@ if (result.success) {
                           onChange={handleInputChange}
                           placeholder="e.g., 9.0"
                           pattern="\d*\.?\d*"
-                          title="Only digits and decimal point allowed"
                           className="w-full p-2 border rounded text-sm dark:border-form-strokedark dark:bg-form-input dark:text-white"
                         />
                       </div>
@@ -828,7 +849,7 @@ if (result.success) {
               </div>
 
               <div>
-                <label className="block mb-1 text-sm dark:text-white">
+                <label className="block mb-1 text-base font-semibold text-green-700 dark:text-green-600">
                   Project Type
                 </label>
                 <select
@@ -845,7 +866,7 @@ if (result.success) {
               </div>
 
               <div>
-                <label className="block mb-1 text-sm dark:text-white">
+                <label className="block mb-1 text-base font-semibold text-green-700 dark:text-green-600">
                   Budget Range
                 </label>
 
@@ -902,7 +923,7 @@ if (result.success) {
 
               {/* Current Stage */}
               <div className="-mt-2">
-                <label className="block mb-1 text-sm dark:text-white">
+                <label className="block mb-1 text-base font-semibold text-green-700 dark:text-green-600">
                   What's the current stage of your home theater room?
                 </label>
                 <select
@@ -946,7 +967,7 @@ if (result.success) {
 
               {/* Demo Date */}
               <div>
-                <label className="block mb-1 text-sm dark:text-white">
+                <label className="block mb-1 text-base font-semibold text-green-700 dark:text-green-600">
                   Demo Date
                 </label>
                 <input
@@ -994,20 +1015,20 @@ if (result.success) {
                   className="w-full p-2 border rounded text-sm dark:border-form-strokedark dark:bg-form-input dark:text-white"
                 />
               </div>
-         <div>
-  <label className="block mb-1 text-sm dark:text-white">
-    Architect Name
-  </label>
-  <input
-    type="text"
-    name="architect_name"
-    value={editingClient.architect_name || ''}
-    onChange={handleInputChange}
-    pattern="^[A-Za-z\s]+$"
-    title="Only alphabets and spaces allowed"
-    className="w-full p-2 border rounded text-sm dark:border-form-strokedark dark:bg-form-input dark:text-white"
-  />
-</div>
+              <div>
+                <label className="block mb-1 text-sm dark:text-white">
+                  Architect Name
+                </label>
+                <input
+                  type="text"
+                  name="architect_name"
+                  value={editingClient.architect_name || ''}
+                  onChange={handleInputChange}
+                  pattern="^[A-Za-z\s]+$"
+                  title="Only alphabets and spaces allowed"
+                  className="w-full p-2 border rounded text-sm dark:border-form-strokedark dark:bg-form-input dark:text-white"
+                />
+              </div>
               <div>
                 <label className="block mb-1 text-sm dark:text-white">
                   Carpenter Number
@@ -1078,164 +1099,166 @@ if (result.success) {
             </h3>
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-
-              
               {/* Reassign To - MULTI SELECT with Checkboxes, Search, and 5 Columns */}
-<div className="md:col-span-3">
-  <label className="block mb-1 text-base font-semibold text-green-700 dark:text-green-600">
-    Reassign To
-  </label>
+              <div className="md:col-span-3">
+                <label className="block mb-1 text-base font-semibold text-green-700 dark:text-green-600">
+                  Reassign To
+                </label>
 
-  {/* Search Box */}
-  <div className="mb-2">
-    <div className="relative">
-      <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-        <svg className="h-4 w-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-        </svg>
-      </div>
-      <input
-        type="text"
-        value={searchTerm}
-        onChange={(e) => setSearchTerm(e.target.value)}
-        className="w-full pl-9 pr-8 py-2 border border-gray-300 dark:border-gray-600 rounded text-sm dark:bg-form-input dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-        placeholder="Search users by name or role..."
-      />
-      {searchTerm && (
-        <button
-          type="button"
-          onClick={() => setSearchTerm('')}
-          className="absolute inset-y-0 right-0 pr-2 flex items-center text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
-        >
-          <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-          </svg>
-        </button>
-      )}
-    </div>
-    {searchTerm && (
-      <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-        Showing {filteredUsers.length} of {users.length} users
-      </p>
-    )}
-  </div>
-
-  {/* Checkbox Selection Area - 5 Columns */}
-  <div className="border border-gray-300 dark:border-gray-600 rounded p-3 max-h-60 overflow-y-auto">
-    {/* Select All Filtered Button */}
-    <div className="mb-2 pb-2 border-b dark:border-gray-700 flex justify-between items-center">
-      <div>
-        <button
-          type="button"
-          onClick={handleSelectAllFiltered}
-          className="text-xs px-3 py-1.5 bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300 rounded hover:bg-blue-200 dark:hover:bg-blue-800 transition-colors whitespace-nowrap"
-        >
-          {filteredUsers.length > 0 &&
-            filteredUsers.every(user =>
-              Array.isArray(editingClient.assigned_to) &&
-              editingClient.assigned_to.includes(user.user_id)
-            )
-            ? 'Deselect All Filtered'
-            : 'Select All Filtered'}
-        </button>
-      </div>
-      <span className="text-xs text-gray-500 dark:text-gray-400">
-        {Array.isArray(editingClient.assigned_to) ? editingClient.assigned_to.length : 0} selected
-      </span>
-    </div>
-
-    {/* Users List - 5 Columns */}
-    {filteredUsers.length > 0 ? (
-      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
-        {filteredUsers.map((user) => {
-          // Helper function to format role display
-          const formatRoleForDisplay = (role: string) => {
-            if (!role) return 'No role';
-            if (role.length > 18) return role.substring(0, 16) + '...';
-            return role;
-          };
-
-          const isSelected = Array.isArray(editingClient.assigned_to) &&
-            editingClient.assigned_to.includes(user.user_id);
-          
-          return (
-            <div
-              key={user.user_id}
-              className={`flex items-start p-2 rounded transition-colors min-w-[120px] ${
-                isSelected
-                  ? 'bg-blue-50 dark:bg-blue-900/30 border border-blue-200 dark:border-blue-700'
-                  : 'border border-transparent hover:bg-gray-50 dark:hover:bg-gray-800 hover:border-gray-200 dark:hover:border-gray-700'
-              }`}
-            >
-              <input
-                type="checkbox"
-                id={`user-${user.user_id}`}
-                checked={isSelected}
-                onChange={() => handleUserCheckboxChange(user.user_id, user.name)}
-                className="h-4 w-4 text-blue-600 rounded focus:ring-blue-500 focus:ring-offset-0 mt-1 flex-shrink-0"
-              />
-              <label
-                htmlFor={`user-${user.user_id}`}
-                className="ml-2 text-sm text-gray-700 dark:text-gray-300 cursor-pointer flex-1 min-w-0"
-              >
-                <div 
-                  className="font-medium truncate mb-0.5"
-                  title={user.name}
-                >
-                  {user.name}
+                {/* Search Box */}
+                <div className="mb-2">
+                  <div className="relative">
+                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                      <svg className="h-4 w-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                      </svg>
+                    </div>
+                    <input
+                      type="text"
+                      value={searchTerm}
+                      onChange={(e) => setSearchTerm(e.target.value)}
+                      className="w-full pl-9 pr-8 py-2 border border-gray-300 dark:border-gray-600 rounded text-sm dark:bg-form-input dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                      placeholder="Search users by name or role..."
+                    />
+                    {searchTerm && (
+                      <button
+                        type="button"
+                        onClick={() => setSearchTerm('')}
+                        className="absolute inset-y-0 right-0 pr-2 flex items-center text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
+                      >
+                        <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                      </button>
+                    )}
+                  </div>
+                  {searchTerm && (
+                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                      Showing {filteredUsers.length} of {users.length} users
+                    </p>
+                  )}
                 </div>
-              
-              </label>
-            </div>
-          );
-        })}
-      </div>
-    ) : (
-      <div className="text-center py-4 text-gray-500 dark:text-gray-400">
-        <div className="text-2xl mb-2">🔍</div>
-        <p className="text-sm">No users found</p>
-        <p className="text-xs mt-1">Try a different search term</p>
-      </div>
-    )}
-  </div>
 
-  {/* Selected Users Preview */}
-  {Array.isArray(editingClient.assigned_to) && editingClient.assigned_to.length > 0 && (
-    <div className="mt-2 p-2 bg-blue-50 dark:bg-blue-900/30 rounded border border-blue-200 dark:border-blue-800">
-      <div className="text-xs text-blue-700 dark:text-blue-300 mb-1 font-medium">
-        Selected Users ({editingClient.assigned_to.length}):
-      </div>
-      <div className="text-xs text-gray-600 dark:text-gray-400 flex flex-wrap gap-1">
-        {editingClient.assigned_to.map(userId => {
-          const user = users.find(u => u.user_id === userId);
-          if (!user) return null;
-          
-          const displayText = `${user.name}${user.role ? ` (${user.role})` : ''}`;
-          
-          return (
-            <span 
-              key={userId}
-              className="inline-flex items-center gap-1 px-2 py-1 bg-blue-100 dark:bg-blue-900/50 rounded text-blue-800 dark:text-blue-300 border border-blue-200 dark:border-blue-700 max-w-[160px]"
-            >
-              <span className="truncate" title={displayText}>
-                {displayText}
-              </span>
-              <button
-                type="button"
-                onClick={() => handleUserCheckboxChange(userId, user.name)}
-                className="text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300 text-xs font-bold flex-shrink-0"
-                aria-label={`Remove ${user.name}`}
-              >
-                ×
-              </button>
-            </span>
-          );
-        })}
-      </div>
-    </div>
-  )}
-</div>
+                {/* Checkbox Selection Area - 5 Columns */}
+                <div className="border border-gray-300 dark:border-gray-600 rounded p-3 max-h-60 overflow-y-auto">
+                  {/* Select All Filtered Button */}
+                  <div className="mb-2 pb-2 border-b dark:border-gray-700 flex justify-between items-center">
+                    <div>
+                      <button
+                        type="button"
+                        onClick={handleSelectAllFiltered}
+                        className="text-xs px-3 py-1.5 bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300 rounded hover:bg-blue-200 dark:hover:bg-blue-800 transition-colors whitespace-nowrap"
+                      >
+                        {filteredUsers.length > 0 &&
+                          filteredUsers.every(user =>
+                            Array.isArray(editingClient.assigned_to) &&
+                            editingClient.assigned_to.includes(user.user_id)
+                          )
+                          ? 'Deselect All Filtered'
+                          : 'Select All Filtered'}
+                      </button>
+                    </div>
+                    <span className="text-xs text-gray-500 dark:text-gray-400">
+                      {Array.isArray(editingClient.assigned_to) ? editingClient.assigned_to.length : 0} selected
+                    </span>
+                  </div>
 
+                  {/* Users List - 5 Columns */}
+                  {filteredUsers.length > 0 ? (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
+                      {filteredUsers.map((user) => {
+                        // Helper function to format role display
+                        const formatRoleForDisplay = (role: string) => {
+                          if (!role) return 'No role';
+                          if (role.length > 18) return role.substring(0, 16) + '...';
+                          return role;
+                        };
+
+                        const isSelected = Array.isArray(editingClient.assigned_to) &&
+                          editingClient.assigned_to.includes(user.user_id);
+                        
+                        return (
+                          <div
+                            key={user.user_id}
+                            className={`flex items-start p-2 rounded transition-colors min-w-[120px] ${
+                              isSelected
+                                ? 'bg-blue-50 dark:bg-blue-900/30 border border-blue-200 dark:border-blue-700'
+                                : 'border border-transparent hover:bg-gray-50 dark:hover:bg-gray-800 hover:border-gray-200 dark:hover:border-gray-700'
+                            }`}
+                          >
+                            <input
+                              type="checkbox"
+                              id={`user-${user.user_id}`}
+                              checked={isSelected}
+                              onChange={() => handleUserCheckboxChange(user.user_id, user.name)}
+                              className="h-4 w-4 text-blue-600 rounded focus:ring-blue-500 focus:ring-offset-0 mt-1 flex-shrink-0"
+                            />
+                            <label
+                              htmlFor={`user-${user.user_id}`}
+                              className="ml-2 text-sm text-gray-700 dark:text-gray-300 cursor-pointer flex-1 min-w-0"
+                            >
+                              <div 
+                                className="font-medium truncate mb-0.5"
+                                title={user.name}
+                              >
+                                {user.name}
+                              </div>
+                              <div 
+                                className="text-xs text-gray-500 dark:text-gray-400 truncate"
+                                title={user.role_label || user.role}
+                              >
+                                {user.role_label || user.role}
+                              </div>
+                            </label>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  ) : (
+                    <div className="text-center py-4 text-gray-500 dark:text-gray-400">
+                      <div className="text-2xl mb-2">🔍</div>
+                      <p className="text-sm">No users found</p>
+                      <p className="text-xs mt-1">Try a different search term</p>
+                    </div>
+                  )}
+                </div>
+
+                {/* Selected Users Preview */}
+                {Array.isArray(editingClient.assigned_to) && editingClient.assigned_to.length > 0 && (
+                  <div className="mt-2 p-2 bg-blue-50 dark:bg-blue-900/30 rounded border border-blue-200 dark:border-blue-800">
+                    <div className="text-xs text-blue-700 dark:text-blue-300 mb-1 font-medium">
+                      Selected Users ({editingClient.assigned_to.length}):
+                    </div>
+                    <div className="text-xs text-gray-600 dark:text-gray-400 flex flex-wrap gap-1">
+                      {editingClient.assigned_to.map(userId => {
+                        const user = users.find(u => u.user_id === userId);
+                        if (!user) return null;
+                        
+                        const displayText = `${user.name}${user.role_label ? ` (${user.role_label})` : ''}`;
+                        
+                        return (
+                          <span 
+                            key={userId}
+                            className="inline-flex items-center gap-1 px-2 py-1 bg-blue-100 dark:bg-blue-900/50 rounded text-blue-800 dark:text-blue-300 border border-blue-200 dark:border-blue-700 max-w-[160px]"
+                          >
+                            <span className="truncate" title={displayText}>
+                              {displayText}
+                            </span>
+                            <button
+                              type="button"
+                              onClick={() => handleUserCheckboxChange(userId, user.name)}
+                              className="text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300 text-xs font-bold flex-shrink-0"
+                              aria-label={`Remove ${user.name}`}
+                            >
+                              ×
+                            </button>
+                          </span>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+              </div>
 
               {/* Follow-up Date */}
               <div className="md:col-span-1 mt-4">
@@ -1292,142 +1315,134 @@ if (result.success) {
               </div>
             </div>
 
-   {Array.isArray(editingClient.reassignment_remarks) &&
-  editingClient.reassignment_remarks.length > 0 && (
-    <div className="mt-3">
-      <label className="text-md font-semibold mb-2 dark:text-white border-b pb-1">
-        Reassignment History ({editingClient.reassignment_remarks.length})
-      </label>
+            {Array.isArray(editingClient.reassignment_remarks) &&
+              editingClient.reassignment_remarks.length > 0 && (
+                <div className="mt-3">
+                  <label className="text-md font-semibold mb-2 dark:text-white border-b pb-1">
+                    Reassignment History ({editingClient.reassignment_remarks.length})
+                  </label>
 
-      <div className="bg-white dark:bg-boxdark border rounded-md p-2 max-h-60 overflow-y-auto space-y-1.5">
+                  <div className="bg-white dark:bg-boxdark border rounded-md p-2 max-h-60 overflow-y-auto space-y-1.5">
+                    {editingClient.reassignment_remarks
+                      .slice()
+                      .sort((a: any, b: any) => {
+                        const dateA = new Date(
+                          a?.reassignment_date || a?.created_at || 0
+                        ).getTime();
+                        const dateB = new Date(
+                          b?.reassignment_date || b?.created_at || 0
+                        ).getTime();
+                        return dateB - dateA;
+                      })
+                      .map((remarkObj: any, index: number) => {
+                        const displayNumber = index + 1;
 
-        {editingClient.reassignment_remarks
-          .slice()
-          .sort((a: any, b: any) => {
-            const dateA = new Date(
-              a?.reassignment_date || a?.created_at || 0
-            ).getTime();
-            const dateB = new Date(
-              b?.reassignment_date || b?.created_at || 0
-            ).getTime();
-            return dateB - dateA; // 🔥 latest first
-          })
-          .map((remarkObj: any, index: number) => {
-            const displayNumber = index + 1;
+                        if (remarkObj && typeof remarkObj === 'object') {
+                          return (
+                            <div
+                              key={index}
+                              className="border rounded p-2 text-[11px] bg-gray-50 dark:bg-gray-800"
+                            >
+                              <div className="flex justify-between items-center mb-0.5">
+                                <div className="flex items-center gap-1.5">
+                                  <span className="font-semibold text-blue-600">
+                                    #{displayNumber}
+                                  </span>
 
-            /* ✅ Object format */
-            if (remarkObj && typeof remarkObj === 'object') {
-              return (
-                <div
-                  key={index}
-                  className="border rounded p-2 text-[11px] bg-gray-50 dark:bg-gray-800"
-                >
-                  {/* Header */}
-                  <div className="flex justify-between items-center mb-0.5">
-                    <div className="flex items-center gap-1.5">
-                      <span className="font-semibold text-blue-600">
-                        #{displayNumber}
-                      </span>
+                                  {remarkObj.leadStage && (
+                                    <span className="px-1.5 py-0.5 text-[10px] bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300 rounded">
+                                      {remarkObj.leadStage}
+                                    </span>
+                                  )}
 
-                      {remarkObj.leadStage && (
-                        <span className="px-1.5 py-0.5 text-[10px] bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300 rounded">
-                          {remarkObj.leadStage}
-                        </span>
-                      )}
+                                  {index === 0 && (
+                                    <span className="px-1 py-0.5 text-[9px] bg-green-100 text-green-700 rounded">
+                                      Latest
+                                    </span>
+                                  )}
+                                </div>
 
-                      {index === 0 && (
-                        <span className="px-1 py-0.5 text-[9px] bg-green-100 text-green-700 rounded">
-                          Latest
-                        </span>
-                      )}
-                    </div>
+                                <span className="text-[10px] text-gray-500">
+                                  {remarkObj.reassignment_date || remarkObj.created_at || ''}
+                                </span>
+                              </div>
 
-                    <span className="text-[10px] text-gray-500">
-                      {remarkObj.reassignment_date || remarkObj.created_at || ''}
-                    </span>
+                              {remarkObj.assignedTo && (
+                                <div className="text-gray-700 dark:text-gray-300 mb-0.5">
+                                  <span className="font-medium">
+                                    {remarkObj.name || 'Unknown'}
+                                  </span>
+                                  {remarkObj.role && (
+                                    <span className="text-gray-400">
+                                      {' '}({remarkObj.role})
+                                    </span>
+                                  )}
+                                  <span className="mx-1 text-gray-400">→</span>
+                                  <span className="font-medium">
+                                    {remarkObj.assignedTo}
+                                  </span>
+                                </div>
+                              )}
+
+                              {remarkObj.remark && (
+                                <div className="bg-white dark:bg-gray-900 px-3 py-2 rounded text-base text-gray-800 dark:text-gray-200">
+                                  {remarkObj.remark}
+                                </div>
+                              )}
+                            </div>
+                          );
+                        }
+
+                        if (typeof remarkObj === 'string') {
+                          return (
+                            <div
+                              key={index}
+                              className="border rounded p-2 text-[11px] bg-gray-50 dark:bg-gray-800"
+                            >
+                              <div className="flex justify-between items-center mb-0.5">
+                                <span className="font-semibold text-blue-600">
+                                  #{displayNumber}
+                                </span>
+                                <span className="text-[10px] text-gray-500">
+                                  Legacy
+                                </span>
+                              </div>
+                              {remarkObj}
+                            </div>
+                          );
+                        }
+
+                        return null;
+                      })}
                   </div>
-
-                  {/* From → To */}
-                  {remarkObj.assignedTo && (
-                    <div className="text-gray-700 dark:text-gray-300 mb-0.5">
-                      <span className="font-medium">
-                        {remarkObj.name || 'Unknown'}
-                      </span>
-                      {remarkObj.role && (
-                        <span className="text-gray-400">
-                          {' '}({remarkObj.role})
-                        </span>
-                      )}
-                      <span className="mx-1 text-gray-400">→</span>
-                      <span className="font-medium">
-                        {remarkObj.assignedTo}
-                      </span>
-                    </div>
-                  )}
-
-                  {/* Remark */}
-{remarkObj.remark && (
-  <div className="bg-white dark:bg-gray-900 px-3 py-2 rounded text-base text-gray-800 dark:text-gray-200">
-    {remarkObj.remark}
-  </div>
-)}
-
                 </div>
-              );
-            }
+              )}
 
-            /* 🟡 Legacy string format */
-            if (typeof remarkObj === 'string') {
-              return (
-                <div
-                  key={index}
-                  className="border rounded p-2 text-[11px] bg-gray-50 dark:bg-gray-800"
-                >
-                  <div className="flex justify-between items-center mb-0.5">
-                    <span className="font-semibold text-blue-600">
-                      #{displayNumber}
-                    </span>
-                    <span className="text-[10px] text-gray-500">
-                      Legacy
-                    </span>
-                  </div>
-                  {remarkObj}
-                </div>
-              );
-            }
+            <div className="mt-3">
+              <label className="block mb-1 text-sm italic font-medium text-emerald-600 dark:text-emerald-400">
+                Detailed Remark (New)
+              </label>
 
-            return null;
-          })}
-
-      </div>
-    </div>
-  )}
-
-
-{/* Simplified version without extra state */}
-<div className="mt-3">
-  <label className="block mb-1 text-sm italic font-medium text-emerald-600 dark:text-emerald-400">
-    Detailed Remark (New)
-  </label>
-  
-  <textarea
-    name="detailed_remark"
-    value={editingClient.detailed_remark || ''}
-    onChange={handleInputChange}
-    onFocus={(e) => {
-      // Clear the field when user focuses on it
-      setEditingClient(prev => ({
-        ...prev,
-        detailed_remark: ''
-      }));
-    }}
-    rows={3}
-    placeholder="Click to write a new remark (existing remark will be cleared)"
-    className="w-full p-2 text-xs border rounded placeholder:italic
-               dark:border-form-strokedark dark:bg-form-input dark:text-white
-               focus:ring-1 focus:ring-blue-400 focus:border-blue-400"
-  />
-</div>
+              <textarea
+                name="detailed_remark"
+                value={editingClient.detailed_remark || ''}
+                onChange={handleInputChange}
+                onFocus={() => {
+                  if (!isNewRemark) {
+                    setEditingClient(prev => ({
+                      ...prev,
+                      detailed_remark: ''
+                    }));
+                    setIsNewRemark(true);
+                  }
+                }}
+                rows={3}
+                placeholder="Click to write a new remark"
+                className="w-full p-2 text-xs border rounded placeholder:italic
+                           dark:border-form-strokedark dark:bg-form-input dark:text-white
+                           focus:ring-1 focus:ring-blue-400 focus:border-blue-400"
+              />
+            </div>
           </div>
 
           {/* Submit Buttons */}
@@ -1447,27 +1462,25 @@ if (result.success) {
             </button>
           </div>
         </form>
-      </div> 
+      </div>
 
-   {toast && (
-  <div className="fixed inset-0 z-50 flex items-center justify-center pointer-events-none">
-    <div
-      className={`max-w-sm rounded-lg px-5 py-3 shadow-lg text-sm whitespace-pre-line animate-fade-in
-        pointer-events-auto
-        ${
-          toast.type === 'success'
-            ? 'bg-green-100 text-green-800 border border-green-300'
-            : toast.type === 'error'
-            ? 'bg-red-100 text-red-800 border border-red-300'
-            : 'bg-yellow-100 text-yellow-800 border border-yellow-300'
-        }`}
-    >
-      {toast.message}
-    </div>
-  </div>
-)}
-
-
+      {toast && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center pointer-events-none">
+          <div
+            className={`max-w-sm rounded-lg px-5 py-3 shadow-lg text-sm whitespace-pre-line animate-fade-in
+              pointer-events-auto
+              ${
+                toast.type === 'success'
+                  ? 'bg-green-100 text-green-800 border border-green-300'
+                  : toast.type === 'error'
+                  ? 'bg-red-100 text-red-800 border border-red-300'
+                  : 'bg-yellow-100 text-yellow-800 border border-yellow-300'
+              }`}
+          >
+            {toast.message}
+          </div>
+        </div>
+      )}
     </div>
   );
 };

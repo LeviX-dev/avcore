@@ -63,7 +63,7 @@ const Area = () => {
 
   return (
     <div className="w-full px-2 sm:px-4 dark:bg-boxdark">
-      <Breadcrumb pageName="Manage Areas" />
+      <Breadcrumb pageName="Manage City" />
 
       {/* Top Controls */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-4">
@@ -75,7 +75,7 @@ const Area = () => {
           }}
           className="w-full sm:w-auto px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600"
         >
-          Add Area
+          Add City
         </button>
 
         {/* Search */}
@@ -85,7 +85,7 @@ const Area = () => {
             value={searchTerm}
             onChange={e => setSearchTerm(e.target.value)}
             className="w-full sm:w-64 border border-stroke dark:border-strokedark dark:bg-boxdark dark:text-white rounded px-4 py-2"
-            placeholder="Search Areas..."
+            placeholder="Search City..."
           />
           <button
             onClick={handleSearch}
@@ -142,8 +142,8 @@ const Area = () => {
         <table className="w-full table-auto sm:min-w-[600px]">
           <thead>
             <tr className="bg-gray-200 dark:bg-meta-4 text-left">
-              <th className="py-3 px-4 font-medium text-black dark:text-white">Area ID</th>
-              <th className="py-3 px-4 font-medium text-black dark:text-white">Area</th>
+              <th className="py-3 px-4 font-medium text-black dark:text-white">City ID</th>
+              <th className="py-3 px-4 font-medium text-black dark:text-white">City</th>
               <th className="py-3 px-4 font-medium text-black dark:text-white">Actions</th>
             </tr>
           </thead>
@@ -166,12 +166,7 @@ const Area = () => {
                         <FontAwesomeIcon icon={faEdit} />
                       </button>
 
-                      <button
-                        className="rounded bg-black px-3 py-1 text-white hover:bg-gray-800"
-                        onClick={() => handleDelete(a.area_id)}
-                      >
-                        <FontAwesomeIcon icon={faTrash} />
-                      </button>
+                    
                     </div>
                   </td>
                 </tr>

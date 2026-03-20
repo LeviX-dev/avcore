@@ -571,228 +571,253 @@ const ClosedLeadsPage: React.FC = () => {
     'Closed Deal': 100
   };
 
-  // Fetch closed leads with pagination support - UPDATED
-  const fetchClosedLeads = async (): Promise<void> => {
-    try {
-      setLoading(true);
-      const response = await axios.get(
-        `${BASE_URL}api/dashboard/close-leads-fulldata`,
-        {
-          params: {
-            page: currentPage,
-            limit: itemsPerPage,
-          },
-          withCredentials: true,
-        }
-      );
+// Fetch closed leads with pagination support - UPDATED
+const fetchClosedLeads = async (): Promise<void> => {
+  try {
+    setLoading(true);
+    const response = await axios.get(
+      `${BASE_URL}api/dashboard/close-leads-fulldata`,
+      {
+        params: {
+          page: currentPage,
+          limit: itemsPerPage,
+        },
+        withCredentials: true,
+      }
+    );
 
-      // Handle the new paginated response structure
-      let closedLeads: any[] = [];
-      let totalCount = 0;
+    // Handle the new paginated response structure
+    let closedLeads: any[] = [];
+    let totalCount = 0;
+    
+    // New response structure with pagination
+    if (response.data.success && Array.isArray(response.data.data)) {
+      closedLeads = response.data.data;
+      totalCount = response.data.pagination?.total || 0;
       
-      // New response structure with pagination
-      if (response.data.success && Array.isArray(response.data.data)) {
-        closedLeads = response.data.data;
-        totalCount = response.data.pagination?.total || 0;
-        
-        console.log('📊 Pagination info:', {
-          page: response.data.pagination?.page,
-          total: response.data.pagination?.total,
-          totalPages: response.data.pagination?.totalPages,
-          showing: response.data.pagination?.showingStart + ' - ' + response.data.pagination?.showingEnd
-        });
-      }
-      // Fallback for old response structure (backward compatibility)
-      else if (Array.isArray(response.data)) {
-        closedLeads = response.data;
-        totalCount = response.data.length;
-        console.warn('⚠️ Using old API response format. Consider updating backend.');
-      }
-      else if (response.data.data && Array.isArray(response.data.data)) {
-        closedLeads = response.data.data;
-        totalCount = response.data.total || response.data.data.length;
-      }
-      else {
-        console.error('❌ Unexpected API response structure:', response.data);
-        setLeads([]);
-        setFilteredLeads([]);
-        setTotalLeads(0);
-        return;
-      }
-
-      const parseValue = (value: any) => {
-        if (value === 'Not Available' || value === null || value === undefined || value === 'Not Found' || value === '') {
-          return '';
-        }
-        return value;
-      };
-
-      const parseIdValue = (value: any) => {
-        if (value === 'Not Available' || value === null || value === undefined || value === 'Not Found' || value === '') {
-          return null;
-        }
-        const num = Number(value);
-        return isNaN(num) ? null : num;
-      };
-
-      const parseStringValue = (value: any) => {
-        if (value === 'Not Available' || value === null || value === undefined || value === 'Not Found') {
-          return '';
-        }
-        return String(value);
-      };
-
-      const processedData = closedLeads.map((item: any) => {
-        // For closed leads, the lead_stage should be "Closed Deal"
-        const lead_stage = "Closed Deal";
-        
-        // For closed deals, always show 100% battery
-        const status_percentage = 100;
-
-        // Process reassignment_remarks
-        const reassignmentRemarks: ReassignmentRemark[] = [];
-        
-        if (item.reassignment_remarks && Array.isArray(item.reassignment_remarks)) {
-          item.reassignment_remarks.forEach((remark: any) => {
-            if (remark) {
-              reassignmentRemarks.push({
-                remark: remark.remark || '',
-                created_by_user: remark.created_by_user || 0,
-                created_at: remark.created_at || '',
-                name: remark.name || '',
-                role: remark.role || '',
-                assignedTo: remark.assignedTo || '',
-                leadStage: remark.leadStage || '',
-                reassignment_date: remark.reassignment_date || ''
-              });
-            }
-          });
-        }
-
-        // Create the lead object
-        const lead: Lead = {
-          master_id: parseIdValue(item.master_id) || 0,
-          name: parseStringValue(item.name),
-          number: parseStringValue(item.number),
-          alternate_number: parseStringValue(item.alternate_number),
-          email: parseStringValue(item.email),
-          address: parseStringValue(item.address),
-          city: parseStringValue(item.city),
-          cat_id: parseIdValue(item.cat_id) || 0,
-          status: parseStringValue(item.status),
-          lead_status: parseStringValue(item.lead_status),
-          lead_stage: lead_stage,
-          created_at: parseStringValue(item.created_at),
-          quick_remark: parseStringValue(item.quick_remark),
-          detailed_remark: parseStringValue(item.detailed_remark),
-          followup_date: parseStringValue(item.followup_date),
-          a_assigned_to: parseStringValue(item.latest_assignedTo || item.assigned_to || item.telecaller_name || item.reassigned_to || ''),
-          a_assign_date: parseStringValue(item.assign_date || item.created_at),
-          a_mode: 'Closed',
-
-          // Battery-related fields
-          status_percentage: status_percentage,
-          is_drop_stage: false,
-          previous_stage: 'Projection List',
-
-          // Reassignment data
-          reassignment_remarks: reassignmentRemarks,
-          reassignment_history: JSON.stringify(reassignmentRemarks),
-          other_inputs: JSON.stringify([]),
-
-          // Additional fields from API
-          area_id: parseIdValue(item.area_id),
-          reference_id: parseIdValue(item.reference_id),
-          assign_id: parseIdValue(item.assign_id),
-          created_by_user: parseIdValue(item.created_by_user),
-          lead_activity: parseIdValue(item.lead_activity) || 0,
-          room_length: parseIdValue(item.room_length),
-          room_width: parseIdValue(item.room_width),
-          room_height: parseIdValue(item.room_height),
-          location_link: parseStringValue(item.location_link),
-          p_type: parseStringValue(item.p_type),
-          budget_range: parseStringValue(item.budget_range),
-          current_stage: parseStringValue(item.current_stage),
-          room_ready: 'Not Available',
-          time_to_complete: parseStringValue(item.time_to_complete),
-          site_visit_date: parseStringValue(item.site_visit_date),
-          demo_date: parseStringValue(item.demo_date),
-          ar_number: parseStringValue(item.ar_number),
-          ca_number: parseStringValue(item.ca_number),
-          e_number: parseStringValue(item.e_number),
-          sm_number: parseStringValue(item.sm_number),
-          pop_number: parseStringValue(item.pop_number),
-          other_number: parseStringValue(item.other_number),
-          category_other: parseStringValue(item.category_other),
-          reference_other: parseStringValue(item.reference_other),
-          architect_name: parseStringValue(item.architect_name),
-
-          // Default values for optional fields
-          telecaller_name: parseStringValue(item.telecaller_name || item.latest_assignedTo || item.assigned_to || item.reassigned_to || ''),
-          document_count: 0,
-          area: parseStringValue(item.area_name || item.area),
-          cat_name: parseStringValue(item.cat_name),
-          reference_name: parseStringValue(item.reference_name),
-          assign_date: parseStringValue(item.assign_date || item.created_at),
-          assigned_to: parseStringValue(item.latest_assignedTo || item.assigned_to || item.telecaller_name || item.reassigned_to || ''),
-          assigned_user_name: parseStringValue(item.telecaller_name || item.latest_assignedTo || item.reassigned_to || ''),
-          reassignment_id: parseIdValue(item.reassignment_id),
-          reassigned_to: parseStringValue(item.reassigned_to),
-          latest_assignedTo: parseStringValue(item.latest_assignedTo || item.assigned_to || item.reassigned_to || ''),
-          latest_leadStage: parseStringValue(item.latest_leadStage || 'Closed Deal'),
-
-          // Ensure these fields are mapped from API
-          latest_reassign_id: parseIdValue(item.reassignment_id),
-          latest_reassigned_to: parseStringValue(item.latest_assignedTo || item.assigned_to || item.reassigned_to || ''),
-          latest_lead_stage: parseStringValue(item.latest_leadStage || 'Closed Deal'),
-          latest_remark: parseStringValue(item.quick_remark),
-          reassignment_date: parseStringValue(item.reassignment_date),
-          document_location_link: parseStringValue(item.document_location_link),
-          area_name: parseStringValue(item.area_name || item.area)
-        };
-
-        return lead;
+      console.log('📊 Pagination info:', {
+        page: response.data.pagination?.page,
+        total: response.data.pagination?.total,
+        totalPages: response.data.pagination?.totalPages,
+        showing: response.data.pagination?.showingStart + ' - ' + response.data.pagination?.showingEnd
       });
-
-      const sortedData = processedData.sort(
-        (a: Lead, b: Lead) => b.master_id - a.master_id,
-      );
-
-      console.log(`✅ Fetched ${sortedData.length} leads for page ${currentPage}, total: ${totalCount}`);
-
-      setLeads(sortedData);
-      setFilteredLeads(sortedData);
-      setTotalLeads(totalCount);
-      
-      // Extract unique cities from current page only (for filters)
-      const cities = sortedData
-        .map(lead => lead.city?.trim())
-        .filter(city => city && city !== '' && city !== 'Not Available' && city !== 'N/A')
-        .filter((city, index, self) => self.indexOf(city) === index)
-        .sort() as string[];
-      setAvailableCities(cities);
-      
-    } catch (error: any) {
-      console.error('❌ Error fetching closed leads:', error);
-      console.error('Error details:', error.response?.data || error.message);
-      
-      // Handle specific error cases
-      if (error.response?.status === 401) {
-        console.error('Authentication error - Session may have expired');
-      } else if (error.response?.status === 400) {
-        console.error('Bad request - Check pagination parameters');
-      }
-      
+    }
+    // Fallback for old response structure (backward compatibility)
+    else if (Array.isArray(response.data)) {
+      closedLeads = response.data;
+      totalCount = response.data.length;
+      console.warn('⚠️ Using old API response format. Consider updating backend.');
+    }
+    else if (response.data.data && Array.isArray(response.data.data)) {
+      closedLeads = response.data.data;
+      totalCount = response.data.total || response.data.data.length;
+    }
+    else {
+      console.error('❌ Unexpected API response structure:', response.data);
       setLeads([]);
       setFilteredLeads([]);
       setTotalLeads(0);
-      
-      // Reset to page 1 on error
-      setCurrentPage(1);
-    } finally {
-      setLoading(false);
+      return;
     }
-  };
+
+    const parseValue = (value: any) => {
+      if (value === 'Not Available' || value === null || value === undefined || value === 'Not Found' || value === '') {
+        return '';
+      }
+      return value;
+    };
+
+    const parseIdValue = (value: any) => {
+      if (value === 'Not Available' || value === null || value === undefined || value === 'Not Found' || value === '') {
+        return null;
+      }
+      const num = Number(value);
+      return isNaN(num) ? null : num;
+    };
+
+    const parseStringValue = (value: any) => {
+      if (value === 'Not Available' || value === null || value === undefined || value === 'Not Found') {
+        return '';
+      }
+      return String(value);
+    };
+
+    const processedData = closedLeads.map((item: any) => {
+      // For closed leads, the lead_stage should be "Closed Deal"
+      const lead_stage = "Closed Deal";
+      
+      // For closed deals, always show 100% battery
+      const status_percentage = 100;
+
+      // Process reassignment_remarks
+      const reassignmentRemarks: ReassignmentRemark[] = [];
+      
+      if (item.reassignment_remarks && Array.isArray(item.reassignment_remarks)) {
+        item.reassignment_remarks.forEach((remark: any) => {
+          if (remark) {
+            reassignmentRemarks.push({
+              remark: remark.remark || '',
+              created_by_user: remark.created_by_user || 0,
+              created_at: remark.created_at || '',
+              name: remark.name || '',
+              role: remark.role || '',
+              assignedTo: remark.assignedTo || '',
+              leadStage: remark.leadStage || '',
+              reassignment_date: remark.reassignment_date || ''
+            });
+          }
+        });
+      }
+
+      // 🔥 IMPORTANT: Determine display city with priority: area_name first, then city
+      let displayCity = '';
+      const areaName = parseStringValue(item.area_name || item.area);
+      const cityName = parseStringValue(item.city);
+      
+      if (areaName && areaName !== '' && areaName !== 'Not Available') {
+        displayCity = areaName; // Use area_name if available
+      } else if (cityName && cityName !== '' && cityName !== 'Not Available') {
+        displayCity = cityName; // Fallback to city if area_name not available
+      } else {
+        displayCity = ''; // Empty if neither available
+      }
+
+      // Create the lead object
+      const lead: Lead = {
+        master_id: parseIdValue(item.master_id) || 0,
+        name: parseStringValue(item.name),
+        number: parseStringValue(item.number),
+        alternate_number: parseStringValue(item.alternate_number),
+        email: parseStringValue(item.email),
+        address: parseStringValue(item.address),
+        city: displayCity, // 🔥 THIS IS THE KEY CHANGE - Use the prioritized display city
+        original_city: parseStringValue(item.city), // Keep original if needed elsewhere
+        original_area: parseStringValue(item.area_name || item.area), // Keep original if needed elsewhere
+        cat_id: parseIdValue(item.cat_id) || 0,
+        status: parseStringValue(item.status),
+        lead_status: parseStringValue(item.lead_status),
+        lead_stage: lead_stage,
+        created_at: parseStringValue(item.created_at),
+        quick_remark: parseStringValue(item.quick_remark),
+        detailed_remark: parseStringValue(item.detailed_remark),
+        followup_date: parseStringValue(item.followup_date),
+        a_assigned_to: parseStringValue(item.latest_assignedTo || item.assigned_to || item.telecaller_name || item.reassigned_to || ''),
+        a_assign_date: parseStringValue(item.assign_date || item.created_at),
+        a_mode: 'Closed',
+
+        // Battery-related fields
+        status_percentage: status_percentage,
+        is_drop_stage: false,
+        previous_stage: 'Projection List',
+
+        // Reassignment data
+        reassignment_remarks: reassignmentRemarks,
+        reassignment_history: JSON.stringify(reassignmentRemarks),
+        other_inputs: JSON.stringify([]),
+
+        // Additional fields from API
+        area_id: parseIdValue(item.area_id),
+        reference_id: parseIdValue(item.reference_id),
+        assign_id: parseIdValue(item.assign_id),
+        created_by_user: parseIdValue(item.created_by_user),
+        lead_activity: parseIdValue(item.lead_activity) || 0,
+        room_length: parseIdValue(item.room_length),
+        room_width: parseIdValue(item.room_width),
+        room_height: parseIdValue(item.room_height),
+        location_link: parseStringValue(item.location_link),
+        p_type: parseStringValue(item.p_type),
+        budget_range: parseStringValue(item.budget_range),
+        current_stage: parseStringValue(item.current_stage),
+        room_ready: 'Not Available',
+        time_to_complete: parseStringValue(item.time_to_complete),
+        site_visit_date: parseStringValue(item.site_visit_date),
+        demo_date: parseStringValue(item.demo_date),
+        ar_number: parseStringValue(item.ar_number),
+        ca_number: parseStringValue(item.ca_number),
+        e_number: parseStringValue(item.e_number),
+        sm_number: parseStringValue(item.sm_number),
+        pop_number: parseStringValue(item.pop_number),
+        other_number: parseStringValue(item.other_number),
+        category_other: parseStringValue(item.category_other),
+        reference_other: parseStringValue(item.reference_other),
+        architect_name: parseStringValue(item.architect_name),
+
+        // Default values for optional fields
+        telecaller_name: parseStringValue(item.telecaller_name || item.latest_assignedTo || item.assigned_to || item.reassigned_to || ''),
+        document_count: 0,
+        area: parseStringValue(item.area_name || item.area),
+        cat_name: parseStringValue(item.cat_name),
+        reference_name: parseStringValue(item.reference_name),
+        assign_date: parseStringValue(item.assign_date || item.created_at),
+        assigned_to: parseStringValue(item.latest_assignedTo || item.assigned_to || item.telecaller_name || item.reassigned_to || ''),
+        assigned_user_name: parseStringValue(item.telecaller_name || item.latest_assignedTo || item.reassigned_to || ''),
+        reassignment_id: parseIdValue(item.reassignment_id),
+        reassigned_to: parseStringValue(item.reassigned_to),
+        latest_assignedTo: parseStringValue(item.latest_assignedTo || item.assigned_to || item.reassigned_to || ''),
+        latest_leadStage: parseStringValue(item.latest_leadStage || 'Closed Deal'),
+
+        // Ensure these fields are mapped from API
+        latest_reassign_id: parseIdValue(item.reassignment_id),
+        latest_reassigned_to: parseStringValue(item.latest_assignedTo || item.assigned_to || item.reassigned_to || ''),
+        latest_lead_stage: parseStringValue(item.latest_leadStage || 'Closed Deal'),
+        latest_remark: parseStringValue(item.quick_remark),
+        reassignment_date: parseStringValue(item.reassignment_date),
+        document_location_link: parseStringValue(item.document_location_link),
+        area_name: parseStringValue(item.area_name || item.area)
+      };
+
+      return lead;
+    });
+
+    const sortedData = processedData.sort(
+      (a: Lead, b: Lead) => b.master_id - a.master_id,
+    );
+
+    console.log(`✅ Fetched ${sortedData.length} leads for page ${currentPage}, total: ${totalCount}`);
+
+    setLeads(sortedData);
+    setFilteredLeads(sortedData);
+    setTotalLeads(totalCount);
+    
+    // 🔥 UPDATED: Extract unique cities from the prioritized displayCity field
+    const cities = sortedData
+      .map(lead => lead.city?.trim()) // This now uses the prioritized displayCity
+      .filter(city => city && city !== '' && city !== 'Not Available' && city !== 'N/A')
+      .filter((city, index, self) => self.indexOf(city) === index)
+      .sort() as string[];
+    setAvailableCities(cities);
+
+    // Debug log to verify the changes
+    console.log('📊 Closed Leads Processed:', {
+      totalLeads: sortedData.length,
+      sampleLead: sortedData[0],
+      city: sortedData[0]?.city, // Should show area_name first
+      original_city: sortedData[0]?.original_city,
+      original_area: sortedData[0]?.original_area,
+    });
+    
+  } catch (error: any) {
+    console.error('❌ Error fetching closed leads:', error);
+    console.error('Error details:', error.response?.data || error.message);
+    
+    // Handle specific error cases
+    if (error.response?.status === 401) {
+      console.error('Authentication error - Session may have expired');
+    } else if (error.response?.status === 400) {
+      console.error('Bad request - Check pagination parameters');
+    }
+    
+    setLeads([]);
+    setFilteredLeads([]);
+    setTotalLeads(0);
+    
+    // Reset to page 1 on error
+    setCurrentPage(1);
+  } finally {
+    setLoading(false);
+  }
+};
+
 
   // Fetch other data
   const fetchCategories = async () => {
@@ -1759,127 +1784,7 @@ const ClosedLeadsPage: React.FC = () => {
                 </div>
               )}
 
-              {/* Stage & Assignment - Only show if exists */}
-              {(hasLeadStages || hasAssignmentInfo) && (
-                <div className="grid grid-cols-2 gap-4">
-                  {/* Lead Stages */}
-                  {hasLeadStages && (
-                    <div className="bg-gradient-to-r from-purple-50 to-pink-50 dark:from-purple-900/20 dark:to-pink-900/20 p-3 rounded-lg border border-purple-100 dark:border-purple-800/30">
-                      <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2 flex items-center gap-2">
-                        <FontAwesomeIcon icon={faUser} className="h-4 w-4 text-purple-500" />
-                        Lead Stages
-                      </h3>
-                      <div className="space-y-2">
-                        {hasField('lead_stage') && (
-                          <div>
-                            <div className="text-xs text-gray-500 dark:text-gray-400">Lead Stage</div>
-                            <div className="font-medium text-black dark:text-white">
-                              {formatValue(selectedLeadDetails.lead_stage)}
-                            </div>
-                          </div>
-                        )}
-                        {hasField('current_stage') && (
-                          <div>
-                            <div className="text-xs text-gray-500 dark:text-gray-400">Current Stage</div>
-                            <div className="font-medium text-black dark:text-white">
-                              {formatValue(selectedLeadDetails.current_stage)}
-                            </div>
-                          </div>
-                        )}
-                        {hasField('latest_leadStage') && (
-                          <div>
-                            <div className="text-xs text-gray-500 dark:text-gray-400">Latest Lead Stage</div>
-                            <div className="font-medium text-black dark:text-white">
-                              {formatValue(selectedLeadDetails.latest_leadStage)}
-                            </div>
-                          </div>
-                        )}
 
-                        {hasField('status_percentage') && (
-                          <div>
-                            <div className="text-xs text-gray-500 dark:text-gray-400">Progress</div>
-                            <div className="mt-0.5">
-                              <ProgressStatus
-                                stage={selectedLeadDetails.lead_stage || selectedLeadDetails.latest_leadStage || ''}
-                                status_percentage={selectedLeadDetails.status_percentage}
-                                is_drop_stage={selectedLeadDetails.is_drop_stage || false}
-                                previous_stage={selectedLeadDetails.previous_stage || ''}
-                              />
-                            </div>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Assignment Info */}
-                  {hasAssignmentInfo && (
-                    <div className="bg-gradient-to-r from-teal-50 to-cyan-50 dark:from-teal-900/20 dark:to-cyan-900/20 p-3 rounded-lg border border-teal-100 dark:border-teal-800/30">
-                      <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2 flex items-center gap-2">
-                        <FontAwesomeIcon icon={faTasks} className="h-4 w-4 text-teal-500" />
-                        Assignment
-                      </h3>
-                      <div className="space-y-2">
-                        {hasField('assigned_to') && (
-                          <div>
-                            <div className="text-xs text-gray-500 dark:text-gray-400">Assigned To</div>
-                            <div className="font-medium text-black dark:text-white truncate">
-                              {formatValue(selectedLeadDetails.assigned_to)}
-                            </div>
-                          </div>
-                        )}
-                        {hasField('telecaller_name') && (
-                          <div>
-                            <div className="text-xs text-gray-500 dark:text-gray-400">Telecaller</div>
-                            <div className="font-medium text-black dark:text-white truncate">
-                              {formatValue(selectedLeadDetails.telecaller_name || selectedLeadDetails.assigned_user_name)}
-                            </div>
-                          </div>
-                        )}
-                        {hasField('latest_assignedTo') && (
-                          <div>
-                            <div className="text-xs text-gray-500 dark:text-gray-400">Latest Assigned To</div>
-                            <div className="font-medium text-black dark:text-white truncate">
-                              {formatValue(selectedLeadDetails.latest_assignedTo || selectedLeadDetails.assigned_user_name)}
-                            </div>
-                          </div>
-                        )}
-                        {hasField('reassigned_to') && (
-                          <div>
-                            <div className="text-xs text-gray-500 dark:text-gray-400">Reassigned To</div>
-                            <div className="font-medium text-black dark:text-white truncate">
-                              {formatValue(selectedLeadDetails.reassigned_to)}
-                            </div>
-                          </div>
-                        )}
-                        {hasField('status') && (
-                          <div>
-                            <div className="text-xs text-gray-500 dark:text-gray-400">Status</div>
-                            <div className={`font-medium ${
-                              selectedLeadDetails.status === 'Assigned' ? 'text-green-600 dark:text-green-400' :
-                              selectedLeadDetails.status === 'Unassigned' ? 'text-red-600 dark:text-red-400' :
-                              'text-blue-600 dark:text-blue-400'
-                            }`}>
-                              {formatValue(selectedLeadDetails.status)}
-                            </div>
-                          </div>
-                        )}
-                        {hasField('lead_status') && (
-                          <div>
-                            <div className="text-xs text-gray-500 dark:text-gray-400">Lead Status</div>
-                            <div className={`font-medium ${
-                              selectedLeadDetails.lead_status === 'Active' ? 'text-green-600 dark:text-green-400' :
-                              'text-gray-600 dark:text-gray-400'
-                            }`}>
-                              {formatValue(selectedLeadDetails.lead_status)}
-                            </div>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  )}
-                </div>
-              )}
 
               {/* Dates Information - Only show if exists */}
               {hasDates && (
@@ -2898,7 +2803,6 @@ const ClosedLeadsPage: React.FC = () => {
         <div className="px-4 py-3">
           <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 mb-2">
             <div className="flex items-center gap-3">
-              <h2 className="text-lg font-medium">Closed Leads</h2>
               {/* Add Total Count Badge */}
               <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-gradient-to-r from-green-100 to-green-200 dark:from-green-900/30 dark:to-green-800/30 text-green-800 dark:text-green-300 border border-green-200 dark:border-green-700/30">
                 <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -2937,11 +2841,7 @@ const ClosedLeadsPage: React.FC = () => {
                     </button>
                   )}
                 </div>
-                {customRecordCount && (
-                  <div className="text-xs text-blue-600 dark:text-blue-400 mt-1 ml-1">
-                    Showing {customRecordCount} records per page
-                  </div>
-                )}
+               
               </div>
 
               {/* Compact Search Input */}
@@ -3821,11 +3721,11 @@ const ClosedLeadsPage: React.FC = () => {
                         </span>
                       </td>
 
-                      {/* Action Buttons */}
+                    
                       <td className="py-4 px-4">
                         <div className="flex justify-center gap-1">
                           {/* Call Button */}
-                          <ActionButton
+                          {/* <ActionButton
                             onClick={() =>
                               handleEdit({ 
                                 ...lead, 
@@ -3842,7 +3742,7 @@ const ClosedLeadsPage: React.FC = () => {
                             className="w-8 h-8 hover:scale-105 transition-transform"
                           >
                             <FontAwesomeIcon icon={faPhone} className="text-xs" />
-                          </ActionButton>
+                          </ActionButton> */}
 
                           {/* Edit Button */}
                           <ActionButton

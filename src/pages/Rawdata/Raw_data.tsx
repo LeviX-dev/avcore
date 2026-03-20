@@ -474,7 +474,45 @@ const RawData = () => {
     area_id: '',
   });
 
-  const [itemsPerPage, setItemsPerPage] = useState(5);
+  const [itemsPerPage, setItemsPerPage] = useState(10);
+
+  const [isLoading, setIsLoading] = useState(true);
+
+
+  // Add these new state variables for role-based user assignment
+const [assignUsers, setAssignUsers] = useState<any[]>([]);
+const [assignCurrentUserRole, setAssignCurrentUserRole] = useState('');
+const [assignRolePermissions, setAssignRolePermissions] = useState<any>(null);
+
+
+// Fetch users with role-based filtering when Assign popup opens
+useEffect(() => {
+  const fetchAssignUsers = async () => {
+    if (!showAssignPopup) return;
+    
+    try {
+      const response = await axios.get(`${BASE_URL}api/users/by-role`, {
+        withCredentials: true
+      });
+      
+      console.log('Assign users API response:', response.data);
+      
+      if (response.data.success) {
+        setAssignUsers(response.data.users || []);
+        setAssignCurrentUserRole(response.data.currentUserRole || '');
+        setAssignRolePermissions(response.data.permissions || null);
+      } else {
+        setAssignUsers([]);
+      }
+    } catch (error) {
+      console.error('Failed to fetch assign users:', error);
+      setAssignUsers([]);
+    }
+  };
+  
+  fetchAssignUsers();
+}, [showAssignPopup]);
+
 
   const [importErrors, setImportErrors] = useState([]);
 
@@ -991,164 +1029,7 @@ const RawData = () => {
                   </div>
                 )}
 
-                {/* Stage & Assignment - Only show if exists */}
-                {(hasLeadStages || hasAssignmentInfo) && (
-                  <div className="grid grid-cols-2 gap-4">
-                    {/* Lead Stages */}
-                    {hasLeadStages && (
-                      <div className="bg-gradient-to-r from-purple-50 to-pink-50 dark:from-purple-900/20 dark:to-pink-900/20 p-3 rounded-lg border border-purple-100 dark:border-purple-800/30">
-                        <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2 flex items-center gap-2">
-                          <FontAwesomeIcon
-                            icon={faUser}
-                            className="h-4 w-4 text-purple-500"
-                          />
-                          Lead Stages
-                        </h3>
-                        <div className="space-y-2">
-                          {hasField('stage') && (
-                            <div>
-                              <div className="text-xs text-gray-500 dark:text-gray-400">
-                                Stage
-                              </div>
-                              <div className="font-medium text-black dark:text-white">
-                                {formatValue(selectedClientDetails.stage)}
-                              </div>
-                            </div>
-                          )}
-                          {hasField('lead_stage') && (
-                            <div>
-                              <div className="text-xs text-gray-500 dark:text-gray-400">
-                                Lead Stage
-                              </div>
-                              <div className="font-medium text-black dark:text-white">
-                                {formatValue(selectedClientDetails.lead_stage)}
-                              </div>
-                            </div>
-                          )}
-                          {hasField('current_stage') && (
-                            <div>
-                              <div className="text-xs text-gray-500 dark:text-gray-400">
-                                Current Stage
-                              </div>
-                              <div className="font-medium text-black dark:text-white">
-                                {formatValue(
-                                  selectedClientDetails.current_stage,
-                                )}
-                              </div>
-                            </div>
-                          )}
-                          {hasField('lead_activity') && (
-                            <div>
-                              <div className="text-xs text-gray-500 dark:text-gray-400">
-                                Lead Activity
-                              </div>
-                              <div className="font-medium text-black dark:text-white">
-                                {formatValue(
-                                  selectedClientDetails.lead_activity,
-                                )}
-                              </div>
-                            </div>
-                          )}
-                          {hasField('status_percentage') && (
-                            <div>
-                              <div className="text-xs text-gray-500 dark:text-gray-400">
-                                Progress
-                              </div>
-                              <div className="mt-0.5">
-                                <ProgressStatus
-                                  stage={
-                                    selectedClientDetails.lead_stage ||
-                                    selectedClientDetails.latest_leadStage
-                                  }
-                                  status_percentage={
-                                    selectedClientDetails.status_percentage
-                                  }
-                                  is_drop_stage={
-                                    selectedClientDetails.is_drop_stage
-                                  }
-                                  previous_stage={
-                                    selectedClientDetails.previous_stage
-                                  }
-                                />
-                              </div>
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    )}
-
-                    {/* Assignment Info */}
-                    {hasAssignmentInfo && (
-                      <div className="bg-gradient-to-r from-teal-50 to-cyan-50 dark:from-teal-900/20 dark:to-cyan-900/20 p-3 rounded-lg border border-teal-100 dark:border-teal-800/30">
-                        <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2 flex items-center gap-2">
-                          <FontAwesomeIcon
-                            icon={faTasks}
-                            className="h-4 w-4 text-teal-500"
-                          />
-                          Assignment
-                        </h3>
-                        <div className="space-y-2">
-                          {hasField('assigned_to') && (
-                            <div>
-                              <div className="text-xs text-gray-500 dark:text-gray-400">
-                                Assigned To
-                              </div>
-                              <div className="font-medium text-black dark:text-white truncate">
-                                {formatValue(selectedClientDetails.assigned_to)}
-                              </div>
-                            </div>
-                          )}
-                          {hasField('telecaller_name') && (
-                            <div>
-                              <div className="text-xs text-gray-500 dark:text-gray-400">
-                                Telecaller
-                              </div>
-                              <div className="font-medium text-black dark:text-white truncate">
-                                {formatValue(
-                                  selectedClientDetails.telecaller_name,
-                                )}
-                              </div>
-                            </div>
-                          )}
-                          {hasField('status') && (
-                            <div>
-                              <div className="text-xs text-gray-500 dark:text-gray-400">
-                                Status
-                              </div>
-                              <div
-                                className={`font-medium ${selectedClientDetails.status === 'Assigned'
-                                    ? 'text-green-600 dark:text-green-400'
-                                    : selectedClientDetails.status ===
-                                      'Unassigned'
-                                      ? 'text-red-600 dark:text-red-400'
-                                      : 'text-blue-600 dark:text-blue-400'
-                                  }`}
-                              >
-                                {formatValue(selectedClientDetails.status)}
-                              </div>
-                            </div>
-                          )}
-                          {hasField('lead_status') && (
-                            <div>
-                              <div className="text-xs text-gray-500 dark:text-gray-400">
-                                Lead Status
-                              </div>
-                              <div
-                                className={`font-medium ${selectedClientDetails.lead_status === 'Active'
-                                    ? 'text-green-600 dark:text-green-400'
-                                    : 'text-gray-600 dark:text-gray-400'
-                                  }`}
-                              >
-                                {formatValue(selectedClientDetails.lead_status)}
-                              </div>
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                )}
-
+            
                 {/* Dates Information - Only show if exists */}
                 {hasDates && (
                   <div className="bg-gradient-to-r from-emerald-50 to-teal-50 dark:from-emerald-900/20 dark:to-teal-900/20 p-3 rounded-lg border border-emerald-100 dark:border-emerald-800/30">
@@ -2448,7 +2329,7 @@ else if (isStageFilter && location.state.lead_stage === 'Others') {
 
     // Clear custom record count
     setCustomRecordCount('');
-    setItemsPerPage(5);
+    setItemsPerPage(10);
 
     // Close all dropdowns
     setShowEntryDateCalendar(false);
@@ -2824,204 +2705,240 @@ else if (isStageFilter && location.state.lead_stage === 'Others') {
   //   }
   // };
 
-  const fetchRawData = async () => {
-    try {
-      const response = await fetch(`${BASE_URL}api/master-data`);
-      if (!response.ok) throw new Error('Network response was not ok');
 
-      const data = await response.json();
+  const Loader = () => (
+  <div className="flex flex-col items-center justify-center py-20">
+    <div className="relative">
+      <div className="w-20 h-20 border-4 border-gray-200 dark:border-gray-700 rounded-full"></div>
+      <div className="absolute top-0 left-0 w-20 h-20 border-4 border-t-blue-500 border-r-transparent border-b-transparent border-l-transparent rounded-full animate-spin"></div>
+    </div>
+    <p className="mt-6 text-gray-600 dark:text-gray-400 font-medium text-lg">
+      Loading master data...
+    </p>
+    <p className="mt-2 text-sm text-gray-500 dark:text-gray-500">
+      Please wait while we fetch your data
+    </p>
+  </div>
+);
 
-      const parseValue = (value) => {
-        if (
-          value === 'Not Available' ||
-          value === null ||
-          value === undefined
-        ) {
-          return '';
+
+
+const fetchRawData = async () => {
+  setIsLoading(true); // Set loading to true before fetching
+  try {
+    const response = await fetch(`${BASE_URL}api/master-data`);
+    if (!response.ok) throw new Error('Network response was not ok');
+
+    const data = await response.json();
+
+    const parseValue = (value) => {
+      if (
+        value === 'Not Available' ||
+        value === null ||
+        value === undefined
+      ) {
+        return '';
+      }
+      return value;
+    };
+
+    const parseIdValue = (value) => {
+      if (
+        value === 'Not Available' ||
+        value === null ||
+        value === undefined
+      ) {
+        return '';
+      }
+      return isNaN(value) ? value : Number(value);
+    };
+
+    // STAGE MAPPING FOR PERCENTAGE CALCULATION
+    const STAGE_PERCENTAGE_MAP: Record<string, number> = {
+      'Fresh Lead': 0,
+      'Cold Lead': 10,
+      'On Hold': 20,
+      'Positive Lead': 30,
+      'Pre Site Visit': 40,
+      Demo: 50,
+      'Quotation Pending': 60,
+      'Quotation Follow-up': 70,
+      'Post Site Visit': 80,
+      'Projection List': 90,
+      Drop: -1,
+      'Closed Deal': 100,
+    };
+
+    // Create an object to track the last non-Drop stage for each client
+    const lastNonDropStages: Record<number, string> = {};
+
+    // First pass: Identify and store last non-Drop stages for all clients
+    data.forEach((item: any) => {
+      const clientId = item.master_id;
+      const currentStage = parseValue(
+        item.stage || item.lead_stage || item.current_stage,
+      );
+      const cleanStage = currentStage ? currentStage.trim() : '';
+
+      // If this is not a Drop stage, store it as the last non-Drop stage
+      if (cleanStage && cleanStage !== 'Drop') {
+        lastNonDropStages[clientId] = cleanStage;
+      }
+    });
+
+    // Second pass: Process data and include previous_stage field
+    const formattedData = data.map((item: any) => {
+      const currentStage = parseValue(
+        item.stage || item.lead_stage || item.current_stage,
+      );
+      const cleanStage = currentStage ? currentStage.trim() : '';
+
+      // Get the last non-Drop stage for this client
+      let previousStage = lastNonDropStages[item.master_id] || '';
+
+      // Special handling: If current is Drop and we don't have a previous stage
+      if (cleanStage === 'Drop' && !previousStage) {
+        if (item.quotation_date || item.site_visit_date) {
+          previousStage = 'Quotation Pending';
+        } else if (item.demo_date) {
+          previousStage = 'Demo';
+        } else {
+          previousStage = 'Positive Lead';
         }
-        return value;
+      }
+
+      // Calculate percentage based on stage (for Drop, use previous stage)
+      const stageForPercentage =
+        cleanStage === 'Drop' ? previousStage : cleanStage;
+      const status_percentage = stageForPercentage
+        ? STAGE_PERCENTAGE_MAP[stageForPercentage] || 0
+        : 0;
+
+      // 🔥 IMPORTANT: Determine display city with priority: area_name first, then city
+      let displayCity = '';
+      const areaName = parseValue(item.area_name);
+      const cityName = parseValue(item.city);
+      
+      if (areaName && areaName !== '' && areaName !== 'Not Available') {
+        displayCity = areaName; // Use area_name if available
+      } else if (cityName && cityName !== '' && cityName !== 'Not Available') {
+        displayCity = cityName; // Fallback to city if area_name not available
+      } else {
+        displayCity = ''; // Empty if neither available
+      }
+
+      return {
+        id: item.master_id,
+        master_id: item.master_id,
+        name: parseValue(item.name),
+        number: parseValue(item.number),
+        alternate_number: parseValue(item.alternate_number),
+        email: parseValue(item.email),
+        address: parseValue(item.address),
+
+        // Master data
+        area: parseValue(item.area_name),
+        area_id: parseIdValue(item.area_id),
+        cat_name: parseValue(item.cat_name),
+        cat_id: parseIdValue(item.cat_id),
+        reference_name: parseValue(item.reference_name),
+        reference_id: parseIdValue(item.reference_id),
+        status: parseValue(item.status),
+
+        // Other inputs
+        category_other: item.category_other || '',
+        reference_other: item.reference_other || '',
+
+        // Location and room details
+        city: displayCity, // 🔥 THIS IS THE KEY CHANGE - Use the prioritized display city
+        original_city: parseValue(item.city), // Keep original if needed elsewhere
+        original_area: parseValue(item.area_name), // Keep original if needed elsewhere
+        location_link: parseValue(item.location_link),
+        room_length: parseValue(item.room_length),
+        room_width: parseValue(item.room_width),
+        room_height: parseValue(item.room_height),
+        p_type: parseValue(item.p_type),
+        budget_range: parseValue(item.budget_range),
+        current_stage: parseValue(item.current_stage),
+        room_ready: parseValue(item.room_ready),
+        time_to_complete: parseValue(item.time_to_complete),
+        site_visit_date: parseValue(item.site_visit_date),
+        demo_date: parseValue(item.demo_date),
+
+        // Contact numbers
+        ar_number: parseValue(item.ar_number),
+        architect_name: parseValue(item.architect_name),
+        ca_number: parseValue(item.ca_number),
+        e_number: parseValue(item.e_number),
+        sm_number: parseValue(item.sm_number),
+        pop_number: parseValue(item.pop_number),
+        other_number: parseValue(item.other_number),
+
+        // Lead information
+        latest_leadStage: parseValue(item.latest_leadStage),
+        lead_stage: parseValue(item.lead_stage),
+
+        quick_remark: parseValue(item.quick_remark),
+        detailed_remark: parseValue(item.detailed_remark),
+
+        // Assignment fields
+        assign_date: parseValue(item.assign_date),
+        followup_date: parseValue(item.followup_date),
+        assignment_remark: parseValue(item.assignment_remark),
+        assigned_to: parseValue(item.assigned_to),
+        assigned_to_user_id: parseIdValue(item.assigned_to_user_id),
+        stage: cleanStage,
+        assign_type: parseValue(item.assign_type),
+
+        reassignment_remarks: Array.isArray(item.reassignment_remarks)
+          ? item.reassignment_remarks.map((remark: any) => {
+            if (typeof remark === 'string') {
+              return remark;
+            } else if (remark && typeof remark === 'object') {
+              return {
+                remark: remark.remark || '',
+                assignedTo: remark.assignedTo || '',
+                leadStage: remark.leadStage || '',
+                reassignment_date: remark.reassignment_date || '',
+                created_by_user: remark.created_by_user || 0,
+                created_at: remark.created_at || '',
+                name: remark.name || '',
+                role: remark.role || '',
+              };
+            }
+            return '';
+          })
+          : [],
+        previous_stage: previousStage,
+
+        // Calculated percentage for battery display
+        status_percentage: status_percentage,
+
+        // Flag to indicate if this is a Drop stage
+        is_drop_stage: cleanStage === 'Drop',
+
+        assign_id: parseIdValue(item.assign_id),
+
+        document_location_link: parseValue(item.document_location_link),
       };
+    });
 
-      const parseIdValue = (value) => {
-        if (
-          value === 'Not Available' ||
-          value === null ||
-          value === undefined
-        ) {
-          return '';
-        }
-        return isNaN(value) ? value : Number(value);
-      };
+    console.log('Processed data with other inputs:', {
+      totalClients: formattedData.length,
+      sampleClient: formattedData[0],
+      hasCategoryOther: formattedData[0]?.category_other,
+      hasReferenceOther: formattedData[0]?.reference_other,
+    });
 
-      // STAGE MAPPING FOR PERCENTAGE CALCULATION
-      const STAGE_PERCENTAGE_MAP: Record<string, number> = {
-        'Fresh Lead': 0,
-        'Cold Lead': 10,
-        'On Hold': 20,
-        'Positive Lead': 30,
-        'Pre Site Visit': 40,
-        Demo: 50,
-        'Quotation Pending': 60,
-        'Quotation Follow-up': 70,
-        'Post Site Visit': 80,
-        'Projection List': 90,
-        Drop: -1,
-        'Closed Deal': 100,
-      };
-
-      // Create an object to track the last non-Drop stage for each client
-      const lastNonDropStages: Record<number, string> = {};
-
-      // First pass: Identify and store last non-Drop stages for all clients
-      data.forEach((item: any) => {
-        const clientId = item.master_id;
-        const currentStage = parseValue(
-          item.stage || item.lead_stage || item.current_stage,
-        );
-        const cleanStage = currentStage ? currentStage.trim() : '';
-
-        // If this is not a Drop stage, store it as the last non-Drop stage
-        if (cleanStage && cleanStage !== 'Drop') {
-          lastNonDropStages[clientId] = cleanStage;
-        }
-      });
-
-      // Second pass: Process data and include previous_stage field
-      const formattedData = data.map((item: any) => {
-        const currentStage = parseValue(
-          item.stage || item.lead_stage || item.current_stage,
-        );
-        const cleanStage = currentStage ? currentStage.trim() : '';
-
-        // Get the last non-Drop stage for this client
-        let previousStage = lastNonDropStages[item.master_id] || '';
-
-        // Special handling: If current is Drop and we don't have a previous stage
-        if (cleanStage === 'Drop' && !previousStage) {
-          if (item.quotation_date || item.site_visit_date) {
-            previousStage = 'Quotation Pending';
-          } else if (item.demo_date) {
-            previousStage = 'Demo';
-          } else {
-            previousStage = 'Positive Lead';
-          }
-        }
-
-        // Calculate percentage based on stage (for Drop, use previous stage)
-        const stageForPercentage =
-          cleanStage === 'Drop' ? previousStage : cleanStage;
-        const status_percentage = stageForPercentage
-          ? STAGE_PERCENTAGE_MAP[stageForPercentage] || 0
-          : 0;
-
-        return {
-          id: item.master_id,
-          master_id: item.master_id,
-          name: parseValue(item.name),
-          number: parseValue(item.number),
-          alternate_number: parseValue(item.alternate_number),
-          email: parseValue(item.email),
-          address: parseValue(item.address),
-
-          // Master data
-          area: parseValue(item.area_name),
-          area_id: parseIdValue(item.area_id),
-          cat_name: parseValue(item.cat_name),
-          cat_id: parseIdValue(item.cat_id),
-          reference_name: parseValue(item.reference_name),
-          reference_id: parseIdValue(item.reference_id),
-          status: parseValue(item.status),
-
-          // Other inputs - ADD THESE TWO LINES
-          category_other: item.category_other || '',
-          reference_other: item.reference_other || '',
-
-          // Location and room details
-          city: parseValue(item.city),
-          location_link: parseValue(item.location_link),
-          room_length: parseValue(item.room_length),
-          room_width: parseValue(item.room_width),
-          room_height: parseValue(item.room_height),
-          p_type: parseValue(item.p_type),
-          budget_range: parseValue(item.budget_range),
-          current_stage: parseValue(item.current_stage),
-          room_ready: parseValue(item.room_ready),
-          time_to_complete: parseValue(item.time_to_complete),
-          site_visit_date: parseValue(item.site_visit_date),
-          demo_date: parseValue(item.demo_date),
-
-          // Contact numbers
-          ar_number: parseValue(item.ar_number),
-          architect_name: parseValue(item.architect_name),
-          ca_number: parseValue(item.ca_number),
-          e_number: parseValue(item.e_number),
-          sm_number: parseValue(item.sm_number),
-          pop_number: parseValue(item.pop_number),
-          other_number: parseValue(item.other_number),
-
-          // Lead information
-          latest_leadStage: parseValue(item.latest_leadStage),
-          lead_stage: parseValue(item.lead_stage),
-
-          quick_remark: parseValue(item.quick_remark),
-          detailed_remark: parseValue(item.detailed_remark),
-
-          // Assignment fields
-          assign_date: parseValue(item.assign_date),
-          followup_date: parseValue(item.followup_date),
-          assignment_remark: parseValue(item.assignment_remark),
-          assigned_to: parseValue(item.assigned_to),
-          assigned_to_user_id: parseIdValue(item.assigned_to_user_id),
-          stage: cleanStage,
-          assign_type: parseValue(item.assign_type),
-
-          reassignment_remarks: Array.isArray(item.reassignment_remarks)
-            ? item.reassignment_remarks.map((remark: any) => {
-              if (typeof remark === 'string') {
-                return remark;
-              } else if (remark && typeof remark === 'object') {
-                return {
-                  remark: remark.remark || '',
-                  assignedTo: remark.assignedTo || '',
-                  leadStage: remark.leadStage || '',
-                  reassignment_date: remark.reassignment_date || '',
-                  created_by_user: remark.created_by_user || 0,
-                  created_at: remark.created_at || '',
-                  name: remark.name || '',
-                  role: remark.role || '',
-                };
-              }
-              return '';
-            })
-            : [],
-          previous_stage: previousStage,
-
-          // Calculated percentage for battery display
-          status_percentage: status_percentage,
-
-          // Flag to indicate if this is a Drop stage
-          is_drop_stage: cleanStage === 'Drop',
-
-          assign_id: parseIdValue(item.assign_id),
-
-          document_location_link: parseValue(item.document_location_link),
-        };
-      });
-
-      console.log('Processed data with other inputs:', {
-        totalClients: formattedData.length,
-        sampleClient: formattedData[0],
-        hasCategoryOther: formattedData[0]?.category_other,
-        hasReferenceOther: formattedData[0]?.reference_other,
-      });
-
-      setRawData(formattedData);
-      setFilteredClients(formattedData);
-      setCurrentPage(1);
-    } catch (error) {
-      console.error('Error fetching Master Data:', error);
-    }
-  };
+    setRawData(formattedData);
+    setFilteredClients(formattedData);
+    setCurrentPage(1);
+  } catch (error) {
+    console.error('Error fetching Master Data:', error);
+  } finally {
+    setIsLoading(false); // Set loading to false after fetching (whether success or error)
+  }
+};
 
   // Call this in useEffect
   useEffect(() => {
@@ -3666,7 +3583,7 @@ else if (isStageFilter && location.state.lead_stage === 'Others') {
     } else {
       // No custom record count, just apply filters normally
       applyFilters();
-      setItemsPerPage(5);
+      setItemsPerPage(10);
     }
   }, [
     customRecordCount,
@@ -3832,7 +3749,7 @@ else if (isStageFilter && location.state.lead_stage === 'Others') {
     } else {
       // Reset to normal pagination - apply filters first
       applyFilters();
-      setItemsPerPage(5); // Reset to default
+      setItemsPerPage(10); // Reset to default
     }
   }, [
     customRecordCount,
@@ -3865,7 +3782,7 @@ else if (isStageFilter && location.state.lead_stage === 'Others') {
   // Add this function to clear the custom record count
   const clearCustomRecordCount = () => {
     setCustomRecordCount('');
-    setItemsPerPage(5);
+    setItemsPerPage(10);
   };
 
   // Handle "Select All" and "Clear All"
@@ -3893,398 +3810,298 @@ else if (isStageFilter && location.state.lead_stage === 'Others') {
   return (
     <div>
       <div className="sticky top-0 z-50 w-full bg-white/95 dark:bg-boxdark/95 backdrop-blur-sm shadow-lg border-b border-gray-200/80 dark:border-gray-800 mb-4">
-        <div className="px-4 py-3">
-          {/* Header with Breadcrumb and Compact Search */}
-          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 mb-2">
-            <div className="min-w-0">
-              <h2 className="text-lg font-medium">Master Data</h2>
+  <div className="px-4 py-3">
+    {/* All in one line */}
+    <div className="flex flex-wrap items-center gap-3">
+      {/* Lead count badge */}
+      <span className="inline-flex items-center px-3 py-1.5 rounded-full text-sm font-medium bg-gradient-to-r from-blue-100 to-blue-200 dark:from-blue-900/30 dark:to-blue-800/30 text-blue-800 dark:text-blue-300 border border-blue-200 dark:border-blue-700/30 whitespace-nowrap">
+        <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+        </svg>
+        {totalItems}
+      </span>
 
-              <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-gradient-to-r from-blue-100 to-blue-200 dark:from-blue-900/30 dark:to-blue-800/30 text-blue-800 dark:text-blue-300 border border-blue-200 dark:border-blue-700/30 mt-2">
-                <svg
-                  className="w-4 h-4 mr-1"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth="2"
-                    d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
-                  />
-                </svg>
-                {totalItems} Leads
-              </span>
-            </div>
-
-            {/* Compact Search Input and Custom Record Count */}
-            <div className="flex flex-col sm:flex-row gap-3 w-full sm:w-auto">
-              {/* Custom Record Count Input */}
-              <div className="w-full sm:w-48">
-                <div className="relative">
-                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                    <svg
-                      className="h-4 w-4 text-gray-400"
-                      fill="none"
-                      stroke="currentColor"
-                      viewBox="0 0 24 24"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
-                      />
-                    </svg>
-                  </div>
-                  <input
-                    type="number"
-                    className="w-full pl-10 pr-10 py-2 text-sm border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
-                    placeholder="Show N records"
-                    value={customRecordCount}
-                    onChange={handleCustomRecordInput}
-                    min="1"
-                  />
-                  {customRecordCount && (
-                    <button
-                      onClick={clearCustomRecordCount}
-                      className="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
-                      title="Clear limit"
-                    >
-                      <svg
-                        className="h-4 w-4"
-                        fill="none"
-                        stroke="currentColor"
-                        viewBox="0 0 24 24"
-                      >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          strokeWidth={2}
-                          d="M6 18L18 6M6 6l12 12"
-                        />
-                      </svg>
-                    </button>
-                  )}
-                </div>
-                {customRecordCount && (
-                  <div className="text-xs text-blue-600 dark:text-blue-400 mt-1 ml-1">
-                    Showing first {customRecordCount} records
-                  </div>
-                )}
-              </div>
-
-              {/* Compact Search Input */}
-              <div className="w-full sm:w-72">
-                <div className="relative">
-                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                    <svg
-                      className="h-4 w-4 text-gray-400"
-                      fill="none"
-                      stroke="currentColor"
-                      viewBox="0 0 24 24"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
-                      />
-                    </svg>
-                  </div>
-                  <input
-                    type="text"
-                    className="w-full pl-10 pr-4 py-2 text-sm border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all"
-                    placeholder="Search name, category, status..."
-                    value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
-                  />
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Action Buttons - Compact Layout */}
-          <div className="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-gray-100 dark:border-gray-800">
-            <div className="flex items-center gap-2">
-              {selectedClients.length > 0 && (
-                <button
-                  className="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded-lg text-sm font-medium flex items-center gap-2 transition-colors shadow-sm"
-                  onClick={handleBulkDelete}
-                >
-                  <svg
-                    className="h-4 w-4"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
-                    />
-                  </svg>
-                  Delete Selected ({selectedClients.length})
-                </button>
-              )}
-            </div>
-
-            <div className="flex flex-wrap items-center gap-2">
-              {/* Reset Filter Button */}
-              <button
-                onClick={clearFilters}
-                className="bg-gradient-to-r from-gray-600 to-gray-700 hover:from-gray-700 hover:to-gray-800 text-white px-4 py-2 rounded-lg text-sm font-medium flex items-center gap-2 transition-all shadow-md hover:shadow-lg whitespace-nowrap"
-              >
-                <svg
-                  className="h-4 w-4"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
-                  />
-                </svg>
-                Reset Filter
-              </button>
-
-              {/* Add New Button */}
-              <button
-                onClick={() => setShowAddPopup(true)}
-                className="bg-gradient-to-r from-purple-600 to-purple-700 hover:from-purple-700 hover:to-purple-800 text-white px-4 py-2 rounded-lg text-sm font-medium flex items-center gap-2 transition-all shadow-md hover:shadow-lg"
-              >
-                <svg
-                  className="h-4 w-4"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M12 4v16m8-8H4"
-                  />
-                </svg>
-                Add New
-              </button>
-
-              {/* Import Button */}
-              <button
-                onClick={() => setShowImportPopup(true)}
-                className="bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white px-4 py-2 rounded-lg text-sm font-medium flex items-center gap-2 transition-all shadow-md hover:shadow-lg"
-              >
-                <svg
-                  className="h-4 w-4"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M9 19l3 3m0 0l3-3m-3 3V10"
-                  />
-                </svg>
-                Import
-              </button>
-
-              {/* Reassign Button */}
-              <button
-                onClick={() => {
-                  if (selectedMasterIds.length === 0) {
-                    alert(
-                      'Please select at least one record to assign/reassign',
-                    );
-                    return;
-                  }
-                  setShowAssignPopup(true);
-                }}
-                disabled={selectedMasterIds.length === 0}
-                className={`bg-gradient-to-r from-green-600 to-green-700 text-white px-4 py-2 rounded-lg text-sm font-medium flex items-center gap-2 transition-all shadow-md hover:shadow-lg ${selectedMasterIds.length === 0
-                    ? 'opacity-50 cursor-not-allowed'
-                    : 'hover:from-green-700 hover:to-green-800'
-                  }`}
-              >
-                <svg
-                  className="h-4 w-4"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197m13.5-6a3.5 3.5 0 11-7 0 3.5 3.5 0 017 0z"
-                  />
-                </svg>
-                {selectedMasterIds.length > 1
-                  ? `Reassign (${selectedMasterIds.length})`
-                  : 'ReAssign'}
-              </button>
-            </div>
-          </div>
+      {/* Record count input - increased height */}
+      <div className="relative w-32">
+        <div className="absolute inset-y-0 left-0 pl-2 flex items-center pointer-events-none">
+          <svg className="h-4 w-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+          </svg>
         </div>
+        <input
+          type="number"
+          className="w-full pl-8 pr-7 py-2 text-sm border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+          placeholder="Show N"
+          value={customRecordCount}
+          onChange={handleCustomRecordInput}
+          min="1"
+        />
+        {customRecordCount && (
+          <button
+            onClick={clearCustomRecordCount}
+            className="absolute inset-y-0 right-0 pr-2 flex items-center text-gray-400 hover:text-gray-600"
+          >
+            <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        )}
       </div>
 
-      {showAssignPopup && (
-        <div className="fixed inset-0 z-[9999] bg-black/70 flex justify-center items-center">
-          <div className="bg-white dark:bg-boxdark p-3 rounded-lg shadow-lg w-full max-w-2xl max-h-[70vh] overflow-y-auto border dark:border-strokedark">
-            {/* HEADER */}
-            <div className="flex items-center justify-between gap-4 border-b pb-3 mb-4 dark:border-strokedark">
-              <h2 className="text-lg sm:text-xl font-semibold text-black dark:text-white">
-                Assign Selected Records ({selectedMasterIds.length})
-              </h2>
+      {/* Search input - increased height and width */}
+      <div className="relative w-55">
+        <div className="absolute inset-y-0 left-0 pl-2 flex items-center pointer-events-none">
+          <svg className="h-4 w-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+          </svg>
+        </div>
+        <input
+          type="text"
+          className="w-full pl-8 pr-3 py-2 text-sm border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+          placeholder="Search name, category, status..."
+          value={searchTerm}
+          onChange={(e) => setSearchTerm(e.target.value)}
+        />
+      </div>
 
-              <button
-                onClick={() => setShowAssignPopup(false)}
-                className="text-xl text-gray-500 hover:text-red-500"
+  {/* Action buttons - compact single line */}
+<div className="flex items-center gap-2 flex-nowrap overflow-x-auto">
+
+  {selectedClients.length > 0 && (
+    <button
+      className="bg-red-500 hover:bg-red-600 text-white px-3 py-1.5 rounded-md text-xs font-medium flex items-center gap-1.5 shadow-sm whitespace-nowrap"
+      onClick={handleBulkDelete}
+    >
+      <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+          d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
+        />
+      </svg>
+      Delete ({selectedClients.length})
+    </button>
+  )}
+
+  <button
+    onClick={clearFilters}
+    className="bg-gradient-to-r from-gray-600 to-gray-700 hover:from-gray-700 hover:to-gray-800 text-white px-3 py-1.5 rounded-md text-xs font-medium flex items-center gap-1.5 shadow-sm whitespace-nowrap"
+  >
+    <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+        d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
+      />
+    </svg>
+    Reset
+  </button>
+
+  <button
+    onClick={() => setShowAddPopup(true)}
+    className="bg-gradient-to-r from-purple-600 to-purple-700 hover:from-purple-700 hover:to-purple-800 text-white px-3 py-1.5 rounded-md text-xs font-medium flex items-center gap-1.5 shadow-sm whitespace-nowrap"
+  >
+    <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+        d="M12 4v16m8-8H4"
+      />
+    </svg>
+    Add
+  </button>
+
+
+  <button
+    onClick={() => {
+      if (selectedMasterIds.length === 0) {
+        alert('Please select at least one record to assign/reassign');
+        return;
+      }
+      setShowAssignPopup(true);
+    }}
+    disabled={selectedMasterIds.length === 0}
+    className={`bg-gradient-to-r from-green-600 to-green-700 text-white px-3 py-1.5 rounded-md text-xs font-medium flex items-center gap-1.5 shadow-sm whitespace-nowrap ${
+      selectedMasterIds.length === 0
+        ? 'opacity-50 cursor-not-allowed'
+        : 'hover:from-green-700 hover:to-green-800'
+    }`}
+  >
+    <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+        d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197m13.5-6a3.5 3.5 0 11-7 0 3.5 3.5 0 017 0z"
+      />
+    </svg>
+    {selectedMasterIds.length > 1
+      ? `Reassign (${selectedMasterIds.length})`
+      : 'ReAssign'}
+  </button>
+
+</div>
+
+    </div>
+  </div>
+</div>
+
+    {showAssignPopup && (
+  <div className="fixed inset-0 z-[9999] bg-black/70 flex justify-center items-center">
+    <div className="bg-white dark:bg-boxdark p-3 rounded-lg shadow-lg w-full max-w-2xl max-h-[70vh] overflow-y-auto border dark:border-strokedark">
+      {/* HEADER */}
+      <div className="flex items-center justify-between gap-4 border-b pb-3 mb-4 dark:border-strokedark">
+        <h2 className="text-lg sm:text-xl font-semibold text-black dark:text-white">
+          Assign Selected Records ({selectedMasterIds.length})
+        </h2>
+
+        <button
+          onClick={() => setShowAssignPopup(false)}
+          className="text-xl text-gray-500 hover:text-red-500"
+        >
+          ×
+        </button>
+      </div>
+
+    
+
+      {/* FORM */}
+      <form onSubmit={handleAssignSubmit} className="space-y-4">
+        {/* ASSIGN TO */}
+        <div>
+          <label className="block font-semibold text-green-600 mb-2">
+            Assign To
+          </label>
+
+          <div className="border rounded p-3 max-h-48 overflow-y-auto dark:border-form-strokedark dark:bg-form-input">
+            {assignUsers.length > 0 ? (
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-2">
+                {assignUsers.map((user) => {
+                  const checked = assignData.assignedTo.includes(user.name);
+
+                  return (
+                    <label
+                      key={user.user_id || user.id}
+                      className="flex items-start gap-2 p-2 rounded cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800"
+                    >
+                      <input
+                        type="checkbox"
+                        checked={checked}
+                        onChange={() =>
+                          setAssignData({
+                            ...assignData,
+                            assignedTo: checked
+                              ? assignData.assignedTo.filter(
+                                  (u) => u !== user.name,
+                                )
+                              : [...assignData.assignedTo, user.name],
+                          })
+                        }
+                        className="mt-1"
+                      />
+
+                      <div className="text-sm">
+                        <div className="font-medium text-black dark:text-white">
+                          {user.name}
+                        </div>
+                        <div className="text-xs text-gray-500 dark:text-gray-400">
+                          {user.role_label || user.role}
+                        </div>
+                      </div>
+                    </label>
+                  );
+                })}
+              </div>
+            ) : (
+              <div className="text-center py-4 text-gray-500 dark:text-gray-400">
+                <p className="text-sm">No users available to assign</p>
+                <p className="text-xs mt-1">You don't have permission to assign to any users</p>
+              </div>
+            )}
+          </div>
+
+          <p className="text-sm mt-1 text-blue-600">
+            Selected: {assignData.assignedTo.length}
+          </p>
+        </div>
+
+        {/* LEAD STAGE + FOLLOWUP DATE */}
+        <div>
+          <label className="block font-semibold text-green-600 mb-2">
+            Lead Details
+          </label>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            {/* Lead Stage */}
+            <div>
+              <label className="block mb-1 text-sm font-medium text-black dark:text-white">
+                Lead Stage *
+              </label>
+              <select
+                name="leadStage"
+                value={assignData.leadStage}
+                onChange={handleChange}
+                required
+                className="w-full border rounded p-2 dark:border-form-strokedark dark:bg-form-input dark:text-white"
               >
-                ×
-              </button>
+                <option value="">Select Lead Stage</option>
+                {leadStages.map((stage, i) => (
+                  <option key={i} value={stage}>
+                    {stage}
+                  </option>
+                ))}
+              </select>
             </div>
 
-            {/* FORM */}
-            <form onSubmit={handleAssignSubmit} className="space-y-4">
-              {/* ASSIGN TO */}
-              <div>
-                <label className="block font-semibold text-green-600 mb-2">
-                  Assign To
-                </label>
-
-                <div className="border rounded p-3 max-h-48 overflow-y-auto dark:border-form-strokedark dark:bg-form-input">
-                  <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-2">
-                    {users.map((user) => {
-                      const checked = assignData.assignedTo.includes(user.name);
-
-                      return (
-                        <label
-                          key={user.id}
-                          className="flex items-start gap-2 p-2 rounded cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800"
-                        >
-                          <input
-                            type="checkbox"
-                            checked={checked}
-                            onChange={() =>
-                              setAssignData({
-                                ...assignData,
-                                assignedTo: checked
-                                  ? assignData.assignedTo.filter(
-                                    (u) => u !== user.name,
-                                  )
-                                  : [...assignData.assignedTo, user.name],
-                              })
-                            }
-                            className="mt-1"
-                          />
-
-                          <div className="text-sm">
-                            <div className="font-medium text-black dark:text-white">
-                              {user.name}
-                            </div>
-                          </div>
-                        </label>
-                      );
-                    })}
-                  </div>
-                </div>
-
-                <p className="text-sm mt-1 text-blue-600">
-                  Selected: {assignData.assignedTo.length}
-                </p>
-              </div>
-
-              {/* LEAD STAGE + FOLLOWUP DATE */}
-              <div>
-                <label className="block font-semibold text-green-600 mb-2">
-                  Lead Details
-                </label>
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  {/* Lead Stage */}
-                  <div>
-                    <label className="block mb-1 text-sm font-medium text-black dark:text-white">
-                      Lead Stage *
-                    </label>
-                    <select
-                      name="leadStage"
-                      value={assignData.leadStage}
-                      onChange={handleChange}
-                      required
-                      className="w-full border rounded p-2 dark:border-form-strokedark dark:bg-form-input dark:text-white"
-                    >
-                      <option value="">Select Lead Stage</option>
-                      {leadStages.map((stage, i) => (
-                        <option key={i} value={stage}>
-                          {stage}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-
-                  {/* Followup Date */}
-                  <div>
-                    <label className="block mb-1 text-sm font-medium text-black dark:text-white">
-                      Followup Date *
-                    </label>
-                    <input
-                      type="date"
-                      name="reassignmentDate"
-                      value={assignData.reassignmentDate}
-                      onChange={handleChange}
-                      required
-                      className="w-full border rounded p-2 dark:border-form-strokedark dark:bg-form-input dark:text-white"
-                    />
-                  </div>
-                </div>
-              </div>
-
-              {/* REMARK */}
-              <div>
-                <label className="block mb-1 font-medium text-black dark:text-white">
-                  Remark
-                </label>
-                <textarea
-                  name="remark"
-                  value={assignData.remark}
-                  onChange={handleChange}
-                  rows={3}
-                  className="w-full border rounded p-2 dark:border-form-strokedark dark:bg-form-input dark:text-white"
-                />
-              </div>
-
-              {/* ACTION BUTTONS */}
-              <div className="flex justify-end gap-3 pt-4 border-t dark:border-strokedark">
-                <button
-                  type="button"
-                  onClick={() => setShowAssignPopup(false)}
-                  className="px-5 py-2 rounded border text-gray-700 dark:text-gray-300"
-                >
-                  Cancel
-                </button>
-
-                <button
-                  type="submit"
-                  disabled={
-                    !assignData.assignedTo.length ||
-                    !assignData.leadStage ||
-                    !assignData.reassignmentDate
-                  }
-                  className="px-6 py-2 rounded bg-green-600 text-white disabled:opacity-50"
-                >
-                  Assign
-                </button>
-              </div>
-            </form>
+            {/* Followup Date */}
+            <div>
+              <label className="block mb-1 text-sm font-medium text-black dark:text-white">
+                Followup Date *
+              </label>
+              <input
+                type="date"
+                name="reassignmentDate"
+                value={assignData.reassignmentDate}
+                onChange={handleChange}
+                required
+                className="w-full border rounded p-2 dark:border-form-strokedark dark:bg-form-input dark:text-white"
+              />
+            </div>
           </div>
         </div>
-      )}
+
+        {/* REMARK */}
+        <div>
+          <label className="block mb-1 font-medium text-black dark:text-white">
+            Remark
+          </label>
+          <textarea
+            name="remark"
+            value={assignData.remark}
+            onChange={handleChange}
+            rows={3}
+            className="w-full border rounded p-2 dark:border-form-strokedark dark:bg-form-input dark:text-white"
+          />
+        </div>
+
+        {/* ACTION BUTTONS */}
+        <div className="flex justify-end gap-3 pt-4 border-t dark:border-strokedark">
+          <button
+            type="button"
+            onClick={() => setShowAssignPopup(false)}
+            className="px-5 py-2 rounded border text-gray-700 dark:text-gray-300"
+          >
+            Cancel
+          </button>
+
+          <button
+            type="submit"
+            disabled={
+              !assignData.assignedTo.length ||
+              !assignData.leadStage ||
+              !assignData.reassignmentDate
+            }
+            className="px-6 py-2 rounded bg-green-600 text-white disabled:opacity-50"
+          >
+            Assign
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+)}
+
 
       {/* Update Data Modal Component */}
       <UpdateRawData
@@ -4434,784 +4251,787 @@ else if (isStageFilter && location.state.lead_stage === 'Others') {
         </div>
       )}
 
-      {/* Main Data Table */}
 
-      {/* Main Data Table */}
-      <div className="h-[calc(100vh-180px)] overflow-y-auto mt-2">
-        <div className="max-w-full overflow-auto rounded-lg border border-stroke bg-white shadow-default dark:border-strokedark dark:bg-boxdark">
-          <div className="overflow-x-auto">
-            <table className="w-full table-auto">
-              <thead>
-                <tr className="bg-gradient-to-r from-gray-50 to-gray-100 dark:from-meta-4 dark:to-gray-800 border-b-2 border-gray-200 dark:border-gray-700">
-                  {/* Checkbox Column */}
-                  <th className="py-5 px-4">
-                    <input
-                      type="checkbox"
-                      checked={(() => {
-                        const currentEntries = filteredClients.slice(
-                          (currentPage - 1) * itemsPerPage,
-                          currentPage * itemsPerPage,
-                        );
-                        return (
-                          currentEntries.length > 0 &&
-                          currentEntries.every((client) =>
-                            selectedClients.includes(client.id),
-                          )
-                        );
-                      })()}
-                      onChange={handleSelectAll}
-                      className="h-4.5 w-4.5 text-blue-600 rounded border-gray-300 focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-boxdark"
-                    />
-                  </th>
+    {/* Main Data Table */}
+<div className="h-[calc(100vh-180px)] overflow-y-auto mt-2">
+  {isLoading ? (
+    <Loader />
+  ) : (
+    <div className="max-w-full overflow-auto rounded-lg border border-stroke bg-white shadow-default dark:border-strokedark dark:bg-boxdark">
+      <div className="overflow-x-auto">
+        <table className="w-full table-auto">
+          <thead>
+            <tr className="bg-gradient-to-r from-gray-50 to-gray-100 dark:from-meta-4 dark:to-gray-800 border-b-2 border-gray-200 dark:border-gray-700">
+              {/* Checkbox Column */}
+              <th className="py-5 px-4">
+                <input
+                  type="checkbox"
+                  checked={(() => {
+                    const currentEntries = filteredClients.slice(
+                      (currentPage - 1) * itemsPerPage,
+                      currentPage * itemsPerPage,
+                    );
+                    return (
+                      currentEntries.length > 0 &&
+                      currentEntries.every((client) =>
+                        selectedClients.includes(client.id),
+                      )
+                    );
+                  })()}
+                  onChange={handleSelectAll}
+                  className="h-4.5 w-4.5 text-blue-600 rounded border-gray-300 focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-boxdark"
+                />
+              </th>
 
-                  {/* Entry Date Column with Filter */}
-                  <th className="py-5 px-4 relative">
-                    <div
-                      ref={entryDateRef}
-                      className="flex items-center justify-between gap-2"
-                    >
-                      <span className="text-xs font-extrabold uppercase tracking-wider text-gray-700 dark:text-gray-300">
-                        Entry Date
-                      </span>
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          e.preventDefault();
-                          closeAllDropdowns();
-                          setShowEntryDateCalendar(!showEntryDateCalendar);
-                        }}
-                        className="text-gray-500 hover:text-blue-600 dark:text-gray-400 dark:hover:text-blue-400 focus:outline-none transition-colors"
-                      >
-                        <FontAwesomeIcon
-                          icon={faChevronDown}
-                          className={`h-3 w-3 transition-transform duration-200 ${showEntryDateCalendar ? 'rotate-180' : ''
-                            }`}
-                        />
-                      </button>
-                    </div>
-
-                    {/* Entry Date Calendar Dropdown */}
-                    {showEntryDateCalendar && (
-                      <div className="absolute top-full left-0 mt-1 z-50 bg-white dark:bg-boxdark border border-gray-300 dark:border-gray-700 rounded-lg shadow-lg p-4 min-w-[250px]">
-                        <div className="flex justify-between items-center mb-3">
-                          <span className="font-semibold text-sm dark:text-white">
-                            Select Entry Date Range
-                          </span>
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setSelectedEntryFromDate('');
-                              setSelectedEntryToDate('');
-                              applyFilters();
-                              setShowEntryDateCalendar(false);
-                            }}
-                            className="text-xs font-medium text-blue-600 hover:text-blue-800 dark:text-blue-400 transition-colors"
-                          >
-                            Clear
-                          </button>
-                        </div>
-
-                        <div className="space-y-3">
-                          <div>
-                            <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">
-                              From Date
-                            </label>
-                            <input
-                              type="date"
-                              value={selectedEntryFromDate}
-                              onChange={(e) => {
-                                e.stopPropagation();
-                                setSelectedEntryFromDate(e.target.value);
-                              }}
-                              onClick={(e) => e.stopPropagation()}
-                              className="w-full p-2 border border-gray-300 dark:border-gray-600 rounded-lg text-sm font-medium dark:bg-form-input dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                            />
-                          </div>
-
-                          <div>
-                            <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">
-                              To Date
-                            </label>
-                            <input
-                              type="date"
-                              value={selectedEntryToDate}
-                              onChange={(e) => {
-                                e.stopPropagation();
-                                setSelectedEntryToDate(e.target.value);
-                              }}
-                              onClick={(e) => e.stopPropagation()}
-                              className="w-full p-2 border border-gray-300 dark:border-gray-600 rounded-lg text-sm font-medium dark:bg-form-input dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                            />
-                          </div>
-                        </div>
-
-                        <div className="mt-4">
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              applyFilters();
-                              setShowEntryDateCalendar(false);
-                            }}
-                            className="w-full py-2.5 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white text-sm font-semibold rounded-lg transition-all duration-200 shadow-md hover:shadow-lg"
-                          >
-                            Apply Filter
-                          </button>
-                        </div>
-                      </div>
-                    )}
-                  </th>
-
-                  {/* FollowUp Date Column with Filter */}
-                  <th className="py-5 px-4 relative">
-                    <div
-                      ref={followupDateRef}
-                      className="flex items-center justify-between gap-2"
-                    >
-                      <span className="text-xs font-extrabold uppercase tracking-wider text-gray-700 dark:text-gray-300">
-                        FollowUp Date
-                      </span>
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          closeAllDropdowns();
-                          setShowFollowupDateCalendar(
-                            !showFollowupDateCalendar,
-                          );
-                        }}
-                        className="text-gray-500 hover:text-blue-600 dark:text-gray-400 dark:hover:text-blue-400 focus:outline-none transition-colors"
-                      >
-                        <FontAwesomeIcon
-                          icon={faChevronDown}
-                          className={`h-3 w-3 transition-transform duration-200 ${showFollowupDateCalendar ? 'rotate-180' : ''
-                            }`}
-                        />
-                      </button>
-                    </div>
-
-                    {/* FollowUp Date Calendar Dropdown */}
-                    {showFollowupDateCalendar && (
-                      <div className="absolute top-full left-0 mt-1 z-50 bg-white dark:bg-boxdark border border-gray-300 dark:border-gray-700 rounded-lg shadow-lg p-4 min-w-[250px]">
-                        <div className="flex justify-between items-center mb-3">
-                          <span className="font-semibold text-sm dark:text-white">
-                            Select Followup Date Range
-                          </span>
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setSelectedFollowupFromDate('');
-                              setSelectedFollowupToDate('');
-                              applyFilters();
-                              setShowFollowupDateCalendar(false);
-                            }}
-                            className="text-xs font-medium text-blue-600 hover:text-blue-800 dark:text-blue-400 transition-colors"
-                          >
-                            Clear
-                          </button>
-                        </div>
-
-                        <div className="space-y-3">
-                          <div>
-                            <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">
-                              From Date
-                            </label>
-                            <input
-                              type="date"
-                              value={selectedFollowupFromDate}
-                              onChange={(e) => {
-                                e.stopPropagation();
-                                setSelectedFollowupFromDate(e.target.value);
-                              }}
-                              onClick={(e) => e.stopPropagation()}
-                              className="w-full p-2 border border-gray-300 dark:border-gray-600 rounded-lg text-sm font-medium dark:bg-form-input dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                            />
-                          </div>
-
-                          <div>
-                            <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">
-                              To Date
-                            </label>
-                            <input
-                              type="date"
-                              value={selectedFollowupToDate}
-                              onChange={(e) => {
-                                e.stopPropagation();
-                                setSelectedFollowupToDate(e.target.value);
-                              }}
-                              onClick={(e) => e.stopPropagation()}
-                              className="w-full p-2 border border-gray-300 dark:border-gray-600 rounded-lg text-sm font-medium dark:bg-form-input dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                            />
-                          </div>
-                        </div>
-
-                        <div className="mt-4">
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              applyFilters();
-                              setShowFollowupDateCalendar(false);
-                            }}
-                            className="w-full py-2.5 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white text-sm font-semibold rounded-lg transition-all duration-200 shadow-md hover:shadow-lg"
-                          >
-                            Apply Filter
-                          </button>
-                        </div>
-                      </div>
-                    )}
-                  </th>
-
-                  {/* Name Column */}
-                  <th className="py-5 px-4">
-                    <div className="text-xs font-extrabold uppercase tracking-wider text-gray-700 dark:text-gray-300">
-                      Name
-                    </div>
-                  </th>
-
-                  {/* Contact Column */}
-                  <th className="py-5 px-4">
-                    <div className="text-xs font-extrabold uppercase tracking-wider text-gray-700 dark:text-gray-300">
-                      Contact
-                    </div>
-                  </th>
-
-                  {/* City Column with Filter */}
-                  <th className="py-5 px-4 relative">
-                    <div
-                      ref={cityFilterRef}
-                      className="flex items-center justify-between gap-2"
-                    >
-                      <span className="text-xs font-extrabold uppercase tracking-wider text-gray-700 dark:text-gray-300">
-                        City
-                      </span>
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          closeAllDropdowns();
-                          setShowCityFilter(!showCityFilter);
-                        }}
-                        className="text-gray-500 hover:text-blue-600 dark:text-gray-400 dark:hover:text-blue-400 focus:outline-none transition-colors"
-                      >
-                        <FontAwesomeIcon
-                          icon={faFilter}
-                          className={`h-3 w-3 transition-colors duration-200 ${selectedCities.length > 0 ? 'text-blue-600' : ''
-                            } ${showCityFilter ? 'text-blue-600' : ''}`}
-                        />
-                      </button>
-                    </div>
-
-                    {/* City Filter Dropdown */}
-                    {showCityFilter && (
-                      <div className="absolute top-full left-0 mt-1 z-50 bg-white dark:bg-boxdark border border-gray-300 dark:border-gray-700 rounded-lg shadow-lg p-4 min-w-[200px] max-h-[300px] overflow-y-auto">
-                        <div className="flex justify-between items-center mb-3">
-                          <span className="font-semibold text-sm dark:text-white">
-                            Filter Cities
-                          </span>
-                          <div className="flex gap-2">
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                setSelectedCities([]);
-                                setShowCityFilter(false);
-                              }}
-                              className="text-xs font-medium text-blue-600 hover:text-blue-800 dark:text-blue-400 transition-colors"
-                            >
-                              Clear All
-                            </button>
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                setShowCityFilter(false);
-                              }}
-                              className="text-xs font-medium text-gray-500 hover:text-gray-700 dark:text-gray-400 transition-colors"
-                            >
-                              ×
-                            </button>
-                          </div>
-                        </div>
-
-                        {availableCities.length > 0 ? (
-                          <>
-                            {availableCities.map((city) => (
-                              <div
-                                key={city}
-                                className="flex items-center mb-2"
-                              >
-                                <input
-                                  type="checkbox"
-                                  id={`city-${city}`}
-                                  checked={selectedCities.includes(city)}
-                                  onChange={(e) => {
-                                    e.stopPropagation();
-                                    handleCitySelect(city);
-                                  }}
-                                  onClick={(e) => e.stopPropagation()}
-                                  className="h-3.5 w-3.5 mr-2.5 text-blue-600 rounded border-gray-300 focus:ring-2 focus:ring-blue-500"
-                                />
-                                <label
-                                  htmlFor={`city-${city}`}
-                                  className="text-sm font-medium dark:text-white cursor-pointer truncate hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    handleCitySelect(city);
-                                  }}
-                                >
-                                  {city}
-                                </label>
-                              </div>
-                            ))}
-                          </>
-                        ) : (
-                          <div className="text-sm font-medium text-gray-500 dark:text-gray-400 italic py-3 text-center">
-                            No cities available
-                          </div>
-                        )}
-
-                        {selectedCities.length > 0 && (
-                          <div className="mt-4 pt-3 border-t border-gray-200 dark:border-gray-700">
-                            <div className="text-xs font-semibold text-gray-600 dark:text-gray-400 mb-2">
-                              Selected ({selectedCities.length}):
-                            </div>
-                            <div className="flex flex-wrap gap-1.5">
-                              {selectedCities.map((city) => (
-                                <span
-                                  key={city}
-                                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold bg-gradient-to-r from-teal-50 to-teal-100 dark:from-teal-900/30 dark:to-teal-800/20 text-teal-800 dark:text-teal-300 border border-teal-200 dark:border-teal-700/30 shadow-sm"
-                                >
-                                  City: {city}
-                                  <button
-                                    onClick={() => handleCitySelect(city)}
-                                    className="ml-1 text-teal-600 hover:text-teal-800 dark:text-teal-400 transition-colors"
-                                  >
-                                    ×
-                                  </button>
-                                </span>
-                              ))}
-                            </div>
-                          </div>
-                        )}
-                      </div>
-                    )}
-                  </th>
-
-                  {/* User Assign Column with Filter */}
-                  <th className="py-5 px-4 relative">
-                    <div
-                      ref={userFilterRef}
-                      className="flex items-center justify-between gap-2"
-                    >
-                      <span className="text-xs font-extrabold uppercase tracking-wider text-gray-700 dark:text-gray-300">
-                        User Assign
-                      </span>
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          closeAllDropdowns();
-                          setShowUserFilter(!showUserFilter);
-                        }}
-                        className="text-gray-500 hover:text-blue-600 dark:text-gray-400 dark:hover:text-blue-400 focus:outline-none transition-colors"
-                      >
-                        <FontAwesomeIcon
-                          icon={faFilter}
-                          className={`h-3 w-3 transition-colors duration-200 ${selectedUsers.length > 0 ? 'text-blue-600' : ''
-                            } ${showUserFilter ? 'text-blue-600' : ''}`}
-                        />
-                      </button>
-                    </div>
-
-                    {/* Assigned User Filter Dropdown */}
-                    {showUserFilter && (
-                      <div className="absolute top-full right-0 mt-1 z-50 bg-white dark:bg-boxdark border border-gray-300 dark:border-gray-700 rounded-lg shadow-lg p-4 min-w-[220px] max-h-[300px] overflow-y-auto">
-                        <div className="flex justify-between items-center mb-3">
-                          <span className="font-semibold text-sm dark:text-white">
-                            Filter Users
-                          </span>
-                          <div className="flex gap-2">
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                setSelectedUsers([]);
-                              }}
-                              className="text-xs font-medium text-blue-600 hover:text-blue-800 dark:text-blue-400 transition-colors"
-                            >
-                              Clear All
-                            </button>
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                setShowUserFilter(false);
-                              }}
-                              className="text-xs font-medium text-gray-500 hover:text-gray-700 dark:text-gray-400 transition-colors"
-                            >
-                              ×
-                            </button>
-                          </div>
-                        </div>
-
-                        {users.length > 0 ? (
-                          <>
-                            {users.map((user) => (
-                              <div
-                                key={user.id}
-                                className="flex items-center mb-2"
-                              >
-                                <input
-                                  type="checkbox"
-                                  id={`user-${user.id}`}
-                                  checked={selectedUsers.includes(user.name)}
-                                  onChange={(e) => {
-                                    e.stopPropagation();
-                                    handleUserSelect(user.name);
-                                  }}
-                                  onClick={(e) => e.stopPropagation()}
-                                  className="h-3.5 w-3.5 mr-2.5 text-blue-600 rounded border-gray-300 focus:ring-2 focus:ring-blue-500"
-                                />
-                                <label
-                                  htmlFor={`user-${user.id}`}
-                                  className="text-sm font-medium dark:text-white cursor-pointer truncate hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
-                                >
-                                  {user.name} ({user.role})
-                                </label>
-                              </div>
-                            ))}
-                          </>
-                        ) : (
-                          <div className="text-sm font-medium text-gray-500 dark:text-gray-400 italic py-3 text-center">
-                            Loading users...
-                          </div>
-                        )}
-
-                        {selectedUsers.length > 0 && (
-                          <div className="mt-4 pt-3 border-t border-gray-200 dark:border-gray-700">
-                            <div className="text-xs font-semibold text-gray-600 dark:text-gray-400 mb-2">
-                              Selected ({selectedUsers.length}):
-                            </div>
-                            <div className="flex flex-wrap gap-1.5">
-                              {selectedUsers.map((user) => (
-                                <span
-                                  key={user}
-                                  className="inline-flex items-center px-3 py-1.5 rounded-full text-xs font-semibold bg-gradient-to-r from-purple-50 to-purple-100 dark:from-purple-900/30 dark:to-purple-800/20 text-purple-800 dark:text-purple-300 border border-purple-200 dark:border-purple-700/30 shadow-sm truncate max-w-[100px]"
-                                >
-                                  {user}
-                                </span>
-                              ))}
-                            </div>
-                          </div>
-                        )}
-                      </div>
-                    )}
-                  </th>
-
-                  {/* Status Column */}
-                  <th className="py-5 px-2">
-                    <div className="text-xs font-extrabold uppercase tracking-wider text-gray-700 dark:text-gray-300">
-                      Status
-                    </div>
-                  </th>
-
-                  {/* Stage Column with Filter */}
-                  <th className="py-5 px-4 relative">
-                    <div
-                      ref={stageFilterRef}
-                      className="flex items-center justify-between gap-2"
-                    >
-                      <span className="text-xs font-extrabold uppercase tracking-wider text-gray-700 dark:text-gray-300">
-                        Stage
-                      </span>
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          closeAllDropdowns();
-                          setShowStageFilter(!showStageFilter);
-                        }}
-                        className="text-gray-500 hover:text-blue-600 dark:text-gray-400 dark:hover:text-blue-400 focus:outline-none transition-colors"
-                      >
-                        <FontAwesomeIcon
-                          icon={faFilter}
-                          className={`h-3 w-3 transition-colors duration-200 ${selectedStages.length > 0 ? 'text-blue-600' : ''
-                            } ${showStageFilter ? 'text-blue-600' : ''}`}
-                        />
-                      </button>
-                    </div>
-
-                    {/* Stage Filter Dropdown */}
-                    {showStageFilter && (
-                      <div className="absolute top-full right-0 mt-1 z-50 bg-white dark:bg-boxdark border border-gray-300 dark:border-gray-700 rounded-lg shadow-lg p-4 min-w-[220px] max-h-[300px] overflow-y-auto">
-                        <div className="flex justify-between items-center mb-3">
-                          <span className="font-semibold text-sm dark:text-white">
-                            Filter Stages
-                          </span>
-                          <div className="flex gap-2">
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                setSelectedStages([]);
-                              }}
-                              className="text-xs font-medium text-blue-600 hover:text-blue-800 dark:text-blue-400 transition-colors"
-                            >
-                              Clear All
-                            </button>
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                setShowStageFilter(false);
-                              }}
-                              className="text-xs font-medium text-gray-500 hover:text-gray-700 dark:text-gray-400 transition-colors"
-                            >
-                              ×
-                            </button>
-                          </div>
-                        </div>
-
-                        {leadStages.length > 0 ? (
-                          <>
-                            {leadStages.map((stage) => (
-                              <div
-                                key={stage}
-                                className="flex items-center mb-2"
-                              >
-                                <input
-                                  type="checkbox"
-                                  id={`stage-${stage}`}
-                                  checked={selectedStages.includes(stage)}
-                                  onChange={(e) => {
-                                    e.stopPropagation();
-                                    handleStageSelect(stage);
-                                  }}
-                                  onClick={(e) => e.stopPropagation()}
-                                  className="h-3.5 w-3.5 mr-2.5 text-blue-600 rounded border-gray-300 focus:ring-2 focus:ring-blue-500"
-                                />
-                                <label
-                                  htmlFor={`stage-${stage}`}
-                                  className="text-sm font-medium dark:text-white cursor-pointer truncate hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
-                                >
-                                  {stage || 'Unknown'}
-                                </label>
-                              </div>
-                            ))}
-                          </>
-                        ) : (
-                          <div className="text-sm font-medium text-gray-500 dark:text-gray-400 italic py-3 text-center">
-                            Loading stages...
-                          </div>
-                        )}
-
-                        {selectedStages.length > 0 && (
-                          <div className="mt-4 pt-3 border-t border-gray-200 dark:border-gray-700">
-                            <div className="text-xs font-semibold text-gray-600 dark:text-gray-400 mb-2">
-                              Selected ({selectedStages.length}):
-                            </div>
-                            <div className="flex flex-wrap gap-1.5">
-                              {selectedStages.map((stage) => (
-                                <span
-                                  key={stage}
-                                  className="inline-flex items-center px-3 py-1.5 rounded-full text-xs font-semibold bg-gradient-to-r from-blue-50 to-blue-100 dark:from-blue-900/30 dark:to-blue-800/20 text-blue-800 dark:text-blue-300 border border-blue-200 dark:border-blue-700/30 shadow-sm truncate max-w-[100px]"
-                                >
-                                  {stage}
-                                </span>
-                              ))}
-                            </div>
-                          </div>
-                        )}
-                      </div>
-                    )}
-                  </th>
-
-                  {/* Remark Column */}
-                  <th className="py-5 px-4">
-                    <div className="text-xs font-extrabold uppercase tracking-wider text-gray-700 dark:text-gray-300">
-                      Remark
-                    </div>
-                  </th>
-
-                  {/* Actions Column */}
-                  <th className="py-5 px-4">
-                    <div className="text-xs font-extrabold uppercase tracking-wider text-gray-700 dark:text-gray-300">
-                      Actions
-                    </div>
-                  </th>
-                </tr>
-              </thead>
-
-              <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
-                {currentItems.map((client, index) => (
-                  <tr
-                    key={client.id}
-                    className="hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors duration-150 border-b border-gray-100 dark:border-gray-700 last:border-b-0"
+              {/* Entry Date Column with Filter */}
+              <th className="py-5 px-4 relative">
+                <div
+                  ref={entryDateRef}
+                  className="flex items-center justify-between gap-2"
+                >
+                  <span className="text-xs font-extrabold uppercase tracking-wider text-gray-700 dark:text-gray-300">
+                    Entry Date
+                  </span>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      e.preventDefault();
+                      closeAllDropdowns();
+                      setShowEntryDateCalendar(!showEntryDateCalendar);
+                    }}
+                    className="text-gray-500 hover:text-blue-600 dark:text-gray-400 dark:hover:text-blue-400 focus:outline-none transition-colors"
                   >
-                    {/* Select Checkbox */}
-                    <td className="py-4 px-4">
-                      <input
-                        type="checkbox"
-                        checked={selectedClients.includes(client.id)}
-                        onChange={() =>
-                          handleSelect(client.id, client.master_id)
-                        }
-                        className="h-4.5 w-4.5 text-blue-600 rounded border-gray-300 focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-boxdark"
-                      />
-                    </td>
+                    <FontAwesomeIcon
+                      icon={faChevronDown}
+                      className={`h-3 w-3 transition-transform duration-200 ${showEntryDateCalendar ? 'rotate-180' : ''
+                        }`}
+                    />
+                  </button>
+                </div>
 
-                    {/* Entry Date */}
-                    <td className="py-4 px-4">
-                      <div className="font-semibold text-sm bg-gradient-to-r from-blue-50 to-blue-100 dark:from-blue-900/20 dark:to-blue-800/10 px-3 py-1.5 rounded-lg text-blue-800 dark:text-blue-300 border border-blue-100 dark:border-blue-800/30 shadow-sm">
-                        {formatDate(client.assign_date)}
-                      </div>
-                    </td>
-
-                    {/* FollowUp Date */}
-                    <td className="py-4 px-4">
-                      <div
-                        className={`inline-flex items-center px-3 py-1.5 rounded-lg font-semibold text-sm border shadow-sm ${new Date(client.followup_date) < new Date()
-                            ? 'bg-gradient-to-r from-red-50 to-red-100 dark:from-red-900/20 dark:to-red-800/10 text-red-800 dark:text-red-300 border-red-200 dark:border-red-800/30'
-                            : 'bg-gradient-to-r from-green-50 to-green-100 dark:from-green-900/20 dark:to-green-800/10 text-green-800 dark:text-green-300 border-green-200 dark:border-green-800/30'
-                          }`}
-                      >
-                        {formatDate(client.followup_date)}
-                      </div>
-                    </td>
-                    {/* Client Name - Now with enhanced styling */}
-                    <td className="py-4 px-4">
-                      <div
-                        onClick={() => {
-                          setSelectedClientDetails(client);
-                          setShowDetailsModal(true);
+                {/* Entry Date Calendar Dropdown */}
+                {showEntryDateCalendar && (
+                  <div className="absolute top-full left-0 mt-1 z-50 bg-white dark:bg-boxdark border border-gray-300 dark:border-gray-700 rounded-lg shadow-lg p-4 min-w-[250px]">
+                    <div className="flex justify-between items-center mb-3">
+                      <span className="font-semibold text-sm dark:text-white">
+                        Select Entry Date Range
+                      </span>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setSelectedEntryFromDate('');
+                          setSelectedEntryToDate('');
+                          applyFilters();
+                          setShowEntryDateCalendar(false);
                         }}
-                        className="group cursor-pointer"
+                        className="text-xs font-medium text-blue-600 hover:text-blue-800 dark:text-blue-400 transition-colors"
                       >
-                        <div className="text-sm font-bold text-gray-900 dark:text-gray-100 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors duration-200">
-                          {client.name}
-                        </div>
-                        <div className="mt-1 flex items-center">
-                          <div className="w-full h-px bg-gradient-to-r from-gray-300 to-gray-100 dark:from-gray-600 dark:to-gray-800 group-hover:from-blue-400 group-hover:to-blue-200 dark:group-hover:from-blue-500 dark:group-hover:to-blue-300 transition-all duration-300"></div>
-                          <div className="ml-2 opacity-0 group-hover:opacity-100 transform translate-x-2 group-hover:translate-x-0 transition-all duration-300">
-                            <FontAwesomeIcon
-                              icon={faEye}
-                              className="text-xs text-gray-400 group-hover:text-blue-500 dark:group-hover:text-blue-400"
-                            />
-                          </div>
-                        </div>
+                        Clear
+                      </button>
+                    </div>
+
+                    <div className="space-y-3">
+                      <div>
+                        <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">
+                          From Date
+                        </label>
+                        <input
+                          type="date"
+                          value={selectedEntryFromDate}
+                          onChange={(e) => {
+                            e.stopPropagation();
+                            setSelectedEntryFromDate(e.target.value);
+                          }}
+                          onClick={(e) => e.stopPropagation()}
+                          className="w-full p-2 border border-gray-300 dark:border-gray-600 rounded-lg text-sm font-medium dark:bg-form-input dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                        />
                       </div>
-                    </td>
 
-                    {/* Contact */}
-                    <td className="py-4 px-4">
-                      <div className="bg-gradient-to-r from-gray-50 to-gray-100 dark:from-gray-700 dark:to-gray-800 text-gray-800 dark:text-gray-300 px-3 py-1.5 rounded-lg font-medium text-sm border border-gray-200 dark:border-gray-600 shadow-sm">
-                        {client.number}
+                      <div>
+                        <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">
+                          To Date
+                        </label>
+                        <input
+                          type="date"
+                          value={selectedEntryToDate}
+                          onChange={(e) => {
+                            e.stopPropagation();
+                            setSelectedEntryToDate(e.target.value);
+                          }}
+                          onClick={(e) => e.stopPropagation()}
+                          className="w-full p-2 border border-gray-300 dark:border-gray-600 rounded-lg text-sm font-medium dark:bg-form-input dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                        />
                       </div>
-                    </td>
+                    </div>
 
-                    {/* City */}
-                    <td className="py-4 px-4">
-                      <div className="flex flex-col gap-1">
-                        <div className="font-semibold text-gray-800 dark:text-gray-200 text-sm">
-                          {client.city || '—'}
-                        </div>
-                        {client.document_location_link && (
-                          <div>
-                            <a
-                              href={client.document_location_link}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="inline-flex items-center gap-1.5 px-3 py-1 text-xs font-medium bg-gradient-to-r from-blue-50 to-blue-100 dark:from-blue-900/30 dark:to-blue-800/20 text-blue-700 dark:text-blue-300 rounded-lg hover:from-blue-100 hover:to-blue-200 dark:hover:from-blue-800/40 dark:hover:to-blue-700/30 transition-all duration-200 border border-blue-200 dark:border-blue-700/30 shadow-sm"
-                              title="Open location link"
-                            >
-                              <FontAwesomeIcon
-                                icon={faMapMarker}
-                                className="w-3 h-3"
-                              />
-                              <span>Location</span>
-                            </a>
-                          </div>
-                        )}
+                    <div className="mt-4">
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          applyFilters();
+                          setShowEntryDateCalendar(false);
+                        }}
+                        className="w-full py-2.5 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white text-sm font-semibold rounded-lg transition-all duration-200 shadow-md hover:shadow-lg"
+                      >
+                        Apply Filter
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </th>
+
+              {/* FollowUp Date Column with Filter */}
+              <th className="py-5 px-4 relative">
+                <div
+                  ref={followupDateRef}
+                  className="flex items-center justify-between gap-2"
+                >
+                  <span className="text-xs font-extrabold uppercase tracking-wider text-gray-700 dark:text-gray-300">
+                    FollowUp Date
+                  </span>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      closeAllDropdowns();
+                      setShowFollowupDateCalendar(
+                        !showFollowupDateCalendar,
+                      );
+                    }}
+                    className="text-gray-500 hover:text-blue-600 dark:text-gray-400 dark:hover:text-blue-400 focus:outline-none transition-colors"
+                  >
+                    <FontAwesomeIcon
+                      icon={faChevronDown}
+                      className={`h-3 w-3 transition-transform duration-200 ${showFollowupDateCalendar ? 'rotate-180' : ''
+                        }`}
+                    />
+                  </button>
+                </div>
+
+                {/* FollowUp Date Calendar Dropdown */}
+                {showFollowupDateCalendar && (
+                  <div className="absolute top-full left-0 mt-1 z-50 bg-white dark:bg-boxdark border border-gray-300 dark:border-gray-700 rounded-lg shadow-lg p-4 min-w-[250px]">
+                    <div className="flex justify-between items-center mb-3">
+                      <span className="font-semibold text-sm dark:text-white">
+                        Select Followup Date Range
+                      </span>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setSelectedFollowupFromDate('');
+                          setSelectedFollowupToDate('');
+                          applyFilters();
+                          setShowFollowupDateCalendar(false);
+                        }}
+                        className="text-xs font-medium text-blue-600 hover:text-blue-800 dark:text-blue-400 transition-colors"
+                      >
+                        Clear
+                      </button>
+                    </div>
+
+                    <div className="space-y-3">
+                      <div>
+                        <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">
+                          From Date
+                        </label>
+                        <input
+                          type="date"
+                          value={selectedFollowupFromDate}
+                          onChange={(e) => {
+                            e.stopPropagation();
+                            setSelectedFollowupFromDate(e.target.value);
+                          }}
+                          onClick={(e) => e.stopPropagation()}
+                          className="w-full p-2 border border-gray-300 dark:border-gray-600 rounded-lg text-sm font-medium dark:bg-form-input dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                        />
                       </div>
-                    </td>
 
-                    {/* User Assign */}
-                    <td className="py-4 px-4">
-                      <div className="bg-gradient-to-r from-purple-50 to-purple-100 dark:from-purple-900/20 dark:to-purple-800/10 text-purple-800 dark:text-purple-300 px-3 py-1.5 rounded-lg font-semibold text-sm border border-purple-200 dark:border-purple-800/30 shadow-sm text-center">
-                        {client.assigned_to}
+                      <div>
+                        <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">
+                          To Date
+                        </label>
+                        <input
+                          type="date"
+                          value={selectedFollowupToDate}
+                          onChange={(e) => {
+                            e.stopPropagation();
+                            setSelectedFollowupToDate(e.target.value);
+                          }}
+                          onClick={(e) => e.stopPropagation()}
+                          className="w-full p-2 border border-gray-300 dark:border-gray-600 rounded-lg text-sm font-medium dark:bg-form-input dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                        />
                       </div>
-                    </td>
+                    </div>
 
-                    {/* Status Column (Progress Bar) */}
-                    <td className="py-4 px-2">
-                      <ProgressStatus
-                        stage={client.stage || client.lead_stage}
-                        status_percentage={client.status_percentage}
-                        is_drop_stage={client.is_drop_stage}
-                        previous_stage={client.previous_stage}
-                      />
-                    </td>
+                    <div className="mt-4">
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          applyFilters();
+                          setShowFollowupDateCalendar(false);
+                        }}
+                        className="w-full py-2.5 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white text-sm font-semibold rounded-lg transition-all duration-200 shadow-md hover:shadow-lg"
+                      >
+                        Apply Filter
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </th>
 
-                    {/* Stage Column */}
-                    <td className="py-4 px-4">
-                      <div className="bg-gradient-to-r from-orange-50 to-orange-100 dark:from-orange-900/20 dark:to-orange-800/10 text-orange-800 dark:text-orange-300 px-3 py-1.5 rounded-lg font-semibold text-sm border border-orange-200 dark:border-orange-800/30 shadow-sm text-center">
-                        {client.stage || client.lead_stage || 'N/A'}
-                      </div>
-                    </td>
+              {/* Name Column */}
+              <th className="py-5 px-4">
+                <div className="text-xs font-extrabold uppercase tracking-wider text-gray-700 dark:text-gray-300">
+                  Name
+                </div>
+              </th>
 
-                    {/* Remark */}
-                    <td className="py-4 px-4">
-                      <div className="group relative">
-                        <div className="font-medium text-gray-700 dark:text-gray-300 text-sm truncate max-w-[200px]">
-                          {client.detailed_remark ||
-                            client.detailed_remark ||
-                            'N/A'}
-                        </div>
+              {/* Contact Column */}
+              <th className="py-5 px-4">
+                <div className="text-xs font-extrabold uppercase tracking-wider text-gray-700 dark:text-gray-300">
+                  Contact
+                </div>
+              </th>
+
+              {/* City Column with Filter */}
+              <th className="py-5 px-4 relative">
+                <div
+                  ref={cityFilterRef}
+                  className="flex items-center justify-between gap-2"
+                >
+                  <span className="text-xs font-extrabold uppercase tracking-wider text-gray-700 dark:text-gray-300">
+                    City
+                  </span>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      closeAllDropdowns();
+                      setShowCityFilter(!showCityFilter);
+                    }}
+                    className="text-gray-500 hover:text-blue-600 dark:text-gray-400 dark:hover:text-blue-400 focus:outline-none transition-colors"
+                  >
+                    <FontAwesomeIcon
+                      icon={faFilter}
+                      className={`h-3 w-3 transition-colors duration-200 ${selectedCities.length > 0 ? 'text-blue-600' : ''
+                        } ${showCityFilter ? 'text-blue-600' : ''}`}
+                    />
+                  </button>
+                </div>
+
+                {/* City Filter Dropdown */}
+                {showCityFilter && (
+                  <div className="absolute top-full left-0 mt-1 z-50 bg-white dark:bg-boxdark border border-gray-300 dark:border-gray-700 rounded-lg shadow-lg p-4 min-w-[200px] max-h-[300px] overflow-y-auto">
+                    <div className="flex justify-between items-center mb-3">
+                      <span className="font-semibold text-sm dark:text-white">
+                        Filter Cities
+                      </span>
+                      <div className="flex gap-2">
                         <button
-                          className="ml-2 text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300 font-semibold text-xs transition-colors"
-                          onClick={() =>
-                            handleShowRemark(
-                              client.detailed_remark || client.detailed_remark,
-                            )
-                          }
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setSelectedCities([]);
+                            setShowCityFilter(false);
+                          }}
+                          className="text-xs font-medium text-blue-600 hover:text-blue-800 dark:text-blue-400 transition-colors"
                         >
-                          More
+                          Clear All
+                        </button>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setShowCityFilter(false);
+                          }}
+                          className="text-xs font-medium text-gray-500 hover:text-gray-700 dark:text-gray-400 transition-colors"
+                        >
+                          ×
                         </button>
                       </div>
-                    </td>
+                    </div>
 
-                    {/* Action Buttons */}
-                    <td className="py-4 px-4">
-                      <div className="flex justify-center gap-1">
-                        <ActionButton
-                          onClick={() => handleEditClick(client)}
-                          title="Edit"
-                          variant="edit"
-                          className="w-8 h-8 hover:scale-105 transition-transform"
-                        >
-                          <FontAwesomeIcon icon={faEdit} className="text-xs" />
-                        </ActionButton>
-                        <ActionButton
-                          onClick={() => handleSingleDelete(client.master_id)}
-                          title="Delete"
-                          variant="delete"
-                          className="w-8 h-8 hover:scale-105 transition-transform"
-                        >
-                          <FontAwesomeIcon icon={faTrash} className="text-xs" />
-                        </ActionButton>
+                    {availableCities.length > 0 ? (
+                      <>
+                        {availableCities.map((city) => (
+                          <div
+                            key={city}
+                            className="flex items-center mb-2"
+                          >
+                            <input
+                              type="checkbox"
+                              id={`city-${city}`}
+                              checked={selectedCities.includes(city)}
+                              onChange={(e) => {
+                                e.stopPropagation();
+                                handleCitySelect(city);
+                              }}
+                              onClick={(e) => e.stopPropagation()}
+                              className="h-3.5 w-3.5 mr-2.5 text-blue-600 rounded border-gray-300 focus:ring-2 focus:ring-blue-500"
+                            />
+                            <label
+                              htmlFor={`city-${city}`}
+                              className="text-sm font-medium dark:text-white cursor-pointer truncate hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleCitySelect(city);
+                              }}
+                            >
+                              {city}
+                            </label>
+                          </div>
+                        ))}
+                      </>
+                    ) : (
+                      <div className="text-sm font-medium text-gray-500 dark:text-gray-400 italic py-3 text-center">
+                        No cities available
                       </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                    )}
 
-          {/* Pagination (remains unchanged) */}
-          {totalItems > 0 && (
-            <Pagination
-              currentPage={currentPage}
-              totalPages={totalPages}
-              onPageChange={handlePageChange}
-              totalItems={totalItems}
-              itemsPerPage={itemsPerPage}
-              showingStart={showingStart}
-              showingEnd={showingEnd}
-            />
-          )}
-        </div>
+                    {selectedCities.length > 0 && (
+                      <div className="mt-4 pt-3 border-t border-gray-200 dark:border-gray-700">
+                        <div className="text-xs font-semibold text-gray-600 dark:text-gray-400 mb-2">
+                          Selected ({selectedCities.length}):
+                        </div>
+                        <div className="flex flex-wrap gap-1.5">
+                          {selectedCities.map((city) => (
+                            <span
+                              key={city}
+                              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold bg-gradient-to-r from-teal-50 to-teal-100 dark:from-teal-900/30 dark:to-teal-800/20 text-teal-800 dark:text-teal-300 border border-teal-200 dark:border-teal-700/30 shadow-sm"
+                            >
+                              City: {city}
+                              <button
+                                onClick={() => handleCitySelect(city)}
+                                className="ml-1 text-teal-600 hover:text-teal-800 dark:text-teal-400 transition-colors"
+                              >
+                                ×
+                              </button>
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </th>
+
+              {/* User Assign Column with Filter */}
+              <th className="py-5 px-4 relative">
+                <div
+                  ref={userFilterRef}
+                  className="flex items-center justify-between gap-2"
+                >
+                  <span className="text-xs font-extrabold uppercase tracking-wider text-gray-700 dark:text-gray-300">
+                    User Assign
+                  </span>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      closeAllDropdowns();
+                      setShowUserFilter(!showUserFilter);
+                    }}
+                    className="text-gray-500 hover:text-blue-600 dark:text-gray-400 dark:hover:text-blue-400 focus:outline-none transition-colors"
+                  >
+                    <FontAwesomeIcon
+                      icon={faFilter}
+                      className={`h-3 w-3 transition-colors duration-200 ${selectedUsers.length > 0 ? 'text-blue-600' : ''
+                        } ${showUserFilter ? 'text-blue-600' : ''}`}
+                    />
+                  </button>
+                </div>
+
+                {/* Assigned User Filter Dropdown */}
+                {showUserFilter && (
+                  <div className="absolute top-full right-0 mt-1 z-50 bg-white dark:bg-boxdark border border-gray-300 dark:border-gray-700 rounded-lg shadow-lg p-4 min-w-[220px] max-h-[300px] overflow-y-auto">
+                    <div className="flex justify-between items-center mb-3">
+                      <span className="font-semibold text-sm dark:text-white">
+                        Filter Users
+                      </span>
+                      <div className="flex gap-2">
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setSelectedUsers([]);
+                          }}
+                          className="text-xs font-medium text-blue-600 hover:text-blue-800 dark:text-blue-400 transition-colors"
+                        >
+                          Clear All
+                        </button>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setShowUserFilter(false);
+                          }}
+                          className="text-xs font-medium text-gray-500 hover:text-gray-700 dark:text-gray-400 transition-colors"
+                        >
+                          ×
+                        </button>
+                      </div>
+                    </div>
+
+                    {users.length > 0 ? (
+                      <>
+                        {users.map((user) => (
+                          <div
+                            key={user.id}
+                            className="flex items-center mb-2"
+                          >
+                            <input
+                              type="checkbox"
+                              id={`user-${user.id}`}
+                              checked={selectedUsers.includes(user.name)}
+                              onChange={(e) => {
+                                e.stopPropagation();
+                                handleUserSelect(user.name);
+                              }}
+                              onClick={(e) => e.stopPropagation()}
+                              className="h-3.5 w-3.5 mr-2.5 text-blue-600 rounded border-gray-300 focus:ring-2 focus:ring-blue-500"
+                            />
+                            <label
+                              htmlFor={`user-${user.id}`}
+                              className="text-sm font-medium dark:text-white cursor-pointer truncate hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
+                            >
+                              {user.name} ({user.role})
+                            </label>
+                          </div>
+                        ))}
+                      </>
+                    ) : (
+                      <div className="text-sm font-medium text-gray-500 dark:text-gray-400 italic py-3 text-center">
+                        Loading users...
+                      </div>
+                    )}
+
+                    {selectedUsers.length > 0 && (
+                      <div className="mt-4 pt-3 border-t border-gray-200 dark:border-gray-700">
+                        <div className="text-xs font-semibold text-gray-600 dark:text-gray-400 mb-2">
+                          Selected ({selectedUsers.length}):
+                        </div>
+                        <div className="flex flex-wrap gap-1.5">
+                          {selectedUsers.map((user) => (
+                            <span
+                              key={user}
+                              className="inline-flex items-center px-3 py-1.5 rounded-full text-xs font-semibold bg-gradient-to-r from-purple-50 to-purple-100 dark:from-purple-900/30 dark:to-purple-800/20 text-purple-800 dark:text-purple-300 border border-purple-200 dark:border-purple-700/30 shadow-sm truncate max-w-[100px]"
+                            >
+                              {user}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </th>
+
+              {/* Status Column */}
+              <th className="py-5 px-2">
+                <div className="text-xs font-extrabold uppercase tracking-wider text-gray-700 dark:text-gray-300">
+                  Status
+                </div>
+              </th>
+
+              {/* Stage Column with Filter */}
+              <th className="py-5 px-4 relative">
+                <div
+                  ref={stageFilterRef}
+                  className="flex items-center justify-between gap-2"
+                >
+                  <span className="text-xs font-extrabold uppercase tracking-wider text-gray-700 dark:text-gray-300">
+                    Stage
+                  </span>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      closeAllDropdowns();
+                      setShowStageFilter(!showStageFilter);
+                    }}
+                    className="text-gray-500 hover:text-blue-600 dark:text-gray-400 dark:hover:text-blue-400 focus:outline-none transition-colors"
+                  >
+                    <FontAwesomeIcon
+                      icon={faFilter}
+                      className={`h-3 w-3 transition-colors duration-200 ${selectedStages.length > 0 ? 'text-blue-600' : ''
+                        } ${showStageFilter ? 'text-blue-600' : ''}`}
+                    />
+                  </button>
+                </div>
+
+                {/* Stage Filter Dropdown */}
+                {showStageFilter && (
+                  <div className="absolute top-full right-0 mt-1 z-50 bg-white dark:bg-boxdark border border-gray-300 dark:border-gray-700 rounded-lg shadow-lg p-4 min-w-[220px] max-h-[300px] overflow-y-auto">
+                    <div className="flex justify-between items-center mb-3">
+                      <span className="font-semibold text-sm dark:text-white">
+                        Filter Stages
+                      </span>
+                      <div className="flex gap-2">
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setSelectedStages([]);
+                          }}
+                          className="text-xs font-medium text-blue-600 hover:text-blue-800 dark:text-blue-400 transition-colors"
+                        >
+                          Clear All
+                        </button>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setShowStageFilter(false);
+                          }}
+                          className="text-xs font-medium text-gray-500 hover:text-gray-700 dark:text-gray-400 transition-colors"
+                        >
+                          ×
+                        </button>
+                      </div>
+                    </div>
+
+                    {leadStages.length > 0 ? (
+                      <>
+                        {leadStages.map((stage) => (
+                          <div
+                            key={stage}
+                            className="flex items-center mb-2"
+                          >
+                            <input
+                              type="checkbox"
+                              id={`stage-${stage}`}
+                              checked={selectedStages.includes(stage)}
+                              onChange={(e) => {
+                                e.stopPropagation();
+                                handleStageSelect(stage);
+                              }}
+                              onClick={(e) => e.stopPropagation()}
+                              className="h-3.5 w-3.5 mr-2.5 text-blue-600 rounded border-gray-300 focus:ring-2 focus:ring-blue-500"
+                            />
+                            <label
+                              htmlFor={`stage-${stage}`}
+                              className="text-sm font-medium dark:text-white cursor-pointer truncate hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
+                            >
+                              {stage || 'Unknown'}
+                            </label>
+                          </div>
+                        ))}
+                      </>
+                    ) : (
+                      <div className="text-sm font-medium text-gray-500 dark:text-gray-400 italic py-3 text-center">
+                        Loading stages...
+                      </div>
+                    )}
+
+                    {selectedStages.length > 0 && (
+                      <div className="mt-4 pt-3 border-t border-gray-200 dark:border-gray-700">
+                        <div className="text-xs font-semibold text-gray-600 dark:text-gray-400 mb-2">
+                          Selected ({selectedStages.length}):
+                        </div>
+                        <div className="flex flex-wrap gap-1.5">
+                          {selectedStages.map((stage) => (
+                            <span
+                              key={stage}
+                              className="inline-flex items-center px-3 py-1.5 rounded-full text-xs font-semibold bg-gradient-to-r from-blue-50 to-blue-100 dark:from-blue-900/30 dark:to-blue-800/20 text-blue-800 dark:text-blue-300 border border-blue-200 dark:border-blue-700/30 shadow-sm truncate max-w-[100px]"
+                            >
+                              {stage}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </th>
+
+              {/* Remark Column */}
+              <th className="py-5 px-4">
+                <div className="text-xs font-extrabold uppercase tracking-wider text-gray-700 dark:text-gray-300">
+                  Remark
+                </div>
+              </th>
+
+              {/* Actions Column */}
+              <th className="py-5 px-4">
+                <div className="text-xs font-extrabold uppercase tracking-wider text-gray-700 dark:text-gray-300">
+                  Actions
+                </div>
+              </th>
+            </tr>
+          </thead>
+
+          <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
+            {currentItems.map((client, index) => (
+              <tr
+                key={client.id}
+                className="hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors duration-150 border-b border-gray-100 dark:border-gray-700 last:border-b-0"
+              >
+                {/* Select Checkbox */}
+                <td className="py-4 px-4">
+                  <input
+                    type="checkbox"
+                    checked={selectedClients.includes(client.id)}
+                    onChange={() =>
+                      handleSelect(client.id, client.master_id)
+                    }
+                    className="h-4.5 w-4.5 text-blue-600 rounded border-gray-300 focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-boxdark"
+                  />
+                </td>
+
+                {/* Entry Date */}
+                <td className="py-4 px-4">
+                  <div className="font-semibold text-sm bg-gradient-to-r from-blue-50 to-blue-100 dark:from-blue-900/20 dark:to-blue-800/10 px-3 py-1.5 rounded-lg text-blue-800 dark:text-blue-300 border border-blue-100 dark:border-blue-800/30 shadow-sm">
+                    {formatDate(client.assign_date)}
+                  </div>
+                </td>
+
+                {/* FollowUp Date */}
+                <td className="py-4 px-4">
+                  <div
+                    className={`inline-flex items-center px-3 py-1.5 rounded-lg font-semibold text-sm border shadow-sm ${new Date(client.followup_date) < new Date()
+                        ? 'bg-gradient-to-r from-red-50 to-red-100 dark:from-red-900/20 dark:to-red-800/10 text-red-800 dark:text-red-300 border-red-200 dark:border-red-800/30'
+                        : 'bg-gradient-to-r from-green-50 to-green-100 dark:from-green-900/20 dark:to-green-800/10 text-green-800 dark:text-green-300 border-green-200 dark:border-green-800/30'
+                      }`}
+                  >
+                    {formatDate(client.followup_date)}
+                  </div>
+                </td>
+                {/* Client Name - Now with enhanced styling */}
+                <td className="py-4 px-4">
+                  <div
+                    onClick={() => {
+                      setSelectedClientDetails(client);
+                      setShowDetailsModal(true);
+                    }}
+                    className="group cursor-pointer"
+                  >
+                    <div className="text-sm font-bold text-gray-900 dark:text-gray-100 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors duration-200">
+                      {client.name}
+                    </div>
+                    <div className="mt-1 flex items-center">
+                      <div className="w-full h-px bg-gradient-to-r from-gray-300 to-gray-100 dark:from-gray-600 dark:to-gray-800 group-hover:from-blue-400 group-hover:to-blue-200 dark:group-hover:from-blue-500 dark:group-hover:to-blue-300 transition-all duration-300"></div>
+                      <div className="ml-2 opacity-0 group-hover:opacity-100 transform translate-x-2 group-hover:translate-x-0 transition-all duration-300">
+                        <FontAwesomeIcon
+                          icon={faEye}
+                          className="text-xs text-gray-400 group-hover:text-blue-500 dark:group-hover:text-blue-400"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                </td>
+
+                {/* Contact */}
+                <td className="py-4 px-4">
+                  <div className="bg-gradient-to-r from-gray-50 to-gray-100 dark:from-gray-700 dark:to-gray-800 text-gray-800 dark:text-gray-300 px-3 py-1.5 rounded-lg font-medium text-sm border border-gray-200 dark:border-gray-600 shadow-sm">
+                    {client.number}
+                  </div>
+                </td>
+
+                {/* City */}
+                <td className="py-4 px-4">
+                  <div className="flex flex-col gap-1">
+                    <div className="font-semibold text-gray-800 dark:text-gray-200 text-sm">
+                      {client.city || '—'}
+                    </div>
+                    {client.document_location_link && (
+                      <div>
+                        <a
+                          href={client.document_location_link}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex items-center gap-1.5 px-3 py-1 text-xs font-medium bg-gradient-to-r from-blue-50 to-blue-100 dark:from-blue-900/30 dark:to-blue-800/20 text-blue-700 dark:text-blue-300 rounded-lg hover:from-blue-100 hover:to-blue-200 dark:hover:from-blue-800/40 dark:hover:to-blue-700/30 transition-all duration-200 border border-blue-200 dark:border-blue-700/30 shadow-sm"
+                          title="Open location link"
+                        >
+                          <FontAwesomeIcon
+                            icon={faMapMarker}
+                            className="w-3 h-3"
+                          />
+                          <span>Location</span>
+                        </a>
+                      </div>
+                    )}
+                  </div>
+                </td>
+
+                {/* User Assign */}
+                <td className="py-4 px-4">
+                  <div className="bg-gradient-to-r from-purple-50 to-purple-100 dark:from-purple-900/20 dark:to-purple-800/10 text-purple-800 dark:text-purple-300 px-3 py-1.5 rounded-lg font-semibold text-sm border border-purple-200 dark:border-purple-800/30 shadow-sm text-center">
+                    {client.assigned_to}
+                  </div>
+                </td>
+
+                {/* Status Column (Progress Bar) */}
+                <td className="py-4 px-2">
+                  <ProgressStatus
+                    stage={client.stage || client.lead_stage}
+                    status_percentage={client.status_percentage}
+                    is_drop_stage={client.is_drop_stage}
+                    previous_stage={client.previous_stage}
+                  />
+                </td>
+
+                {/* Stage Column */}
+                <td className="py-4 px-4">
+                  <div className="bg-gradient-to-r from-orange-50 to-orange-100 dark:from-orange-900/20 dark:to-orange-800/10 text-orange-800 dark:text-orange-300 px-3 py-1.5 rounded-lg font-semibold text-sm border border-orange-200 dark:border-orange-800/30 shadow-sm text-center">
+                    {client.stage || client.lead_stage || 'N/A'}
+                  </div>
+                </td>
+
+                {/* Remark */}
+                <td className="py-4 px-4">
+                  <div className="group relative">
+                    <div className="font-medium text-gray-700 dark:text-gray-300 text-sm truncate max-w-[200px]">
+                      {client.detailed_remark ||
+                        client.detailed_remark ||
+                        'N/A'}
+                    </div>
+                    <button
+                      className="ml-2 text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300 font-semibold text-xs transition-colors"
+                      onClick={() =>
+                        handleShowRemark(
+                          client.detailed_remark || client.detailed_remark,
+                        )
+                      }
+                    >
+                      More
+                    </button>
+                  </div>
+                </td>
+
+                {/* Action Buttons */}
+                <td className="py-4 px-4">
+                  <div className="flex justify-center gap-1">
+                    <ActionButton
+                      onClick={() => handleEditClick(client)}
+                      title="Edit"
+                      variant="edit"
+                      className="w-8 h-8 hover:scale-105 transition-transform"
+                    >
+                      <FontAwesomeIcon icon={faEdit} className="text-xs" />
+                    </ActionButton>
+                    <ActionButton
+                      onClick={() => handleSingleDelete(client.master_id)}
+                      title="Delete"
+                      variant="delete"
+                      className="w-8 h-8 hover:scale-105 transition-transform"
+                    >
+                      <FontAwesomeIcon icon={faTrash} className="text-xs" />
+                    </ActionButton>
+                  </div>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
       </div>
 
-      {/* Add this after your search input */}
+      {/* Pagination (remains unchanged) */}
+      {totalItems > 0 && (
+        <Pagination
+          currentPage={currentPage}
+          totalPages={totalPages}
+          onPageChange={handlePageChange}
+          totalItems={totalItems}
+          itemsPerPage={itemsPerPage}
+          showingStart={showingStart}
+          showingEnd={showingEnd}
+        />
+      )}
+    </div>
+  )}
+</div>
+
+
       {/* Active Filters Display */}
       {(selectedEntryFromDate ||
         selectedEntryToDate ||
@@ -5362,21 +5182,7 @@ else if (isStageFilter && location.state.lead_stage === 'Others') {
           </div>
         )}
 
-      {openRemark && (
-        <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50">
-          <div className="bg-white p-5 rounded-lg shadow-lg max-w-lg w-full">
-            <h2 className="text-lg font-bold mb-3">Full Remark</h2>
-            <p className="text-gray-800 whitespace-pre-line">{openRemark}</p>
-
-            <button
-              className="mt-4 bg-red-500 text-white px-4 py-2 rounded"
-              onClick={() => setOpenRemark(null)}
-            >
-              Close
-            </button>
-          </div>
-        </div>
-      )}
+  
 
       {openRemark && (
         <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-50">
@@ -5419,64 +5225,6 @@ else if (isStageFilter && location.state.lead_stage === 'Others') {
         </div>
       )}
 
-      {showImportPopup && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 px-2 sm:px-4">
-          <div className="bg-white dark:bg-boxdark rounded-lg shadow-md w-full max-w-lg p-4 sm:p-6">
-            {/* Header */}
-            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 border-b pb-3 mb-4 dark:border-strokedark">
-              <h2 className="text-lg sm:text-2xl font-bold dark:text-white">
-                Import Bulk Data
-              </h2>
-
-              {/* Download Button */}
-              <a
-                href="/documents/data_import_format.xlsx"
-                download
-                className="inline-flex items-center gap-2 border px-3 py-2 rounded bg-blue-500 text-white text-sm w-fit"
-              >
-                <FontAwesomeIcon icon={faDownload} />
-                Download Sample
-              </a>
-            </div>
-
-            {/* Error */}
-            {error && !showDuplicateModal && (
-              <div className="bg-red-100 text-red-700 p-3 rounded mb-4 text-sm">
-                <strong>Error:</strong> {error}
-              </div>
-            )}
-
-            <form onSubmit={handleSubmit} className="space-y-4">
-              {/* File Input */}
-              <input
-                type="file"
-                accept=".xlsx, .csv"
-                onChange={handleFileChange}
-                required
-                className="w-full border rounded px-3 py-2 text-sm"
-              />
-
-              {/* Action Buttons */}
-              <div className="flex flex-col sm:flex-row justify-end gap-3 pt-2">
-                <button
-                  type="submit"
-                  className="bg-green-500 text-white px-4 py-2 rounded text-sm w-full sm:w-auto"
-                >
-                  Submit
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => setShowImportPopup(false)}
-                  className="bg-red-500 text-white px-4 py-2 rounded text-sm w-full sm:w-auto"
-                >
-                  Cancel
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
 
       {/* Add Single Data Popup */}
       <InsertDataModal

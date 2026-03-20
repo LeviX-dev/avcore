@@ -26,7 +26,28 @@ import attendanceRoutes from "./routes/attendanceRoutes.js";
 
 import cron from "node-cron";
 import { importMetaLeadsRoundRobin } from "./controllers/metaController.js";
+import { storeMetaLeadsForReport } from "./controllers/metaReportController.js";
 
+
+import executionTypeRoute from "./routes/executionTypeProcessRoute.js";
+// import processExecutionRoute from "./routes/processExecutionRoute.js";
+import scheduleSystemRoutes from './routes/scheduleSystemRoutes.js';
+
+import preExecutionRoutes from './routes/preExecutionRoutes.js';
+import executionRoutes from './routes/executionRoutes.js';
+
+import completeExecutionRoutes from './routes/completeExecutionRoutes.js';
+
+
+import modelRoutes from "./routes/modelRoutes.js";
+import productRoutes from './routes/productRoutes.js'
+
+import onwardRoutes from './routes/onwardRoutes.js'
+
+import dailyExecutionRoutes from "./routes/dailyExecutionRoutes.js";
+import metaReportRoutes from "./routes/metaReportRoutes.js";
+
+import { checkTimeLogout } from './middleware/sessionExpiry.js';
 
 
 
@@ -78,7 +99,12 @@ if (fs.existsSync(uploadsDir)) {
 }
 
 // Serve static files from the CORRECT uploads directory
-app.use('/uploads', express.static(uploadsDir));
+app.use('/uploads', express.static(uploadsDir)); 
+
+app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
+
+app.use(checkTimeLogout);
+
 
 // Debug route to check file accessibility
 app.get('/debug-files', (req, res) => {
@@ -154,12 +180,59 @@ app.use("/api/sujit", metaRoutes);
 
 app.use("/api/attendance", attendanceRoutes);
 
+app.use('/api', executionTypeRoute);
+// app.use('/api', processExecutionRoute);
+app.use('/api', scheduleSystemRoutes);
+app.use('/api/execution', preExecutionRoutes);
+
+app.use('/api', executionRoutes);
+
+app.use('/api', completeExecutionRoutes);
+
+
+app.use("/api", modelRoutes);
+
+app.use("/api/product",productRoutes)
+app.use('/api', onwardRoutes)
+
+app.use("/api/daily-execution", dailyExecutionRoutes);
+
+
+app.use("/api/report", metaReportRoutes);
+
 
 
 // ✅ ADD CRON HERE
-cron.schedule("* * * * *", async () => {
-  console.log("⏱ Meta auto-import running...");
-  await importMetaLeadsRoundRobin({}, {});
+// cron.schedule("* * * * *", async () => {
+//   console.log("⏱ Meta auto-import running...");
+//   await importMetaLeadsRoundRobin({}, {});
+// });
+
+
+cron.schedule("*/5 * * * *", async () => {
+  console.log("⏱ Meta auto-import and storage running at:", new Date().toISOString());
+  
+  // Store leads in report table (using new controller)
+  try {
+    console.log("📊 Storing Meta leads for reporting...");
+    const result = await storeMetaLeadsForReport({}, {});
+    console.log("✅ Meta leads stored successfully:", {
+      inserted: result?.inserted || 0,
+      duplicates: result?.duplicates || 0,
+      skipped: result?.skipped || 0
+    });
+  } catch (error) {
+    console.error("❌ Error storing Meta leads in report table:", error.message);
+  }
+  
+  // Import to CRM (using existing controller)
+  try {
+    console.log("📞 Importing Meta leads to CRM...");
+    const result = await importMetaLeadsRoundRobin({}, {});
+    console.log("✅ Meta leads imported to CRM successfully");
+  } catch (error) {
+    console.error("❌ Error importing Meta leads to CRM:", error.message);
+  }
 });
 
 

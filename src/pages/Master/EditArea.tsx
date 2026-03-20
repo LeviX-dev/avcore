@@ -39,7 +39,7 @@ const EditArea = ({ AreaToEdit, onClose, onAreaUpdated }) => {
   return (
     <div className="fixed inset-0 bg-black bg-opacity-30 flex justify-center items-center z-50">
       <div className="bg-white dark:bg-boxdark p-5 rounded-lg w-full max-w-md">
-        <h2 className="text-xl font-bold mb-4 text-black dark:text-white">Edit Area</h2>
+        <h2 className="text-xl font-bold mb-4 text-black dark:text-white">Edit City</h2>
        
         <form onSubmit={handleSubmit}>
           <input

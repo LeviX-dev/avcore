@@ -18,16 +18,25 @@ import {
   FolderPlus,
   Eye,
   CheckCircle,
-  X,
   ChevronDown,
-  CalendarCheck,
-  MapPin,
+  X,
+  LogOut,
   TrendingUp,
-  // Add any other icons you need
-  ShieldCheck,   // ✅ for Role Permission
-  UserCog        // ✅ for Employee Reports
+  ShieldCheck,
+  UserCog,
+  ClipboardCheck,
+  CalendarCheck,
 
+  // ✅ ADD THESE
+  Boxes,
+  Warehouse,
+  FileStack,
+  Clipboard,
+  MapPin
 } from 'lucide-react';
+
+
+
 
 export const menuIcons = {
   LayoutDashboard,

@@ -492,6 +492,13 @@ const TodaysTodoPage: React.FC = () => {
   const [users, setUsers] = useState<any[]>([]);
   const [leadStages, setLeadStages] = useState<string[]>([]);
   
+  // Add these new state variables for role-based user assignment
+const [assignUsers, setAssignUsers] = useState<any[]>([]);
+const [assignCurrentUserRole, setAssignCurrentUserRole] = useState('');
+const [assignRolePermissions, setAssignRolePermissions] = useState<any>(null);
+
+
+
   // Filter states
   const [showEntryDateCalendar, setShowEntryDateCalendar] = useState(false);
   const [showFollowupDateCalendar, setShowFollowupDateCalendar] = useState(false);
@@ -853,128 +860,7 @@ const renderDetailsModal = () => {
               </div>
             )}
 
-            {/* Stage & Assignment - Only show if exists */}
-            {(hasLeadStages || hasAssignmentInfo) && (
-              <div className="grid grid-cols-2 gap-4">
-                {/* Lead Stages */}
-                {hasLeadStages && (
-                  <div className="bg-gradient-to-r from-purple-50 to-pink-50 dark:from-purple-900/20 dark:to-pink-900/20 p-3 rounded-lg border border-purple-100 dark:border-purple-800/30">
-                    <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2 flex items-center gap-2">
-                      <FontAwesomeIcon icon={faUser} className="h-4 w-4 text-purple-500" />
-                      Lead Stages
-                    </h3>
-                    <div className="space-y-2">
-                      {hasField('lead_stage') && (
-                        <div>
-                          <div className="text-xs text-gray-500 dark:text-gray-400">Lead Stage</div>
-                          <div className="font-medium text-black dark:text-white">
-                            {formatValue(selectedLeadDetails.lead_stage)}
-                          </div>
-                        </div>
-                      )}
-                      {hasField('current_stage') && (
-                        <div>
-                          <div className="text-xs text-gray-500 dark:text-gray-400">Current Stage</div>
-                          <div className="font-medium text-black dark:text-white">
-                            {formatValue(selectedLeadDetails.current_stage)}
-                          </div>
-                        </div>
-                      )}
-                      {hasField('latest_leadStage') && (
-                        <div>
-                          <div className="text-xs text-gray-500 dark:text-gray-400">Latest Lead Stage</div>
-                          <div className="font-medium text-black dark:text-white">
-                            {formatValue(selectedLeadDetails.latest_leadStage)}
-                          </div>
-                        </div>
-                      )}
-
-                    {hasField('status_percentage') && (
-  <div>
-    <div className="text-xs text-gray-500 dark:text-gray-400">Progress</div>
-    <div className="mt-0.5">
-      <ProgressStatus
-        stage={selectedLeadDetails.lead_stage}
-        status_percentage={selectedLeadDetails.status_percentage}
-        is_drop_stage={selectedLeadDetails.is_drop_stage}
-        previous_stage={selectedLeadDetails.previous_stage}
-      />
-    </div>
-  </div>
-)}
-
-                    </div>
-                  </div>
-                )}
-
-                {/* Assignment Info */}
-                {hasAssignmentInfo && (
-                  <div className="bg-gradient-to-r from-teal-50 to-cyan-50 dark:from-teal-900/20 dark:to-cyan-900/20 p-3 rounded-lg border border-teal-100 dark:border-teal-800/30">
-                    <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2 flex items-center gap-2">
-                      <FontAwesomeIcon icon={faTasks} className="h-4 w-4 text-teal-500" />
-                      Assignment
-                    </h3>
-                    <div className="space-y-2">
-                      {hasField('assigned_to') && (
-                        <div>
-                          <div className="text-xs text-gray-500 dark:text-gray-400">Assigned To</div>
-                          <div className="font-medium text-black dark:text-white truncate">
-                            {formatValue(selectedLeadDetails.assigned_to)}
-                          </div>
-                        </div>
-                      )}
-                      {hasField('telecaller_name') && (
-                        <div>
-                          <div className="text-xs text-gray-500 dark:text-gray-400">Telecaller</div>
-                          <div className="font-medium text-black dark:text-white truncate">
-                            {formatValue(selectedLeadDetails.telecaller_name)}
-                          </div>
-                        </div>
-                      )}
-                      {hasField('latest_assignedTo') && (
-                        <div>
-                          <div className="text-xs text-gray-500 dark:text-gray-400">Latest Assigned To</div>
-                          <div className="font-medium text-black dark:text-white truncate">
-                            {formatValue(selectedLeadDetails.latest_assignedTo)}
-                          </div>
-                        </div>
-                      )}
-                      {hasField('reassigned_to') && (
-                        <div>
-                          <div className="text-xs text-gray-500 dark:text-gray-400">Reassigned To</div>
-                          <div className="font-medium text-black dark:text-white truncate">
-                            {formatValue(selectedLeadDetails.reassigned_to)}
-                          </div>
-                        </div>
-                      )}
-                      {hasField('status') && (
-                        <div>
-                          <div className="text-xs text-gray-500 dark:text-gray-400">Status</div>
-                          <div className={`font-medium ${
-                            selectedLeadDetails.status === 'Assigned' ? 'text-green-600 dark:text-green-400' :
-                            selectedLeadDetails.status === 'Unassigned' ? 'text-red-600 dark:text-red-400' :
-                            'text-blue-600 dark:text-blue-400'
-                          }`}>
-                            {formatValue(selectedLeadDetails.status)}
-                          </div>
-                        </div>
-                      )}
-                      {hasField('lead_status') && (
-                        <div>
-                          <div className="text-xs text-gray-500 dark:text-gray-400">Lead Status</div>
-                          <div className={`font-medium ${
-                            selectedLeadDetails.lead_status === 'Active' ? 'text-green-600 dark:text-green-400' :
-                            'text-gray-600 dark:text-gray-400'
-                          }`}>
-                            {formatValue(selectedLeadDetails.lead_status)}
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                )}
-              </div>
-            )}
+          
 
             {/* Dates Information - Only show if exists */}
             {hasDates && (
@@ -1217,6 +1103,7 @@ const renderDetailsModal = () => {
 
 
 
+
 // Add these state variables near your other state declarations (around line ~200)
 const [selectedLeads, setSelectedLeads] = useState<number[]>([]);
 const [selectedMasterIds, setSelectedMasterIds] = useState<number[]>([]);
@@ -1238,39 +1125,26 @@ const handleAssignChange = (
   }));
 };
 
-
-
-
-
-// Fetch today's leads with server-side filtering and pagination
 const fetchTodaysLeads = async () => {
   try {
     setLoading(true);
     
-    // Build filter parameters for server-side
     const filterParams: any = {
       page: currentPage,
       limit: itemsPerPage, 
     };
 
-    // Add search term if exists
-    if (searchTerm.trim()) {
-      filterParams.search = searchTerm;
-    }
-
-    // Add date filters
+    if (searchTerm.trim()) filterParams.search = searchTerm;
     if (selectedEntryFromDate) filterParams.entryFromDate = selectedEntryFromDate;
     if (selectedEntryToDate) filterParams.entryToDate = selectedEntryToDate;
     if (selectedFollowupFromDate) filterParams.followupFromDate = selectedFollowupFromDate;
     if (selectedFollowupToDate) filterParams.followupToDate = selectedFollowupToDate;
-    
-    // Add array filters
     if (selectedStages.length > 0) filterParams.stages = selectedStages.join(',');
     if (selectedUsersFilter.length > 0) filterParams.users = selectedUsersFilter.join(',');
     if (selectedCities.length > 0) filterParams.cities = selectedCities.join(',');
 
     const response = await axios.get(
-      `${BASE_URL}api/dashboard/todays-assign-fulldata`,
+      `${BASE_URL}api/dashboard/assigned-miss-todays-leads-fulldata`, // ✅ new route
       {
         params: filterParams,
         withCredentials: true,
@@ -1280,168 +1154,157 @@ const fetchTodaysLeads = async () => {
     const data = response.data;
 
     if (data.success) {
-      const leadsArray = data.leads || [];
+      // ✅ Combine missed + today leads
+      const missedLeads = data.missed?.leads || [];
+      const todaysLeads = data.today?.leads || [];
+      const leadsArray = [...missedLeads, ...todaysLeads];
+
+      // ✅ Pagination: missed leads are paginated, today's are not
+      const missedTotal = data.missed?.total || 0;
+      const todayTotal = data.today?.total || 0;
       
-      // Create an object to track the last non-Drop stage for each client
       const lastNonDropStages: Record<number, string> = {};
       
-      // First pass: Identify and store last non-Drop stages for all clients
       leadsArray.forEach((item: any) => {
         const clientId = item.master_id;
         const currentStage = item.lead_stage || item.latest_leadStage || item.current_stage || '';
         const cleanStage = currentStage ? currentStage.trim() : '';
-        
         if (cleanStage && cleanStage !== 'Drop') {
           lastNonDropStages[clientId] = cleanStage;
         }
       });
 
       const parseValue = (value: any) => {
-        if (value === 'Not Available' || value === null || value === undefined || value === '') {
-          return '';
-        }
+        if (value === 'Not Available' || value === null || value === undefined || value === '') return '';
         return value;
       };
 
       const parseIdValue = (value: any) => {
-        if (value === 'Not Available' || value === null || value === undefined) {
-          return '';
-        }
+        if (value === 'Not Available' || value === null || value === undefined) return '';
         return isNaN(value) ? value : Number(value);
       };
 
-const processedData = leadsArray.map((item: any) => {
-  const currentStage = parseValue(item.lead_stage || item.latest_leadStage || item.current_stage);
-  const cleanStage = currentStage ? currentStage.trim() : '';
+      const processedData = leadsArray.map((item: any) => {
+        const currentStage = parseValue(item.lead_stage || item.latest_leadStage || item.current_stage);
+        const cleanStage = currentStage ? currentStage.trim() : '';
 
-  
+        let previousStage = lastNonDropStages[item.master_id] || '';
+        if (cleanStage === 'Drop' && !previousStage) {
+          if (item.quotation_date || item.site_visit_date) previousStage = 'Quotation Pending';
+          else if (item.demo_date) previousStage = 'Demo';
+          else previousStage = 'Positive Lead';
+        }
 
+        const stageForPercentage = cleanStage === 'Drop' ? previousStage : cleanStage;
+        const status_percentage = stageForPercentage ? (STAGE_PERCENTAGE_MAP[stageForPercentage] || 0) : 0;
 
+        let reassignmentRemarks = [];
+        if (Array.isArray(item.reassignment_remarks)) {
+          reassignmentRemarks = item.reassignment_remarks;
+        }
 
+        // 🔥 IMPORTANT: Determine display city with priority: area_name first, then city
+        let displayCity = '';
+        const areaName = parseValue(item.area_name);
+        const cityName = parseValue(item.city);
+        
+        if (areaName && areaName !== '' && areaName !== 'Not Available') {
+          displayCity = areaName; // Use area_name if available
+        } else if (cityName && cityName !== '' && cityName !== 'Not Available') {
+          displayCity = cityName; // Fallback to city if area_name not available
+        } else {
+          displayCity = ''; // Empty if neither available
+        }
 
-  let previousStage = lastNonDropStages[item.master_id] || '';
+        return {
+          master_id: item.master_id,
+          name: parseValue(item.name),
+          number: parseValue(item.number),
+          alternate_number: parseValue(item.alternate_number),
+          email: parseValue(item.email),
+          address: parseValue(item.address),
+          city: displayCity, // 🔥 THIS IS THE KEY CHANGE - Use the prioritized display city
+          original_city: parseValue(item.city), // Keep original if needed elsewhere
+          original_area: parseValue(item.area_name), // Keep original if needed elsewhere
+          status: parseValue(item.status),
+          lead_status: parseValue(item.lead_status),
+          lead_stage: cleanStage,
+          cat_id: parseIdValue(item.cat_id),
+          cat_name: parseValue(item.cat_name),
+          reference_id: parseIdValue(item.reference_id),
+          reference_name: parseValue(item.reference_name),
+          area_id: parseValue(item.area_id),
+          area_name: parseValue(item.area_name),
+          assign_date: parseValue(item.assign_date),
+          followup_date: parseValue(item.followup_date),
+          reassignment_date: parseValue(item.reassignment_date),
+          room_length: parseIdValue(item.room_length),
+          room_width: parseIdValue(item.room_width),
+          room_height: parseIdValue(item.room_height),
+          p_type: parseValue(item.p_type),
+          budget_range: parseValue(item.budget_range),
+          current_stage: parseValue(item.current_stage),
+          site_visit_date: parseValue(item.site_visit_date),
+          demo_date: parseValue(item.demo_date),
+          ar_number: parseValue(item.ar_number),
+          architect_name: parseValue(item.architect_name),
+          ca_number: parseValue(item.ca_number),
+          e_number: parseValue(item.e_number),
+          sm_number: parseValue(item.sm_number),
+          pop_number: parseValue(item.pop_number),
+          other_number: parseValue(item.other_number),
+          quick_remark: parseValue(item.quick_remark),
+          detailed_remark: parseValue(item.detailed_remark),
+          action_date: parseValue(item.reassignment_date || item.followup_date || ''),
+          assigned_to: parseValue(item.reassigned_to || item.assigned_user_name),
+          telecaller_name: parseValue(item.telecaller_name || item.reassigned_to),
+          category_other: parseValue(item.category_other),
+          reference_other: parseValue(item.reference_other),
+          reassignment_remarks: reassignmentRemarks,
+          latest_assignedTo: parseValue(item.latest_assignedTo),
+          latest_leadStage: parseValue(item.latest_leadStage),
+          status_percentage,
+          is_drop_stage: cleanStage === 'Drop',
+          previous_stage: previousStage,
+          document_location_link: parseValue(item.document_location_link),
+          location_link: parseValue(item.location_link),
+          // ✅ tag each row so UI can show missed vs today badge if needed
+          data_type: item.data_type || 'todays',
+        };
+      });
 
-  if (cleanStage === 'Drop' && !previousStage) {
-    if (item.quotation_date || item.site_visit_date) {
-      previousStage = 'Quotation Pending';
-    } else if (item.demo_date) {
-      previousStage = 'Demo';
-    } else {
-      previousStage = 'Positive Lead';
-    }
-  }
-
-  const stageForPercentage = cleanStage === 'Drop' ? previousStage : cleanStage;
-  const status_percentage = stageForPercentage
-    ? (STAGE_PERCENTAGE_MAP[stageForPercentage] || 0)
-    : 0;
-
-  // ✅ NEW: Single source of date for Today tab
-  const action_date = item.reassignment_date || item.followup_date || '';
-
-  let reassignmentRemarks = [];
-  if (Array.isArray(item.reassignment_remarks)) {
-    reassignmentRemarks = item.reassignment_remarks;
-  }
-
-   return {
-    master_id: item.master_id,
-    name: parseValue(item.name),
-    number: parseValue(item.number),
-    alternate_number: parseValue(item.alternate_number), // Added
-    email: parseValue(item.email),
-    address: parseValue(item.address),
-    city: parseValue(item.city),
-    status: parseValue(item.status),
-    lead_status: parseValue(item.lead_status),
-    lead_stage: cleanStage,
-    
-    // Category/Reference info
-    cat_id: parseIdValue(item.cat_id), // Added
-    cat_name: parseValue(item.cat_name), // Added
-    reference_id: parseIdValue(item.reference_id), // Added
-    reference_name: parseValue(item.reference_name), // Added
-    area_id: parseValue(item.area_id), // Added
-    area_name: parseValue(item.area), // Added
-    
-    // Dates
-    assign_date: parseValue(item.assign_date),
-    followup_date: parseValue(item.followup_date),
-    reassignment_date: parseValue(item.reassignment_date),
-    
-    // Project details
-    room_length: parseIdValue(item.room_length), // Added
-    room_width: parseIdValue(item.room_width), // Added
-    room_height: parseIdValue(item.room_height), // Added
-    p_type: parseValue(item.p_type), // Added
-    budget_range: parseValue(item.budget_range), // Added
-    current_stage: parseValue(item.current_stage), // Added
-    
-    // Additional dates
-    site_visit_date: parseValue(item.site_visit_date), // Added
-    demo_date: parseValue(item.demo_date), // Added
-    
-    // Contact numbers
-    ar_number: parseValue(item.ar_number), // Added
-        architect_name: parseValue(item.architect_name), // Add this
-    ca_number: parseValue(item.ca_number), // Added
-    e_number: parseValue(item.e_number), // Added
-    sm_number: parseValue(item.sm_number), // Added
-    pop_number: parseValue(item.pop_number), // Added
-    other_number: parseValue(item.other_number), // Added
-    
-    // Other fields
-    quick_remark: parseValue(item.quick_remark),
-    detailed_remark: parseValue(item.detailed_remark),
-    
-    // ✅ Keep action_date
-    action_date: parseValue(item.reassignment_date || item.followup_date || ''),
-    
-    assigned_to: parseValue(item.reassigned_to || item.assigned_user_name),
-    telecaller_name: parseValue(item.reassigned_to || item.assigned_user_name),
-    
-    category_other: parseValue(item.category_other),
-    reference_other: parseValue(item.reference_other),
-    
-    reassignment_remarks: reassignmentRemarks,
-    
-    latest_assignedTo: parseValue(item.latest_assignedTo),
-    latest_leadStage: parseValue(item.latest_leadStage),
-    
-    status_percentage,
-    is_drop_stage: cleanStage === 'Drop',
-    previous_stage: previousStage,
-    
-    // Links
-    document_location_link: parseValue(item.document_location_link), // Added
-    location_link: parseValue(item.location_link), // Added if exists
-  };
-
-});
-
-
-      // Set the data from server response
       setLeads(processedData);
-      // Set filteredLeads to the same data (server already filtered)
       setFilteredLeads(processedData);
-      setTotalLeads(data.total || 0);
-      
-      // Extract unique cities for filter dropdown (from current page data)
+
+      // ✅ Fix pagination: use missed total for paginated count
+      // Today's leads are always fully loaded, missed are paginated
+      setTotalLeads(missedTotal + todayTotal);
+
+      // 🔥 UPDATED: Extract unique cities from the prioritized displayCity field
       const cities = processedData
-        .map(lead => lead.city?.trim())
+        .map(lead => lead.city?.trim()) // This now uses the prioritized displayCity
         .filter(city => city && city !== '' && city !== 'Not Available' && city !== 'N/A')
         .filter((city, index, self) => self.indexOf(city) === index)
         .sort() as string[];
       setAvailableCities(cities);
-      
+
+      // Debug log to verify the changes
+      console.log('📊 Today\'s Leads Processed:', {
+        totalLeads: processedData.length,
+        sampleLead: processedData[0],
+        city: processedData[0]?.city, // Should show area_name first
+        original_city: processedData[0]?.original_city,
+        original_area: processedData[0]?.original_area,
+      });
+
     } else {
-      console.error('Error fetching today\'s leads:', data);
+      console.error('Error fetching leads:', data);
       setLeads([]);
       setFilteredLeads([]);
       setTotalLeads(0);
     }
   } catch (error) {
-    console.error('Error fetching today\'s leads:', error);
+    console.error('Error fetching leads:', error);
     setLeads([]);
     setFilteredLeads([]);
     setTotalLeads(0);
@@ -1449,6 +1312,37 @@ const processedData = leadsArray.map((item: any) => {
     setLoading(false);
   }
 };
+
+
+
+// Fetch users with role-based filtering when Assign popup opens
+useEffect(() => {
+  const fetchAssignUsers = async () => {
+    if (!showAssignPopup) return;
+    
+    try {
+      const response = await axios.get(`${BASE_URL}api/users/by-role`, {
+        withCredentials: true
+      });
+      
+      console.log('Assign users API response:', response.data);
+      
+      if (response.data.success) {
+        setAssignUsers(response.data.users || []);
+        setAssignCurrentUserRole(response.data.currentUserRole || '');
+        setAssignRolePermissions(response.data.permissions || null);
+      } else {
+        setAssignUsers([]);
+      }
+    } catch (error) {
+      console.error('Failed to fetch assign users:', error);
+      setAssignUsers([]);
+    }
+  };
+  
+  fetchAssignUsers();
+}, [showAssignPopup]);
+
 
   // Fetch other data
   const fetchCategories = async () => {
@@ -1676,7 +1570,7 @@ const clearFilters = async () => {
 
   // Clear custom record count
   setCustomRecordCount('');
-  setItemsPerPage(10);
+  setItemsPerPage(5);
 
   // Close all dropdowns
   setShowEntryDateCalendar(false);
@@ -1704,7 +1598,7 @@ const handleCustomRecordInput = (e: React.ChangeEvent<HTMLInputElement>) => {
   const value = e.target.value;
   if (value === '') {
     setCustomRecordCount('');
-    setItemsPerPage(10);
+    setItemsPerPage(5);
     setCurrentPage(1);
     // Trigger refetch when clearing
     setRefreshTrigger(prev => prev + 1);
@@ -1723,7 +1617,7 @@ const handleCustomRecordInput = (e: React.ChangeEvent<HTMLInputElement>) => {
 
 const clearCustomRecordCount = () => {
   setCustomRecordCount('');
-  setItemsPerPage(10);
+  setItemsPerPage(5);
   setCurrentPage(1);
   // Trigger refetch
   setRefreshTrigger(prev => prev + 1);
@@ -1737,12 +1631,16 @@ const clearCustomRecordCount = () => {
 const showingStart = totalLeads === 0 ? 0 : ((currentPage - 1) * itemsPerPage) + 1;
 const showingEnd = Math.min(currentPage * itemsPerPage, totalLeads);
 
+
 const handlePageChange = (page: number) => {
-  if (page >= 1 && page <= Math.ceil(totalLeads / itemsPerPage)) {
+  const maxPages = Math.ceil(totalLeads / itemsPerPage);
+  if (page >= 1 && page <= maxPages) {
     setCurrentPage(page);
-    // Page change will trigger the useEffect that calls fetchTodaysLeads
+    window.scrollTo({ top: 0, behavior: 'smooth' }); // optional UX improvement
   }
 };
+
+
 // Update the useEffect that calls fetchTodaysLeads
 useEffect(() => {
   fetchTodaysLeads();
@@ -2624,9 +2522,7 @@ const renderDocsModal = () => {
         <div className="px-4 py-3">
           {/* Header with Breadcrumb and Compact Search */}
           <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 mb-2">
-            <h2 className="text-lg font-medium text-gray-900 dark:text-white">
-              Today's Assignments
-            </h2> 
+           
              <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-gradient-to-r from-blue-100 to-blue-200 dark:from-blue-900/30 dark:to-blue-800/30 text-blue-800 dark:text-blue-300 border border-blue-200 dark:border-blue-700/30">
           <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
@@ -2665,15 +2561,7 @@ const renderDocsModal = () => {
       </button>
     )}
   </div>
-  {customRecordCount ? (
-    <div className="text-xs text-blue-600 dark:text-blue-400 mt-1 ml-1 font-medium">
-      Showing {customRecordCount} records per page
-    </div>
-  ) : (
-    <div className="text-xs text-gray-500 dark:text-gray-400 mt-1 ml-1">
-      Default: 10 records per page
-    </div>
-  )}
+
 </div>
   {/* Compact Search Input */}
   <div className="w-full sm:w-72">
@@ -3618,23 +3506,6 @@ const renderDocsModal = () => {
 <td className="py-4 px-4">
   <div className="flex justify-center gap-1">
     
-    
-    {/* Call Button */}
-    <ActionButton
-      onClick={() =>
-        handleEdit({ 
-          ...lead, 
-          master_id: lead.master_id,
-          assigned_to: lead.assigned_to || lead.telecaller_name || '' ,
-        })
-      }
-      title="Make Call"
-      variant="call"
-      className="w-8 h-8 hover:scale-105 transition-transform"
-    >
-      <FontAwesomeIcon icon={faPhone} className="text-xs" />
-    </ActionButton>
-
     {/* Edit Button */}
     <ActionButton
       onClick={() => handleEditClick(lead)}
@@ -3668,6 +3539,7 @@ const renderDocsModal = () => {
 
 
           {/* Pagination */}
+
 {totalLeads > 0 && (
   <Pagination
     currentPage={currentPage}
@@ -3675,10 +3547,11 @@ const renderDocsModal = () => {
     onPageChange={handlePageChange}
     totalItems={totalLeads}
     itemsPerPage={itemsPerPage}
-    showingStart={((currentPage - 1) * itemsPerPage) + 1}
+    showingStart={totalLeads === 0 ? 0 : ((currentPage - 1) * itemsPerPage) + 1}
     showingEnd={Math.min(currentPage * itemsPerPage, totalLeads)}
   />
 )}
+
         </>
       )}
 
@@ -3743,83 +3616,82 @@ const renderDocsModal = () => {
         <span className="text-blue-600 font-semibold">
           {selectedMasterIds.length}
         </span>
-
       </div>
 
+
+
       {/* FORM */}
-<form
-  onSubmit={async (e) => {
-    e.preventDefault();
+      <form
+        onSubmit={async (e) => {
+          e.preventDefault();
 
-    if (
-      !assignData.assignedTo.length ||
-      !assignData.leadStage ||
-      !assignData.reassignmentDate
-    ) {
-      alert('Please select users, lead stage, and followup date');
-      return;
-    }
+          if (
+            !assignData.assignedTo.length ||
+            !assignData.leadStage ||
+            !assignData.reassignmentDate
+          ) {
+            alert('Please select users, lead stage, and followup date');
+            return;
+          }
 
-    try {
-      // ✅ ONE request per master_id
-      const requests = selectedMasterIds.map((master_id) =>
-        fetch(`${BASE_URL}api/add`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          credentials: 'include',
-          body: JSON.stringify({
-            master_id,
+          try {
+            // ✅ ONE request per master_id
+            const requests = selectedMasterIds.map((master_id) =>
+              fetch(`${BASE_URL}api/add`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                credentials: 'include',
+                body: JSON.stringify({
+                  master_id,
 
-            // IMPORTANT: array (backend loops this)
-            assignedTo: assignData.assignedTo,
+                  // IMPORTANT: array (backend loops this)
+                  assignedTo: assignData.assignedTo,
 
-            leadStage: assignData.leadStage,
-            remark: assignData.remark,
+                  leadStage: assignData.leadStage,
+                  remark: assignData.remark,
 
-            // IMPORTANT: sync both
-            reassignment_date: assignData.reassignmentDate,
-            followup_date: assignData.reassignmentDate,
-          }),
-        })
-      );
+                  // IMPORTANT: sync both
+                  reassignment_date: assignData.reassignmentDate,
+                  followup_date: assignData.reassignmentDate,
+                }),
+              })
+            );
 
-      const responses = await Promise.all(requests);
-      const results = await Promise.all(responses.map(r => r.json()));
+            const responses = await Promise.all(requests);
+            const results = await Promise.all(responses.map(r => r.json()));
 
-      let totalInserted = 0;
-      let totalSkipped = 0;
+            let totalInserted = 0;
+            let totalSkipped = 0;
 
-      results.forEach(r => {
-        totalInserted += r.inserted_count || 0;
-        totalSkipped += r.skipped_count || 0;
-      });
+            results.forEach(r => {
+              totalInserted += r.inserted_count || 0;
+              totalSkipped += r.skipped_count || 0;
+            });
 
-      alert(
-        `✅ Assignment completed\nInserted: ${totalInserted}\nSkipped: ${totalSkipped}`
-      );
+            alert(
+              `✅ Assignment completed\nInserted: ${totalInserted}\nSkipped: ${totalSkipped}`
+            );
 
-      // RESET
-      setAssignData({
-        assignedTo: [],
-        leadStage: '',
-        remark: '',
-        reassignmentDate: new Date().toISOString().split('T')[0],
-      });
+            // RESET
+            setAssignData({
+              assignedTo: [],
+              leadStage: '',
+              remark: '',
+              reassignmentDate: new Date().toISOString().split('T')[0],
+            });
 
-      setSelectedMasterIds([]);
-      setSelectedLeads([]);
-      setShowAssignPopup(false);
-      setRefreshTrigger(prev => prev + 1);
+            setSelectedMasterIds([]);
+            setSelectedLeads([]);
+            setShowAssignPopup(false);
+            setRefreshTrigger(prev => prev + 1);
 
-    } catch (err) {
-      console.error(err);
-      alert('❌ Submission failed');
-    }
-  }}
-  className="space-y-4"
->
-
-
+          } catch (err) {
+            console.error(err);
+            alert('❌ Submission failed');
+          }
+        }}
+        className="space-y-4"
+      >
         {/* ASSIGN TO */}
         <div>
           <div className="flex justify-between items-center mb-2">
@@ -3830,7 +3702,7 @@ const renderDocsModal = () => {
               <button
                 type="button"
                 onClick={() => {
-                  const allUsers = users.map((user) => user.name);
+                  const allUsers = assignUsers.map((user) => user.name);
                   setAssignData({
                     ...assignData,
                     assignedTo: allUsers,
@@ -3856,18 +3728,19 @@ const renderDocsModal = () => {
           </div>
 
           <div className="border rounded p-2 max-h-48 overflow-y-auto dark:border-form-strokedark dark:bg-form-input">
-            {users.length === 0 ? (
+            {assignUsers.length === 0 ? (
               <div className="text-center py-4 text-gray-500 dark:text-gray-400">
-                No users available
+                <p className="text-sm">No users available to assign</p>
+                <p className="text-xs mt-1">You don't have permission to assign to any users</p>
               </div>
             ) : (
               <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-2">
-                {users.map((user) => {
+                {assignUsers.map((user) => {
                   const checked = assignData.assignedTo.includes(user.name);
 
                   return (
                     <label
-                      key={user.id}
+                      key={user.user_id || user.id}
                       className={`flex gap-2 p-2 rounded cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800 ${
                         checked
                           ? 'bg-blue-50 dark:bg-blue-900/30 border border-blue-200 dark:border-blue-700'
@@ -3893,9 +3766,9 @@ const renderDocsModal = () => {
                         <div className="font-medium text-black dark:text-white">
                           {user.name}
                         </div>
-                      </div>
-                      <div className="text-xs px-1.5 py-0.5 rounded bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300">
-                        {user.id}
+                        <div className="text-[10px] text-gray-500 dark:text-gray-400">
+                          {user.role_label || user.role}
+                        </div>
                       </div>
                     </label>
                   );
@@ -3909,75 +3782,73 @@ const renderDocsModal = () => {
           </p>
         </div>
 
-      
-      {/* LEAD STAGE + FOLLOWUP DATE */}
-<div>
-  <label className="block font-semibold text-green-600 dark:text-green-400 mb-2">
-    Lead Details
-  </label>
+        {/* LEAD STAGE + FOLLOWUP DATE */}
+        <div>
+          <label className="block font-semibold text-green-600 dark:text-green-400 mb-2">
+            Lead Details
+          </label>
 
-  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-    {/* Lead Stage */}
-    <div>
-      <label className="block mb-1 text-sm font-medium text-black dark:text-white">
-        Lead Stage *
-      </label>
-      <select
-        name="leadStage"
-        value={assignData.leadStage}
-        onChange={(e) =>
-          setAssignData({ ...assignData, leadStage: e.target.value })
-        }
-        required
-        className="w-full border rounded p-2 dark:border-form-strokedark dark:bg-form-input dark:text-white text-black"
-      >
-        <option value="">Select Lead Stage</option>
-        {leadStages.map((stage, i) => (
-          <option key={i} value={stage}>
-            {stage}
-          </option>
-        ))}
-      </select>
-    </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            {/* Lead Stage */}
+            <div>
+              <label className="block mb-1 text-sm font-medium text-black dark:text-white">
+                Lead Stage *
+              </label>
+              <select
+                name="leadStage"
+                value={assignData.leadStage}
+                onChange={(e) =>
+                  setAssignData({ ...assignData, leadStage: e.target.value })
+                }
+                required
+                className="w-full border rounded p-2 dark:border-form-strokedark dark:bg-form-input dark:text-white text-black"
+              >
+                <option value="">Select Lead Stage</option>
+                {leadStages.map((stage, i) => (
+                  <option key={i} value={stage}>
+                    {stage}
+                  </option>
+                ))}
+              </select>
+            </div>
 
-    {/* Followup Date */}
-    <div>
-      <label className="block mb-1 text-sm font-medium text-black dark:text-white">
-        Followup Date *
-      </label>
-      <div className="flex gap-3">
-        <input
-          type="date"
-          name="reassignmentDate"
-          value={assignData.reassignmentDate || ''}
-          onChange={(e) =>
-            setAssignData({
-              ...assignData,
-              reassignmentDate: e.target.value,
-            })
-          }
-          required
-          className="w-full border rounded p-2 dark:border-form-strokedark dark:bg-form-input dark:text-white text-black"
-          min="2020-01-01"
-          max="2030-12-31"
-        />
-        <button
-          type="button"
-          onClick={() => {
-            setAssignData({
-              ...assignData,
-              reassignmentDate: new Date().toISOString().split('T')[0],
-            });
-          }}
-          className="px-3 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 text-sm whitespace-nowrap"
-        >
-          Today
-        </button>
-      </div>
-    </div>
-  </div>
-</div>
-
+            {/* Followup Date */}
+            <div>
+              <label className="block mb-1 text-sm font-medium text-black dark:text-white">
+                Followup Date *
+              </label>
+              <div className="flex gap-3">
+                <input
+                  type="date"
+                  name="reassignmentDate"
+                  value={assignData.reassignmentDate || ''}
+                  onChange={(e) =>
+                    setAssignData({
+                      ...assignData,
+                      reassignmentDate: e.target.value,
+                    })
+                  }
+                  required
+                  className="w-full border rounded p-2 dark:border-form-strokedark dark:bg-form-input dark:text-white text-black"
+                  min="2020-01-01"
+                  max="2030-12-31"
+                />
+                <button
+                  type="button"
+                  onClick={() => {
+                    setAssignData({
+                      ...assignData,
+                      reassignmentDate: new Date().toISOString().split('T')[0],
+                    });
+                  }}
+                  className="px-3 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 text-sm whitespace-nowrap"
+                >
+                  Today
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
 
         {/* REMARK */}
         <div>
@@ -4024,6 +3895,7 @@ const renderDocsModal = () => {
     </div>
   </div>
 )}
+
 
 {openRemark && (
   <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">

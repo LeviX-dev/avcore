@@ -16,7 +16,10 @@ const db = mysql.createPool({
   host: '127.0.0.1',
   user: 'root',
   password: '',
-  database: 'db_mms_newdb',
+  // database: 'db_mms_newdb',
+  
+    database: 'db_mms_avcore',
+
   // database: 'db_mms',
   port: 3308,
 });

@@ -83,7 +83,7 @@ const InsertDataModal: React.FC<InsertDataModalProps> = ({
   setSingleFormData,
   categories,
   references,
-  area,
+
   fetchRawData,
   setError,
   setDuplicateEntries,
@@ -94,6 +94,29 @@ const InsertDataModal: React.FC<InsertDataModalProps> = ({
   const [users, setUsers] = useState<User[]>([]);
   const [filteredUsers, setFilteredUsers] = useState<User[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
+  const [currentUserRole, setCurrentUserRole] = useState<string>('');
+
+  const [areas, setAreas] = useState<Area[]>([]);
+
+  // Get current user role from localStorage/session
+  useEffect(() => {
+    const userRole = localStorage.getItem('userRole') || sessionStorage.getItem('userRole') || '';
+    setCurrentUserRole(userRole);
+    console.log('Current user role:', userRole); // For debugging
+  }, []);
+
+  useEffect(() => {
+  const fetchAreas = async () => {
+    try {
+      const response = await axios.get(`${BASE_URL}api/area`);
+      setAreas(response.data);
+    } catch (error) {
+      console.error("Error fetching areas:", error);
+    }
+  };
+
+  fetchAreas();
+}, []);
 
   // Set current date as default for assign_date (Entry Date)
   useEffect(() => {
@@ -110,9 +133,8 @@ const InsertDataModal: React.FC<InsertDataModalProps> = ({
   useEffect(() => {
     const fetchUsers = async () => {
       try {
-        const response = await axios.get(`${BASE_URL}api/users`);
-        setUsers(response.data);
-        setFilteredUsers(response.data);
+const response = await axios.get(`${BASE_URL}api/users/by-role`);
+setUsers(response.data.users); // IMPORTANT
       } catch (error) {
         console.error('Failed to fetch users:', error);
       }
@@ -120,19 +142,25 @@ const InsertDataModal: React.FC<InsertDataModalProps> = ({
     fetchUsers();
   }, []);
 
-  // Filter users based on search term
+
   useEffect(() => {
-    if (searchTerm.trim() === '') {
-      setFilteredUsers(users);
-    } else {
-      const term = searchTerm.toLowerCase();
-      const filtered = users.filter(user =>
-        user.name.toLowerCase().includes(term) ||
-        (user.role && user.role.toLowerCase().includes(term))
-      );
-      setFilteredUsers(filtered);
-    }
-  }, [searchTerm, users]);
+  if (!users.length) return;
+
+  let telecallers = users.filter(
+    (user) => user.role?.toLowerCase() === 'tele_caller'
+  );
+
+  // Apply search on telecallers only
+  if (searchTerm.trim() !== '') {
+    const term = searchTerm.toLowerCase();
+
+    telecallers = telecallers.filter(user =>
+      user.name.toLowerCase().includes(term)
+    );
+  }
+
+  setFilteredUsers(telecallers);
+}, [users, searchTerm]);
 
   // Fetch lead stages
   useEffect(() => {
@@ -252,37 +280,44 @@ const InsertDataModal: React.FC<InsertDataModalProps> = ({
     }
   };
 
+
   // Handle select all filtered users
-  const handleSelectAllFiltered = () => {
-    if (filteredUsers.length === 0) return;
+const handleSelectAllFiltered = () => {
+  if (filteredUsers.length === 0) return;
 
-    const currentAssigned = Array.isArray(singleFormData.assigned_to)
-      ? [...singleFormData.assigned_to]
-      : [];
+  const currentAssigned = Array.isArray(singleFormData.assigned_to)
+    ? [...singleFormData.assigned_to]
+    : [];
 
-    // Get IDs of filtered users
-    const filteredUserIds = filteredUsers.map(user => user.user_id);
+  // Get IDs of filtered users
+  const filteredUserIds = filteredUsers.map(user => user.user_id);
 
-    // Check if all filtered users are already selected
-    const allFilteredSelected = filteredUserIds.every(id =>
-      currentAssigned.includes(id)
-    );
+  // Check if all filtered users are already selected
+  const allFilteredSelected = filteredUserIds.every(id =>
+    currentAssigned.includes(id)
+  );
 
-    if (allFilteredSelected) {
-      // Deselect all filtered users
-      setSingleFormData({
-        ...singleFormData,
-        assigned_to: currentAssigned.filter(id => !filteredUserIds.includes(id))
-      });
-    } else {
-      // Add all filtered users (avoiding duplicates)
-      const newAssigned = [...new Set([...currentAssigned, ...filteredUserIds])];
-      setSingleFormData({
-        ...singleFormData,
-        assigned_to: newAssigned
-      });
-    }
-  };
+  if (allFilteredSelected) {
+    // Deselect all filtered users
+    setSingleFormData({
+      ...singleFormData,
+      assigned_to: currentAssigned.filter(id => !filteredUserIds.includes(id))
+    });
+  } else {
+    // Add all filtered users (avoiding duplicates)
+    // Method 1: Using Array.from with Set (works in all TS environments)
+    const combined = [...currentAssigned, ...filteredUserIds];
+    const newAssigned = Array.from(new Set(combined));
+    
+    // Method 2: Alternative if you prefer filter method
+    // const newAssigned = combined.filter((value, index, self) => self.indexOf(value) === index);
+    
+    setSingleFormData({
+      ...singleFormData,
+      assigned_to: newAssigned
+    });
+  }
+};
 
 
   const handleAddSingleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
@@ -485,6 +520,39 @@ const InsertDataModal: React.FC<InsertDataModalProps> = ({
   }
 };
 
+  // Get role display name for helper text
+  const getRoleDisplayName = (role: string) => {
+    const roleMap: { [key: string]: string } = {
+      'tele_caller': 'Telecaller',
+      'digital_marketing': 'Digital Marketing',
+      'field_marketing_executive': 'Field Marketing Executive',
+      'junior_autocad_designer': 'Junior AutoCAD Designer',
+      'senior_autocad_designer': 'Senior AutoCAD Designer',
+      'tech_sale_sound_engineer': 'Tech-sale Sound Engineer',
+      'technical_head': 'Technical Head',
+      'admin': 'Director (Super Admin)',
+      'sub_admin': 'Business Head (Sub Admin)'
+    };
+    return roleMap[role] || role;
+  };
+
+  // Get helper text based on current user role
+  const getRoleHelperText = () => {
+    switch (currentUserRole.toLowerCase()) {
+      case 'tele_caller':
+        return "As Telecaller, you can only assign to Marketing team members (Digital Marketing, Field Marketing Executive)";
+      case 'digital_marketing':
+      case 'field_marketing_executive':
+        return "As Marketing, you can only assign to AutoCAD designers (Junior/Senior AutoCAD Designer)";
+      case 'junior_autocad_designer':
+      case 'senior_autocad_designer':
+        return "As AutoCAD, you can only assign to Sound Engineer (Tech-sale Sound Engineer)";
+      case 'tech_sale_sound_engineer':
+        return "As Sound Engineer, you can only assign to Technical Head";
+      default:
+        return "";
+    }
+  };
 
   if (!showAddPopup) return null;
 
@@ -515,11 +583,12 @@ const InsertDataModal: React.FC<InsertDataModalProps> = ({
                   value={singleFormData.name}
                   onChange={handleInputChange}
                   required
+                  pattern="^[A-Za-z\s]+$"
+                  title="Only alphabets and spaces allowed"
                   className="w-full p-2 border rounded text-sm dark:border-form-strokedark dark:bg-form-input dark:text-white"
                 />
               </div>
 
-              {/* Contact No. */}
               <div>
                 <label className="block mb-1 text-base font-semibold text-green-700 dark:text-green-600">
                   Contact No. *
@@ -530,13 +599,13 @@ const InsertDataModal: React.FC<InsertDataModalProps> = ({
                   value={singleFormData.number}
                   onChange={handleInputChange}
                   required
-                  pattern="\d*"
-                  title="Only digits are allowed"
+                  pattern="^[0-9]{10}$"
+                  maxLength={10}
+                  title="Enter valid 10 digit number"
                   className="w-full p-2 border rounded text-sm dark:border-form-strokedark dark:bg-form-input dark:text-white"
                 />
               </div>
 
-              {/* Alternate No. */}
               <div>
                 <label className="block mb-1 text-sm dark:text-white">
                   Alternate No.
@@ -599,6 +668,8 @@ const InsertDataModal: React.FC<InsertDataModalProps> = ({
                       name="category_other"
                       value={singleFormData.category_other || ''}
                       onChange={handleInputChange}
+                      pattern="^[A-Za-z\s]+$"
+                      title="Only alphabets and spaces allowed"
                       placeholder="Enter other category"
                       className="w-full p-2 mt-2 border rounded text-sm
                              dark:border-form-strokedark dark:bg-form-input dark:text-white"
@@ -666,6 +737,8 @@ const InsertDataModal: React.FC<InsertDataModalProps> = ({
                       name="reference_other"
                       value={singleFormData.reference_other || ''}
                       onChange={handleInputChange}
+                      pattern="^[A-Za-z\s]+$"
+                      title="Only alphabets and spaces allowed"
                       placeholder={placeholderText}
                       className="w-full p-2 mt-2 border rounded-md text-sm
                                focus:ring-2 focus:ring-blue-500
@@ -684,31 +757,45 @@ const InsertDataModal: React.FC<InsertDataModalProps> = ({
             </h3>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
               <div className="md:col-span-2">
-                <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
-                  {/* City Field */}
-                  <div className="md:col-span-2">
-                    <label className="block mb-1 text-sm dark:text-white">
-                      City
-                    </label>
-                    <input
-                      type="text"
-                      name="city"
-                      value={singleFormData.city || ''}
-                      onChange={handleInputChange}
-                      className="w-full p-2 border rounded text-sm dark:border-form-strokedark dark:bg-form-input dark:text-white"
-                    />
-                  </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-1">
+                
+                    {/* City */}
+<div>
+  <label className="block mb-1 text-base font-semibold text-green-700 dark:text-green-600">
+    City
+  </label>
+
+  <select
+    name="area_id"
+    value={singleFormData.area_id || ''}
+    onChange={handleInputChange}
+    required
+    className="w-full p-2 border rounded text-sm dark:border-form-strokedark dark:bg-form-input dark:text-white"
+  >
+    <option value="">Select City</option>
+
+    {areas.length > 0 ? (
+      areas.map((areaItem) => (
+        <option key={areaItem.area_id} value={areaItem.area_id}>
+          {areaItem.area_name}
+        </option>
+      ))
+    ) : (
+      <option value="" disabled>Loading city...</option>
+    )}
+  </select>
+</div>
 
                   {/* Room Dimensions (L / W / H) */}
-                  <div className="md:col-span-2">
-                    <label className="block mb-1 text-sm dark:text-white">
+                  <div className="md:col-span-1">
+                    <label className="block mb-1 text-base font-semibold text-green-700 dark:text-green-600">
                       Room Dimensions
                     </label>
 
                     <div className="grid grid-cols-3 gap-3">
                       {/* Length */}
                       <div>
-                        <label className="block mb-1 text-xs dark:text-white text-gray-500">
+                        <label className="block mb-1 text-xs text-gray-800 dark:text-gray-200">
                           Length (L) ft
                         </label>
                         <input
@@ -718,14 +805,13 @@ const InsertDataModal: React.FC<InsertDataModalProps> = ({
                           onChange={handleInputChange}
                           placeholder="e.g., 12.5"
                           pattern="\d*\.?\d*"
-                          title="Only digits and decimal point allowed"
                           className="w-full p-2 border rounded text-sm dark:border-form-strokedark dark:bg-form-input dark:text-white"
                         />
                       </div>
 
                       {/* Width */}
                       <div>
-                        <label className="block mb-1 text-xs dark:text-white text-gray-500">
+                        <label className="block mb-1 text-xs text-gray-800 dark:text-gray-200">
                           Width (W) ft
                         </label>
                         <input
@@ -735,14 +821,13 @@ const InsertDataModal: React.FC<InsertDataModalProps> = ({
                           onChange={handleInputChange}
                           placeholder="e.g., 10.75"
                           pattern="\d*\.?\d*"
-                          title="Only digits and decimal point allowed"
                           className="w-full p-2 border rounded text-sm dark:border-form-strokedark dark:bg-form-input dark:text-white"
                         />
                       </div>
 
                       {/* Height */}
                       <div>
-                        <label className="block mb-1 text-xs dark:text-white text-gray-500">
+                        <label className="block mb-1 text-xs text-gray-800 dark:text-gray-200">
                           Height (H) ft
                         </label>
                         <input
@@ -752,7 +837,6 @@ const InsertDataModal: React.FC<InsertDataModalProps> = ({
                           onChange={handleInputChange}
                           placeholder="e.g., 9.0"
                           pattern="\d*\.?\d*"
-                          title="Only digits and decimal point allowed"
                           className="w-full p-2 border rounded text-sm dark:border-form-strokedark dark:bg-form-input dark:text-white"
                         />
                       </div>
@@ -762,7 +846,7 @@ const InsertDataModal: React.FC<InsertDataModalProps> = ({
               </div>
 
               <div>
-                <label className="block mb-1 text-sm dark:text-white">
+                <label className="block mb-1 text-base font-semibold text-green-700 dark:text-green-600">
                   Project Type
                 </label>
                 <select
@@ -779,7 +863,7 @@ const InsertDataModal: React.FC<InsertDataModalProps> = ({
               </div>
 
               <div>
-                <label className="block mb-1 text-sm dark:text-white">
+                <label className="block mb-1 text-base font-semibold text-green-700 dark:text-green-600">
                   Budget Range
                 </label>
 
@@ -836,7 +920,7 @@ const InsertDataModal: React.FC<InsertDataModalProps> = ({
 
               {/* Current Stage */}
               <div className="-mt-2">
-                <label className="block mb-1 text-sm dark:text-white">
+                <label className="block mb-1 text-base font-semibold text-green-700 dark:text-green-600">
                   What's the current stage of your home theater room?
                 </label>
                 <select
@@ -880,7 +964,7 @@ const InsertDataModal: React.FC<InsertDataModalProps> = ({
 
               {/* Demo Date */}
               <div>
-                <label className="block mb-1 text-sm dark:text-white">
+                <label className="block mb-1 text-base font-semibold text-green-700 dark:text-green-600">
                   Demo Date
                 </label>
                 <input
@@ -892,8 +976,6 @@ const InsertDataModal: React.FC<InsertDataModalProps> = ({
                 />
               </div>
 
-           
-
               {/* Entry Date - Read Only */}
               <div>
                 <label className="block mb-1 text-sm dark:text-white">
@@ -903,10 +985,9 @@ const InsertDataModal: React.FC<InsertDataModalProps> = ({
                   type="date"
                   name="assign_date"
                   value={singleFormData.assign_date || ''}
-                  onChange={handleInputChange}
-                  className="w-full p-2 border rounded text-sm dark:border-form-strokedark dark:bg-form-input dark:text-white bg-gray-100 cursor-not-allowed"
                   readOnly
                   disabled
+                  className="w-full p-2 border rounded text-sm dark:border-form-strokedark dark:bg-form-input dark:text-white bg-gray-100 cursor-not-allowed"
                 />
                 <p className="text-xs text-gray-500 mt-1">Entry date cannot be modified</p>
               </div>
@@ -940,6 +1021,8 @@ const InsertDataModal: React.FC<InsertDataModalProps> = ({
                   name="architect_name"
                   value={singleFormData.architect_name || ''}
                   onChange={handleInputChange}
+                  pattern="^[A-Za-z\s]+$"
+                  title="Only alphabets and spaces allowed"
                   className="w-full p-2 border rounded text-sm dark:border-form-strokedark dark:bg-form-input dark:text-white"
                 />
               </div>
@@ -1012,6 +1095,15 @@ const InsertDataModal: React.FC<InsertDataModalProps> = ({
               Lead Management
             </h3>
 
+            {/* Role-based helper text */}
+            {getRoleHelperText() && (
+              <div className="mb-3 p-2 bg-blue-50 dark:bg-blue-900/30 rounded border border-blue-200 dark:border-blue-800">
+                <p className="text-xs text-blue-700 dark:text-blue-300">
+                  ℹ️ {getRoleHelperText()}
+                </p>
+              </div>
+            )}
+
             <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
               {/* Assign To - MULTI SELECT with Checkboxes, Search, and 5 Columns */}
               <div className="md:col-span-3">
@@ -1055,65 +1147,81 @@ const InsertDataModal: React.FC<InsertDataModalProps> = ({
 
                 {/* Checkbox Selection Area - 5 Columns */}
                 <div className="border border-gray-300 dark:border-gray-600 rounded p-3 max-h-60 overflow-y-auto">
-                  {/* Select All Filtered Button */}
-                  <div className="mb-2 pb-2 border-b dark:border-gray-700">
-                    <button
-                      type="button"
-                      onClick={handleSelectAllFiltered}
-                      className="text-xs px-3 py-1.5 bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300 rounded hover:bg-blue-200 dark:hover:bg-blue-800 transition-colors"
-                    >
-                      {filteredUsers.length > 0 &&
-                        filteredUsers.every(user =>
+                  {/* Show message if no users available based on role */}
+                  {filteredUsers.length === 0 && (
+                    <div className="text-center py-4 text-gray-500 dark:text-gray-400">
+                      <div className="text-2xl mb-2">👤</div>
+                      <p className="text-sm">No users available to assign</p>
+                      <p className="text-xs mt-1">Based on your role permissions</p>
+                    </div>
+                  )}
+
+                  {/* Select All Filtered Button - only show if there are users */}
+                  {filteredUsers.length > 0 && (
+                    <div className="mb-2 pb-2 border-b dark:border-gray-700 flex justify-between items-center">
+                      <button
+                        type="button"
+                        onClick={handleSelectAllFiltered}
+                        className="text-xs px-3 py-1.5 bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300 rounded hover:bg-blue-200 dark:hover:bg-blue-800 transition-colors"
+                      >
+                        {filteredUsers.every(user =>
                           Array.isArray(singleFormData.assigned_to) &&
                           singleFormData.assigned_to.includes(user.user_id)
                         )
-                        ? 'Deselect All Filtered'
-                        : 'Select All Filtered'}
-                    </button>
-                    <span className="text-xs text-gray-500 dark:text-gray-400 ml-2">
-                      {Array.isArray(singleFormData.assigned_to) ? singleFormData.assigned_to.length : 0} selected
-                    </span>
-                  </div>
+                          ? 'Deselect All Filtered'
+                          : 'Select All Filtered'}
+                      </button>
+                      <span className="text-xs text-gray-500 dark:text-gray-400">
+                        {Array.isArray(singleFormData.assigned_to) ? singleFormData.assigned_to.length : 0} selected
+                      </span>
+                    </div>
+                  )}
 
                   {/* Users List - 5 Columns */}
                   {filteredUsers.length > 0 ? (
-                    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-2">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
                       {filteredUsers.map((user) => {
                         const isSelected = Array.isArray(singleFormData.assigned_to) &&
                           singleFormData.assigned_to.includes(user.user_id);
+                        
                         return (
                           <div
                             key={user.user_id}
-                            className={`flex items-start p-2 rounded transition-colors ${isSelected
+                            className={`flex items-start p-2 rounded transition-colors min-w-[120px] ${
+                              isSelected
                                 ? 'bg-blue-50 dark:bg-blue-900/30 border border-blue-200 dark:border-blue-700'
                                 : 'border border-transparent hover:bg-gray-50 dark:hover:bg-gray-800 hover:border-gray-200 dark:hover:border-gray-700'
-                              }`}
+                            }`}
                           >
                             <input
                               type="checkbox"
                               id={`user-${user.user_id}`}
                               checked={isSelected}
                               onChange={() => handleUserCheckboxChange(user.user_id)}
-                              className="h-4 w-4 text-blue-600 rounded focus:ring-blue-500 focus:ring-offset-0 mt-1"
+                              className="h-4 w-4 text-blue-600 rounded focus:ring-blue-500 focus:ring-offset-0 mt-1 flex-shrink-0"
                             />
                             <label
                               htmlFor={`user-${user.user_id}`}
-                              className="ml-2 text-sm text-gray-700 dark:text-gray-300 cursor-pointer flex-1"
+                              className="ml-2 text-sm text-gray-700 dark:text-gray-300 cursor-pointer flex-1 min-w-0"
                             >
-                              <div className="font-medium line-clamp-1">{user.name}</div>
-                            
+                              <div 
+                                className="font-medium truncate mb-0.5"
+                                title={user.name}
+                              >
+                                {user.name}
+                              </div>
+                              <div 
+                                className="text-xs text-gray-500 dark:text-gray-400 truncate"
+                                title={getRoleDisplayName(user.role)}
+                              >
+                                {getRoleDisplayName(user.role)}
+                              </div>
                             </label>
                           </div>
                         );
                       })}
                     </div>
-                  ) : (
-                    <div className="text-center py-4 text-gray-500 dark:text-gray-400">
-                      <div className="text-2xl mb-2">🔍</div>
-                      <p className="text-sm">No users found</p>
-                      <p className="text-xs mt-1">Try a different search term</p>
-                    </div>
-                  )}
+                  ) : null}
                 </div>
 
                 {/* Selected Users Preview */}
@@ -1122,18 +1230,39 @@ const InsertDataModal: React.FC<InsertDataModalProps> = ({
                     <div className="text-xs text-blue-700 dark:text-blue-300 mb-1 font-medium">
                       Selected Users ({singleFormData.assigned_to.length}):
                     </div>
-                    <div className="text-xs text-gray-600 dark:text-gray-400">
+                    <div className="text-xs text-gray-600 dark:text-gray-400 flex flex-wrap gap-1">
                       {singleFormData.assigned_to.map(userId => {
                         const user = users.find(u => u.user_id === userId);
-                        return user ? `${user.name}${user.role ? ` (${user.role})` : ''}` : userId;
-                      }).join(', ')}
+                        if (!user) return null;
+                        
+                        const displayText = `${user.name} (${getRoleDisplayName(user.role)})`;
+                        
+                        return (
+                          <span 
+                            key={userId}
+                            className="inline-flex items-center gap-1 px-2 py-1 bg-blue-100 dark:bg-blue-900/50 rounded text-blue-800 dark:text-blue-300 border border-blue-200 dark:border-blue-700 max-w-[200px]"
+                          >
+                            <span className="truncate" title={displayText}>
+                              {displayText}
+                            </span>
+                            <button
+                              type="button"
+                              onClick={() => handleUserCheckboxChange(userId)}
+                              className="text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300 text-xs font-bold flex-shrink-0"
+                              aria-label={`Remove ${user.name}`}
+                            >
+                              ×
+                            </button>
+                          </span>
+                        );
+                      })}
                     </div>
                   </div>
                 )}
               </div>
 
-   {/* Follow-up Date */}
-              <div className="md:col-span-1 mt-4 ">
+              {/* Follow-up Date */}
+              <div className="md:col-span-1 mt-4">
                 <label className="block mb-1 text-base font-semibold text-green-700 dark:text-green-600">
                   Follow-up Date
                 </label>
@@ -1146,7 +1275,7 @@ const InsertDataModal: React.FC<InsertDataModalProps> = ({
                 />
               </div>
 
-              <div className="md:col-span-1 mt-4 ">
+              <div className="md:col-span-1 mt-4">
                 <label className="block mb-1 text-base font-semibold text-green-700 dark:text-green-600">
                   Lead Stage
                 </label>
@@ -1225,5 +1354,4 @@ const InsertDataModal: React.FC<InsertDataModalProps> = ({
   );
 };
 
-export default InsertDataModal;  
-
+export default InsertDataModal;

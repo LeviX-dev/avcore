@@ -1,157 +1,3 @@
-// import React, { useEffect, useState } from 'react';
-// import { FaPlus, FaEye, FaHistory } from 'react-icons/fa';
-// import axios from 'axios';
-// import { useNavigate } from 'react-router-dom';
-// import Breadcrumb from '../../components/Breadcrumbs/Breadcrumb';
-// import { BASE_URL } from '../../../public/config';
-
-// const QuotationPending = () => {
-//   const navigate = useNavigate();
-//   const [data, setData] = useState([]);
-//   const [searchTerm, setSearchTerm] = useState('');
-
-//   useEffect(() => {
-//     fetchQuotationPending();
-//   }, []);
-
-//   const fetchQuotationPending = async () => {
-//     try {
-//       // Backend should return "created_flag" for each master_id
-//       const res = await axios.get(`${BASE_URL}api/quotation-pending`);
-//       setData(res.data);
-//     } catch (error) {
-//       console.error('Error fetching quotation pending leads', error);
-//     }
-//   };
-
-//   const filteredData = data.filter(
-//     (item) =>
-//       item.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-//       item.number?.includes(searchTerm),
-//   );
-
-//   return (
-//     <div>
-//       <Breadcrumb pageName="Quotation Pending" />
-
-//       {/* Top Bar */}
-//       <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between mb-4">
-//         <div className="flex flex-col sm:flex-row gap-2 w-full md:w-auto">
-//           <input
-//             type="text"
-//             value={searchTerm}
-//             onChange={(e) => setSearchTerm(e.target.value)}
-//             className="border rounded px-4 py-2 w-full sm:w-64"
-//             placeholder="Search leads..."
-//           />
-//           <button className="bg-blue-500 text-white px-4 py-2 rounded w-full sm:w-auto">
-//             Search
-//           </button>
-//         </div>
-//       </div>
-
-//       <div className="max-w-full mt-2 overflow-x-auto rounded-sm border bg-white shadow-default">
-//         <table className="w-full table-auto">
-//           <thead>
-//             <tr className="bg-gray-200 text-left">
-//               <th className="py-4 px-4">Sr No.</th>
-//               <th className="py-4 px-4">Name</th>
-//               <th className="py-4 px-4">Contact</th>
-//               <th className="py-4 px-4">Lead Stage</th>
-//               <th className="py-4 px-4">Assigned To</th>
-//               <th className="py-4 px-4">Category</th>
-//               <th className="py-4 px-4">Actions</th>
-//             </tr>
-//           </thead>
-
-//           <tbody>
-//             {filteredData.length > 0 ? (
-//               filteredData.map((row, index) => (
-//                 <tr key={row.master_id}>
-//                   <td className="py-3 px-4">{index + 1}</td>
-//                   <td className="py-3 px-4 font-medium">{row.name}</td>
-//                   <td className="py-3 px-4">{row.number || 'N/A'}</td>
-//                   <td className="py-3 px-4">
-//                     {row.created_flag ? (
-//                       <span className="inline-flex rounded-full py-1 px-3 text-sm font-medium bg-green-600 bg-opacity-10 text-green-600">
-//                         Quotation Created
-//                       </span>
-//                     ) : (
-//                       <span className="inline-flex rounded-full py-1 px-3 text-sm font-medium bg-yellow-500 bg-opacity-10 text-yellow-600">
-//                         {row.lead_stage}
-//                       </span>
-//                     )}
-//                   </td>
-
-//                   <td className="py-3 px-4">
-//                     {row.latest_assignedTo || row.assigned_to}
-//                   </td>
-//                   <td className="py-3 px-4">{row.cat_name}</td>
-
-//                   <td className="py-3 px-4">
-//                     <div className="flex flex-wrap gap-2">
-//                       {/* ADD QUOTATION BUTTON */}
-//                       <button
-//                         className={`px-3 py-1 rounded text-white ${
-//                           row.created_flag
-//                             ? 'bg-gray-400 cursor-not-allowed'
-//                             : 'bg-blue-600'
-//                         }`}
-//                         title={
-//                           row.created_flag
-//                             ? 'Quotation already created'
-//                             : 'Add Quotation'
-//                         }
-//                         onClick={() =>
-//                           !row.created_flag &&
-//                           navigate(`/quotation/add/${row.master_id}`, {
-//                             state: { name: row.name },
-//                           })
-//                         }
-//                         disabled={row.created_flag}
-//                       >
-//                         <FaPlus />
-//                       </button>
-
-//                       {/* <button
-//                         className="bg-green-600 border border-white-600 text-white px-3 py-1 rounded"
-//                         title="View Lead"
-//                         onClick={() => navigate(`/lead/view/${row.master_id}`)}
-//                       >
-//                         <FaEye />
-//                       </button> */}
-
-//                       <button
-//                         className="bg-gray-600 text-white px-3 py-1 rounded"
-//                         title="View Logs"
-//                         onClick={() =>
-//                           navigate(`/quotation/revisions/${row.master_id}`)
-//                         }
-//                       >
-//                         <FaEye />
-//                       </button>
-//                     </div>
-//                   </td>
-//                 </tr>
-//               ))
-//             ) : (
-//               <tr>
-//                 <td colSpan={8} className="text-center py-5">
-//                   No quotation pending leads found
-//                 </td>
-//               </tr>
-//             )}
-//           </tbody>
-//         </table>
-//       </div>
-//     </div>
-//   );
-// };
-
-// export default QuotationPending;
-
-
-
 import React, { useEffect, useState } from 'react';
 import { FaPlus, FaEye, FaHistory, FaSearch, FaFilter } from 'react-icons/fa';
 import { MdPerson, MdPhone, MdCategory } from 'react-icons/md';
@@ -166,22 +12,35 @@ const QuotationPending = () => {
   const [data, setData] = useState([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [loading, setLoading] = useState(true);
+  const [viewMode, setViewMode] = useState('active'); 
 
   useEffect(() => {
     fetchQuotationPending();
   }, []);
 
-  const fetchQuotationPending = async () => {
-    try {
-      setLoading(true);
-      const res = await axios.get(`${BASE_URL}api/quotation-pending`);
-      setData(res.data);
-    } catch (error) {
-      console.error('Error fetching quotation pending leads', error);
-    } finally {
-      setLoading(false);
-    }
-  };
+const fetchQuotationPending = async () => {
+  try {
+    setLoading(true);
+    const res = await axios.get(`${BASE_URL}api/quotation-pending`);
+    setData(res.data);
+  } catch (error) {
+    console.error('Error fetching quotation pending leads', error);
+  } finally {
+    setLoading(false);
+  }
+};
+
+const fetchQuotationClosed = async () => {
+  try {
+    setLoading(true);
+    const res = await axios.get(`${BASE_URL}api/getQuotationClosedLeads`);
+    setData(res.data);
+  } catch (error) {
+    console.error('Error fetching quotation closed leads', error);
+  } finally {
+    setLoading(false);
+  }
+};
 
   const filteredData = data.filter(
     (item) =>
@@ -193,7 +52,7 @@ const QuotationPending = () => {
 
   return (
     <div className="p-4 md:p-6 bg-gray-50 dark:bg-boxdark min-h-screen">
-      <Breadcrumb pageName="Quotation Pending" />
+      <Breadcrumb pageName={viewMode === 'active' ? "Quotation Pending" : "Quotation History"} />
 
       {/* Top Bar with Search */}
       <div className="bg-white dark:bg-boxdark-2 rounded-xl shadow-lg border border-gray-200 dark:border-gray-700 p-4 mb-6">
@@ -228,13 +87,23 @@ const QuotationPending = () => {
                 {filteredData.length} leads
               </span>
             </div>
-            <button 
-              className="flex items-center gap-2 px-4 py-2.5 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white rounded-lg shadow-md hover:shadow-lg transition-all duration-200"
-              onClick={fetchQuotationPending}
-            >
-              <FaHistory className="text-sm" />
-              <span className="font-medium">Refresh</span>
-            </button>
+         <button
+  className="flex items-center gap-2 px-4 py-2.5 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white rounded-lg shadow-md hover:shadow-lg transition-all duration-200"
+  onClick={() => {
+    if (viewMode === 'active') {
+      fetchQuotationClosed();
+      setViewMode('history');
+    } else {
+      fetchQuotationPending();
+      setViewMode('active');
+    }
+  }}
+>
+  <FaHistory className="text-sm" />
+  <span className="font-medium">
+    {viewMode === 'active' ? 'History' : 'Back'}
+  </span>
+</button>
           </div>
         </div>
       </div>
@@ -328,23 +197,30 @@ const QuotationPending = () => {
                     </td>
 
                     {/* Lead Stage */}
-                    <td className="py-3 px-4">
-                      {row.created_flag ? (
-                        <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg bg-gradient-to-r from-green-50 to-green-100 dark:from-green-900/30 dark:to-green-800/20 border border-green-200 dark:border-green-700/30">
-                          <div className="w-2 h-2 bg-green-500 rounded-full"></div>
-                          <span className="font-semibold text-green-700 dark:text-green-300 text-xs">
-                            Quotation Created
-                          </span>
-                        </div>
-                      ) : (
-                        <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg bg-gradient-to-r from-yellow-50 to-yellow-100 dark:from-yellow-900/30 dark:to-yellow-800/20 border border-yellow-200 dark:border-yellow-700/30">
-                          <div className="w-2 h-2 bg-yellow-500 rounded-full"></div>
-                          <span className="font-semibold text-yellow-700 dark:text-yellow-300 text-xs">
-                            {row.lead_stage || 'Pending'}
-                          </span>
-                        </div>
-                      )}
-                    </td>
+                <td className="py-3 px-4">
+  {row.lead_stage === 'Closed Deal' ? (
+    <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg bg-gradient-to-r from-red-50 to-red-100 dark:from-red-900/30 dark:to-red-800/20 border border-red-200 dark:border-red-700/30">
+      <div className="w-2 h-2 bg-red-500 rounded-full"></div>
+      <span className="font-semibold text-red-700 dark:text-red-300 text-xs">
+        Closed Deal
+      </span>
+    </div>
+  ) : row.created_flag ? (
+    <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg bg-gradient-to-r from-green-50 to-green-100 dark:from-green-900/30 dark:to-green-800/20 border border-green-200 dark:border-green-700/30">
+      <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+      <span className="font-semibold text-green-700 dark:text-green-300 text-xs">
+        Quotation Created
+      </span>
+    </div>
+  ) : (
+    <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg bg-gradient-to-r from-yellow-50 to-yellow-100 dark:from-yellow-900/30 dark:to-yellow-800/20 border border-yellow-200 dark:border-yellow-700/30">
+      <div className="w-2 h-2 bg-yellow-500 rounded-full"></div>
+      <span className="font-semibold text-yellow-700 dark:text-yellow-300 text-xs">
+        Quotation Pending
+      </span>
+    </div>
+  )}
+</td>
 
                     {/* Assigned To */}
                     <td className="py-3 px-4">
@@ -387,16 +263,23 @@ const QuotationPending = () => {
                         </button>
 
                         {/* VIEW REVISIONS BUTTON */}
-                        <button
-                          className="flex items-center justify-center p-2 rounded-lg font-medium bg-gradient-to-r from-gray-600 to-gray-700 hover:from-gray-700 hover:to-gray-800 text-white shadow-md hover:shadow-lg transition-all duration-200"
-                          title="View Quotation Logs"
-                          onClick={() =>
-                            navigate(`/quotation/revisions/${row.master_id}`)
-                          }
-                        >
-                          <FaEye className="text-sm" />
-                        </button>
-                        
+                      {/* VIEW REVISIONS BUTTON */}
+<button
+  className={`flex items-center justify-center p-2 rounded-lg font-medium transition-all duration-200 ${
+    row.created_flag
+      ? 'bg-gradient-to-r from-gray-600 to-gray-700 hover:from-gray-700 hover:to-gray-800 text-white shadow-md hover:shadow-lg'
+      : 'bg-gray-200 dark:bg-gray-700 text-gray-400 cursor-not-allowed'
+  }`}
+  title={row.created_flag ? 'View Quotation Logs' : 'Quotation Pending'}
+  onClick={() =>
+    row.created_flag &&
+    navigate(`/quotation/revisions/${row.master_id}`)
+  }
+  disabled={!row.created_flag}
+>
+  <FaEye className="text-sm" />
+</button>
+
                         {/* VIEW LEAD BUTTON (Optional - uncomment if needed) */}
                         {/* <button
                           className="flex items-center justify-center p-2 rounded-lg font-medium bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800 text-white shadow-md hover:shadow-lg transition-all duration-200"

@@ -604,21 +604,6 @@ const Sidebar = ({ sidebarOpen, setSidebarOpen }: SidebarProps) => {
                 }}
               </SidebarLinkGroup>
               {/* <!-- Menu Item Task --> */}
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
             </ul>
           </div>
 

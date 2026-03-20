@@ -51,6 +51,8 @@ interface Area {
 }
 
 interface Client {
+  original_area: any;
+  original_city: any;
   lead_activity(lead_activity: any): React.ReactNode;
   master_id: number;
   name: string;
@@ -397,6 +399,19 @@ const CallList = () => {
 
   const [locationLink, setLocationLink] = useState('');
   const [remark, setRemark] = useState('');
+
+  // Add these new state variables for Documents modal
+const [docsUsers, setDocsUsers] = useState<any[]>([]);
+const [docsFilteredUsers, setDocsFilteredUsers] = useState<any[]>([]);
+const [docsSearchTerm, setDocsSearchTerm] = useState('');
+const [docsCurrentUserRole, setDocsCurrentUserRole] = useState('');
+const [docsRolePermissions, setDocsRolePermissions] = useState<any>(null);
+
+  // Add these new state variables
+const [assignUsers, setAssignUsers] = useState<any[]>([]);
+const [currentUserRole, setCurrentUserRole] = useState('');
+const [rolePermissions, setRolePermissions] = useState<any>(null);
+
 
   const [docsClient, setDocsClient] = useState<Client | null>(null);
   const [docsData, setDocsData] = useState<DocumentData>({
@@ -881,150 +896,7 @@ const handleShowRemark = (text) => {
                 </div>
               )}
 
-              {/* Stage & Assignment - Only show if exists */}
-              {(hasLeadStages || hasAssignmentInfo) && (
-                <div className="grid grid-cols-2 gap-4">
-                  {/* Lead Stages */}
-                  {hasLeadStages && (
-                    <div className="bg-gradient-to-r from-purple-50 to-pink-50 dark:from-purple-900/20 dark:to-pink-900/20 p-3 rounded-lg border border-purple-100 dark:border-purple-800/30">
-                      <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2 flex items-center gap-2">
-                        <FontAwesomeIcon
-                          icon={faUser}
-                          className="h-4 w-4 text-purple-500"
-                        />
-                        Lead Stages
-                      </h3>
-                      <div className="space-y-2">
-                        {hasField('stage') && (
-                          <div>
-                            <div className="text-xs text-gray-500 dark:text-gray-400">
-                              Stage
-                            </div>
-                            <div className="font-medium text-black dark:text-white">
-                              {formatValue(selectedClientDetails.stage)}
-                            </div>
-                          </div>
-                        )}
-                        {hasField('lead_stage') && (
-                          <div>
-                            <div className="text-xs text-gray-500 dark:text-gray-400">
-                              Lead Stage
-                            </div>
-                            <div className="font-medium text-black dark:text-white">
-                              {formatValue(selectedClientDetails.lead_stage)}
-                            </div>
-                          </div>
-                        )}
-                        {hasField('current_stage') && (
-                          <div>
-                            <div className="text-xs text-gray-500 dark:text-gray-400">
-                              Current Stage
-                            </div>
-                            <div className="font-medium text-black dark:text-white">
-                              {formatValue(selectedClientDetails.current_stage)}
-                            </div>
-                          </div>
-                        )}
-                        {hasField('lead_activity') && (
-                          <div>
-                            <div className="text-xs text-gray-500 dark:text-gray-400">
-                              Lead Activity
-                            </div>
-                            <div className="font-medium text-black dark:text-white">
-                              {formatValue(selectedClientDetails.lead_activity)}
-                            </div>
-                          </div>
-                        )}
-{hasField('status_percentage') && (
-  <div>
-    <div className="text-xs text-gray-500 dark:text-gray-400">Progress</div>
-    <div className="mt-0.5">
-      <ProgressStatus
-        stage={selectedClientDetails.stage}
-        status_percentage={selectedClientDetails.status_percentage}
-        is_drop_stage={selectedClientDetails.is_drop_stage}
-        previous_stage={selectedClientDetails.previous_stage}
-      />
-    </div>
-  </div>
-)}
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Assignment Info */}
-                  {hasAssignmentInfo && (
-                    <div className="bg-gradient-to-r from-teal-50 to-cyan-50 dark:from-teal-900/20 dark:to-cyan-900/20 p-3 rounded-lg border border-teal-100 dark:border-teal-800/30">
-                      <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2 flex items-center gap-2">
-                        <FontAwesomeIcon
-                          icon={faTasks}
-                          className="h-4 w-4 text-teal-500"
-                        />
-                        Assignment
-                      </h3>
-                      <div className="space-y-2">
-                        {hasField('assigned_to') && (
-                          <div>
-                            <div className="text-xs text-gray-500 dark:text-gray-400">
-                              Assigned To
-                            </div>
-                            <div className="font-medium text-black dark:text-white truncate">
-                              {formatValue(selectedClientDetails.assigned_to)}
-                            </div>
-                          </div>
-                        )}
-                        {hasField('telecaller_name') && (
-                          <div>
-                            <div className="text-xs text-gray-500 dark:text-gray-400">
-                              Telecaller
-                            </div>
-                            <div className="font-medium text-black dark:text-white truncate">
-                              {formatValue(
-                                selectedClientDetails.telecaller_name,
-                              )}
-                            </div>
-                          </div>
-                        )}
-                        {hasField('status') && (
-                          <div>
-                            <div className="text-xs text-gray-500 dark:text-gray-400">
-                              Status
-                            </div>
-                            <div
-                              className={`font-medium ${
-                                selectedClientDetails.status === 'Assigned'
-                                  ? 'text-green-600 dark:text-green-400'
-                                  : selectedClientDetails.status ===
-                                    'Unassigned'
-                                  ? 'text-red-600 dark:text-red-400'
-                                  : 'text-blue-600 dark:text-blue-400'
-                              }`}
-                            >
-                              {formatValue(selectedClientDetails.status)}
-                            </div>
-                          </div>
-                        )}
-                        {hasField('lead_status') && (
-                          <div>
-                            <div className="text-xs text-gray-500 dark:text-gray-400">
-                              Lead Status
-                            </div>
-                            <div
-                              className={`font-medium ${
-                                selectedClientDetails.lead_status === 'Active'
-                                  ? 'text-green-600 dark:text-green-400'
-                                  : 'text-gray-600 dark:text-gray-400'
-                              }`}
-                            >
-                              {formatValue(selectedClientDetails.lead_status)}
-                            </div>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  )}
-                </div>
-              )}
+              
 
               {/* Dates Information - Only show if exists */}
               {hasDates && (
@@ -1343,6 +1215,38 @@ const handleShowRemark = (text) => {
     );
   };
 
+  
+  // Fetch users with role-based filtering when Documents modal opens
+useEffect(() => {
+  const fetchDocsUsers = async () => {
+    if (!showDocsPopup) return;
+    
+    try {
+      const response = await axios.get(`${BASE_URL}api/users/by-role`, {
+        withCredentials: true
+      });
+      
+      console.log('Docs users API response:', response.data);
+      
+      if (response.data.success) {
+        setDocsUsers(response.data.users || []);
+        setDocsFilteredUsers(response.data.users || []);
+        setDocsCurrentUserRole(response.data.currentUserRole || '');
+        setDocsRolePermissions(response.data.permissions || null);
+      } else {
+        setDocsUsers([]);
+        setDocsFilteredUsers([]);
+      }
+    } catch (error) {
+      console.error('Failed to fetch docs users:', error);
+      setDocsUsers([]);
+      setDocsFilteredUsers([]);
+    }
+  };
+  
+  fetchDocsUsers();
+}, [showDocsPopup]);
+
 
 const [showAddPopup, setShowAddPopup] = useState(false);
 const [singleFormData, setSingleFormData] = useState({
@@ -1481,262 +1385,277 @@ const ProgressStatus: React.FC<{
     }
   }, [searchTerm, users]);
 
-  const fetchTaleCallerData = async () => {
-    try {
-      const response = await axios.get(`${BASE_URL}api/getcompleterawdata`, {
-        withCredentials: true,
-      });
+// Add this with your other useState declarations
+const [isLoading, setIsLoading] = useState(true);
 
-      // STAGE_PERCENTAGE_MAP for battery calculation
-      const STAGE_PERCENTAGE_MAP: Record<string, number> = {
-        'Fresh Lead': 0,
-        'Cold Lead': 10,
-        'On Hold': 20,
-        'Positive Lead': 30,
-        'Pre Site Visit': 40,
-        Demo: 50,
-        'Quotation Pending': 60,
-        'Quotation Follow-up': 70,
-        'Post Site Visit': 80,
-        'Projection List': 90,
-        Drop: -1,
-        'Closed Deal': 100,
-      };
+// Simple Spinner Loader
+const Loader = () => (
+  <div className="flex flex-col items-center justify-center py-20">
+    <div className="relative">
+      <div className="w-20 h-20 border-4 border-gray-200 dark:border-gray-700 rounded-full"></div>
+      <div className="absolute top-0 left-0 w-20 h-20 border-4 border-t-blue-500 border-r-transparent border-b-transparent border-l-transparent rounded-full animate-spin"></div>
+    </div>
+    <p className="mt-6 text-gray-600 dark:text-gray-400 font-medium text-lg">
+      Loading call list data...
+    </p>
+    <p className="mt-2 text-sm text-gray-500 dark:text-gray-500">
+      Please wait while we fetch your data
+    </p>
+  </div>
+);
 
-      // Create an object to track the last non-Drop stage for each client
-      const lastNonDropStages: Record<number, string> = {};
+const fetchTaleCallerData = async () => {
+  setIsLoading(true);
+  try {
+    const response = await axios.get(`${BASE_URL}api/getcompleterawdata`, {
+      withCredentials: true,
+    });
 
-      // First pass: Identify and store last non-Drop stages for all clients
-      response.data.forEach((item: any) => {
-        const clientId = item.master_id;
-        const currentStage =
-          item.stage || item.lead_stage || item.current_stage || '';
-        const cleanStage = currentStage ? currentStage.trim() : '';
+    // STAGE_PERCENTAGE_MAP for battery calculation
+    const STAGE_PERCENTAGE_MAP: Record<string, number> = {
+      'Fresh Lead': 0,
+      'Cold Lead': 10,
+      'On Hold': 20,
+      'Positive Lead': 30,
+      'Pre Site Visit': 40,
+      Demo: 50,
+      'Quotation Pending': 60,
+      'Quotation Follow-up': 70,
+      'Post Site Visit': 80,
+      'Projection List': 90,
+      Drop: -1,
+      'Closed Deal': 100,
+    };
 
-        // If this is not a Drop stage, store it as the last non-Drop stage
-        if (cleanStage && cleanStage !== 'Drop') {
-          lastNonDropStages[clientId] = cleanStage;
+    // Create an object to track the last non-Drop stage for each client
+    const lastNonDropStages: Record<number, string> = {};
+
+    // First pass: Identify and store last non-Drop stages for all clients
+    response.data.forEach((item: any) => {
+      const clientId = item.master_id;
+      const currentStage =
+        item.stage || item.lead_stage || item.current_stage || '';
+      const cleanStage = currentStage ? currentStage.trim() : '';
+
+      // If this is not a Drop stage, store it as the last non-Drop stage
+      if (cleanStage && cleanStage !== 'Drop') {
+        lastNonDropStages[clientId] = cleanStage;
+      }
+    });
+
+    const parseValue = (value: any) => {
+      if (
+        value === 'Not Available' ||
+        value === null ||
+        value === undefined
+      ) {
+        return '';
+      }
+      return value;
+    };
+
+    const parseIdValue = (value: any) => {
+      if (
+        value === 'Not Available' ||
+        value === null ||
+        value === undefined
+      ) {
+        return '';
+      }
+      return isNaN(value) ? value : Number(value);
+    };
+
+    const processedData = response.data.map((item: any) => {
+      const currentStage = parseValue(
+        item.stage || item.lead_stage || item.current_stage,
+      );
+      const cleanStage = currentStage ? currentStage.trim() : '';
+
+      // Get the last non-Drop stage for this client
+      let previousStage = lastNonDropStages[item.master_id] || '';
+
+      // Special handling for Drop stage
+      if (cleanStage === 'Drop' && !previousStage) {
+        // Try to infer from other fields
+        if (item.quotation_date || item.site_visit_date) {
+          previousStage = 'Quotation Pending';
+        } else if (item.demo_date) {
+          previousStage = 'Demo';
+        } else {
+          previousStage = 'Positive Lead';
         }
-      });
+      }
 
-      const parseValue = (value: any) => {
-        if (
-          value === 'Not Available' ||
-          value === null ||
-          value === undefined
-        ) {
-          return '';
-        }
-        return value;
-      };
+      // Calculate percentage based on stage (for Drop, use previous stage)
+      const stageForPercentage =
+        cleanStage === 'Drop' ? previousStage : cleanStage;
+      const status_percentage = stageForPercentage
+        ? STAGE_PERCENTAGE_MAP[stageForPercentage] || 0
+        : 0;
 
-      const parseIdValue = (value: any) => {
-        if (
-          value === 'Not Available' ||
-          value === null ||
-          value === undefined
-        ) {
-          return '';
-        }
-        return isNaN(value) ? value : Number(value);
-      };
+      // 🔥 IMPORTANT: Determine display city with priority: area_name first, then city
+      let displayCity = '';
+      const areaName = parseValue(item.area_name);
+      const cityName = parseValue(item.city);
+      
+      if (areaName && areaName !== '' && areaName !== 'Not Available') {
+        displayCity = areaName; // Use area_name if available
+      } else if (cityName && cityName !== '' && cityName !== 'Not Available') {
+        displayCity = cityName; // Fallback to city if area_name not available
+      } else {
+        displayCity = ''; // Empty if neither available
+      }
 
-      const processedData = response.data.map((item: any) => {
-        const currentStage = parseValue(
-          item.stage || item.lead_stage || item.current_stage,
-        );
-        const cleanStage = currentStage ? currentStage.trim() : '';
+      // Process reassignment_remarks
+      let reassignmentRemarks = [];
 
-        // Get the last non-Drop stage for this client
-        let previousStage = lastNonDropStages[item.master_id] || '';
-
-        // Special handling for Drop stage
-        if (cleanStage === 'Drop' && !previousStage) {
-          // Try to infer from other fields
-          if (item.quotation_date || item.site_visit_date) {
-            previousStage = 'Quotation Pending';
-          } else if (item.demo_date) {
-            previousStage = 'Demo';
-          } else {
-            previousStage = 'Positive Lead';
-          }
-        }
-
-        // Calculate percentage based on stage (for Drop, use previous stage)
-        const stageForPercentage =
-          cleanStage === 'Drop' ? previousStage : cleanStage;
-        const status_percentage = stageForPercentage
-          ? STAGE_PERCENTAGE_MAP[stageForPercentage] || 0
-          : 0;
-
-        // ✅ CRITICAL: Process reassignment_remarks EXACTLY like RawData.tsx
-        let reassignmentRemarks = [];
-
-        if (item.reassignment_remarks) {
-          if (Array.isArray(item.reassignment_remarks)) {
-            reassignmentRemarks = item.reassignment_remarks.map(
-              (remark: any) => {
-                if (typeof remark === 'string') {
-                  return remark;
-                } else if (remark && typeof remark === 'object') {
-                  return {
-                    remark: remark.remark || '',
-                    created_by_user: remark.created_by_user || 0,
-                    created_at: remark.created_at || '',
-                    name: remark.name || '',
-                    role: remark.role || '',
-                    // Add these fields if they exist in your API response
-                    assignedTo: remark.assignedTo || '',
-                    leadStage: remark.leadStage || '',
-                    reassignment_date: remark.reassignment_date || '',
-                  };
-                }
-                return '';
-              },
-            );
-          } else if (typeof item.reassignment_remarks === 'string') {
-            // Handle case where it's a JSON string
-            try {
-              const parsedRemarks = JSON.parse(item.reassignment_remarks);
-              if (Array.isArray(parsedRemarks)) {
-                reassignmentRemarks = parsedRemarks;
+      if (item.reassignment_remarks) {
+        if (Array.isArray(item.reassignment_remarks)) {
+          reassignmentRemarks = item.reassignment_remarks.map(
+            (remark: any) => {
+              if (typeof remark === 'string') {
+                return remark;
+              } else if (remark && typeof remark === 'object') {
+                return {
+                  remark: remark.remark || '',
+                  created_by_user: remark.created_by_user || 0,
+                  created_at: remark.created_at || '',
+                  name: remark.name || '',
+                  role: remark.role || '',
+                  assignedTo: remark.assignedTo || '',
+                  leadStage: remark.leadStage || '',
+                  reassignment_date: remark.reassignment_date || '',
+                };
               }
-            } catch (e) {
-              reassignmentRemarks = [item.reassignment_remarks];
+              return '';
+            },
+          );
+        } else if (typeof item.reassignment_remarks === 'string') {
+          try {
+            const parsedRemarks = JSON.parse(item.reassignment_remarks);
+            if (Array.isArray(parsedRemarks)) {
+              reassignmentRemarks = parsedRemarks;
             }
+          } catch (e) {
+            reassignmentRemarks = [item.reassignment_remarks];
           }
         }
+      }
 
-        return {
-          master_id: item.master_id,
-          id: item.master_id,
-          name: parseValue(item.name),
-          number: parseValue(item.number),
-          email: parseValue(item.email),
-          address: parseValue(item.address),
-          city: parseValue(item.city),
-          area: parseValue(item.area_name),
-          cat_name: parseValue(item.cat_name),
-          reference_name: parseValue(item.reference_name),
-          status: parseValue(item.status),
-          stage: cleanStage, // Use cleaned stage
-          assign_date: parseValue(item.assign_date),
-          followup_date: parseValue(item.followup_date),
+      return {
+        master_id: item.master_id,
+        id: item.master_id,
+        name: parseValue(item.name),
+        number: parseValue(item.number),
+        email: parseValue(item.email),
+        address: parseValue(item.address),
+        city: displayCity, // 🔥 THIS IS THE KEY CHANGE - Use the prioritized display city
+        original_city: parseValue(item.city), // Keep original if needed
+        original_area: parseValue(item.area_name), // Keep original if needed
+        area: parseValue(item.area_name),
+        cat_name: parseValue(item.cat_name),
+        reference_name: parseValue(item.reference_name),
+        status: parseValue(item.status),
+        stage: cleanStage,
+        assign_date: parseValue(item.assign_date),
+        followup_date: parseValue(item.followup_date),
 
-          // ✅ FIX: Get assigned person from reassigned_to first, then fallback
-          assigned_to: parseValue(item.reassigned_to || item.assigned_to),
-          telecaller_name: parseValue(item.reassigned_to || item.assigned_to), // Use reassigned_to first
+        // Assigned person
+        assigned_to: parseValue(item.reassigned_to || item.assigned_to),
+        telecaller_name: parseValue(item.reassigned_to || item.assigned_to),
 
-          quick_remark: parseValue(item.quick_remark),
-          detailed_remark: parseValue(item.detailed_remark),
-          document_count: item.document_count || 0,
-          cat_id: parseIdValue(item.cat_id),
-          client_name: parseValue(item.name),
-          category: parseValue(item.cat_name),
+        quick_remark: parseValue(item.quick_remark),
+        detailed_remark: parseValue(item.detailed_remark),
+        document_count: item.document_count || 0,
+        cat_id: parseIdValue(item.cat_id),
+        client_name: parseValue(item.name),
+        category: parseValue(item.cat_name),
 
-          // ✅ NEW: Battery-related fields
-          status_percentage: status_percentage,
-          is_drop_stage: cleanStage === 'Drop',
-          previous_stage: previousStage,
+        // Battery-related fields
+        status_percentage: status_percentage,
+        is_drop_stage: cleanStage === 'Drop',
+        previous_stage: previousStage,
 
-          // ✅ UPDATED - Now matches RawData.tsx exactly
-          reassignment_remarks: reassignmentRemarks,
+        // Reassignment remarks
+        reassignment_remarks: reassignmentRemarks,
 
-          // ✅ ADD THESE CRITICAL FIELDS FOR UpdateRawData
-          category_other: parseValue(item.category_other),
-          reference_other: parseValue(item.reference_other),
+        // Other fields needed for UpdateRawData
+        category_other: parseValue(item.category_other),
+        reference_other: parseValue(item.reference_other),
+        reference_id: parseIdValue(item.reference_id),
+        area_id: parseIdValue(item.area_id),
+        location_link: parseValue(item.location_link),
+        room_length: parseValue(item.room_length),
+        room_width: parseValue(item.room_width),
+        room_height: parseValue(item.room_height),
+        p_type: parseValue(item.p_type),
+        budget_range: parseValue(item.budget_range),
+        current_stage: parseValue(item.current_stage),
+        room_ready: parseValue(item.room_ready),
+        time_to_complete: parseValue(item.time_to_complete),
+        site_visit_date: parseValue(item.site_visit_date),
+        demo_date: parseValue(item.demo_date),
+        ar_number: parseValue(item.ar_number),
+        architect_name: parseValue(item.architect_name),
+        ca_number: parseValue(item.ca_number),
+        e_number: parseValue(item.e_number),
+        sm_number: parseValue(item.sm_number),
+        pop_number: parseValue(item.pop_number),
+        other_number: parseValue(item.other_number),
+        lead_stage: parseValue(item.lead_stage),
+        assigned_to_list: Array.isArray(item.assigned_to)
+          ? item.assigned_to
+          : [],
+        assign_id: parseIdValue(item.assign_id),
+        alternate_number: parseValue(item.alternate_number),
+        document_location_link: parseValue(item.document_location_link),
+      };
+    });
 
-          // Also include other fields needed by UpdateRawData component
-          reference_id: parseIdValue(item.reference_id),
-          area_id: parseIdValue(item.area_id),
-          location_link: parseValue(item.location_link),
-          room_length: parseValue(item.room_length),
-          room_width: parseValue(item.room_width),
-          room_height: parseValue(item.room_height),
-          p_type: parseValue(item.p_type),
-          budget_range: parseValue(item.budget_range),
-          current_stage: parseValue(item.current_stage),
-          room_ready: parseValue(item.room_ready),
-          time_to_complete: parseValue(item.time_to_complete),
-          site_visit_date: parseValue(item.site_visit_date),
-          demo_date: parseValue(item.demo_date),
-          ar_number: parseValue(item.ar_number),
-          architect_name: parseValue(item.architect_name), // ✅ ADD THIS FIELD
-          ca_number: parseValue(item.ca_number),
-          e_number: parseValue(item.e_number),
-          sm_number: parseValue(item.sm_number),
-          pop_number: parseValue(item.pop_number),
-          other_number: parseValue(item.other_number),
-          lead_stage: parseValue(item.lead_stage),
-          assigned_to_list: Array.isArray(item.assigned_to)
-            ? item.assigned_to
-            : [],
+    const uniqueClientsMap = new Map<number, Client>();
+    processedData.forEach((client: Client) => {
+      if (!uniqueClientsMap.has(client.master_id)) {
+        uniqueClientsMap.set(client.master_id, client);
+      }
+    });
+    const uniqueClients = Array.from(uniqueClientsMap.values());
 
-          // ✅ ADD assign_id field to match RawData structure
-          assign_id: parseIdValue(item.assign_id),
+    setClients(uniqueClients);
+    setFilteredClients(uniqueClients);
 
-          // ✅ ADD alternate_number field
-          alternate_number: parseValue(item.alternate_number),
+    // Extract unique cities - now using the prioritized displayCity
+    const cities = uniqueClients
+      .map((client) => client.city?.trim())
+      .filter(
+        (city) =>
+          city && city !== '' && city !== 'Not Available' && city !== 'N/A',
+      )
+      .filter((city, index, self) => self.indexOf(city) === index)
+      .sort() as string[];
+    setAvailableCities(cities);
 
-          document_location_link: parseValue(item.document_location_link),
-        };
-      });
+    setCurrentPage(1);
 
-      const uniqueClientsMap = new Map<number, Client>();
-      processedData.forEach((client: Client) => {
-        if (!uniqueClientsMap.has(client.master_id)) {
-          uniqueClientsMap.set(client.master_id, client);
-        }
-      });
-      const uniqueClients = Array.from(uniqueClientsMap.values());
-
-      setClients(uniqueClients);
-      setFilteredClients(uniqueClients);
-
-      // Extract unique cities
-      const cities = uniqueClients
-        .map((client) => client.city?.trim())
-        .filter(
-          (city) =>
-            city && city !== '' && city !== 'Not Available' && city !== 'N/A',
-        )
-        .filter((city, index, self) => self.indexOf(city) === index)
-        .sort() as string[];
-      setAvailableCities(cities);
-
-      setCurrentPage(1);
-
-      // Debug log to check the data structure
-      console.log('📊 CallList Data Loaded:', {
-        totalClients: uniqueClients.length,
-        sampleClient: uniqueClients[0],
-        assigned_to: uniqueClients[0]?.assigned_to,
-        telecaller_name: uniqueClients[0]?.telecaller_name,
-        stage: uniqueClients[0]?.stage,
-        status_percentage: uniqueClients[0]?.status_percentage,
-        is_drop_stage: uniqueClients[0]?.is_drop_stage,
-        previous_stage: uniqueClients[0]?.previous_stage,
-        category_other: uniqueClients[0]?.category_other, // Check this
-        reference_other: uniqueClients[0]?.reference_other, // Check this
-        architect_name: uniqueClients[0]?.architect_name, // Check this
-        reassignmentRemarksType: uniqueClients[0]?.reassignment_remarks
-          ? Array.isArray(uniqueClients[0].reassignment_remarks)
-            ? uniqueClients[0].reassignment_remarks.length > 0
-              ? typeof uniqueClients[0].reassignment_remarks[0] === 'object'
-                ? 'array of objects'
-                : 'array of strings'
-              : 'empty array'
-            : 'not an array'
-          : 'undefined',
-      });
-    } catch (error) {
-      console.error('Error fetching data:', error);
-    }
-  };
+    // Debug log
+    console.log('📊 CallList Data Loaded:', {
+      totalClients: uniqueClients.length,
+      sampleClient: uniqueClients[0],
+      city: uniqueClients[0]?.city, // This will now show area_name first, then city
+      original_city: uniqueClients[0]?.original_city,
+      original_area: uniqueClients[0]?.original_area,
+    });
+  } catch (error) {
+    console.error('Error fetching data:', error);
+  } finally {
+    setIsLoading(false);
+  }
+};
 
 
   useEffect(() => {
   fetchTaleCallerData();
+
+
 
   // Fetch users - Update this
   const fetchUsers = async () => {
@@ -1749,6 +1668,8 @@ const ProgressStatus: React.FC<{
       console.error('Failed to fetch users:', error);
     }
   };
+
+
 
   // Fetch lead stages - Update this
   const fetchLeadStages = async () => {
@@ -1765,6 +1686,36 @@ const ProgressStatus: React.FC<{
   fetchUsers();
   fetchLeadStages();
 }, []);
+
+
+
+    // Fetch users with role-based filtering when assign popup opens
+useEffect(() => {
+  const fetchAssignUsers = async () => {
+    if (!showAssignPopup) return;
+    
+    try {
+      const response = await axios.get(`${BASE_URL}api/users/by-role`, {
+        withCredentials: true
+      });
+      
+      console.log('Assign users API response:', response.data);
+      
+      if (response.data.success) {
+        setAssignUsers(response.data.users || []);
+        setCurrentUserRole(response.data.currentUserRole || '');
+        setRolePermissions(response.data.permissions || null);
+      } else {
+        setAssignUsers([]);
+      }
+    } catch (error) {
+      console.error('Failed to fetch assign users:', error);
+      setAssignUsers([]);
+    }
+  };
+  
+  fetchAssignUsers();
+}, [showAssignPopup]);
 
 
   // Apply filters function similar to RawData
@@ -1988,8 +1939,8 @@ useEffect(() => {
   } else {
     // No custom record count, just apply filters normally
     applyFilters();
-    setItemsPerPage(10);
-  }
+    setItemsPerPage;
+  }(10)
 }, [customRecordCount, clients, searchTerm, selectedEntryFromDate, selectedEntryToDate, 
     selectedFollowupFromDate, selectedFollowupToDate, selectedStages, selectedUsers, selectedCities]);
 
@@ -2549,170 +2500,106 @@ const handleDeleteDocument = async (docId: number) => {
 
   return (
     <div className="p-4">
-      {/* Sticky Header with Filters - Same as RawData */}
-      <div className="sticky top-0 z-50 w-full bg-white/95 dark:bg-boxdark/95 backdrop-blur-sm shadow-lg border-b border-gray-200/80 dark:border-gray-800 mb-4">
-        <div className="px-4 py-3">
-          {/* Header with Breadcrumb and Compact Search */}
-          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 mb-2">
-            <h2 className="text-lg font-medium">Call List</h2>
-
-            <div className="flex flex-col sm:flex-row gap-3 w-full sm:w-auto">
-              {/* Custom Record Count Input */}
-              <div className="w-full sm:w-48">
-                <div className="relative">
-                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                    <svg
-                      className="h-4 w-4 text-gray-400"
-                      fill="none"
-                      stroke="currentColor"
-                      viewBox="0 0 24 24"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
-                      />
-                    </svg>
-                  </div>
-                  <input
-                    type="number"
-                    className="w-full pl-10 pr-10 py-2 text-sm border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
-                    placeholder="Show N records"
-                    value={customRecordCount}
-                    onChange={handleCustomRecordInput}
-                    min="1"
-                  />
-                  {customRecordCount && (
-                    <button
-                      onClick={clearCustomRecordCount}
-                      className="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
-                      title="Clear limit"
-                    >
-                      <svg
-                        className="h-4 w-4"
-                        fill="none"
-                        stroke="currentColor"
-                        viewBox="0 0 24 24"
-                      >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          strokeWidth={2}
-                          d="M6 18L18 6M6 6l12 12"
-                        />
-                      </svg>
-                    </button>
-                  )}
-                </div>
-                {customRecordCount && (
-                  <div className="text-xs text-blue-600 dark:text-blue-400 mt-1 ml-1">
-                    Showing first {customRecordCount} records
-                  </div>
-                )}
-              </div>
-
-              {/* Compact Search Input */}
-              <div className="w-full sm:w-72">
-                <div className="relative">
-                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                    <svg
-                      className="h-4 w-4 text-gray-400"
-                      fill="none"
-                      stroke="currentColor"
-                      viewBox="0 0 24 24"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
-                      />
-                    </svg>
-                  </div>
-                  <input
-                    type="text"
-                    className="w-full pl-10 pr-4 py-2 text-sm border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all"
-                    placeholder="Search name, category, status..."
-                    value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
-                  />
-                </div>
-              </div>
-
-<div className="flex flex-wrap items-center gap-2">
-
-
-              {/* NEW: Reset Filter Button */}
-              <button
-                onClick={clearFilters}
-                className="bg-gradient-to-r from-gray-600 to-gray-700 hover:from-gray-700 hover:to-gray-800 text-white px-4 py-2 rounded-lg text-sm font-medium flex items-center gap-2 transition-all shadow-md hover:shadow-lg whitespace-nowrap"
-              >
-                <svg
-                  className="h-4 w-4"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
-                  />
-                </svg>
-                Reset Filter
-              </button>
-
-  <button
-    onClick={() => setShowAddPopup(true)}
-    className="bg-gradient-to-r from-purple-600 to-purple-700 hover:from-purple-700 hover:to-purple-800 text-white px-4 py-2 rounded-lg text-sm font-medium flex items-center gap-2 transition-all shadow-md hover:shadow-lg"
-  >
-    <FontAwesomeIcon icon={faPlus} className="h-4 w-4" />
-    Add New
-  </button>
-
-
-              {/* Reassign Button */}
-              <button
-                onClick={() => {
-                  if (selectedMasterIds.length === 0) {
-                    alert(
-                      'Please select at least one record to assign/reassign',
-                    );
-                    return;
-                  }
-                  setShowAssignPopup(true);
-                }}
-                disabled={selectedMasterIds.length === 0}
-                className={`bg-gradient-to-r from-green-600 to-green-700 text-white px-4 py-2 rounded-lg text-sm font-medium flex items-center gap-2 transition-all shadow-md hover:shadow-lg ${
-                  selectedMasterIds.length === 0
-                    ? 'opacity-50 cursor-not-allowed'
-                    : 'hover:from-green-700 hover:to-green-800'
-                }`}
-              >
-                <svg
-                  className="h-4 w-4"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197m13.5-6a3.5 3.5 0 11-7 0 3.5 3.5 0 017 0z"
-                  />
-                </svg>
-                {selectedMasterIds.length > 1
-                  ? `Reassign (${selectedMasterIds.length})`
-                  : 'ReAssign'}
-              </button> 
-              </div>
-            </div>
-          </div>
+    {/* Sticky Header with Filters - Same as RawData */}
+<div className="sticky top-0 z-50 w-full bg-white/95 dark:bg-boxdark/95 backdrop-blur-sm shadow-lg border-b border-gray-200/80 dark:border-gray-800 mb-4">
+  <div className="px-4 py-3">
+    {/* Header with Breadcrumb and Compact Search */}
+    <div className="flex flex-wrap items-center gap-3">
+      {/* Custom Record Count Input - increased height */}
+      <div className="relative w-32">
+        <div className="absolute inset-y-0 left-0 pl-2 flex items-center pointer-events-none">
+          <svg className="h-4 w-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+          </svg>
         </div>
+        <input
+          type="number"
+          className="w-full pl-8 pr-7 py-2 text-sm border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+          placeholder="Show N"
+          value={customRecordCount}
+          onChange={handleCustomRecordInput}
+          min="1"
+        />
+        {customRecordCount && (
+          <button
+            onClick={clearCustomRecordCount}
+            className="absolute inset-y-0 right-0 pr-2 flex items-center text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
+            title="Clear limit"
+          >
+            <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        )}
       </div>
+
+      {/* Compact Search Input - increased height and width */}
+      <div className="relative w-64">
+        <div className="absolute inset-y-0 left-0 pl-2 flex items-center pointer-events-none">
+          <svg className="h-4 w-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+          </svg>
+        </div>
+        <input
+          type="text"
+          className="w-full pl-8 pr-3 py-2 text-sm border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all"
+          placeholder="Search name, category, status..."
+          value={searchTerm}
+          onChange={(e) => setSearchTerm(e.target.value)}
+        />
+      </div>
+
+      {/* Action buttons - all in one line with increased size */}
+      <div className="flex flex-wrap items-center gap-2">
+        {/* Reset Filter Button - increased size */}
+        <button
+          onClick={clearFilters}
+          className="bg-gradient-to-r from-gray-600 to-gray-700 hover:from-gray-700 hover:to-gray-800 text-white px-4 py-2 rounded-lg text-sm font-medium flex items-center gap-2 transition-all shadow-md hover:shadow-lg whitespace-nowrap min-w-[100px] justify-center"
+        >
+          <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+          </svg>
+          Reset Filter
+        </button>
+
+        {/* Add New Button - increased size */}
+        <button
+          onClick={() => setShowAddPopup(true)}
+          className="bg-gradient-to-r from-purple-600 to-purple-700 hover:from-purple-700 hover:to-purple-800 text-white px-4 py-2 rounded-lg text-sm font-medium flex items-center gap-2 transition-all shadow-md hover:shadow-lg whitespace-nowrap min-w-[100px] justify-center"
+        >
+          <FontAwesomeIcon icon={faPlus} className="h-4 w-4" />
+          Add New
+        </button>
+
+        {/* Reassign Button - increased size */}
+        <button
+          onClick={() => {
+            if (selectedMasterIds.length === 0) {
+              alert('Please select at least one record to assign/reassign');
+              return;
+            }
+            setShowAssignPopup(true);
+          }}
+          disabled={selectedMasterIds.length === 0}
+          className={`bg-gradient-to-r from-green-600 to-green-700 text-white px-4 py-2 rounded-lg text-sm font-medium flex items-center gap-2 transition-all shadow-md hover:shadow-lg whitespace-nowrap min-w-[120px] justify-center ${
+            selectedMasterIds.length === 0
+              ? 'opacity-50 cursor-not-allowed'
+              : 'hover:from-green-700 hover:to-green-800'
+          }`}
+        >
+          <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197m13.5-6a3.5 3.5 0 11-7 0 3.5 3.5 0 017 0z" />
+          </svg>
+          {selectedMasterIds.length > 1
+            ? `Reassign (${selectedMasterIds.length})`
+            : 'ReAssign'}
+        </button>
+      </div>
+    </div>
+
+   
+  </div>
+</div>
 
       {successMessage && (
         <div className="mb-4 p-3 bg-green-100 text-green-800 rounded border border-green-300 dark:bg-green-900 dark:text-green-200 dark:border-green-700">
@@ -2816,6 +2703,9 @@ const handleDeleteDocument = async (docId: number) => {
       )}
 
       <div className="max-w-full overflow-auto rounded-lg border border-stroke bg-white shadow-default dark:border-strokedark dark:bg-boxdark">
+          {isLoading ? (
+    <Loader />
+  ) : (
         <div className="overflow-x-auto">
           <table className="w-full table-auto">
             <thead>
@@ -3671,24 +3561,7 @@ const handleDeleteDocument = async (docId: number) => {
                     <div className="flex justify-center gap-1">
                    
 
-                      {/* Call Button */}
-                      <ActionButton
-                        onClick={() =>
-                          handleEdit({
-                            ...client,
-                            master_id: client.master_id,
-                            assigned_to:
-                              client.assigned_to ||
-                              client.telecaller_name ||
-                              '',
-                          })
-                        }
-                        title="Make Call"
-                        variant="call"
-                        className="w-8 h-8 hover:scale-105 transition-transform"
-                      >
-                        <FontAwesomeIcon icon={faPhone} className="text-xs" />
-                      </ActionButton>
+                  
 
                       {/* Edit Button */}
                       <ActionButton
@@ -3733,644 +3606,621 @@ const handleDeleteDocument = async (docId: number) => {
             </tbody>
           </table>
         </div>
-      </div>
+  )}
+</div>
 
-      {/* Pagination */}
-      {totalItems > 0 && (
-        <Pagination
-          currentPage={currentPage}
-          totalPages={totalPages}
-          onPageChange={handlePageChange}
-          totalItems={totalItems}
-          itemsPerPage={itemsPerPage}
-          showingStart={showingStart}
-          showingEnd={showingEnd}
-        />
-      )}
+{/* Pagination */}
+{!isLoading && totalItems > 0 && (
+  <Pagination
+    currentPage={currentPage}
+    totalPages={totalPages}
+    onPageChange={handlePageChange}
+    totalItems={totalItems}
+    itemsPerPage={itemsPerPage}
+    showingStart={showingStart}
+    showingEnd={showingEnd}
+  />
+)}
 
-      {/* Combined Documents/Upload Modal */}
-      {showDocsPopup && docsClient && (
-        <div className="fixed inset-0 bg-black/70 flex justify-center items-start z-[9999] overflow-y-auto p-4 sm:p-10">
-          <div className="bg-white dark:bg-boxdark p-6 rounded-xl shadow-2xl w-full max-w-5xl max-h-[90vh] overflow-y-auto border border-gray-300 dark:border-gray-700">
-            {/* Header */}
-            <div className="flex justify-between items-center border-b pb-4 mb-6 dark:border-gray-700">
-              <div>
-                <h2 className="text-2xl font-bold text-gray-800 dark:text-white">
-                  📁 Files for {docsClient.name}
-                </h2>
-                <p className="text-sm text-gray-600 dark:text-gray-400">
-                  Manage documents, links, and remarks in one place
-                </p>
-              </div>
-<button
-  onClick={() => {
-    setShowDocsPopup(false);
-    setUploadFiles([]);
-    setLocationLink('');
-    setRemark('');
-    setDetailedRemark(''); // 🔴 ADD THIS
-    setFollowupDate('');
-    setSelectedUsers([]);
-    setLeadStage('');
-  }}
-  className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 text-2xl p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-full transition-colors"
->
-  <FontAwesomeIcon icon={faTimes} />
-</button>
-            </div>
-
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-              {/* Left Column - Upload Section */}
-
-            {/* Right Column - Upload Section */}
-<div className="lg:col-span-1">
-  <div className="bg-gray-50 dark:bg-white/5 p-5 rounded-xl border border-gray-200 dark:border-gray-700 sticky top-0">
-    <h3 className="text-lg font-semibold mb-4 text-gray-800 dark:text-white flex items-center gap-2">
-      <FontAwesomeIcon icon={faFileUpload} className="text-blue-500" />
-      Upload New
-    </h3>
-
-    <div className="space-y-4">
-      {/* File Type */}
-      <div>
-        <label className="block mb-1.5 text-xs font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400">
-          Type
-        </label>
-        <select
-          value={uploadType}
-          onChange={(e) => setUploadType(e.target.value as any)}
-          className="w-full p-2.5 border border-gray-300 rounded-lg text-sm dark:text-white dark:bg-gray-800 focus:ring-2 focus:ring-blue-500 outline-none"
-        >
-          <option value="documents">📄 Document</option>
-          <option value="image">🖼️ Image</option>
-          <option value="video">🎥 Video</option>
-        </select>
-      </div>
-
-      {/* Follow-up Date Field - Prefilled from client data */}
-      <div>
-        <label className="block mb-1.5 text-xs font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400">
-          Follow-up Date
-        </label>
-        <input
-          type="date"
-          value={followupDate || docsClient?.followup_date || ''}
-          onChange={(e) => setFollowupDate(e.target.value)}
-          className="w-full p-2.5 border border-gray-300 rounded-lg text-sm dark:text-white dark:bg-gray-800 focus:ring-2 focus:ring-blue-500 outline-none"
-        />
-      </div>
-
-      {/* Reassign To (Multiple Users) - Prechecked from client data */}
-      <div>
-        <label className="block mb-1.5 text-xs font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400">
-          Reassign To (Multiple Users)
-        </label>
-
-        {/* Search Box */}
-        <div className="mb-2">
-          <div className="relative">
-            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-              <svg
-                className="h-4 w-4 text-gray-400"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
-                />
-              </svg>
-            </div>
-            <input
-              type="text"
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full pl-9 pr-8 py-2 border border-gray-300 dark:border-gray-600 rounded text-sm dark:bg-form-input dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-              placeholder="Search users by name or role..."
-            />
-            {searchTerm && (
-              <button
-                type="button"
-                onClick={() => setSearchTerm('')}
-                className="absolute inset-y-0 right-0 pr-2 flex items-center text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
-              >
-                <svg
-                  className="h-4 w-4"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M6 18L18 6M6 6l12 12"
-                  />
-                </svg>
-              </button>
-            )}
-          </div>
-
-          {searchTerm && (
-            <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-              Showing {filteredUsers.length} of {users.length} users
-            </p>
-          )}
+     {/* Combined Documents/Upload Modal */}
+{showDocsPopup && docsClient && (
+  <div className="fixed inset-0 bg-black/70 flex justify-center items-start z-[9999] overflow-y-auto p-4 sm:p-10">
+    <div className="bg-white dark:bg-boxdark p-6 rounded-xl shadow-2xl w-full max-w-5xl max-h-[90vh] overflow-y-auto border border-gray-300 dark:border-gray-700">
+      {/* Header */}
+      <div className="flex justify-between items-center border-b pb-4 mb-6 dark:border-gray-700">
+        <div>
+          <h2 className="text-2xl font-bold text-gray-800 dark:text-white">
+            📁 Files for {docsClient.name}
+          </h2>
+          <p className="text-sm text-gray-600 dark:text-gray-400">
+            Manage documents, links, and remarks in one place
+          </p>
         </div>
+        <button
+          onClick={() => {
+            setShowDocsPopup(false);
+            setUploadFiles([]);
+            setLocationLink('');
+            setRemark('');
+            setDetailedRemark('');
+            setFollowupDate('');
+            setSelectedUsers([]);
+            setLeadStage('');
+          }}
+          className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 text-2xl p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-full transition-colors"
+        >
+          <FontAwesomeIcon icon={faTimes} />
+        </button>
+      </div>
 
-        {/* Checkbox Selection Area - Prechecked based on client's assigned user */}
-        <div className="border border-gray-300 dark:border-gray-600 rounded p-3 max-h-40 overflow-y-auto">
-          {/* Select All Filtered */}
-          <div className="mb-2 pb-2 border-b dark:border-gray-700 flex items-center justify-between">
-            <button
-              type="button"
-              onClick={() => {
-                const allFilteredSelected = filteredUsers.every((user) =>
-                  selectedUsers.includes(user.user_id || user.id),
-                );
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        {/* Left Column - Upload Section */}
+        <div className="lg:col-span-1">
+          <div className="bg-gray-50 dark:bg-white/5 p-5 rounded-xl border border-gray-200 dark:border-gray-700 sticky top-0">
+            <h3 className="text-lg font-semibold mb-4 text-gray-800 dark:text-white flex items-center gap-2">
+              <FontAwesomeIcon icon={faFileUpload} className="text-blue-500" />
+              Upload New
+            </h3>
 
-                if (allFilteredSelected) {
-                  setSelectedUsers((prev) =>
-                    prev.filter(
-                      (userId) =>
-                        !filteredUsers.some(
-                          (user) =>
-                            user.user_id === userId || user.id === userId,
-                        ),
-                    ),
-                  );
-                } else {
-                  const filteredUserIds = filteredUsers.map(
-                    (user) => user.user_id || user.id,
-                  );
-                  setSelectedUsers((prev) => [
-                    ...new Set([...prev, ...filteredUserIds]),
-                  ]);
-                }
-              }}
-              className="text-xs px-3 py-1.5 bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300 rounded hover:bg-blue-200 dark:hover:bg-blue-800 transition-colors"
-            >
-              {filteredUsers.length > 0 &&
-              filteredUsers.every((user) =>
-                selectedUsers.includes(user.user_id || user.id),
-              )
-                ? 'Deselect All Filtered'
-                : 'Select All Filtered'
-              }
-            </button>
+        
 
-            <span className="text-xs text-gray-500 dark:text-gray-400">
-              {selectedUsers.length} selected
-            </span>
-          </div>
+            <div className="space-y-4">
+              {/* File Type */}
+              <div>
+                <label className="block mb-1.5 text-xs font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400">
+                  Type
+                </label>
+                <select
+                  value={uploadType}
+                  onChange={(e) => setUploadType(e.target.value as any)}
+                  className="w-full p-2.5 border border-gray-300 rounded-lg text-sm dark:text-white dark:bg-gray-800 focus:ring-2 focus:ring-blue-500 outline-none"
+                >
+                  <option value="documents">📄 Document</option>
+                  <option value="image">🖼️ Image</option>
+                  <option value="video">🎥 Video</option>
+                </select>
+              </div>
 
-          {/* Users List - Precheck current assigned user */}
-          {filteredUsers.length > 0 ? (
-            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-2">
-              {filteredUsers.map((user) => {
-                const isSelected = selectedUsers.includes(
-                  user.user_id || user.id,
-                );
+              {/* Follow-up Date Field - Prefilled from client data */}
+              <div>
+                <label className="block mb-1.5 text-xs font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400">
+                  Follow-up Date
+                </label>
+                <input
+                  type="date"
+                  value={followupDate || docsClient?.followup_date || ''}
+                  onChange={(e) => setFollowupDate(e.target.value)}
+                  className="w-full p-2.5 border border-gray-300 rounded-lg text-sm dark:text-white dark:bg-gray-800 focus:ring-2 focus:ring-blue-500 outline-none"
+                />
+              </div>
 
-                return (
-                  <div
-                    key={user.user_id || user.id}
-                    className={`flex items-start p-2 rounded transition-colors min-h-[60px] ${
-                      isSelected
-                        ? 'bg-blue-50 dark:bg-blue-900/30 border border-blue-200 dark:border-blue-700'
-                        : 'border border-transparent hover:bg-gray-50 dark:hover:bg-gray-800 hover:border-gray-200 dark:hover:border-gray-700'
-                    }`}
-                  >
+              {/* Reassign To (Multiple Users) - Using role-based users */}
+              <div>
+                <label className="block mb-1.5 text-xs font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400">
+                  Reassign To (Multiple Users)
+                </label>
+
+                {/* Search Box */}
+                <div className="mb-2">
+                  <div className="relative">
+                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                      <svg
+                        className="h-4 w-4 text-gray-400"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
+                        />
+                      </svg>
+                    </div>
                     <input
-                      type="checkbox"
-                      id={`user-${user.user_id || user.id}`}
-                      checked={isSelected}
-                      onChange={() => {
-                        const userId = user.user_id || user.id;
-                        if (selectedUsers.includes(userId)) {
+                      type="text"
+                      value={docsSearchTerm}
+                      onChange={(e) => setDocsSearchTerm(e.target.value)}
+                      className="w-full pl-9 pr-8 py-2 border border-gray-300 dark:border-gray-600 rounded text-sm dark:bg-form-input dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                      placeholder="Search users by name or role..."
+                    />
+                    {docsSearchTerm && (
+                      <button
+                        type="button"
+                        onClick={() => setDocsSearchTerm('')}
+                        className="absolute inset-y-0 right-0 pr-2 flex items-center text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
+                      >
+                        <svg
+                          className="h-4 w-4"
+                          fill="none"
+                          stroke="currentColor"
+                          viewBox="0 0 24 24"
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={2}
+                            d="M6 18L18 6M6 6l12 12"
+                          />
+                        </svg>
+                      </button>
+                    )}
+                  </div>
+
+                  {docsSearchTerm && (
+                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                      Showing {docsFilteredUsers.length} of {docsUsers.length} users
+                    </p>
+                  )}
+                </div>
+
+                {/* Checkbox Selection Area */}
+                <div className="border border-gray-300 dark:border-gray-600 rounded p-3 max-h-40 overflow-y-auto">
+                  {/* Select All Filtered */}
+                  <div className="mb-2 pb-2 border-b dark:border-gray-700 flex items-center justify-between">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const allFilteredSelected = docsFilteredUsers.every((user) =>
+                          selectedUsers.includes(user.user_id || user.id),
+                        );
+
+                        if (allFilteredSelected) {
                           setSelectedUsers((prev) =>
-                            prev.filter((id) => id !== userId),
+                            prev.filter(
+                              (userId) =>
+                                !docsFilteredUsers.some(
+                                  (user) =>
+                                    user.user_id === userId || user.id === userId,
+                                ),
+                            ),
                           );
                         } else {
-                          setSelectedUsers((prev) => [...prev, userId]);
+                          const filteredUserIds = docsFilteredUsers.map(
+                            (user) => user.user_id || user.id,
+                          );
+                          setSelectedUsers((prev) => [
+                            ...new Set([...prev, ...filteredUserIds]),
+                          ]);
                         }
                       }}
-                      className="h-4 w-4 text-blue-600 rounded focus:ring-blue-500 focus:ring-offset-0 mt-1 flex-shrink-0"
-                    />
-
-                    <label
-                      htmlFor={`user-${user.user_id || user.id}`}
-                      className="ml-2 text-sm text-gray-700 dark:text-gray-300 cursor-pointer flex-1 min-w-0"
+                      className="text-xs px-3 py-1.5 bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300 rounded hover:bg-blue-200 dark:hover:bg-blue-800 transition-colors"
                     >
-                      {/* NAME – highest priority */}
-                      <div className="font-semibold text-sm truncate">
-                        {user.name}
-                      </div>
+                      {docsFilteredUsers.length > 0 &&
+                      docsFilteredUsers.every((user) =>
+                        selectedUsers.includes(user.user_id || user.id),
+                      )
+                        ? 'Deselect All Filtered'
+                        : 'Select All Filtered'
+                      }
+                    </button>
 
-                  
-                    </label>
+                    <span className="text-xs text-gray-500 dark:text-gray-400">
+                      {selectedUsers.length} selected
+                    </span>
                   </div>
-                );
-              })}
-            </div>
-          ) : (
-            <div className="text-center py-4 text-gray-500 dark:text-gray-400">
-              <div className="text-2xl mb-2">🔍</div>
-              <p className="text-sm">No users found</p>
-              <p className="text-xs mt-1">Try a different search term</p>
-            </div>
-          )}
-        </div>
 
-        {/* Selected Users Preview */}
-        {selectedUsers.length > 0 && (
-          <div className="mt-2 p-2 bg-blue-50 dark:bg-blue-900/30 rounded border border-blue-200 dark:border-blue-800">
-            <div className="text-xs text-blue-700 dark:text-blue-300 mb-1 font-medium">
-              Selected Users ({selectedUsers.length}):
-            </div>
-            <div className="text-xs text-gray-600 dark:text-gray-400 break-words">
-              {selectedUsers
-                .map((userId) => {
-                  const user = users.find(
-                    (u) => u.user_id === userId || u.id === userId,
-                  );
-                  return user
-                    ? `${user.name}${user.role ? ` (${user.role})` : ''}`
-                    : userId;
-                })
-                .join(', ')}
-            </div>
-          </div>
-        )}
-      </div>
+                  {/* Users List */}
+                  {docsFilteredUsers.length > 0 ? (
+                    <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-2">
+                      {docsFilteredUsers.map((user) => {
+                        const isSelected = selectedUsers.includes(
+                          user.user_id || user.id,
+                        );
 
-      {/* Lead Stage - Prefilled from client data */}
-      <div>
-        <label className="block mb-1.5 text-xs font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400">
-          Lead Stage
-        </label>
-        <select
-          value={leadStage || docsClient?.lead_stage || docsClient?.stage || ''}
-          onChange={(e) => setLeadStage(e.target.value)}
-          className="w-full p-2.5 border border-gray-300 rounded-lg text-sm dark:text-white dark:bg-gray-800 focus:ring-2 focus:ring-blue-500 outline-none"
-        >
-          <option value="">Select Lead Stage</option>
-          {leadStages.map((stage, index) => (
-            <option key={index} value={stage}>
-              {stage}
-            </option>
-          ))}
-        </select>
-      </div>
+                        return (
+                          <div
+                            key={user.user_id || user.id}
+                            className={`flex items-start p-2 rounded transition-colors min-h-[60px] ${
+                              isSelected
+                                ? 'bg-blue-50 dark:bg-blue-900/30 border border-blue-200 dark:border-blue-700'
+                                : 'border border-transparent hover:bg-gray-50 dark:hover:bg-gray-800 hover:border-gray-200 dark:hover:border-gray-700'
+                            }`}
+                          >
+                            <input
+                              type="checkbox"
+                              id={`doc-user-${user.user_id || user.id}`}
+                              checked={isSelected}
+                              onChange={() => {
+                                const userId = user.user_id || user.id;
+                                if (selectedUsers.includes(userId)) {
+                                  setSelectedUsers((prev) =>
+                                    prev.filter((id) => id !== userId),
+                                  );
+                                } else {
+                                  setSelectedUsers((prev) => [...prev, userId]);
+                                }
+                              }}
+                              className="h-4 w-4 text-blue-600 rounded focus:ring-blue-500 focus:ring-offset-0 mt-1 flex-shrink-0"
+                            />
 
-      {/* Location Link - Prefilled from client data */}
-      <div>
-        <label className="block mb-1.5 text-xs font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400">
-          Location Link
-        </label>
-        <input
-          type="text"
-          placeholder="https://example.com"
-          value={locationLink || docsClient?.location_link || docsClient?.document_location_link || ''}
-          onChange={(e) => setLocationLink(e.target.value)}
-          className="w-full p-2.5 border border-gray-300 rounded-lg text-sm dark:text-white dark:bg-gray-800 focus:ring-2 focus:ring-blue-500 outline-none"
-        />
-      </div> 
-
-
-
-      {/* Detailed Remark Field - NEW */}
-<div>
-  <label className="block mb-1.5 text-xs font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400">
-    Detailed Remark 
-  </label>
-  <textarea
-    placeholder="Enter detailed remark for this update..."
-    value={detailedRemark}
-    onChange={(e) => setDetailedRemark(e.target.value)}
-    className="w-full p-2.5 border border-gray-300 rounded-lg text-sm dark:text-white dark:bg-gray-800 focus:ring-2 focus:ring-blue-500 outline-none"
-    rows={3}
-  />
-</div>
-
-      {/* File Upload Area */}
-      <div className="border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-lg p-4 text-center hover:border-blue-500 transition-colors bg-white dark:bg-gray-800/50">
-        <input
-          type="file"
-          multiple
-          id="file-upload"
-          className="hidden"
-          onChange={handleFileChange}
-        />
-        <label
-          htmlFor="file-upload"
-          className="cursor-pointer block"
-        >
-          <FontAwesomeIcon
-            icon={faFileUpload}
-            className="text-2xl text-gray-400 mb-1"
-          />
-          <p className="text-xs text-gray-600 dark:text-gray-400 font-medium">
-            Click to browse files
-          </p>
-        </label>
-      </div>
-
-      {/* Selected Files Preview */}
-      {uploadFiles.length > 0 && (
-        <div className="bg-blue-50 dark:bg-blue-900/20 p-2 rounded-lg border border-blue-100 dark:border-blue-800">
-          <p className="text-xs font-bold text-blue-700 dark:text-blue-400 mb-1">
-            Selected ({uploadFiles.length})
-          </p>
-          <div className="max-h-20 overflow-y-auto space-y-1">
-            {uploadFiles.map((f, i) => (
-              <div
-                key={i}
-                className="text-[11px] truncate dark:text-gray-300 flex justify-between"
-              >
-                <span>{f.name}</span>
-                <button
-                  onClick={() =>
-                    setUploadFiles((prev) =>
-                      prev.filter((_, idx) => idx !== i),
-                    )
-                  }
-                  className="text-red-500 ml-1 hover:text-red-700"
-                >
-                  ×
-                </button>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* Submit Button */}
-      <button
-        onClick={handleUploadSubmit}
-        disabled={uploadFiles.length === 0}
-        className={`w-full py-3 rounded-lg font-bold text-sm transition-all shadow-md ${
-          uploadFiles.length > 0
-            ? 'bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white active:scale-95'
-            : 'bg-gray-200 dark:bg-gray-700 text-gray-400 cursor-not-allowed'
-        }`}
-      >
-        UPLOAD & UPDATE
-      </button>
-    </div>
-  </div>
-</div>
-
-
-
-              {/* Right Column - Gallery View (Remains the same) */}
-              <div className="lg:col-span-2 space-y-8">
-               {/* Images Section */}
-{docsData.images.length > 0 && (
-  <section>
-    <h3 className="text-sm font-bold uppercase tracking-widest text-gray-400 mb-4 flex items-center gap-2">
-      <FontAwesomeIcon
-        icon={faImages}
-        className="text-purple-500"
-      />{' '}
-      Images
-    </h3>
-    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-      {docsData.images.map((doc, index) => (
-        <div
-          key={index}
-          className="group bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl overflow-hidden hover:shadow-xl transition-all"
-        >
-          <div className="aspect-video bg-gray-100 dark:bg-black/20 relative">
-            <img
-              src={doc.url}
-              alt="img"
-              className="w-full h-full object-cover"
-            />
-            <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-3">
-              <a
-                href={doc.url}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="p-2 bg-white rounded-full text-blue-600 hover:scale-110 transition-transform"
-                title="View"
-              >
-                <FontAwesomeIcon icon={faEye} />
-              </a>
-              <a
-                href={doc.url}
-                download
-                className="p-2 bg-white rounded-full text-green-600 hover:scale-110 transition-transform"
-                title="Download"
-              >
-                <FontAwesomeIcon icon={faDownload} />
-              </a>
-              <button
-                onClick={() => handleDeleteDocument(doc.doc_id)}
-                className="p-2 bg-white rounded-full text-red-600 hover:scale-110 transition-transform"
-                title="Delete"
-              >
-                <FontAwesomeIcon icon={faTimes} />
-              </button>
-            </div>
-          </div>
-          <div className="p-3">
-            <p className="text-xs font-medium truncate dark:text-gray-200 mb-2">
-              {doc.url.split('/').pop()}
-            </p>
-            <div className="space-y-2">
-              {doc.link && (
-                <a
-                  href={doc.link}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="block text-[11px] text-blue-500 hover:underline truncate bg-blue-50 dark:bg-blue-900/30 p-1.5 rounded"
-                >
-                  🔗 {doc.link}
-                </a>
-              )}
-              {doc.remark && (
-                <p className="text-[11px] text-gray-500 dark:text-gray-400 italic bg-gray-50 dark:bg-gray-700/50 p-1.5 rounded">
-                  💬 {doc.remark}
-                </p>
-              )}
-            </div>
-          </div>
-        </div>
-      ))}
-    </div>
-  </section>
-)}
-
-                {/* Documents Section */}
-{docsData.documents.length > 0 && (
-  <section>
-    <h3 className="text-sm font-bold uppercase tracking-widest text-gray-400 mb-4 flex items-center gap-2">
-      <FontAwesomeIcon
-        icon={faFile}
-        className="text-blue-500"
-      />{' '}
-      Documents
-    </h3>
-    <div className="space-y-3">
-      {docsData.documents.map((doc, index) => (
-        <div
-          key={index}
-          className="p-4 bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 hover:border-blue-400 transition-colors"
-        >
-          <div className="flex items-start justify-between gap-4">
-            <div className="flex items-start gap-3 flex-1">
-              <div className="text-2xl mt-1">
-                {getFileIcon(doc.url)}
-              </div>
-              <div className="flex-1 min-w-0">
-                <p className="font-semibold text-sm dark:text-white truncate">
-                  {doc.url.split('/').pop()}
-                </p>
-                {doc.remark && (
-                  <p className="text-xs text-gray-500 mt-1">
-                    Remark:{' '}
-                    <span className="italic">{doc.remark}</span>
-                  </p>
-                )}
-                {doc.link && (
-                  <a
-                    href={doc.link}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="inline-block mt-2 text-xs text-blue-600 dark:text-blue-400 font-bold hover:underline"
-                  >
-                    <FontAwesomeIcon
-                      icon={faEye}
-                      className="mr-1"
-                    />{' '}
-                    View Location Link
-                  </a>
-                )}
-              </div>
-            </div>
-            <div className="flex gap-2">
-              <a
-                href={doc.url}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="p-2 text-gray-400 hover:text-blue-500"
-                title="View"
-              >
-                <FontAwesomeIcon icon={faEye} />
-              </a>
-              <a
-                href={doc.url}
-                download
-                className="p-2 text-gray-400 hover:text-green-500"
-                title="Download"
-              >
-                <FontAwesomeIcon icon={faDownload} />
-              </a>
-              <button
-                onClick={() => handleDeleteDocument(doc.doc_id)}
-                className="p-2 text-gray-400 hover:text-red-500"
-                title="Delete"
-              >
-                <FontAwesomeIcon icon={faTimes} />
-              </button>
-            </div>
-          </div>
-        </div>
-      ))}
-    </div>
-  </section>
-)}
-
-              {/* Videos Section */}
-{docsData.videos.length > 0 && (
-  <section>
-    <h3 className="text-sm font-bold uppercase tracking-widest text-gray-400 mb-4 flex items-center gap-2">
-      <FontAwesomeIcon
-        icon={faVideo}
-        className="text-red-500"
-      />{' '}
-      Videos
-    </h3>
-    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-      {docsData.videos.map((doc, index) => (
-        <div
-          key={index}
-          className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl overflow-hidden"
-        >
-          <video controls className="w-full h-40 bg-black">
-            <source src={doc.url} type="video/mp4" />
-          </video>
-          <div className="p-3">
-            <div className="flex justify-between items-start mb-2">
-              <p className="text-xs font-bold truncate dark:text-gray-200">
-                {doc.url.split('/').pop()}
-              </p>
-              <div className="flex gap-2">
-                <a
-                  href={doc.url}
-                  download
-                  className="p-1 text-gray-400 hover:text-green-500"
-                  title="Download"
-                >
-                  <FontAwesomeIcon icon={faDownload} className="text-xs" />
-                </a>
-                <button
-                  onClick={() => handleDeleteDocument(doc.doc_id)}
-                  className="p-1 text-gray-400 hover:text-red-500"
-                  title="Delete"
-                >
-                  <FontAwesomeIcon icon={faTimes} className="text-xs" />
-                </button>
-              </div>
-            </div>
-            {doc.link && (
-              <a
-                href={doc.link}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="block text-[11px] text-blue-500 hover:underline mb-2 truncate"
-              >
-                🔗 Map/Source Link
-              </a>
-            )}
-            {doc.remark && (
-              <p className="text-[11px] text-gray-500 italic border-t border-gray-100 dark:border-gray-700 pt-2 mt-1">
-                {doc.remark}
-              </p>
-            )}
-          </div>
-        </div>
-      ))}
-    </div>
-  </section>
-)}
-
-                {/* Empty State */}
-                {docsData.images.length === 0 &&
-                  docsData.documents.length === 0 &&
-                  docsData.videos.length === 0 && (
-                    <div className="text-center py-20 bg-gray-50 dark:bg-white/5 rounded-2xl border-2 border-dashed border-gray-200 dark:border-gray-800">
-                      <FontAwesomeIcon
-                        icon={faFile}
-                        className="text-5xl text-gray-300 mb-4"
-                      />
-                      <p className="text-gray-500 font-medium">
-                        No files uploaded yet.
-                      </p>
-                      <p className="text-sm text-gray-400 mt-2">
-                        Upload files using the form on the left
-                      </p>
+                            <label
+                              htmlFor={`doc-user-${user.user_id || user.id}`}
+                              className="ml-2 text-sm text-gray-700 dark:text-gray-300 cursor-pointer flex-1 min-w-0"
+                            >
+                              <div className="font-semibold text-sm truncate">
+                                {user.name}
+                              </div>
+                              <div className="text-xs text-gray-500 dark:text-gray-400 truncate">
+                                {user.role_label || user.role}
+                              </div>
+                            </label>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  ) : (
+                    <div className="text-center py-4 text-gray-500 dark:text-gray-400">
+                      <div className="text-2xl mb-2">🔍</div>
+                      <p className="text-sm">No users found</p>
+                      <p className="text-xs mt-1">Try a different search term</p>
                     </div>
                   )}
+                </div>
+
+                {/* Selected Users Preview */}
+                {selectedUsers.length > 0 && (
+                  <div className="mt-2 p-2 bg-blue-50 dark:bg-blue-900/30 rounded border border-blue-200 dark:border-blue-800">
+                    <div className="text-xs text-blue-700 dark:text-blue-300 mb-1 font-medium">
+                      Selected Users ({selectedUsers.length}):
+                    </div>
+                    <div className="text-xs text-gray-600 dark:text-gray-400 break-words">
+                      {selectedUsers
+                        .map((userId) => {
+                          const user = docsUsers.find(
+                            (u) => u.user_id === userId || u.id === userId,
+                          );
+                          return user
+                            ? `${user.name}${user.role ? ` (${user.role})` : ''}`
+                            : userId;
+                        })
+                        .join(', ')}
+                    </div>
+                  </div>
+                )}
               </div>
+
+              {/* Lead Stage - Prefilled from client data */}
+              <div>
+                <label className="block mb-1.5 text-xs font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400">
+                  Lead Stage
+                </label>
+                <select
+                  value={leadStage || docsClient?.lead_stage || docsClient?.stage || ''}
+                  onChange={(e) => setLeadStage(e.target.value)}
+                  className="w-full p-2.5 border border-gray-300 rounded-lg text-sm dark:text-white dark:bg-gray-800 focus:ring-2 focus:ring-blue-500 outline-none"
+                >
+                  <option value="">Select Lead Stage</option>
+                  {leadStages.map((stage, index) => (
+                    <option key={index} value={stage}>
+                      {stage}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Location Link - Prefilled from client data */}
+              <div>
+                <label className="block mb-1.5 text-xs font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400">
+                  Location Link
+                </label>
+                <input
+                  type="text"
+                  placeholder="https://example.com"
+                  value={locationLink || docsClient?.location_link || docsClient?.document_location_link || ''}
+                  onChange={(e) => setLocationLink(e.target.value)}
+                  className="w-full p-2.5 border border-gray-300 rounded-lg text-sm dark:text-white dark:bg-gray-800 focus:ring-2 focus:ring-blue-500 outline-none"
+                />
+              </div>
+
+              {/* Detailed Remark Field */}
+              <div>
+                <label className="block mb-1.5 text-xs font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400">
+                  Detailed Remark 
+                </label>
+                <textarea
+                  placeholder="Enter detailed remark for this update..."
+                  value={detailedRemark}
+                  onChange={(e) => setDetailedRemark(e.target.value)}
+                  className="w-full p-2.5 border border-gray-300 rounded-lg text-sm dark:text-white dark:bg-gray-800 focus:ring-2 focus:ring-blue-500 outline-none"
+                  rows={3}
+                />
+              </div>
+
+              {/* File Upload Area */}
+              <div className="border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-lg p-4 text-center hover:border-blue-500 transition-colors bg-white dark:bg-gray-800/50">
+                <input
+                  type="file"
+                  multiple
+                  id="file-upload"
+                  className="hidden"
+                  onChange={handleFileChange}
+                />
+                <label
+                  htmlFor="file-upload"
+                  className="cursor-pointer block"
+                >
+                  <FontAwesomeIcon
+                    icon={faFileUpload}
+                    className="text-2xl text-gray-400 mb-1"
+                  />
+                  <p className="text-xs text-gray-600 dark:text-gray-400 font-medium">
+                    Click to browse files
+                  </p>
+                </label>
+              </div>
+
+              {/* Selected Files Preview */}
+              {uploadFiles.length > 0 && (
+                <div className="bg-blue-50 dark:bg-blue-900/20 p-2 rounded-lg border border-blue-100 dark:border-blue-800">
+                  <p className="text-xs font-bold text-blue-700 dark:text-blue-400 mb-1">
+                    Selected ({uploadFiles.length})
+                  </p>
+                  <div className="max-h-20 overflow-y-auto space-y-1">
+                    {uploadFiles.map((f, i) => (
+                      <div
+                        key={i}
+                        className="text-[11px] truncate dark:text-gray-300 flex justify-between"
+                      >
+                        <span>{f.name}</span>
+                        <button
+                          onClick={() =>
+                            setUploadFiles((prev) =>
+                              prev.filter((_, idx) => idx !== i),
+                            )
+                          }
+                          className="text-red-500 ml-1 hover:text-red-700"
+                        >
+                          ×
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Submit Button */}
+              <button
+                onClick={handleUploadSubmit}
+                disabled={uploadFiles.length === 0}
+                className={`w-full py-3 rounded-lg font-bold text-sm transition-all shadow-md ${
+                  uploadFiles.length > 0
+                    ? 'bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white active:scale-95'
+                    : 'bg-gray-200 dark:bg-gray-700 text-gray-400 cursor-not-allowed'
+                }`}
+              >
+                UPLOAD & UPDATE
+              </button>
             </div>
           </div>
         </div>
-      )}
+
+        {/* Right Column - Gallery View */}
+        <div className="lg:col-span-2 space-y-8">
+          {/* Images Section */}
+          {docsData.images.length > 0 && (
+            <section>
+              <h3 className="text-sm font-bold uppercase tracking-widest text-gray-400 mb-4 flex items-center gap-2">
+                <FontAwesomeIcon icon={faImages} className="text-purple-500" /> Images
+              </h3>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                {docsData.images.map((doc, index) => (
+                  <div
+                    key={index}
+                    className="group bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl overflow-hidden hover:shadow-xl transition-all"
+                  >
+                    <div className="aspect-video bg-gray-100 dark:bg-black/20 relative">
+                      <img
+                        src={doc.url}
+                        alt="img"
+                        className="w-full h-full object-cover"
+                      />
+                      <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-3">
+                        <a
+                          href={doc.url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="p-2 bg-white rounded-full text-blue-600 hover:scale-110 transition-transform"
+                          title="View"
+                        >
+                          <FontAwesomeIcon icon={faEye} />
+                        </a>
+                        <a
+                          href={doc.url}
+                          download
+                          className="p-2 bg-white rounded-full text-green-600 hover:scale-110 transition-transform"
+                          title="Download"
+                        >
+                          <FontAwesomeIcon icon={faDownload} />
+                        </a>
+                        <button
+                          onClick={() => handleDeleteDocument(doc.doc_id)}
+                          className="p-2 bg-white rounded-full text-red-600 hover:scale-110 transition-transform"
+                          title="Delete"
+                        >
+                          <FontAwesomeIcon icon={faTimes} />
+                        </button>
+                      </div>
+                    </div>
+                    <div className="p-3">
+                      <p className="text-xs font-medium truncate dark:text-gray-200 mb-2">
+                        {doc.url.split('/').pop()}
+                      </p>
+                      <div className="space-y-2">
+                        {doc.link && (
+                          <a
+                            href={doc.link}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="block text-[11px] text-blue-500 hover:underline truncate bg-blue-50 dark:bg-blue-900/30 p-1.5 rounded"
+                          >
+                            🔗 {doc.link}
+                          </a>
+                        )}
+                        {doc.remark && (
+                          <p className="text-[11px] text-gray-500 dark:text-gray-400 italic bg-gray-50 dark:bg-gray-700/50 p-1.5 rounded">
+                            💬 {doc.remark}
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </section>
+          )}
+
+          {/* Documents Section */}
+          {docsData.documents.length > 0 && (
+            <section>
+              <h3 className="text-sm font-bold uppercase tracking-widest text-gray-400 mb-4 flex items-center gap-2">
+                <FontAwesomeIcon icon={faFile} className="text-blue-500" /> Documents
+              </h3>
+              <div className="space-y-3">
+                {docsData.documents.map((doc, index) => (
+                  <div
+                    key={index}
+                    className="p-4 bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 hover:border-blue-400 transition-colors"
+                  >
+                    <div className="flex items-start justify-between gap-4">
+                      <div className="flex items-start gap-3 flex-1">
+                        <div className="text-2xl mt-1">
+                          {getFileIcon(doc.url)}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="font-semibold text-sm dark:text-white truncate">
+                            {doc.url.split('/').pop()}
+                          </p>
+                          {doc.remark && (
+                            <p className="text-xs text-gray-500 mt-1">
+                              Remark:{' '}
+                              <span className="italic">{doc.remark}</span>
+                            </p>
+                          )}
+                          {doc.link && (
+                            <a
+                              href={doc.link}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="inline-block mt-2 text-xs text-blue-600 dark:text-blue-400 font-bold hover:underline"
+                            >
+                              <FontAwesomeIcon icon={faEye} className="mr-1" /> View Location Link
+                            </a>
+                          )}
+                        </div>
+                      </div>
+                      <div className="flex gap-2">
+                        <a
+                          href={doc.url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="p-2 text-gray-400 hover:text-blue-500"
+                          title="View"
+                        >
+                          <FontAwesomeIcon icon={faEye} />
+                        </a>
+                        <a
+                          href={doc.url}
+                          download
+                          className="p-2 text-gray-400 hover:text-green-500"
+                          title="Download"
+                        >
+                          <FontAwesomeIcon icon={faDownload} />
+                        </a>
+                        <button
+                          onClick={() => handleDeleteDocument(doc.doc_id)}
+                          className="p-2 text-gray-400 hover:text-red-500"
+                          title="Delete"
+                        >
+                          <FontAwesomeIcon icon={faTimes} />
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </section>
+          )}
+
+          {/* Videos Section */}
+          {docsData.videos.length > 0 && (
+            <section>
+              <h3 className="text-sm font-bold uppercase tracking-widest text-gray-400 mb-4 flex items-center gap-2">
+                <FontAwesomeIcon icon={faVideo} className="text-red-500" /> Videos
+              </h3>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                {docsData.videos.map((doc, index) => (
+                  <div
+                    key={index}
+                    className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl overflow-hidden"
+                  >
+                    <video controls className="w-full h-40 bg-black">
+                      <source src={doc.url} type="video/mp4" />
+                    </video>
+                    <div className="p-3">
+                      <div className="flex justify-between items-start mb-2">
+                        <p className="text-xs font-bold truncate dark:text-gray-200">
+                          {doc.url.split('/').pop()}
+                        </p>
+                        <div className="flex gap-2">
+                          <a
+                            href={doc.url}
+                            download
+                            className="p-1 text-gray-400 hover:text-green-500"
+                            title="Download"
+                          >
+                            <FontAwesomeIcon icon={faDownload} className="text-xs" />
+                          </a>
+                          <button
+                            onClick={() => handleDeleteDocument(doc.doc_id)}
+                            className="p-1 text-gray-400 hover:text-red-500"
+                            title="Delete"
+                          >
+                            <FontAwesomeIcon icon={faTimes} className="text-xs" />
+                          </button>
+                        </div>
+                      </div>
+                      {doc.link && (
+                        <a
+                          href={doc.link}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="block text-[11px] text-blue-500 hover:underline mb-2 truncate"
+                        >
+                          🔗 Map/Source Link
+                        </a>
+                      )}
+                      {doc.remark && (
+                        <p className="text-[11px] text-gray-500 italic border-t border-gray-100 dark:border-gray-700 pt-2 mt-1">
+                          {doc.remark}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </section>
+          )}
+
+          {/* Empty State */}
+          {docsData.images.length === 0 &&
+            docsData.documents.length === 0 &&
+            docsData.videos.length === 0 && (
+              <div className="text-center py-20 bg-gray-50 dark:bg-white/5 rounded-2xl border-2 border-dashed border-gray-200 dark:border-gray-800">
+                <FontAwesomeIcon icon={faFile} className="text-5xl text-gray-300 mb-4" />
+                <p className="text-gray-500 font-medium">No files uploaded yet.</p>
+                <p className="text-sm text-gray-400 mt-2">
+                  Upload files using the form on the left
+                </p>
+              </div>
+            )}
+        </div>
+      </div>
+    </div>
+  </div>
+)}
+
 
       {isModalOpen && selectedClient && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-start z-50 overflow-y-auto">
@@ -4404,233 +4254,242 @@ const handleDeleteDocument = async (docId: number) => {
       {/* Add this just before the closing </div> of your component */}
       {showDetailsModal && renderDetailsModal()}
 
-      {showAssignPopup && (
-        <div className="fixed inset-0 z-[9999] bg-black/70 flex justify-center items-center">
-          <div className="bg-white dark:bg-boxdark p-3 rounded-lg shadow-lg w-full max-w-2xl max-h-[70vh] overflow-y-auto border dark:border-strokedark">
-            {/* HEADER */}
-            <div className="flex items-center justify-between border-b pb-3 mb-4 dark:border-strokedark">
-              <h2 className="text-lg font-semibold text-black dark:text-white">
-                Assign Selected Records ({selectedMasterIds.length})
-              </h2>
+    {showAssignPopup && (
+  <div className="fixed inset-0 z-[9999] bg-black/70 flex justify-center items-center">
+    <div className="bg-white dark:bg-boxdark p-3 rounded-lg shadow-lg w-full max-w-2xl max-h-[70vh] overflow-y-auto border dark:border-strokedark">
+      {/* HEADER */}
+      <div className="flex items-center justify-between border-b pb-3 mb-4 dark:border-strokedark">
+        <h2 className="text-lg font-semibold text-black dark:text-white">
+          Assign Selected Records ({selectedMasterIds.length})
+        </h2>
 
-              <button
-                onClick={() => setShowAssignPopup(false)}
-                className="text-xl text-gray-500 hover:text-red-500"
-              >
-                ×
-              </button>
-            </div>
+        <button
+          onClick={() => setShowAssignPopup(false)}
+          className="text-xl text-gray-500 hover:text-red-500"
+        >
+          ×
+        </button>
+      </div>
 
-            {/* SELECTED RECORDS (COMPACT) */}
-            <div className="mb-3 p-2 bg-gray-50 dark:bg-gray-800 rounded text-sm">
-              <span className="font-medium dark:text-white">
-                Selected Records:
-              </span>{' '}
-              <span className="text-blue-600 font-semibold">
-                {selectedMasterIds.length}
-              </span>
-            </div>
+      {/* SELECTED RECORDS (COMPACT) */}
+      <div className="mb-3 p-2 bg-gray-50 dark:bg-gray-800 rounded text-sm">
+        <span className="font-medium dark:text-white">
+          Selected Records:
+        </span>{' '}
+        <span className="text-blue-600 font-semibold">
+          {selectedMasterIds.length}
+        </span>
+      </div>
 
-            {/* FORM */}
-<form
-  onSubmit={async (e) => {
-    e.preventDefault();
+      {/* FORM */}
+      <form
+        onSubmit={async (e) => {
+          e.preventDefault();
 
-    if (
-      !assignData.assignedTo.length ||
-      !assignData.leadStage ||
-      !assignData.reassignmentDate
-    ) {
-      alert('Please fill all required fields');
-      return;
-    }
+          if (
+            !assignData.assignedTo.length ||
+            !assignData.leadStage ||
+            !assignData.reassignmentDate
+          ) {
+            alert('Please fill all required fields');
+            return;
+          }
 
-    try {
-      // ✅ ONE request per master_id
-      const requests = selectedMasterIds.map((master_id) =>
-        fetch(`${BASE_URL}api/add`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          credentials: 'include',
-          body: JSON.stringify({
-            master_id,
+          try {
+            // ✅ ONE request per master_id
+            const requests = selectedMasterIds.map((master_id) =>
+              fetch(`${BASE_URL}api/add`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                credentials: 'include',
+                body: JSON.stringify({
+                  master_id,
 
-            // IMPORTANT: array (backend handles loop)
-            assignedTo: assignData.assignedTo,
+                  // IMPORTANT: array (backend handles loop)
+                  assignedTo: assignData.assignedTo,
 
-            leadStage: assignData.leadStage,
-            remark: assignData.remark,
+                  leadStage: assignData.leadStage,
+                  remark: assignData.remark,
 
-            // IMPORTANT: sync both
-            reassignment_date: assignData.reassignmentDate,
-            followup_date: assignData.reassignmentDate,
-          }),
-        })
-      );
+                  // IMPORTANT: sync both
+                  reassignment_date: assignData.reassignmentDate,
+                  followup_date: assignData.reassignmentDate,
+                }),
+              })
+            );
 
-      const responses = await Promise.all(requests);
-      const results = await Promise.all(responses.map(r => r.json()));
+            const responses = await Promise.all(requests);
+            const results = await Promise.all(responses.map(r => r.json()));
 
-      let inserted = 0;
-      let skipped = 0;
+            let inserted = 0;
+            let skipped = 0;
 
-      results.forEach(r => {
-        inserted += r.inserted_count || 0;
-        skipped += r.skipped_count || 0;
-      });
+            results.forEach(r => {
+              inserted += r.inserted_count || 0;
+              skipped += r.skipped_count || 0;
+            });
 
-      alert(
-        `✅ Assignment completed\nInserted: ${inserted}\nSkipped: ${skipped}`
-      );
+            alert(
+              `✅ Assignment completed\nInserted: ${inserted}\nSkipped: ${skipped}`
+            );
 
-      // RESET
-      setAssignData({
-        assignedTo: [],
-        leadStage: '',
-        remark: '',
-        reassignmentDate: new Date().toISOString().split('T')[0],
-      });
+            // RESET
+            setAssignData({
+              assignedTo: [],
+              leadStage: '',
+              remark: '',
+              reassignmentDate: new Date().toISOString().split('T')[0],
+            });
 
-      setSelectedMasterIds([]);
-      setSelectedClients([]);
-      setShowAssignPopup(false);
-      fetchTaleCallerData();
+            setSelectedMasterIds([]);
+            setSelectedClients([]);
+            setShowAssignPopup(false);
+            fetchTaleCallerData();
 
-    } catch (err) {
-      console.error(err);
-      alert('❌ Submission failed');
-    }
-  }}
-  className="space-y-4"
->
+          } catch (err) {
+            console.error(err);
+            alert('❌ Submission failed');
+          }
+        }}
+        className="space-y-4"
+      >
+        {/* ASSIGN TO */}
+        <div>
+          <label className="block font-semibold text-green-600 mb-2">
+            Assign To
+          </label>
 
-              {/* ASSIGN TO */}
-              <div>
-                <label className="block font-semibold text-green-600 mb-2">
-                  Assign To
-                </label>
+       
 
-                <div className="border rounded p-2 max-h-48 overflow-y-auto dark:border-form-strokedark dark:bg-form-input">
-                  <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-2">
-                    {users.map((user) => {
-                      const checked = assignData.assignedTo.includes(user.name);
+          <div className="border rounded p-2 max-h-48 overflow-y-auto dark:border-form-strokedark dark:bg-form-input">
+            {assignUsers.length > 0 ? (
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-2">
+                {assignUsers.map((user) => {
+                  const checked = assignData.assignedTo.includes(user.name);
 
-                      return (
-                        <label
-                          key={user.id}
-                          className="flex gap-2 p-2 rounded cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800"
-                        >
-                          <input
-                            type="checkbox"
-                            checked={checked}
-                            onChange={() =>
-                              setAssignData({
-                                ...assignData,
-                                assignedTo: checked
-                                  ? assignData.assignedTo.filter(
-                                      (u) => u !== user.name,
-                                    )
-                                  : [...assignData.assignedTo, user.name],
-                              })
-                            }
-                          />
-                          <div className="text-xs">
-                            <div className="font-medium text-black dark:text-white">
-                              {user.name}
-                            </div>
-                          </div>
-                        </label>
-                      );
-                    })}
-                  </div>
-                </div>
-
-                <p className="text-sm text-blue-600 mt-1">
-                  Selected: {assignData.assignedTo.length}
-                </p>
-              </div>
-
-                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  {/* Lead Stage */}
-                  <div>
-                    <label className="block mb-1 text-sm font-medium text-black dark:text-white">
-                      Lead Stage *
-                    </label>
-                    <select
-                      name="leadStage"
-                      value={assignData.leadStage}
-                      onChange={handleChange}
-                      required
-                      className="w-full border rounded p-2 dark:border-form-strokedark dark:bg-form-input dark:text-white"
+                  return (
+                    <label
+                      key={user.user_id || user.id}
+                      className="flex gap-2 p-2 rounded cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800"
                     >
-                      <option value="">Select Lead Stage</option>
-                      {leadStages.map((stage, i) => (
-                        <option key={i} value={stage}>
-                          {stage}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-
-                  {/* Followup Date */}
-                  <div>
-                    <label className="block mb-1 text-sm font-medium text-black dark:text-white">
-                      Followup Date *
+                      <input
+                        type="checkbox"
+                        checked={checked}
+                        onChange={() =>
+                          setAssignData({
+                            ...assignData,
+                            assignedTo: checked
+                              ? assignData.assignedTo.filter(
+                                  (u) => u !== user.name,
+                                )
+                              : [...assignData.assignedTo, user.name],
+                          })
+                        }
+                      />
+                      <div className="text-xs">
+                        <div className="font-medium text-black dark:text-white">
+                          {user.name}
+                        </div>
+                        <div className="text-gray-500 dark:text-gray-400 text-[10px]">
+                          {user.role_label || user.role}
+                        </div>
+                      </div>
                     </label>
-                    <input
-                      type="date"
-                      name="reassignmentDate"
-                      value={assignData.reassignmentDate}
-                      onChange={handleChange}
-                      required
-                      className="w-full border rounded p-2 dark:border-form-strokedark dark:bg-form-input dark:text-white"
-                    />
-                  </div>
-                </div>
-
-              {/* REMARK */}
-              <div>
-                <label className="block font-medium dark:text-white mb-1">
-                  Remark
-                </label>
-                <textarea
-                  rows={3}
-                  value={assignData.remark}
-                  onChange={(e) =>
-                    setAssignData({ ...assignData, remark: e.target.value })
-                  }
-                  className="w-full border rounded p-2 dark:border-form-strokedark dark:bg-form-input dark:text-white"
-                />
+                  );
+                })}
               </div>
-
-              {/* ACTION BUTTONS */}
-              <div className="flex justify-end gap-3 pt-4 border-t dark:border-strokedark">
-                <button
-                  type="button"
-                  onClick={() => setShowAssignPopup(false)}
-                  className="px-4 py-2 rounded border text-gray-700 dark:text-gray-300"
-                >
-                  Cancel
-                </button>
-
-                <button
-                  type="submit"
-                  disabled={
-                    !assignData.assignedTo.length ||
-                    !assignData.leadStage ||
-                    !assignData.reassignmentDate
-                  }
-                  className="px-5 py-2 rounded bg-green-600 text-white disabled:opacity-50"
-                >
-                  Assign
-                </button>
+            ) : (
+              <div className="text-center py-4 text-gray-500 dark:text-gray-400">
+                <p className="text-sm">No users available to assign</p>
+                <p className="text-xs mt-1">You don't have permission to assign to any users</p>
               </div>
-            </form>
+            )}
+          </div>
+
+          <p className="text-sm text-blue-600 mt-1">
+            Selected: {assignData.assignedTo.length}
+          </p>
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          {/* Lead Stage */}
+          <div>
+            <label className="block mb-1 text-sm font-medium text-black dark:text-white">
+              Lead Stage *
+            </label>
+            <select
+              name="leadStage"
+              value={assignData.leadStage}
+              onChange={handleChange}
+              required
+              className="w-full border rounded p-2 dark:border-form-strokedark dark:bg-form-input dark:text-white"
+            >
+              <option value="">Select Lead Stage</option>
+              {leadStages.map((stage, i) => (
+                <option key={i} value={stage}>
+                  {stage}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {/* Followup Date */}
+          <div>
+            <label className="block mb-1 text-sm font-medium text-black dark:text-white">
+              Followup Date *
+            </label>
+            <input
+              type="date"
+              name="reassignmentDate"
+              value={assignData.reassignmentDate}
+              onChange={handleChange}
+              required
+              className="w-full border rounded p-2 dark:border-form-strokedark dark:bg-form-input dark:text-white"
+            />
           </div>
         </div>
-      )} 
 
+        {/* REMARK */}
+        <div>
+          <label className="block font-medium dark:text-white mb-1">
+            Remark
+          </label>
+          <textarea
+            rows={3}
+            value={assignData.remark}
+            onChange={(e) =>
+              setAssignData({ ...assignData, remark: e.target.value })
+            }
+            className="w-full border rounded p-2 dark:border-form-strokedark dark:bg-form-input dark:text-white"
+          />
+        </div>
 
+        {/* ACTION BUTTONS */}
+        <div className="flex justify-end gap-3 pt-4 border-t dark:border-strokedark">
+          <button
+            type="button"
+            onClick={() => setShowAssignPopup(false)}
+            className="px-4 py-2 rounded border text-gray-700 dark:text-gray-300"
+          >
+            Cancel
+          </button>
+
+          <button
+            type="submit"
+            disabled={
+              !assignData.assignedTo.length ||
+              !assignData.leadStage ||
+              !assignData.reassignmentDate
+            }
+            className="px-5 py-2 rounded bg-green-600 text-white disabled:opacity-50"
+          >
+            Assign
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+)}
       {openRemark && (
   <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
     <div className="bg-white dark:bg-gray-900 p-5 rounded-lg shadow-lg max-w-lg w-full">

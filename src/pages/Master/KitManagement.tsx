@@ -64,7 +64,7 @@ const KitManagement = () => {
 
   return (
     <div>
-      <Breadcrumb pageName="Manage Kits" />
+      <Breadcrumb pageName="Manage Package" />
 
       <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between mb-4">
         <div>
@@ -72,7 +72,7 @@ const KitManagement = () => {
             onClick={() => navigate('/master/add-kit')}
             className="bg-blue-600 text-white px-4 py-2 rounded w-full md:w-auto"
           >
-            Add Kit
+            Add Package
           </button>
         </div>
 
@@ -118,9 +118,9 @@ const KitManagement = () => {
           <thead>
             <tr className="bg-gray-200 text-left">
               <th className="py-4 px-4">Sr No.</th>
-              <th className="py-4 px-4">Kit Name</th>
+              <th className="py-4 px-4">Package Name</th>
               <th className="py-4 px-4">Category</th>
-              <th className="py-4 px-4">Kit Price</th>
+              <th className="py-4 px-4">Package Price</th>
               <th className="py-4 px-4">Status</th>
               <th className="py-4 px-4">Actions</th>
             </tr>

@@ -260,7 +260,7 @@ const ProgressStatus: React.FC<{
 
   return (
     <div className="flex flex-col items-center w-16">
-      <div className="text-sm font-bold text-gray-900 dark:text-white mb-0.5">
+      <div className="text-xs font-bold text-gray-900 dark:text-white mb-0.5">
         {percentage}%
       </div>
       
@@ -341,7 +341,7 @@ const Pagination: React.FC<PaginationProps> = ({
         <button
           onClick={() => onPageChange(currentPage - 1)}
           disabled={currentPage === 1}
-          className={`relative inline-flex items-center rounded-md border border-gray-300 dark:border-white/10 bg-white dark:bg-white/5 px-4 py-2 text-sm font-medium text-gray-700 dark:text-white ${
+          className={`relative inline-flex items-center rounded-md border border-gray-300 dark:border-white/10 bg-white dark:bg-white/5 px-4 py-2 text-xs font-medium text-gray-700 dark:text-white ${
             currentPage === 1
               ? 'cursor-not-allowed opacity-50'
               : 'hover:bg-gray-50 dark:hover:bg-white/10'
@@ -352,7 +352,7 @@ const Pagination: React.FC<PaginationProps> = ({
         <button
           onClick={() => onPageChange(currentPage + 1)}
           disabled={currentPage === totalPages}
-          className={`relative ml-3 inline-flex items-center rounded-md border border-gray-300 dark:border-white/10 bg-white dark:bg-white/5 px-4 py-2 text-sm font-medium text-gray-700 dark:text-white ${
+          className={`relative ml-3 inline-flex items-center rounded-md border border-gray-300 dark:border-white/10 bg-white dark:bg-white/5 px-4 py-2 text-xs font-medium text-gray-700 dark:text-white ${
             currentPage === totalPages
               ? 'cursor-not-allowed opacity-50'
               : 'hover:bg-gray-50 dark:hover:bg-white/10'
@@ -364,7 +364,7 @@ const Pagination: React.FC<PaginationProps> = ({
 
       <div className="hidden sm:flex sm:flex-1 sm:items-center sm:justify-between">
         <div>
-          <p className="text-sm text-gray-700 dark:text-gray-300">
+          <p className="text-xs text-gray-700 dark:text-gray-300">
             Showing
             <span className="font-medium mx-1 text-gray-900 dark:text-white">{showingStart}</span>
             to
@@ -409,7 +409,7 @@ const Pagination: React.FC<PaginationProps> = ({
                 return (
                   <span
                     key={`dots-${index}`}
-                    className="relative inline-flex items-center px-4 py-2 text-sm font-semibold text-gray-700 dark:text-gray-300 inset-ring inset-ring-gray-300 dark:inset-ring-gray-700 focus:outline-offset-0"
+                    className="relative inline-flex items-center px-4 py-2 text-xs font-semibold text-gray-700 dark:text-gray-300 inset-ring inset-ring-gray-300 dark:inset-ring-gray-700 focus:outline-offset-0"
                   >
                     ...
                   </span>
@@ -423,7 +423,7 @@ const Pagination: React.FC<PaginationProps> = ({
                 <button
                   key={pageNumber}
                   onClick={() => onPageChange(pageNumber)}
-                  className={`relative inline-flex items-center px-4 py-2 text-sm font-semibold focus:z-20 focus:outline-offset-0 ${
+                  className={`relative inline-flex items-center px-4 py-2 text-xs font-semibold focus:z-20 focus:outline-offset-0 ${
                     isCurrent
                       ? 'z-10 bg-indigo-600 text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600'
                       : 'text-gray-900 dark:text-white inset-ring inset-ring-gray-300 dark:inset-ring-gray-700 hover:bg-gray-50 dark:hover:bg-white/5'
@@ -550,207 +550,233 @@ const UpcomingAssignmentsPage: React.FC = () => {
 
   const [openRemark, setOpenRemark] = useState<string | null>(null);
 
-  // Fetch upcoming leads
-  const fetchUpcomingLeads = async () => {
-    try {
-      setLoading(true);
-      const response = await axios.get(
-        `${BASE_URL}api/dashboard/upcoming-assign-fulldata`,
-        {
-          params: {
-            page: currentPage,
-            limit: itemsPerPage,
-            search: searchTerm || undefined,
-            entryFromDate: selectedEntryFromDate || undefined,
-            entryToDate: selectedEntryToDate || undefined,
-            followupFromDate: selectedFollowupFromDate || undefined,
-            followupToDate: selectedFollowupToDate || undefined,
-            stages: selectedStages.length > 0 ? selectedStages.join(',') : undefined,
-            users: selectedUsersFilter.length > 0 ? selectedUsersFilter.join(',') : undefined,
-            cities: selectedCities.length > 0 ? selectedCities.join(',') : undefined,
-          },
-          withCredentials: true,
+// Fetch upcoming leads
+const fetchUpcomingLeads = async () => {
+  try {
+    setLoading(true);
+    const response = await axios.get(
+      `${BASE_URL}api/dashboard/upcoming-assign-fulldata`,
+      {
+        params: {
+          page: currentPage,
+          limit: itemsPerPage,
+          search: searchTerm || undefined,
+          entryFromDate: selectedEntryFromDate || undefined,
+          entryToDate: selectedEntryToDate || undefined,
+          followupFromDate: selectedFollowupFromDate || undefined,
+          followupToDate: selectedFollowupToDate || undefined,
+          stages: selectedStages.length > 0 ? selectedStages.join(',') : undefined,
+          users: selectedUsersFilter.length > 0 ? selectedUsersFilter.join(',') : undefined,
+          cities: selectedCities.length > 0 ? selectedCities.join(',') : undefined,
+        },
+        withCredentials: true,
+      }
+    );
+
+    const data = response.data;
+
+    if (data.success) {
+      const upcomingLeads = data.upcomingLeads || [];
+      
+      const lastNonDropStages: Record<number, string> = {};
+      
+      upcomingLeads.forEach((item: any) => {
+        const clientId = item.master_id;
+        const currentStage = item.lead_stage || item.latest_leadStage || item.current_stage || '';
+        const cleanStage = currentStage ? currentStage.trim() : '';
+        
+        if (cleanStage && cleanStage !== 'Drop') {
+          lastNonDropStages[clientId] = cleanStage;
         }
+      });
+
+      const parseValue = (value: any) => {
+        if (value === 'Not Available' || value === null || value === undefined || value === '' || value === 'Not Found') {
+          return '';
+        }
+        return value;
+      };
+
+      const parseIdValue = (value: any) => {
+        if (value === 'Not Available' || value === null || value === undefined) {
+          return '';
+        }
+        return isNaN(value) ? value : Number(value);
+      };
+
+      const processedData = upcomingLeads.map((item: any) => {
+        const currentStage = parseValue(item.lead_stage || item.latest_leadStage || item.current_stage);
+        const cleanStage = currentStage ? currentStage.trim() : '';
+        
+        let previousStage = lastNonDropStages[item.master_id] || '';
+        
+        if (cleanStage === 'Drop' && !previousStage) {
+          if (item.quotation_date || item.site_visit_date) {
+            previousStage = 'Quotation Pending';
+          } else if (item.demo_date) {
+            previousStage = 'Demo';
+          } else {
+            previousStage = 'Positive Lead';
+          }
+        }
+        
+        const stageForPercentage = cleanStage === 'Drop' ? previousStage : cleanStage;
+        const status_percentage = stageForPercentage ? 
+          (STAGE_PERCENTAGE_MAP[stageForPercentage] || 0) : 0;
+
+        // 🔥 IMPORTANT: Determine display city with priority: area_name first, then city
+        let displayCity = '';
+        const areaName = parseValue(item.area_name);
+        const cityName = parseValue(item.city);
+        
+        if (areaName && areaName !== '' && areaName !== 'Not Available') {
+          displayCity = areaName; // Use area_name if available
+        } else if (cityName && cityName !== '' && cityName !== 'Not Available') {
+          displayCity = cityName; // Fallback to city if area_name not available
+        } else {
+          displayCity = ''; // Empty if neither available
+        }
+
+        let reassignmentRemarks: ReassignmentRemark[] = [];
+        if (item.reassignment_remarks) {
+          if (Array.isArray(item.reassignment_remarks)) {
+            reassignmentRemarks = item.reassignment_remarks.map((remark: any) => {
+              return {
+                remark: remark.remark || '',
+                created_by_user: remark.created_by_user || 0,
+                created_at: remark.created_at || '',
+                name: remark.name || '',
+                role: remark.role || '',
+                assignedTo: remark.assignedTo || '',
+                leadStage: remark.leadStage || '',
+                reassignment_date: remark.reassignment_date || ''
+              };
+            });
+          }
+        }
+
+        return {
+          master_id: item.master_id,
+          name: parseValue(item.name),
+          number: parseValue(item.number),
+          email: parseValue(item.email),
+          address: parseValue(item.address),
+          city: displayCity, // 🔥 THIS IS THE KEY CHANGE - Use the prioritized display city
+          original_city: parseValue(item.city), // Keep original if needed elsewhere
+          original_area: parseValue(item.area_name), // Keep original if needed elsewhere
+          cat_id: parseIdValue(item.cat_id),
+          status: parseValue(item.status),
+          lead_status: parseValue(item.lead_status),
+          lead_stage: cleanStage,
+          created_at: parseValue(item.created_at),
+          quick_remark: parseValue(item.quick_remark),
+          detailed_remark: parseValue(item.detailed_remark),
+          followup_date: parseValue(item.followup_date),
+          assign_date: parseValue(item.assign_date),
+          assigned_to: parseValue(item.reassigned_to || item.assigned_user_name || item.telecaller_name),
+          assigned_user_name: parseValue(item.reassigned_to || item.assigned_user_name || item.telecaller_name),
+          reassignment_id: parseIdValue(item.reassignment_id),
+          reassignment_date: parseValue(item.reassignment_date),
+          reassigned_to: parseValue(item.reassigned_to),
+          telecaller_name: parseValue(item.reassigned_to || item.assigned_user_name || item.telecaller_name),
+          document_count: item.document_count || 0,
+          area: parseValue(item.area_name),
+          cat_name: parseValue(item.cat_name),
+          reference_name: parseValue(item.reference_name),
+          room_length: parseValue(item.room_length),
+          room_width: parseValue(item.room_width),
+          room_height: parseValue(item.room_height),
+          location_link: parseValue(item.location_link),
+          p_type: parseValue(item.p_type),
+          budget_range: parseValue(item.budget_range),
+          current_stage: parseValue(item.current_stage),
+          room_ready: parseValue(item.room_ready),
+          time_to_complete: parseValue(item.time_to_complete),
+          site_visit_date: parseValue(item.site_visit_date),
+          demo_date: parseValue(item.demo_date),
+          ar_number: parseValue(item.ar_number),
+          ca_number: parseValue(item.ca_number),
+          e_number: parseValue(item.e_number),
+          sm_number: parseValue(item.sm_number),
+          pop_number: parseValue(item.pop_number),
+          other_number: parseValue(item.other_number),
+          reassignment_remarks: reassignmentRemarks,
+          latest_assignedTo: parseValue(item.latest_assignedTo),
+          latest_leadStage: parseValue(item.latest_leadStage),
+          
+          // Battery-related fields
+          status_percentage: status_percentage,
+          is_drop_stage: cleanStage === 'Drop',
+          previous_stage: previousStage,
+          
+          // Additional fields for EditRawData
+          category_other: parseValue(item.category_other),
+          reference_other: parseValue(item.reference_other),
+          architect_name: parseValue(item.architect_name),
+          alternate_number: parseValue(item.alternate_number),
+          reference_id: parseIdValue(item.reference_id),
+          area_id: parseIdValue(item.area_id),
+          assign_id: parseIdValue(item.assign_id),
+          
+          // Additional fields from API
+          created_by_user: parseValue(item.created_by_user),
+          lead_activity: parseIdValue(item.lead_activity),
+          reassignment_remark: parseValue(item.reassignment_remark),
+          reassignment_lead_stage: parseValue(item.reassignment_lead_stage),
+          assigned_to_user_id: parseIdValue(item.assigned_to_user_id),
+          call_remark: parseValue(item.call_remark),
+          call_duration: parseValue(item.call_duration),
+          products: item.products,
+          document_location_link: parseValue(item.document_location_link),
+        };
+      });
+
+      const sortedData = processedData.sort(
+        (a: UpcomingLead, b: UpcomingLead) => {
+          if (a.followup_date && b.followup_date) {
+            return new Date(a.followup_date).getTime() - new Date(b.followup_date).getTime();
+          }
+          return b.master_id - a.master_id;
+        },
       );
 
-      const data = response.data;
+      setLeads(sortedData);
+      setFilteredLeads(sortedData);
+      setTotalLeads(data.total || 0);
+      
+      // 🔥 UPDATED: Extract unique cities from the prioritized displayCity field
+      const cities = sortedData
+        .map(lead => lead.city?.trim()) // This now uses the prioritized displayCity
+        .filter(city => city && city !== '' && city !== 'Not Available' && city !== 'N/A')
+        .filter((city, index, self) => self.indexOf(city) === index)
+        .sort() as string[];
+      setAvailableCities(cities);
 
-      if (data.success) {
-        const upcomingLeads = data.upcomingLeads || [];
-        
-        const lastNonDropStages: Record<number, string> = {};
-        
-        upcomingLeads.forEach((item: any) => {
-          const clientId = item.master_id;
-          const currentStage = item.lead_stage || item.latest_leadStage || item.current_stage || '';
-          const cleanStage = currentStage ? currentStage.trim() : '';
-          
-          if (cleanStage && cleanStage !== 'Drop') {
-            lastNonDropStages[clientId] = cleanStage;
-          }
-        });
-
-        const parseValue = (value: any) => {
-          if (value === 'Not Available' || value === null || value === undefined || value === '' || value === 'Not Found') {
-            return '';
-          }
-          return value;
-        };
-
-        const parseIdValue = (value: any) => {
-          if (value === 'Not Available' || value === null || value === undefined) {
-            return '';
-          }
-          return isNaN(value) ? value : Number(value);
-        };
-
-        const processedData = upcomingLeads.map((item: any) => {
-          const currentStage = parseValue(item.lead_stage || item.latest_leadStage || item.current_stage);
-          const cleanStage = currentStage ? currentStage.trim() : '';
-          
-          let previousStage = lastNonDropStages[item.master_id] || '';
-          
-          if (cleanStage === 'Drop' && !previousStage) {
-            if (item.quotation_date || item.site_visit_date) {
-              previousStage = 'Quotation Pending';
-            } else if (item.demo_date) {
-              previousStage = 'Demo';
-            } else {
-              previousStage = 'Positive Lead';
-            }
-          }
-          
-          const stageForPercentage = cleanStage === 'Drop' ? previousStage : cleanStage;
-          const status_percentage = stageForPercentage ? 
-            (STAGE_PERCENTAGE_MAP[stageForPercentage] || 0) : 0;
-
-          let reassignmentRemarks: ReassignmentRemark[] = [];
-          if (item.reassignment_remarks) {
-            if (Array.isArray(item.reassignment_remarks)) {
-              reassignmentRemarks = item.reassignment_remarks.map((remark: any) => {
-                return {
-                  remark: remark.remark || '',
-                  created_by_user: remark.created_by_user || 0,
-                  created_at: remark.created_at || '',
-                  name: remark.name || '',
-                  role: remark.role || '',
-                  assignedTo: remark.assignedTo || '',
-                  leadStage: remark.leadStage || '',
-                  reassignment_date: remark.reassignment_date || ''
-                };
-              });
-            }
-          }
-
-          return {
-            master_id: item.master_id,
-            name: parseValue(item.name),
-            number: parseValue(item.number),
-            email: parseValue(item.email),
-            address: parseValue(item.address),
-            city: parseValue(item.city),
-            cat_id: parseIdValue(item.cat_id),
-            status: parseValue(item.status),
-            lead_status: parseValue(item.lead_status),
-            lead_stage: cleanStage,
-            created_at: parseValue(item.created_at),
-            quick_remark: parseValue(item.quick_remark),
-            detailed_remark: parseValue(item.detailed_remark),
-            followup_date: parseValue(item.followup_date),
-            assign_date: parseValue(item.assign_date),
-            assigned_to: parseValue(item.reassigned_to || item.assigned_user_name || item.telecaller_name),
-            assigned_user_name: parseValue(item.reassigned_to || item.assigned_user_name || item.telecaller_name),
-            reassignment_id: parseIdValue(item.reassignment_id),
-            reassignment_date: parseValue(item.reassignment_date),
-            reassigned_to: parseValue(item.reassigned_to),
-            telecaller_name: parseValue(item.reassigned_to || item.assigned_user_name || item.telecaller_name),
-            document_count: item.document_count || 0,
-            area: parseValue(item.area_name),
-            cat_name: parseValue(item.cat_name),
-            reference_name: parseValue(item.reference_name),
-            room_length: parseValue(item.room_length),
-            room_width: parseValue(item.room_width),
-            room_height: parseValue(item.room_height),
-            location_link: parseValue(item.location_link),
-            p_type: parseValue(item.p_type),
-            budget_range: parseValue(item.budget_range),
-            current_stage: parseValue(item.current_stage),
-            room_ready: parseValue(item.room_ready),
-            time_to_complete: parseValue(item.time_to_complete),
-            site_visit_date: parseValue(item.site_visit_date),
-            demo_date: parseValue(item.demo_date),
-            ar_number: parseValue(item.ar_number),
-            ca_number: parseValue(item.ca_number),
-            e_number: parseValue(item.e_number),
-            sm_number: parseValue(item.sm_number),
-            pop_number: parseValue(item.pop_number),
-            other_number: parseValue(item.other_number),
-            reassignment_remarks: reassignmentRemarks,
-            latest_assignedTo: parseValue(item.latest_assignedTo),
-            latest_leadStage: parseValue(item.latest_leadStage),
-            
-            // Battery-related fields
-            status_percentage: status_percentage,
-            is_drop_stage: cleanStage === 'Drop',
-            previous_stage: previousStage,
-            
-            // Additional fields for EditRawData
-            category_other: parseValue(item.category_other),
-            reference_other: parseValue(item.reference_other),
-            architect_name: parseValue(item.architect_name),
-            alternate_number: parseValue(item.alternate_number),
-            reference_id: parseIdValue(item.reference_id),
-            area_id: parseIdValue(item.area_id),
-            assign_id: parseIdValue(item.assign_id),
-            
-            // Additional fields from API
-            created_by_user: parseValue(item.created_by_user),
-            lead_activity: parseIdValue(item.lead_activity),
-            reassignment_remark: parseValue(item.reassignment_remark),
-            reassignment_lead_stage: parseValue(item.reassignment_lead_stage),
-            assigned_to_user_id: parseIdValue(item.assigned_to_user_id),
-            call_remark: parseValue(item.call_remark),
-            call_duration: parseValue(item.call_duration),
-            products: item.products,
-            document_location_link: parseValue(item.document_location_link),
-          };
-        });
-
-        const sortedData = processedData.sort(
-          (a: UpcomingLead, b: UpcomingLead) => {
-            if (a.followup_date && b.followup_date) {
-              return new Date(a.followup_date).getTime() - new Date(b.followup_date).getTime();
-            }
-            return b.master_id - a.master_id;
-          },
-        );
-
-        setLeads(sortedData);
-        setFilteredLeads(sortedData);
-        setTotalLeads(data.total || 0);
-        
-        const cities = sortedData
-          .map(lead => lead.city?.trim())
-          .filter(city => city && city !== '' && city !== 'Not Available' && city !== 'N/A')
-          .filter((city, index, self) => self.indexOf(city) === index)
-          .sort() as string[];
-        setAvailableCities(cities);
-        
-      } else {
-        console.error('Error fetching upcoming leads:', data);
-        setLeads([]);
-        setFilteredLeads([]);
-        setTotalLeads(0);
-      }
-    } catch (error) {
-      console.error('Error fetching upcoming leads:', error);
+      // Debug log to verify the changes
+      console.log('📊 Upcoming Leads Processed:', {
+        totalLeads: sortedData.length,
+        sampleLead: sortedData[0],
+        city: sortedData[0]?.city, // Should show area_name first
+        original_city: sortedData[0]?.original_city,
+        original_area: sortedData[0]?.original_area,
+      });
+      
+    } else {
+      console.error('Error fetching upcoming leads:', data);
       setLeads([]);
       setFilteredLeads([]);
       setTotalLeads(0);
-    } finally {
-      setLoading(false);
     }
-  };
+  } catch (error) {
+    console.error('Error fetching upcoming leads:', error);
+    setLeads([]);
+    setFilteredLeads([]);
+    setTotalLeads(0);
+  } finally {
+    setLoading(false);
+  }
+};
+
 
   // Apply filters function
   const applyFilters = async () => {
@@ -1364,11 +1390,11 @@ const UpcomingAssignmentsPage: React.FC = () => {
               
               {/* Contact Info */}
               <div className="bg-gradient-to-r from-gray-50 to-gray-100 dark:from-gray-800/50 dark:to-gray-900/50 p-3 rounded-lg border border-gray-200 dark:border-gray-700">
-                <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2 flex items-center gap-2">
+                <h3 className="text-xs font-semibold text-gray-700 dark:text-gray-300 mb-2 flex items-center gap-2">
                   <FontAwesomeIcon icon={faPhone} className="h-4 w-4 text-blue-500" />
                   Contact Information
                 </h3>
-                <div className="grid grid-cols-2 gap-3 text-sm">
+                <div className="grid grid-cols-2 gap-3 text-xs">
                   {hasField('name') && (
                     <div>
                       <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">Name</div>
@@ -1431,11 +1457,11 @@ const UpcomingAssignmentsPage: React.FC = () => {
               {/* Additional Contact Numbers */}
               {hasContactNumbers && (
                 <div className="bg-gradient-to-r from-indigo-50 to-purple-50 dark:from-indigo-900/20 dark:to-purple-900/20 p-3 rounded-lg border border-indigo-100 dark:border-indigo-800/30">
-                  <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2 flex items-center gap-2">
+                  <h3 className="text-xs font-semibold text-gray-700 dark:text-gray-300 mb-2 flex items-center gap-2">
                     <FontAwesomeIcon icon={faUsers} className="h-4 w-4 text-indigo-500" />
                     Additional Contacts
                   </h3>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 text-sm">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 text-xs">
                     {hasField('architect_name') && (
                       <div>
                         <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">Architect</div>
@@ -1499,7 +1525,7 @@ const UpcomingAssignmentsPage: React.FC = () => {
               {/* Lead & Category Information */}
               {hasLeadInfo && (
                 <div className="bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20 p-3 rounded-lg border border-blue-100 dark:border-blue-800/30">
-                  <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2 flex items-center gap-2">
+                  <h3 className="text-xs font-semibold text-gray-700 dark:text-gray-300 mb-2 flex items-center gap-2">
                     <FontAwesomeIcon icon={faInfoCircle} className="h-4 w-4 text-blue-500" />
                     Lead Details
                   </h3>
@@ -1542,133 +1568,16 @@ const UpcomingAssignmentsPage: React.FC = () => {
                 </div>
               )}
 
-              {/* Stage & Assignment */}
-              {(hasLeadStages || hasAssignmentInfo) && (
-                <div className="grid grid-cols-2 gap-4">
-                  {hasLeadStages && (
-                    <div className="bg-gradient-to-r from-purple-50 to-pink-50 dark:from-purple-900/20 dark:to-pink-900/20 p-3 rounded-lg border border-purple-100 dark:border-purple-800/30">
-                      <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2 flex items-center gap-2">
-                        <FontAwesomeIcon icon={faUser} className="h-4 w-4 text-purple-500" />
-                        Lead Stages
-                      </h3>
-                      <div className="space-y-2">
-                        {hasField('lead_stage') && (
-                          <div>
-                            <div className="text-xs text-gray-500 dark:text-gray-400">Lead Stage</div>
-                            <div className="font-medium text-black dark:text-white">
-                              {formatValue(selectedLeadDetails.lead_stage)}
-                            </div>
-                          </div>
-                        )}
-                        {hasField('current_stage') && (
-                          <div>
-                            <div className="text-xs text-gray-500 dark:text-gray-400">Current Stage</div>
-                            <div className="font-medium text-black dark:text-white">
-                              {formatValue(selectedLeadDetails.current_stage)}
-                            </div>
-                          </div>
-                        )}
-                        {hasField('latest_leadStage') && (
-                          <div>
-                            <div className="text-xs text-gray-500 dark:text-gray-400">Latest Lead Stage</div>
-                            <div className="font-medium text-black dark:text-white">
-                              {formatValue(selectedLeadDetails.latest_leadStage)}
-                            </div>
-                          </div>
-                        )}
-                        {hasField('status_percentage') && (
-                          <div>
-                            <div className="text-xs text-gray-500 dark:text-gray-400">Progress</div>
-                            <div className="mt-0.5">
-                              <ProgressStatus
-                                stage={selectedLeadDetails.lead_stage || selectedLeadDetails.latest_leadStage || ''}
-                                status_percentage={selectedLeadDetails.status_percentage}
-                                is_drop_stage={selectedLeadDetails.is_drop_stage}
-                                previous_stage={selectedLeadDetails.previous_stage}
-                              />
-                            </div>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  )}
-
-                  {hasAssignmentInfo && (
-                    <div className="bg-gradient-to-r from-teal-50 to-cyan-50 dark:from-teal-900/20 dark:to-cyan-900/20 p-3 rounded-lg border border-teal-100 dark:border-teal-800/30">
-                      <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2 flex items-center gap-2">
-                        <FontAwesomeIcon icon={faTasks} className="h-4 w-4 text-teal-500" />
-                        Assignment
-                      </h3>
-                      <div className="space-y-2">
-                        {hasField('assigned_to') && (
-                          <div>
-                            <div className="text-xs text-gray-500 dark:text-gray-400">Assigned To</div>
-                            <div className="font-medium text-black dark:text-white truncate">
-                              {formatValue(selectedLeadDetails.assigned_to)}
-                            </div>
-                          </div>
-                        )}
-                        {hasField('telecaller_name') && (
-                          <div>
-                            <div className="text-xs text-gray-500 dark:text-gray-400">Telecaller</div>
-                            <div className="font-medium text-black dark:text-white truncate">
-                              {formatValue(selectedLeadDetails.telecaller_name || selectedLeadDetails.assigned_user_name)}
-                            </div>
-                          </div>
-                        )}
-                        {hasField('latest_assignedTo') && (
-                          <div>
-                            <div className="text-xs text-gray-500 dark:text-gray-400">Latest Assigned To</div>
-                            <div className="font-medium text-black dark:text-white truncate">
-                              {formatValue(selectedLeadDetails.latest_assignedTo || selectedLeadDetails.assigned_user_name)}
-                            </div>
-                          </div>
-                        )}
-                        {hasField('reassigned_to') && (
-                          <div>
-                            <div className="text-xs text-gray-500 dark:text-gray-400">Reassigned To</div>
-                            <div className="font-medium text-black dark:text-white truncate">
-                              {formatValue(selectedLeadDetails.reassigned_to)}
-                            </div>
-                          </div>
-                        )}
-                        {hasField('status') && (
-                          <div>
-                            <div className="text-xs text-gray-500 dark:text-gray-400">Status</div>
-                            <div className={`font-medium ${
-                              selectedLeadDetails.status === 'Assigned' ? 'text-green-600 dark:text-green-400' :
-                              selectedLeadDetails.status === 'Unassigned' ? 'text-red-600 dark:text-red-400' :
-                              'text-blue-600 dark:text-blue-400'
-                            }`}>
-                              {formatValue(selectedLeadDetails.status)}
-                            </div>
-                          </div>
-                        )}
-                        {hasField('lead_status') && (
-                          <div>
-                            <div className="text-xs text-gray-500 dark:text-gray-400">Lead Status</div>
-                            <div className={`font-medium ${
-                              selectedLeadDetails.lead_status === 'Active' ? 'text-green-600 dark:text-green-400' :
-                              'text-gray-600 dark:text-gray-400'
-                            }`}>
-                              {formatValue(selectedLeadDetails.lead_status)}
-                            </div>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  )}
-                </div>
-              )}
+          
 
               {/* Dates Information */}
               {hasDates && (
                 <div className="bg-gradient-to-r from-emerald-50 to-teal-50 dark:from-emerald-900/20 dark:to-teal-900/20 p-3 rounded-lg border border-emerald-100 dark:border-emerald-800/30">
-                  <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2 flex items-center gap-2">
+                  <h3 className="text-xs font-semibold text-gray-700 dark:text-gray-300 mb-2 flex items-center gap-2">
                     <FontAwesomeIcon icon={faCalendarAlt} className="h-4 w-4 text-emerald-500" />
                     Dates
                   </h3>
-                  <div className="grid grid-cols-2 gap-3 text-sm">
+                  <div className="grid grid-cols-2 gap-3 text-xs">
                     {hasField('assign_date') && (
                       <div>
                         <div className="text-xs text-gray-500 dark:text-gray-400">Entry Date</div>
@@ -1712,11 +1621,11 @@ const UpcomingAssignmentsPage: React.FC = () => {
               {/* Project Details */}
               {hasProjectDetails && (
                 <div className="bg-gradient-to-r from-amber-50 to-yellow-50 dark:from-amber-900/20 dark:to-yellow-900/20 p-3 rounded-lg border border-amber-100 dark:border-amber-800/30">
-                  <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2 flex items-center gap-2">
+                  <h3 className="text-xs font-semibold text-gray-700 dark:text-gray-300 mb-2 flex items-center gap-2">
                     <FontAwesomeIcon icon={faFile} className="h-4 w-4 text-amber-500" />
                     Project Details
                   </h3>
-                  <div className="grid grid-cols-2 gap-3 text-sm">
+                  <div className="grid grid-cols-2 gap-3 text-xs">
                     {(hasField('room_length') || hasField('room_width')) && (
                       <div>
                         <div className="text-xs text-gray-500 dark:text-gray-400">Room Size</div>
@@ -1765,7 +1674,7 @@ const UpcomingAssignmentsPage: React.FC = () => {
               {/* Links */}
               {hasLinks && (
                 <div className="bg-gradient-to-r from-blue-50 to-cyan-50 dark:from-blue-900/20 dark:to-cyan-900/20 p-3 rounded-lg border border-blue-100 dark:border-blue-800/30">
-                  <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2 flex items-center gap-2">
+                  <h3 className="text-xs font-semibold text-gray-700 dark:text-gray-300 mb-2 flex items-center gap-2">
                     <FontAwesomeIcon icon={faMapMarkerAlt} className="h-4 w-4 text-blue-500" />
                     Links
                   </h3>
@@ -1775,7 +1684,7 @@ const UpcomingAssignmentsPage: React.FC = () => {
                         href={selectedLeadDetails.document_location_link}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="inline-flex items-center gap-2 px-3 py-2 text-sm bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 rounded-lg hover:bg-blue-200 dark:hover:bg-blue-800/50 transition-colors border border-blue-200 dark:border-blue-700"
+                        className="inline-flex items-center gap-2 px-3 py-2 text-xs bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 rounded-lg hover:bg-blue-200 dark:hover:bg-blue-800/50 transition-colors border border-blue-200 dark:border-blue-700"
                       >
                         <FontAwesomeIcon icon={faFile} className="h-3 w-3" />
                         Document Location Link
@@ -1786,7 +1695,7 @@ const UpcomingAssignmentsPage: React.FC = () => {
                         href={selectedLeadDetails.location_link}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="inline-flex items-center gap-2 px-3 py-2 text-sm bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 rounded-lg hover:bg-green-200 dark:hover:bg-green-800/50 transition-colors border border-green-200 dark:border-green-700"
+                        className="inline-flex items-center gap-2 px-3 py-2 text-xs bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 rounded-lg hover:bg-green-200 dark:hover:bg-green-800/50 transition-colors border border-green-200 dark:border-green-700"
                       >
                         <FontAwesomeIcon icon={faMapMarkerAlt} className="h-3 w-3" />
                         Location Link
@@ -1799,11 +1708,11 @@ const UpcomingAssignmentsPage: React.FC = () => {
               {/* Remarks */}
               {hasRemarks && (
                 <div className="bg-gradient-to-r from-gray-50 to-slate-50 dark:from-gray-800/50 dark:to-slate-900/50 p-3 rounded-lg border border-gray-200 dark:border-gray-700">
-                  <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2 flex items-center gap-2">
+                  <h3 className="text-xs font-semibold text-gray-700 dark:text-gray-300 mb-2 flex items-center gap-2">
                     <FontAwesomeIcon icon={faInfoCircle} className="h-4 w-4 text-gray-500" />
                     Remarks
                   </h3>
-                  <div className="text-sm">
+                  <div className="text-xs">
                     {hasField('quick_remark') && (
                       <div className="mb-2">
                         <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">Quick Remark</div>
@@ -1836,7 +1745,7 @@ const UpcomingAssignmentsPage: React.FC = () => {
                 Array.isArray(selectedLeadDetails.reassignment_remarks) && 
                 selectedLeadDetails.reassignment_remarks.length > 0 && (
                 <div className="mt-4">
-                  <h3 className="text-sm font-semibold mb-3 dark:text-white flex items-center gap-2">
+                  <h3 className="text-xs font-semibold mb-3 dark:text-white flex items-center gap-2">
                     <FontAwesomeIcon icon={faUser} className="h-4 w-4 text-yellow-500" />
                     Reassignments ({selectedLeadDetails.reassignment_remarks.length})
                   </h3>
@@ -1849,7 +1758,7 @@ const UpcomingAssignmentsPage: React.FC = () => {
                           <div key={index} className="p-3 bg-white dark:bg-gray-800 rounded-lg shadow-sm border dark:border-gray-700">
                             <div className="flex justify-between items-start">
                               <div>
-                                <div className="font-medium text-sm mb-1">
+                                <div className="font-medium text-xs mb-1">
                                   <span className="text-blue-600">{remarkObj.name || 'Unknown'}</span>
                                   <span className="mx-2 text-gray-400">→</span>
                                   <span className="text-green-600">{remarkObj.assignedTo || 'Unknown'}</span>
@@ -1862,7 +1771,7 @@ const UpcomingAssignmentsPage: React.FC = () => {
                             </div>
                             
                             {remarkObj.remark && (
-                              <div className="text-sm text-gray-700 dark:text-gray-300 mt-2 pt-2 border-t">
+                              <div className="text-xs text-gray-700 dark:text-gray-300 mt-2 pt-2 border-t">
                                 {remarkObj.remark}
                               </div>
                             )}
@@ -1893,7 +1802,7 @@ const UpcomingAssignmentsPage: React.FC = () => {
               <h2 className="text-2xl font-bold text-gray-800 dark:text-white">
                 📁 Files for {docsClient.name}
               </h2>
-              <p className="text-sm text-gray-600 dark:text-gray-400">
+              <p className="text-xs text-gray-600 dark:text-gray-400">
                 Manage documents, links, and remarks in one place
               </p>
             </div>
@@ -1930,7 +1839,7 @@ const UpcomingAssignmentsPage: React.FC = () => {
                     <select
                       value={uploadType}
                       onChange={(e) => setUploadType(e.target.value as any)}
-                      className="w-full p-2.5 border border-gray-300 rounded-lg text-sm dark:text-white dark:bg-gray-800 focus:ring-2 focus:ring-blue-500 outline-none"
+                      className="w-full p-2.5 border border-gray-300 rounded-lg text-xs dark:text-white dark:bg-gray-800 focus:ring-2 focus:ring-blue-500 outline-none"
                     >
                       <option value="documents">📄 Document</option>
                       <option value="image">🖼️ Image</option>
@@ -1946,7 +1855,7 @@ const UpcomingAssignmentsPage: React.FC = () => {
                       type="date"
                       value={followupDate}
                       onChange={(e) => setFollowupDate(e.target.value)}
-                      className="w-full p-2.5 border border-gray-300 rounded-lg text-sm dark:text-white dark:bg-gray-800 focus:ring-2 focus:ring-blue-500 outline-none"
+                      className="w-full p-2.5 border border-gray-300 rounded-lg text-xs dark:text-white dark:bg-gray-800 focus:ring-2 focus:ring-blue-500 outline-none"
                     />
                   </div>
 
@@ -1966,7 +1875,7 @@ const UpcomingAssignmentsPage: React.FC = () => {
                           type="text"
                           value={searchUserTerm}
                           onChange={(e) => setSearchUserTerm(e.target.value)}
-                          className="w-full pl-9 pr-8 py-2 border border-gray-300 dark:border-gray-600 rounded text-sm dark:bg-form-input dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                          className="w-full pl-9 pr-8 py-2 border border-gray-300 dark:border-gray-600 rounded text-xs dark:bg-form-input dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                           placeholder="Search users by name or role..."
                         />
                         {searchUserTerm && (
@@ -2051,7 +1960,7 @@ const UpcomingAssignmentsPage: React.FC = () => {
                                 />
                                 <label 
                                   htmlFor={`user-${user.user_id || user.id}`}
-                                  className="ml-2 text-sm text-gray-700 dark:text-gray-300 cursor-pointer flex-1"
+                                  className="ml-2 text-xs text-gray-700 dark:text-gray-300 cursor-pointer flex-1"
                                 >
                                   <div className="font-medium line-clamp-1">{user.name}</div>
                                 </label>
@@ -2062,7 +1971,7 @@ const UpcomingAssignmentsPage: React.FC = () => {
                       ) : (
                         <div className="text-center py-4 text-gray-500 dark:text-gray-400">
                           <div className="text-2xl mb-2">🔍</div>
-                          <p className="text-sm">No users found</p>
+                          <p className="text-xs">No users found</p>
                           <p className="text-xs mt-1">Try a different search term</p>
                         </div>
                       )}
@@ -2090,7 +1999,7 @@ const UpcomingAssignmentsPage: React.FC = () => {
                     <select
                       value={leadStage}
                       onChange={(e) => setLeadStage(e.target.value)}
-                      className="w-full p-2.5 border border-gray-300 rounded-lg text-sm dark:text-white dark:bg-gray-800 focus:ring-2 focus:ring-blue-500 outline-none"
+                      className="w-full p-2.5 border border-gray-300 rounded-lg text-xs dark:text-white dark:bg-gray-800 focus:ring-2 focus:ring-blue-500 outline-none"
                     >
                       <option value="">Select Lead Stage</option>
                       {leadStages.map((stage, index) => (
@@ -2110,7 +2019,7 @@ const UpcomingAssignmentsPage: React.FC = () => {
                       placeholder="https://example.com"
                       value={locationLink}
                       onChange={(e) => setLocationLink(e.target.value)}
-                      className="w-full p-2.5 border border-gray-300 rounded-lg text-sm dark:text-white dark:bg-gray-800 focus:ring-2 focus:ring-blue-500 outline-none"
+                      className="w-full p-2.5 border border-gray-300 rounded-lg text-xs dark:text-white dark:bg-gray-800 focus:ring-2 focus:ring-blue-500 outline-none"
                     />
                   </div>
 
@@ -2122,7 +2031,7 @@ const UpcomingAssignmentsPage: React.FC = () => {
                       placeholder="Enter detailed remark for this update..."
                       value={detailedRemark}
                       onChange={(e) => setDetailedRemark(e.target.value)}
-                      className="w-full p-2.5 border border-gray-300 rounded-lg text-sm dark:text-white dark:bg-gray-800 focus:ring-2 focus:ring-blue-500 outline-none"
+                      className="w-full p-2.5 border border-gray-300 rounded-lg text-xs dark:text-white dark:bg-gray-800 focus:ring-2 focus:ring-blue-500 outline-none"
                       rows={3}
                     />
                   </div>
@@ -2165,7 +2074,7 @@ const UpcomingAssignmentsPage: React.FC = () => {
                   <button
                     onClick={handleUploadSubmit}
                     disabled={uploadFiles.length === 0}
-                    className={`w-full py-3 rounded-lg font-bold text-sm transition-all shadow-md ${
+                    className={`w-full py-3 rounded-lg font-bold text-xs transition-all shadow-md ${
                       uploadFiles.length > 0 
                       ? 'bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white active:scale-95' 
                       : 'bg-gray-200 dark:bg-gray-700 text-gray-400 cursor-not-allowed'
@@ -2180,7 +2089,7 @@ const UpcomingAssignmentsPage: React.FC = () => {
             <div className="lg:col-span-2 space-y-8">
               {docsData.images.length > 0 && (
                 <section>
-                  <h3 className="text-sm font-bold uppercase tracking-widest text-gray-400 mb-4 flex items-center gap-2">
+                  <h3 className="text-xs font-bold uppercase tracking-widest text-gray-400 mb-4 flex items-center gap-2">
                     <FontAwesomeIcon icon={faImages} className="text-purple-500" /> Images
                   </h3>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -2227,7 +2136,7 @@ const UpcomingAssignmentsPage: React.FC = () => {
 
               {docsData.documents.length > 0 && (
                 <section>
-                  <h3 className="text-sm font-bold uppercase tracking-widest text-gray-400 mb-4 flex items-center gap-2">
+                  <h3 className="text-xs font-bold uppercase tracking-widest text-gray-400 mb-4 flex items-center gap-2">
                     <FontAwesomeIcon icon={faFile} className="text-blue-500" /> Documents
                   </h3>
                   <div className="space-y-3">
@@ -2237,7 +2146,7 @@ const UpcomingAssignmentsPage: React.FC = () => {
                           <div className="flex items-start gap-3 flex-1">
                             <div className="text-2xl mt-1">{getFileIcon(doc.url)}</div>
                             <div className="flex-1 min-w-0">
-                              <p className="font-semibold text-sm dark:text-white truncate">{doc.url.split('/').pop()}</p>
+                              <p className="font-semibold text-xs dark:text-white truncate">{doc.url.split('/').pop()}</p>
                               {doc.remark && <p className="text-xs text-gray-500 mt-1">Remark: <span className="italic">{doc.remark}</span></p>}
                               {doc.link && (
                                 <a href={doc.link} target="_blank" rel="noopener noreferrer" className="inline-block mt-2 text-xs text-blue-600 dark:text-blue-400 font-bold hover:underline">
@@ -2270,7 +2179,7 @@ const UpcomingAssignmentsPage: React.FC = () => {
 
               {docsData.videos.length > 0 && (
                 <section>
-                  <h3 className="text-sm font-bold uppercase tracking-widest text-gray-400 mb-4 flex items-center gap-2">
+                  <h3 className="text-xs font-bold uppercase tracking-widest text-gray-400 mb-4 flex items-center gap-2">
                     <FontAwesomeIcon icon={faVideo} className="text-red-500" /> Videos
                   </h3>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -2316,7 +2225,7 @@ const UpcomingAssignmentsPage: React.FC = () => {
                 <div className="text-center py-20 bg-gray-50 dark:bg-white/5 rounded-2xl border-2 border-dashed border-gray-200 dark:border-gray-800">
                   <FontAwesomeIcon icon={faFile} className="text-5xl text-gray-300 mb-4" />
                   <p className="text-gray-500 font-medium">No files uploaded yet.</p>
-                  <p className="text-sm text-gray-400 mt-2">Upload files using the form on the left</p>
+                  <p className="text-xs text-gray-400 mt-2">Upload files using the form on the left</p>
                 </div>
               )}
             </div>
@@ -2333,8 +2242,8 @@ const UpcomingAssignmentsPage: React.FC = () => {
         <div className="px-4 py-3">
           <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 mb-2">
             <div className="flex items-center gap-3">
-              <h2 className="text-lg font-medium">Upcoming Assignments</h2>
-              <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-gradient-to-r from-blue-100 to-blue-200 dark:from-blue-900/30 dark:to-blue-800/30 text-blue-800 dark:text-blue-300 border border-blue-200 dark:border-blue-700/30">
+             
+              <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-gradient-to-r from-blue-100 to-blue-200 dark:from-blue-900/30 dark:to-blue-800/30 text-blue-800 dark:text-blue-300 border border-blue-200 dark:border-blue-700/30">
                 <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
                 </svg>
@@ -2352,7 +2261,7 @@ const UpcomingAssignmentsPage: React.FC = () => {
                   </div>
                   <input
                     type="number"
-                    className="w-full pl-10 pr-10 py-2 text-sm border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                    className="w-full pl-10 pr-10 py-2 text-xs border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
                     placeholder="Show N records"
                     value={customRecordCount}
                     onChange={handleCustomRecordInput}
@@ -2384,7 +2293,7 @@ const UpcomingAssignmentsPage: React.FC = () => {
                   </div>
                   <input
                     type="text"
-                    className="w-full pl-10 pr-4 py-2 text-sm border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all"
+                    className="w-full pl-10 pr-4 py-2 text-xs border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all"
                     placeholder="Search name, category, status..."
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
@@ -2394,7 +2303,7 @@ const UpcomingAssignmentsPage: React.FC = () => {
 
               <button
                 onClick={clearFilters}
-                className="bg-gradient-to-r from-gray-600 to-gray-700 hover:from-gray-700 hover:to-gray-800 text-white px-4 py-2 rounded-lg text-sm font-medium flex items-center gap-2 transition-all shadow-md hover:shadow-lg whitespace-nowrap"
+                className="bg-gradient-to-r from-gray-600 to-gray-700 hover:from-gray-700 hover:to-gray-800 text-white px-4 py-2 rounded-lg text-xs font-medium flex items-center gap-2 transition-all shadow-md hover:shadow-lg whitespace-nowrap"
               >
                 <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
@@ -2411,7 +2320,7 @@ const UpcomingAssignmentsPage: React.FC = () => {
                   setShowAssignPopup(true);
                 }}
                 disabled={selectedMasterIds.length === 0}
-                className={`bg-gradient-to-r from-green-600 to-green-700 text-white px-4 py-2 rounded-lg text-sm font-medium flex items-center gap-2 transition-all shadow-md hover:shadow-lg ${
+                className={`bg-gradient-to-r from-green-600 to-green-700 text-white px-4 py-2 rounded-lg text-xs font-medium flex items-center gap-2 transition-all shadow-md hover:shadow-lg ${
                   selectedMasterIds.length === 0
                     ? 'opacity-50 cursor-not-allowed'
                     : 'hover:from-green-700 hover:to-green-800'
@@ -2432,7 +2341,7 @@ const UpcomingAssignmentsPage: React.FC = () => {
       {/* Active Filters Display */}
       {(selectedEntryFromDate || selectedEntryToDate || selectedFollowupFromDate || selectedFollowupToDate || selectedStages.length > 0 || selectedUsersFilter.length > 0 || selectedCities.length > 0) && (
         <div className="flex items-center gap-2 mb-4 p-2 bg-gray-50 dark:bg-gray-800 rounded">
-          <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Active filters:</span>
+          <span className="text-xs font-medium text-gray-700 dark:text-gray-300">Active filters:</span>
           <div className="flex flex-wrap gap-2">
             {(selectedEntryFromDate || selectedEntryToDate) && (
               <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300">
@@ -2497,7 +2406,7 @@ const UpcomingAssignmentsPage: React.FC = () => {
             ))}
             <button
               onClick={clearFilters}
-              className="ml-2 text-sm text-red-600 hover:text-red-800 dark:text-red-400 dark:hover:text-red-300 font-medium"
+              className="ml-2 text-xs text-red-600 hover:text-red-800 dark:text-red-400 dark:hover:text-red-300 font-medium"
             >
               Clear all filters
             </button>
@@ -2585,7 +2494,7 @@ const UpcomingAssignmentsPage: React.FC = () => {
                       {showEntryDateCalendar && (
                         <div className="absolute top-full left-0 mt-1 z-50 bg-white dark:bg-boxdark border border-gray-300 dark:border-gray-700 rounded-lg shadow-lg p-4 min-w-[250px]">
                           <div className="flex justify-between items-center mb-3">
-                            <span className="font-semibold text-sm dark:text-white">Select Entry Date Range</span>
+                            <span className="font-semibold text-xs dark:text-white">Select Entry Date Range</span>
                             <button
                               onClick={(e) => {
                                 e.stopPropagation();
@@ -2613,7 +2522,7 @@ const UpcomingAssignmentsPage: React.FC = () => {
                                   setSelectedEntryFromDate(e.target.value);
                                 }}
                                 onClick={(e) => e.stopPropagation()}
-                                className="w-full p-2 border border-gray-300 dark:border-gray-600 rounded-lg text-sm font-medium dark:bg-form-input dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                className="w-full p-2 border border-gray-300 dark:border-gray-600 rounded-lg text-xs font-medium dark:bg-form-input dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                               />
                             </div>
                             
@@ -2629,7 +2538,7 @@ const UpcomingAssignmentsPage: React.FC = () => {
                                   setSelectedEntryToDate(e.target.value);
                                 }}
                                 onClick={(e) => e.stopPropagation()}
-                                className="w-full p-2 border border-gray-300 dark:border-gray-600 rounded-lg text-sm font-medium dark:bg-form-input dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                className="w-full p-2 border border-gray-300 dark:border-gray-600 rounded-lg text-xs font-medium dark:bg-form-input dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                               />
                             </div>
                           </div>
@@ -2641,7 +2550,7 @@ const UpcomingAssignmentsPage: React.FC = () => {
                                 applyFilters();
                                 setShowEntryDateCalendar(false);
                               }}
-                              className="w-full py-2.5 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white text-sm font-semibold rounded-lg transition-all duration-200 shadow-md hover:shadow-lg"
+                              className="w-full py-2.5 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white text-xs font-semibold rounded-lg transition-all duration-200 shadow-md hover:shadow-lg"
                             >
                               Apply Filter
                             </button>
@@ -2672,7 +2581,7 @@ const UpcomingAssignmentsPage: React.FC = () => {
                       {showFollowupDateCalendar && (
                         <div className="absolute top-full left-0 mt-1 z-50 bg-white dark:bg-boxdark border border-gray-300 dark:border-gray-700 rounded-lg shadow-lg p-4 min-w-[250px]">
                           <div className="flex justify-between items-center mb-3">
-                            <span className="font-semibold text-sm dark:text-white">Select Followup Date Range</span>
+                            <span className="font-semibold text-xs dark:text-white">Select Followup Date Range</span>
                             <button
                               onClick={(e) => {
                                 e.stopPropagation();
@@ -2700,7 +2609,7 @@ const UpcomingAssignmentsPage: React.FC = () => {
                                   setSelectedFollowupFromDate(e.target.value);
                                 }}
                                 onClick={(e) => e.stopPropagation()}
-                                className="w-full p-2 border border-gray-300 dark:border-gray-600 rounded-lg text-sm font-medium dark:bg-form-input dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                className="w-full p-2 border border-gray-300 dark:border-gray-600 rounded-lg text-xs font-medium dark:bg-form-input dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                               />
                             </div>
                             
@@ -2716,7 +2625,7 @@ const UpcomingAssignmentsPage: React.FC = () => {
                                   setSelectedFollowupToDate(e.target.value);
                                 }}
                                 onClick={(e) => e.stopPropagation()}
-                                className="w-full p-2 border border-gray-300 dark:border-gray-600 rounded-lg text-sm font-medium dark:bg-form-input dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                className="w-full p-2 border border-gray-300 dark:border-gray-600 rounded-lg text-xs font-medium dark:bg-form-input dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                               />
                             </div>
                           </div>
@@ -2728,7 +2637,7 @@ const UpcomingAssignmentsPage: React.FC = () => {
                                 applyFilters();
                                 setShowFollowupDateCalendar(false);
                               }}
-                              className="w-full py-2.5 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white text-sm font-semibold rounded-lg transition-all duration-200 shadow-md hover:shadow-lg"
+                              className="w-full py-2.5 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white text-xs font-semibold rounded-lg transition-all duration-200 shadow-md hover:shadow-lg"
                             >
                               Apply Filter
                             </button>
@@ -2771,7 +2680,7 @@ const UpcomingAssignmentsPage: React.FC = () => {
                       {showCityFilter && (
                         <div className="absolute top-full left-0 mt-1 z-50 bg-white dark:bg-boxdark border border-gray-300 dark:border-gray-700 rounded-lg shadow-lg p-4 min-w-[200px] max-h-[300px] overflow-y-auto">
                           <div className="flex justify-between items-center mb-3">
-                            <span className="font-semibold text-sm dark:text-white">Filter Cities</span>
+                            <span className="font-semibold text-xs dark:text-white">Filter Cities</span>
                             <div className="flex gap-2">
                               <button
                                 onClick={(e) => {
@@ -2812,7 +2721,7 @@ const UpcomingAssignmentsPage: React.FC = () => {
                                   />
                                   <label 
                                     htmlFor={`city-${city}`}
-                                    className="text-sm font-medium dark:text-white cursor-pointer truncate hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
+                                    className="text-xs font-medium dark:text-white cursor-pointer truncate hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
                                   >
                                     {city}
                                   </label>
@@ -2820,7 +2729,7 @@ const UpcomingAssignmentsPage: React.FC = () => {
                               ))}
                             </>
                           ) : (
-                            <div className="text-sm font-medium text-gray-500 dark:text-gray-400 italic py-3 text-center">
+                            <div className="text-xs font-medium text-gray-500 dark:text-gray-400 italic py-3 text-center">
                               No cities available
                             </div>
                           )}
@@ -2877,7 +2786,7 @@ const UpcomingAssignmentsPage: React.FC = () => {
                       {showUserFilter && (
                         <div className="absolute top-full right-0 mt-1 z-50 bg-white dark:bg-boxdark border border-gray-300 dark:border-gray-700 rounded-lg shadow-lg p-4 min-w-[220px] max-h-[300px] overflow-y-auto">
                           <div className="flex justify-between items-center mb-3">
-                            <span className="font-semibold text-sm dark:text-white">Filter Users</span>
+                            <span className="font-semibold text-xs dark:text-white">Filter Users</span>
                             <div className="flex gap-2">
                               <button
                                 onClick={(e) => {
@@ -2918,7 +2827,7 @@ const UpcomingAssignmentsPage: React.FC = () => {
                                   />
                                   <label 
                                     htmlFor={`user-${user.id}`}
-                                    className="text-sm font-medium dark:text-white cursor-pointer truncate hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
+                                    className="text-xs font-medium dark:text-white cursor-pointer truncate hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
                                   >
                                     {user.name} ({user.role})
                                   </label>
@@ -2926,7 +2835,7 @@ const UpcomingAssignmentsPage: React.FC = () => {
                               ))}
                             </>
                           ) : (
-                            <div className="text-sm font-medium text-gray-500 dark:text-gray-400 italic py-3 text-center">
+                            <div className="text-xs font-medium text-gray-500 dark:text-gray-400 italic py-3 text-center">
                               Loading users...
                             </div>
                           )}
@@ -2974,7 +2883,7 @@ const UpcomingAssignmentsPage: React.FC = () => {
                       {showStageFilter && (
                         <div className="absolute top-full right-0 mt-1 z-50 bg-white dark:bg-boxdark border border-gray-300 dark:border-gray-700 rounded-lg shadow-lg p-4 min-w-[220px] max-h-[300px] overflow-y-auto">
                           <div className="flex justify-between items-center mb-3">
-                            <span className="font-semibold text-sm dark:text-white">Filter Stages</span>
+                            <span className="font-semibold text-xs dark:text-white">Filter Stages</span>
                             <div className="flex gap-2">
                               <button
                                 onClick={(e) => {
@@ -3015,7 +2924,7 @@ const UpcomingAssignmentsPage: React.FC = () => {
                                   />
                                   <label 
                                     htmlFor={`stage-${stage}`}
-                                    className="text-sm font-medium dark:text-white cursor-pointer truncate hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
+                                    className="text-xs font-medium dark:text-white cursor-pointer truncate hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
                                   >
                                     {stage || 'Unknown'}
                                   </label>
@@ -3023,7 +2932,7 @@ const UpcomingAssignmentsPage: React.FC = () => {
                               ))}
                             </>
                           ) : (
-                            <div className="text-sm font-medium text-gray-500 dark:text-gray-400 italic py-3 text-center">
+                            <div className="text-xs font-medium text-gray-500 dark:text-gray-400 italic py-3 text-center">
                               Loading stages...
                             </div>
                           )}
@@ -3054,12 +2963,7 @@ const UpcomingAssignmentsPage: React.FC = () => {
                         Remark
                       </div>
                     </th>
-                    
-                    <th className="py-5 px-4">
-                      <div className="text-xs font-extrabold uppercase tracking-wider text-gray-700 dark:text-gray-300">
-                        Actions
-                      </div>
-                    </th>
+                  
                   </tr>
                 </thead>
 
@@ -3088,7 +2992,7 @@ const UpcomingAssignmentsPage: React.FC = () => {
                       </td>
 
                       <td className="py-4 px-4">
-                        <div className="font-semibold text-sm bg-gradient-to-r from-blue-50 to-blue-100 dark:from-blue-900/20 dark:to-blue-800/10 text-blue-800 dark:text-blue-300 px-3 py-1.5 rounded-lg border border-blue-100 dark:border-blue-800/30 shadow-sm">
+                        <div className="font-semibold text-xs bg-gradient-to-r from-blue-50 to-blue-100 dark:from-blue-900/20 dark:to-blue-800/10 text-blue-800 dark:text-blue-300 px-3 py-1.5 rounded-lg border border-blue-100 dark:border-blue-800/30 shadow-sm">
                           {lead.assign_date
                             ? new Date(lead.assign_date).toLocaleDateString("en-GB")
                             : "—"}
@@ -3097,7 +3001,7 @@ const UpcomingAssignmentsPage: React.FC = () => {
 
                       <td className="py-4 px-4">
                         <div
-                          className={`inline-flex items-center px-3 py-1.5 rounded-lg font-semibold text-sm border shadow-sm ${
+                          className={`inline-flex items-center px-3 py-1.5 rounded-lg font-semibold text-xs border shadow-sm ${
                             lead.followup_date && new Date(lead.followup_date) < new Date()
                               ? 'bg-gradient-to-r from-red-50 to-red-100 dark:from-red-900/20 dark:to-red-800/10 text-red-800 dark:text-red-300 border-red-200 dark:border-red-800/30'
                               : 'bg-gradient-to-r from-green-50 to-green-100 dark:from-green-900/20 dark:to-green-800/10 text-green-800 dark:text-green-300 border-green-200 dark:border-green-800/30'
@@ -3117,7 +3021,7 @@ const UpcomingAssignmentsPage: React.FC = () => {
                           }}
                           className="group cursor-pointer"
                         >
-                          <div className="text-sm font-bold text-gray-900 dark:text-gray-100 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors duration-200">
+                          <div className="text-xs font-bold text-gray-900 dark:text-gray-100 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors duration-200">
                             {lead.name}
                           </div>
                           <div className="mt-1 flex items-center">
@@ -3133,14 +3037,14 @@ const UpcomingAssignmentsPage: React.FC = () => {
                       </td>
 
                       <td className="py-4 px-4">
-                        <div className="text-sm font-medium bg-gradient-to-r from-gray-50 to-gray-100 dark:from-gray-700 dark:to-gray-800 text-gray-900 dark:text-white px-3 py-1.5 rounded-lg border border-gray-200 dark:border-gray-600 shadow-sm">
+                        <div className="text-xs font-medium bg-gradient-to-r from-gray-50 to-gray-100 dark:from-gray-700 dark:to-gray-800 text-gray-900 dark:text-white px-3 py-1.5 rounded-lg border border-gray-200 dark:border-gray-600 shadow-sm">
                           {lead.number || "—"}
                         </div>
                       </td>
 
                       <td className="py-4 px-4">
                         <div className="flex flex-col gap-1.5">
-                          <div className="text-sm font-bold text-gray-900 dark:text-white">
+                          <div className="text-xs font-bold text-gray-900 dark:text-white">
                             {lead.city || "—"}
                           </div>
                           
@@ -3171,7 +3075,7 @@ const UpcomingAssignmentsPage: React.FC = () => {
                       </td>
 
                       <td className="py-4 px-4">
-                        <div className="text-sm font-semibold bg-gradient-to-r from-purple-50 to-purple-100 dark:from-purple-900/30 dark:to-purple-800/20 text-purple-800 dark:text-purple-300 px-3 py-1.5 rounded-lg border border-purple-200 dark:border-purple-700/30 shadow-sm text-center">
+                        <div className="text-xs font-semibold bg-gradient-to-r from-purple-50 to-purple-100 dark:from-purple-900/30 dark:to-purple-800/20 text-purple-800 dark:text-purple-300 px-3 py-1.5 rounded-lg border border-purple-200 dark:border-purple-700/30 shadow-sm text-center">
                           {lead.telecaller_name || "—"}
                         </div>
                       </td>
@@ -3186,7 +3090,7 @@ const UpcomingAssignmentsPage: React.FC = () => {
                         <span
                           onClick={() => handleShowRemark(lead.detailed_remark)}
                           title="Click to view full remark"
-                          className={`inline-flex cursor-pointer rounded-full py-1.5 px-3.5 text-sm font-semibold border shadow-sm truncate max-w-[220px]
+                          className={`inline-flex cursor-pointer rounded-full py-1.5 px-3.5 text-xs font-semibold border shadow-sm truncate max-w-[220px]
                             ${
                               lead.quick_remark === "Interested"
                                 ? "bg-gradient-to-r from-green-50 to-green-100 dark:from-green-900/30 dark:to-green-800/20 text-green-800 dark:text-green-300 border-green-200 dark:border-green-700/30"
@@ -3208,7 +3112,7 @@ const UpcomingAssignmentsPage: React.FC = () => {
                         </span>
                       </td>
 
-                      <td className="py-4 px-4">
+                      {/* <td className="py-4 px-4">
                         <div className="flex justify-center gap-1">
                           <ActionButton
                             onClick={() =>
@@ -3244,7 +3148,7 @@ const UpcomingAssignmentsPage: React.FC = () => {
                             <FontAwesomeIcon icon={faFileUpload} className="text-xs" />
                           </ActionButton>
                         </div>
-                      </td>
+                      </td> */}
                     </tr>
                   ))}
                 </tbody>
@@ -3469,7 +3373,7 @@ const UpcomingAssignmentsPage: React.FC = () => {
                   )}
                 </div>
 
-                <p className="text-sm text-blue-600 dark:text-blue-400 mt-2">
+                <p className="text-xs text-blue-600 dark:text-blue-400 mt-2">
                   Selected: {assignData.assignedTo.length}
                 </p>
               </div>
@@ -3481,7 +3385,7 @@ const UpcomingAssignmentsPage: React.FC = () => {
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div>
-                    <label className="block mb-1 text-sm font-medium text-black dark:text-white">
+                    <label className="block mb-1 text-xs font-medium text-black dark:text-white">
                       Lead Stage *
                     </label>
                     <select
@@ -3501,7 +3405,7 @@ const UpcomingAssignmentsPage: React.FC = () => {
                   </div>
 
                   <div>
-                    <label className="block mb-1 text-sm font-medium text-black dark:text-white">
+                    <label className="block mb-1 text-xs font-medium text-black dark:text-white">
                       Followup Date *
                     </label>
                     <div className="flex gap-3">
@@ -3523,7 +3427,7 @@ const UpcomingAssignmentsPage: React.FC = () => {
                             reassignmentDate: new Date().toISOString().split('T')[0],
                           });
                         }}
-                        className="px-3 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 text-sm whitespace-nowrap"
+                        className="px-3 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 text-xs whitespace-nowrap"
                       >
                         Today
                       </button>

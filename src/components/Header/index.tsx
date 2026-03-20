@@ -171,7 +171,7 @@ const handleAttendanceToggle = async () => {
       isCheckedIn ? 'bg-red-600 hover:bg-red-700' : 'bg-green-600 hover:bg-green-700'
     }`}
   >
-    {isCheckedIn ? 'Check Out' : 'Check In'}
+    {isCheckedIn ? 'Log Out' : 'Log In'}
   </button>
 
 

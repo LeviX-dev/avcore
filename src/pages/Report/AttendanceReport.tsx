@@ -40,56 +40,56 @@ const AttendanceReport = () => {
   const [mode, setMode] = useState<'attendance' | 'presence'>('attendance');
 
   // Format time to 12-hour with AM/PM
-  const formatTimeTo12Hour = (val?: string | null): string => {
-    if (!val) return '-';
-    try {
-      const date = new Date(val);
-      if (isNaN(date.getTime())) return '-';
-      
-      let hours = date.getHours();
-      const minutes = String(date.getMinutes()).padStart(2, '0');
-      const ampm = hours >= 12 ? 'PM' : 'AM';
-      
-      hours = hours % 12;
-      hours = hours || 12; // Convert 0 to 12
-      
-      return `${hours}:${minutes} ${ampm}`;
-    } catch {
-      return '-';
-    }
-  };
-
+const formatTimeTo12Hour = (val?: string | null): string => {
+  if (!val) return 'Not Mark';  // Changed from '-' to 'not mark'
+  try {
+    const date = new Date(val);
+    if (isNaN(date.getTime())) return 'Not Mark';  // Changed from '-' to 'not mark'
+    
+    let hours = date.getHours();
+    const minutes = String(date.getMinutes()).padStart(2, '0');
+    const ampm = hours >= 12 ? 'PM' : 'AM';
+    
+    hours = hours % 12;
+    hours = hours || 12; // Convert 0 to 12
+    
+    return `${hours}:${minutes} ${ampm}`;
+  } catch {
+    return 'Not Mark';  // Changed from '-' to 'not mark'
+  }
+};
   // Format date only (DD-MM-YYYY)
-  const formatDateOnly = (val?: string | null): string => {
-    if (!val) return '-';
-    try {
-      const date = new Date(val);
-      if (isNaN(date.getTime())) return '-';
-      const day = String(date.getDate()).padStart(2, '0');
-      const month = String(date.getMonth() + 1).padStart(2, '0');
-      const year = date.getFullYear();
-      return `${day}-${month}-${year}`;
-    } catch {
-      return '-';
-    }
-  };
+const formatDateOnly = (val?: string | null): string => {
+  if (!val) return 'Not Mark';  // Changed from '-' to 'not mark'
+  try {
+    const date = new Date(val);
+    if (isNaN(date.getTime())) return 'Not Mark';  // Changed from '-' to 'not mark'
+    const day = String(date.getDate()).padStart(2, '0');
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const year = date.getFullYear();
+    return `${day}-${month}-${year}`;
+  } catch {
+    return 'Not Mark';  // Changed from '-' to 'not mark'
+  }
+};
 
   // Format date and time for export
-  const formatDateTimeForExport = (val?: string | null): string => {
-    if (!val) return '-';
-    try {
-      const date = new Date(val);
-      if (isNaN(date.getTime())) return '-';
-      const day = String(date.getDate()).padStart(2, '0');
-      const month = String(date.getMonth() + 1).padStart(2, '0');
-      const year = date.getFullYear();
-      const hours = String(date.getHours()).padStart(2, '0');
-      const minutes = String(date.getMinutes()).padStart(2, '0');
-      return `${day}-${month}-${year} ${hours}:${minutes}`;
-    } catch {
-      return '-';
-    }
-  };
+const formatDateTimeForExport = (val?: string | null): string => {
+  if (!val) return 'Not Mark';  // Changed from '-' to 'not mark'
+  try {
+    const date = new Date(val);
+    if (isNaN(date.getTime())) return 'not mark';  // Changed from '-' to 'not mark'
+    const day = String(date.getDate()).padStart(2, '0');
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const year = date.getFullYear();
+    const hours = String(date.getHours()).padStart(2, '0');
+    const minutes = String(date.getMinutes()).padStart(2, '0');
+    return `${day}-${month}-${year} ${hours}:${minutes}`;
+  } catch {
+    return 'not mark';  // Changed from '-' to 'not mark'
+  }
+};
+
 
   // Load employees list - FIXED: Direct call to users API
   const loadEmployees = async () => {
@@ -184,66 +184,66 @@ const AttendanceReport = () => {
   }, [filteredRows, page]);
 
   // Export to Excel - UPDATED to fetch only Amol Sir's data
-  const exportExcel = async () => {
-    setExportLoading(true);
-    try {
-      // Fetch data specifically for export (only Amol Sir)
-      const exportData = await loadAttendance(true);
-      
-      // If no data, show message
-      if (!exportData || exportData.length === 0) {
-        alert('No data found for Amol Sir in the selected date range');
-        return;
-      }
-      
-      // Prepare data for Excel
-      const data = exportData.map(r => ({
-        Name: r.user_name,
-        Role: r.role,
-        Date: formatDateOnly(r.attendance_date),
-        'Check In': formatTimeTo12Hour(r.check_in_datetime),
-        'Check Out': formatTimeTo12Hour(r.check_out_datetime),
-        Status: r.status,
-        'Auto Checkout': r.auto_checkout ? 'Yes' : 'No',
-      }));
-
-      const worksheet = XLSX.utils.json_to_sheet(data);
-      const workbook = XLSX.utils.book_new();
-      XLSX.utils.book_append_sheet(workbook, worksheet, 'Attendance');
-
-      // Add filter info
-      const filterInfo = [
-        ['Attendance Report - Amol Sir Only'],
-        [`Exported: ${new Date().toLocaleString()}`],
-        [`Date Range: ${from} to ${to}`],
-        ['Employee: Amol Sir'],
-        ['Auto Checkout Filter: All'],
-        [''] // Empty row
-      ];
-
-      XLSX.utils.sheet_add_aoa(worksheet, filterInfo, { origin: -1 });
-      
-      // Auto-size columns
-      const maxWidth = data.reduce((w, r) => Math.max(w, r.Name?.length || 0), 10);
-      worksheet['!cols'] = [
-        { wch: maxWidth + 2 }, // Name
-        { wch: 20 }, // Role
-        { wch: 15 }, // Date
-        { wch: 15 }, // Check In
-        { wch: 15 }, // Check Out
-        { wch: 12 }, // Status
-        { wch: 15 }, // Auto Checkout
-      ];
-      
-      const fileName = `attendance_amol_sir_${new Date().toISOString().split('T')[0]}.xlsx`;
-      XLSX.writeFile(workbook, fileName);
-    } catch (error) {
-      console.error('Error exporting to Excel:', error);
-      alert('Error exporting to Excel');
-    } finally {
-      setExportLoading(false);
+const exportExcel = async () => {
+  setExportLoading(true);
+  try {
+    // Fetch data specifically for export (only Amol Sir)
+    const exportData = await loadAttendance(true);
+    
+    // If no data, show message
+    if (!exportData || exportData.length === 0) {
+      alert('No data found for Amol Sir in the selected date range');
+      return;
     }
-  };
+    
+    // Prepare data for Excel
+    const data = exportData.map(r => ({
+      Name: r.user_name,
+      Role: r.role,
+      Date: formatDateOnly(r.attendance_date),
+      'Check In': formatTimeTo12Hour(r.check_in_datetime),
+      'Check Out': formatTimeTo12Hour(r.check_out_datetime),
+      Status: r.status,
+      'Auto Checkout': r.auto_checkout ? 'Yes' : 'No',
+    }));
+
+    const worksheet = XLSX.utils.json_to_sheet(data);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, 'Attendance');
+
+    // Add filter info
+    const filterInfo = [
+      ['Attendance Report - Amol Sir Only'],
+      [`Exported: ${new Date().toLocaleString()}`],
+      [`Date Range: ${from} to ${to}`],
+      ['Employee: Amol Sir'],
+      ['Auto Checkout Filter: All'],
+      [''] // Empty row
+    ];
+
+    XLSX.utils.sheet_add_aoa(worksheet, filterInfo, { origin: -1 });
+    
+    // Auto-size columns
+    const maxWidth = data.reduce((w, r) => Math.max(w, r.Name?.length || 0), 10);
+    worksheet['!cols'] = [
+      { wch: maxWidth + 2 }, // Name
+      { wch: 20 }, // Role
+      { wch: 15 }, // Date
+      { wch: 15 }, // Check In
+      { wch: 15 }, // Check Out
+      { wch: 12 }, // Status
+      { wch: 15 }, // Auto Checkout
+    ];
+    
+    const fileName = `attendance_amol_sir_${new Date().toISOString().split('T')[0]}.xlsx`;
+    XLSX.writeFile(workbook, fileName);
+  } catch (error) {
+    console.error('Error exporting to Excel:', error);
+    alert('Error exporting to Excel');
+  } finally {
+    setExportLoading(false);
+  }
+};
 
   // Reset filters
   const resetFilters = () => {
@@ -259,13 +259,14 @@ const AttendanceReport = () => {
     loadAttendance();
   };
 
+
+
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-boxdark p-4 md:p-6">
       <div className="max-w-7xl mx-auto">
         {/* Header */}
         <div className="mb-6">
           <h1 className="text-2xl font-bold text-gray-800 dark:text-white">Attendance Report</h1>
-          <p className="text-gray-600 dark:text-gray-400 mt-1">Track and manage employee attendance records</p>
         </div>
 
         {/* Filters Card - All in Single Line */}
@@ -522,12 +523,7 @@ const AttendanceReport = () => {
           )}
         </div>
         
-        {/* Export Notice */}
-        <div className="mt-4 p-3 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-md">
-          <p className="text-sm text-yellow-800 dark:text-yellow-300">
-            <span className="font-medium">Note:</span> The "Export Excel" button will download only Amol Sir's attendance data for the selected date range.
-          </p>
-        </div>
+    
       </div>
     </div>
   );
