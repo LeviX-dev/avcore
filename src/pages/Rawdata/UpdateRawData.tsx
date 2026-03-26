@@ -165,51 +165,22 @@ const UpdateRawData: React.FC<UpdateDataModalProps> = ({
     }
   }, [showEditPopup]);
 
-  useEffect(() => {
-    if (!showEditPopup || !editingClient || users.length === 0) return;
+useEffect(() => {
+  if (!showEditPopup || !editingClient) return;
 
-    const resolvedUserIds: string[] = [];
+  // ❌ DO NOT PREFILL ASSIGNED USERS
+  // Always reset on popup open
 
-    if (Array.isArray(editingClient.reassignment_remarks)) {
-      editingClient.reassignment_remarks.forEach((r: any) => {
-        if (r?.assignedTo) {
-          r.assignedTo
-            .toString()
-            .split(',')
-            .map((n: string) => n.trim())
-            .forEach((name: string) => {
-              const matchedUser = users.find(
-                (u: any) =>
-                  u.name?.toLowerCase() === name.toLowerCase()
-              );
-
-              if (matchedUser && !resolvedUserIds.includes(matchedUser.user_id)) {
-                resolvedUserIds.push(matchedUser.user_id);
-              }
-            });
+  setEditingClient(prev =>
+    prev
+      ? {
+          ...prev,
+          assigned_to: [] // 🔥 EMPTY by default
         }
-      });
-    }
+      : prev
+  );
 
-    const mergedAssigned = Array.from(
-      new Set([
-        ...(Array.isArray(editingClient.assigned_to)
-          ? editingClient.assigned_to.filter(v => typeof v !== 'string' || isNaN(Number(v)))
-          : []),
-        ...resolvedUserIds,
-      ])
-    );
-
-    setEditingClient(prev =>
-      prev
-        ? {
-            ...prev,
-            assigned_to: mergedAssigned,
-          }
-        : prev
-    );
-
-  }, [showEditPopup, users, editingClient]);
+}, [showEditPopup]);
 
   // Filter users based on search term
   useEffect(() => {
@@ -226,168 +197,175 @@ const UpdateRawData: React.FC<UpdateDataModalProps> = ({
     }
   }, [searchTerm, users]);
 
-  const handleUpdateClient = async (editingClient: Client) => {
-    try {
-      // Prepare the data to send
-      const updateData: any = {
-        name: editingClient.name,
-        email: editingClient.email,
-        number: editingClient.number,
-        alternate_number: editingClient.alternate_number,
-        address: editingClient.address,
-        cat_id: editingClient.cat_id,
-        reference_id: editingClient.reference_id || editingClient.reference,
-        area_id: editingClient.area_id,
-        // 🔥 MODIFIED: Send the appropriate value based on what's being shown
-        city: editingClient.city,
-        location_link: editingClient.location_link,
-        room_length: editingClient.room_length,
-        room_width: editingClient.room_width,
-        room_height: editingClient.room_height,
-        p_type: editingClient.p_type,
-        budget_range: editingClient.budget_range,
-        current_stage: editingClient.current_stage,
-        time_to_complete: editingClient.time_to_complete,
-        site_visit_date: editingClient.site_visit_date,
-        demo_date: editingClient.demo_date,
-        ar_number: editingClient.ar_number,
-        architect_name: editingClient.architect_name,
-        ca_number: editingClient.ca_number,
-        e_number: editingClient.e_number,
-        sm_number: editingClient.sm_number,
-        pop_number: editingClient.pop_number,
-        other_number: editingClient.other_number,
-        lead_stage: editingClient.lead_stage,
-        quick_remark: editingClient.quick_remark,
-        detailed_remark: editingClient.detailed_remark,
-        followup_date: editingClient.followup_date,
-        assign_id: editingClient.assign_id,
-        category_other: editingClient.category_other,
-        reference_other: editingClient.reference_other,
-      };
+const handleUpdateClient = async (editingClient: Client) => {
+  try {
+    // 🔥 ADD VALIDATION: Check if at least one user is selected
+    if (!Array.isArray(editingClient.assigned_to) || editingClient.assigned_to.length === 0) {
+      showToast('⚠️ Please select at least one user to reassign.', 'warning', 3000);
+      return { success: false, message: "No user selected" };
+    }
 
-      // Auto-copy quick_remark to detailed_remark if quick_remark is selected and detailed_remark is empty
-      if (editingClient.quick_remark && !editingClient.detailed_remark) {
-        updateData.detailed_remark = editingClient.quick_remark;
+    // Prepare the data to send
+    const updateData: any = {
+      name: editingClient.name,
+      email: editingClient.email,
+      number: editingClient.number,
+      alternate_number: editingClient.alternate_number,
+      address: editingClient.address,
+      cat_id: editingClient.cat_id,
+      reference_id: editingClient.reference_id || editingClient.reference,
+      area_id: editingClient.area_id,
+      // 🔥 MODIFIED: Send the appropriate value based on what's being shown
+      city: editingClient.city,
+      location_link: editingClient.location_link,
+      room_length: editingClient.room_length,
+      room_width: editingClient.room_width,
+      room_height: editingClient.room_height,
+      p_type: editingClient.p_type,
+      budget_range: editingClient.budget_range,
+      current_stage: editingClient.current_stage,
+      time_to_complete: editingClient.time_to_complete,
+      site_visit_date: editingClient.site_visit_date,
+      demo_date: editingClient.demo_date,
+      ar_number: editingClient.ar_number,
+      architect_name: editingClient.architect_name,
+      ca_number: editingClient.ca_number,
+      e_number: editingClient.e_number,
+      sm_number: editingClient.sm_number,
+      pop_number: editingClient.pop_number,
+      other_number: editingClient.other_number,
+      lead_stage: editingClient.lead_stage,
+      quick_remark: editingClient.quick_remark,
+      detailed_remark: editingClient.detailed_remark,
+      followup_date: editingClient.followup_date,
+      assign_id: editingClient.assign_id,
+      category_other: editingClient.category_other,
+      reference_other: editingClient.reference_other,
+    };
+
+    // Auto-copy quick_remark to detailed_remark if quick_remark is selected and detailed_remark is empty
+    if (editingClient.quick_remark && !editingClient.detailed_remark) {
+      updateData.detailed_remark = editingClient.quick_remark;
+    }
+
+    // If assigned_to is provided and not empty, include it for reassignment
+    if (Array.isArray(editingClient.assigned_to) && editingClient.assigned_to.length > 0) {
+      updateData.assignedTo = editingClient.assigned_to;
+
+      // Also include leadStage for reassignment if provided
+      if (editingClient.lead_stage) {
+        updateData.leadStage = editingClient.lead_stage;
       }
 
-      // If assigned_to is provided and not empty, include it for reassignment
-      if (Array.isArray(editingClient.assigned_to) && editingClient.assigned_to.length > 0) {
-        updateData.assignedTo = editingClient.assigned_to;
-
-        // Also include leadStage for reassignment if provided
-        if (editingClient.lead_stage) {
-          updateData.leadStage = editingClient.lead_stage;
-        }
-
-        // You might want to add reassignment_date if needed
-        if (editingClient.reassignment_date) {
-          updateData.reassignment_date = editingClient.reassignment_date;
-        } else {
-          // Default to today's date if not provided
-          updateData.reassignment_date = new Date().toISOString().split('T')[0];
-        }
-
-        // Include remark for reassignment
-        if (editingClient.detailed_remark) {
-          updateData.remark = editingClient.detailed_remark;
-        }
-      }
-
-      const response = await axios.put(
-        `${BASE_URL}api/master-data/${editingClient.master_id}`,
-        updateData,
-        { withCredentials: true }
-      );
-
-      const data = response.data;
-
-      if (response.status === 200) {
-        let alertMsg = "✅ Client updated successfully.";
-
-        // Show quick remark auto-copy notification
-        if (data.quick_remark_copied) {
-          alertMsg += "\n📝 Quick Remark copied to Detailed Remark.";
-        }
-
-        // Show inserted reassignment info
-        if (data.inserted && data.inserted.length) {
-          alertMsg += `\nAdded ${data.inserted.length} new reassignment(s).`;
-
-          // Optionally show details of inserted reassignments
-          if (data.inserted_details) {
-            data.inserted_details.forEach((detail: any) => {
-              alertMsg += `\n• ${detail.user_name} - ${detail.stage}`;
-            });
-          }
-        }
-
-        // Show skipped duplicates info
-        if (data.skipped && data.skipped.length) {
-          const skippedList = data.skipped
-            .map((s: any) => `• ${s.finalName || s.user_name} (Stage: ${s.leadStage || s.stage})`)
-            .join("\n");
-          alertMsg += `\n\n⚠️ Skipped ${data.skipped.length} duplicate reassignment(s):\n${skippedList}`;
-        }
-
-        // Show reassignment remarks info if available
-        if (data.reassignment_remarks_added) {
-          alertMsg += `\n\n📝 Added reassignment remark to history.`;
-        }
-
-        // If there were reassignment changes, show summary
-        if ((data.inserted && data.inserted.length > 0) || (data.skipped && data.skipped.length > 0)) {
-          alertMsg += `\n\n📊 Summary: ${(data.inserted?.length || 0) + (data.skipped?.length || 0)} total reassignment attempts.`;
-        }
-
-        showToast(alertMsg, 'success', 2000);
-
-        fetchRawData(); // Refresh the table
-        return { success: true };
+      // You might want to add reassignment_date if needed
+      if (editingClient.reassignment_date) {
+        updateData.reassignment_date = editingClient.reassignment_date;
       } else {
-        return { success: false, message: "Failed to update client" };
+        // Default to today's date if not provided
+        updateData.reassignment_date = new Date().toISOString().split('T')[0];
       }
-    } catch (error: any) {
-      console.error("Update failed:", error);
 
-      let errorMessage = "❌ Failed to update client.";
+      // Include remark for reassignment
+      if (editingClient.detailed_remark) {
+        updateData.remark = editingClient.detailed_remark;
+      }
+    }
 
-      if (error.response) {
-        // Server responded with error
-        console.error("Response error:", error.response.data);
-        console.error("Status:", error.response.status);
+    const response = await axios.put(
+      `${BASE_URL}api/master-data/${editingClient.master_id}`,
+      updateData,
+      { withCredentials: true }
+    );
 
-        if (error.response.data.message) {
-          errorMessage = `❌ ${error.response.data.message}`;
-        } else if (error.response.data.error) {
-          errorMessage = `❌ ${error.response.data.error}`;
-        }
+    const data = response.data;
 
-        // Check for specific error types
-        if (error.response.data.duplicates && error.response.data.duplicates.length > 0) {
-          errorMessage += `\n\n⚠️ Found ${error.response.data.duplicates.length} duplicate entries:`;
-          error.response.data.duplicates.forEach((dup: any) => {
-            errorMessage += `\n• ${dup.name || 'N/A'} (${dup.number || 'No number'})`;
+    if (response.status === 200) {
+      let alertMsg = "✅ Client updated successfully.";
+
+      // Show quick remark auto-copy notification
+      if (data.quick_remark_copied) {
+        alertMsg += "\n📝 Quick Remark copied to Detailed Remark.";
+      }
+
+      // Show inserted reassignment info
+      if (data.inserted && data.inserted.length) {
+        alertMsg += `\nAdded ${data.inserted.length} new reassignment(s).`;
+
+        // Optionally show details of inserted reassignments
+        if (data.inserted_details) {
+          data.inserted_details.forEach((detail: any) => {
+            alertMsg += `\n• ${detail.user_name} - ${detail.stage}`;
           });
         }
-      } else if (error.request) {
-        // Request made but no response
-        console.error("No response received:", error.request);
-        errorMessage = "❌ No response from server. Check your connection.";
-      } else {
-        // Something else happened
-        console.error("Error:", error.message);
-        errorMessage = `❌ Error: ${error.message}`;
       }
 
-      showToast(errorMessage, 'error', 5000);
-      return {
-        success: false,
-        message: errorMessage,
-        error: error.response?.data || error.message
-      };
+      // Show skipped duplicates info
+      if (data.skipped && data.skipped.length) {
+        const skippedList = data.skipped
+          .map((s: any) => `• ${s.finalName || s.user_name} (Stage: ${s.leadStage || s.stage})`)
+          .join("\n");
+        alertMsg += `\n\n⚠️ Skipped ${data.skipped.length} duplicate reassignment(s):\n${skippedList}`;
+      }
+
+      // Show reassignment remarks info if available
+      if (data.reassignment_remarks_added) {
+        alertMsg += `\n\n📝 Added reassignment remark to history.`;
+      }
+
+      // If there were reassignment changes, show summary
+      if ((data.inserted && data.inserted.length > 0) || (data.skipped && data.skipped.length > 0)) {
+        alertMsg += `\n\n📊 Summary: ${(data.inserted?.length || 0) + (data.skipped?.length || 0)} total reassignment attempts.`;
+      }
+
+      showToast(alertMsg, 'success', 2000);
+
+      fetchRawData(); // Refresh the table
+      return { success: true };
+    } else {
+      return { success: false, message: "Failed to update client" };
     }
-  };
+  } catch (error: any) {
+    console.error("Update failed:", error);
+
+    let errorMessage = "❌ Failed to update client.";
+
+    if (error.response) {
+      // Server responded with error
+      console.error("Response error:", error.response.data);
+      console.error("Status:", error.response.status);
+
+      if (error.response.data.message) {
+        errorMessage = `❌ ${error.response.data.message}`;
+      } else if (error.response.data.error) {
+        errorMessage = `❌ ${error.response.data.error}`;
+      }
+
+      // Check for specific error types
+      if (error.response.data.duplicates && error.response.data.duplicates.length > 0) {
+        errorMessage += `\n\n⚠️ Found ${error.response.data.duplicates.length} duplicate entries:`;
+        error.response.data.duplicates.forEach((dup: any) => {
+          errorMessage += `\n• ${dup.name || 'N/A'} (${dup.number || 'No number'})`;
+        });
+      }
+    } else if (error.request) {
+      // Request made but no response
+      console.error("No response received:", error.request);
+      errorMessage = "❌ No response from server. Check your connection.";
+    } else {
+      // Something else happened
+      console.error("Error:", error.message);
+      errorMessage = `❌ Error: ${error.message}`;
+    }
+
+    showToast(errorMessage, 'error', 5000);
+    return {
+      success: false,
+      message: errorMessage,
+      error: error.response?.data || error.message
+    };
+  }
+};
+
 
   const [isNewRemark, setIsNewRemark] = useState(false);
 
@@ -498,28 +476,36 @@ const UpdateRawData: React.FC<UpdateDataModalProps> = ({
     fetchQuickRemarks();
   }, []);
 
-  // Checkbox handler for user selection
-  const handleUserCheckboxChange = (userId: string, userName: string) => {
-    if (!editingClient) return;
+const handleUserCheckboxChange = (userId: string, userName: string) => {
+  if (!editingClient) return;
 
-    const currentAssigned = Array.isArray(editingClient.assigned_to)
-      ? [...editingClient.assigned_to]
-      : [];
+  const currentAssigned = Array.isArray(editingClient.assigned_to)
+    ? [...editingClient.assigned_to]
+    : [];
 
-    if (currentAssigned.includes(userId)) {
-      // Remove user
-      setEditingClient({
-        ...editingClient,
-        assigned_to: currentAssigned.filter(id => id !== userId)
-      });
-    } else {
-      // Add user
-      setEditingClient({
-        ...editingClient,
-        assigned_to: [...currentAssigned, userId]
-      });
-    }
-  };
+  // If user is already selected, deselect them
+  if (currentAssigned.includes(userId)) {
+    setEditingClient({
+      ...editingClient,
+      assigned_to: currentAssigned.filter(id => id !== userId)
+    });
+    return;
+  }
+
+  // If trying to select a different user, show toast and enforce single selection
+  if (currentAssigned.length === 1) {
+    // Show toast notification that only one user can be selected
+    showToast('⚠️ Only one user can be selected at a time. Please deselect the current user first.', 'warning', 3000);
+    return;
+  }
+
+  // If no user is selected, select this one
+  setEditingClient({
+    ...editingClient,
+    assigned_to: [userId] // 🔥 Only this user selected
+  });
+};
+
 
   // Handle select all filtered users
   const handleSelectAllFiltered = () => {
@@ -570,15 +556,22 @@ const UpdateRawData: React.FC<UpdateDataModalProps> = ({
           </button>
         </div>
 
-        <form onSubmit={async (e) => {
-          e.preventDefault();
-          const result = await handleUpdateClient(editingClient);
-          if (result.success) {
-            setTimeout(() => {
-              closeEditPopup();
-            }, 2200);
-          }
-        }}>
+<form onSubmit={async (e) => {
+  e.preventDefault();
+  
+  // 🔥 Add validation check before submission
+  if (!Array.isArray(editingClient.assigned_to) || editingClient.assigned_to.length === 0) {
+    showToast('⚠️ Please select at least one user to reassign.', 'warning', 3000);
+    return; // Stop form submission
+  }
+  
+  const result = await handleUpdateClient(editingClient);
+  if (result.success) {
+    setTimeout(() => {
+      closeEditPopup();
+    }, 2200);
+  }
+}}>
           {/* Required Fields Section */}
           <div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">

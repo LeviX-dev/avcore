@@ -111,30 +111,30 @@ const ROLE_HIERARCHY = {
     description: 'Tele Caller'
   },
   digital_marketing: {
-    canSee: ['tele_caller'],
+    canSee: ['tele_caller' , 'digital_marketing'],
     description: 'Digital Marketing'
   },
   
   field_marketing_executive: {
-    canSee: ['junior_autocad_designer'],
+    canSee: ['junior_autocad_designer' ,'field_marketing_executive'],
     description: 'Field Marketing Executive'
   },
   junior_autocad_designer: {
-    canSee: ['tech_sale_sound_engineer', 'technical_head'],
+    canSee: ['tech_sale_sound_engineer', 'technical_head' , 'junior_autocad_designer'],
     description: 'Junior AutoCAD Designer'
   },
   senior_autocad_designer: {
-    canSee: ['project_manager'],
+    canSee: ['project_manager' , 'senior_autocad_designer'],
     description: 'Senior AutoCAD Designer'
   },
   tech_sale_sound_engineer: {
-    canSee: ['technical_head', 'junior_autocad_designer'],
+    canSee: ['technical_head', 'junior_autocad_designer' , 'tech_sale_sound_engineer'],
     description: 'Tech-sale Sound Engineer'
   },
   technical_head: {
     canSee: ['admin', 'sub_admin', 'digital_marketing', 'tele_caller', 'field_marketing_executive', 
              'junior_autocad_designer', 'senior_autocad_designer', 'tech_sale_sound_engineer', 
-             'technical_head', 'project_manager'],
+             'technical_head', 'project_manager' ,'technical_head'],
     description: 'Technical Head'
   },
   project_manager: {
@@ -142,6 +142,7 @@ const ROLE_HIERARCHY = {
     description: 'Project Manager'
   }
 };
+
 
 
 

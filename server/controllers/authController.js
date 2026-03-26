@@ -49,7 +49,7 @@ import db from '../database/db.js';
 
 
 
-export const signIn = async (req, res) => {
+export const signIn1 = async (req, res) => {
   try {
 
     const { username, password } = req.body;
@@ -88,6 +88,71 @@ export const signIn = async (req, res) => {
       username: user.username
     });
 
+  } catch (error) {
+    res.status(500).json({ message: 'Server error', error: error.message });
+  }
+};
+
+// Add this at the top of your file
+const otpRequestTracker = new Map(); // Track OTP requests per user
+
+export const signIn = async (req, res) => {
+  try {
+    const { username, password } = req.body;
+    
+    if (!username || !password) {
+      return res.status(400).json({ message: 'Please provide username and password' });
+    }
+    
+    const user = await getUserByUsername(username);
+    if (!user) {
+      return res.status(401).json({ message: 'Invalid username' });
+    }
+    
+    const isPasswordValid = await bcrypt.compare(password, user.password);
+    if (!isPasswordValid) {
+      return res.status(401).json({ message: 'Invalid password' });
+    }
+    
+    // Check if user requested OTP recently (within last 30 seconds)
+    const lastRequestTime = otpRequestTracker.get(user.user_id);
+    const now = Date.now();
+    
+    if (lastRequestTime && (now - lastRequestTime) < 30000) { // 30 seconds cooldown
+      return res.status(429).json({ 
+        message: 'OTP already sent. Please wait 30 seconds before requesting again.',
+        waitTime: Math.ceil((30000 - (now - lastRequestTime)) / 1000)
+      });
+    }
+    
+    // Update the tracker with current time
+    otpRequestTracker.set(user.user_id, now);
+    
+    // Clean up old entries after 30 seconds
+    setTimeout(() => {
+      if (otpRequestTracker.get(user.user_id) === now) {
+        otpRequestTracker.delete(user.user_id);
+      }
+    }, 30000);
+    
+    // Generate OTP
+    const otp = Math.floor(100000 + Math.random() * 900000).toString();
+    const expiry = new Date(Date.now() + 5 * 60 * 1000);
+    
+    await db.query(
+      "UPDATE users SET otp=?, otp_expiry=? WHERE user_id=?",
+      [otp, expiry, user.user_id]
+    );
+    
+    // Send OTP email (non-blocking)
+    sendOtpMail(user, otp).catch(err => console.error('Email sending failed:', err));
+    
+    return res.status(200).json({ 
+      message: "OTP sent to your email. Please check your inbox (may take 2-3 seconds).",
+      otpRequired: true, 
+      username: user.username 
+    });
+    
   } catch (error) {
     res.status(500).json({ message: 'Server error', error: error.message });
   }

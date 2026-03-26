@@ -130,37 +130,38 @@ const InsertDataModal: React.FC<InsertDataModalProps> = ({
   }, [showAddPopup]);
 
   // Fetch users
-  useEffect(() => {
-    const fetchUsers = async () => {
-      try {
-const response = await axios.get(`${BASE_URL}api/users/by-role`);
-setUsers(response.data.users); // IMPORTANT
-      } catch (error) {
-        console.error('Failed to fetch users:', error);
-      }
-    };
-    fetchUsers();
-  }, []);
-
+useEffect(() => {
+  const fetchUsers = async () => {
+    try {
+      const response = await axios.get(`${BASE_URL}api/users`);
+      // The API returns the array directly, not wrapped in a 'users' property
+      setUsers(response.data); // CHANGE THIS LINE
+      console.log('Users fetched:', response.data); // For debugging
+    } catch (error) {
+      console.error('Failed to fetch users:', error);
+    }
+  };
+  fetchUsers();
+}, []);
 
   useEffect(() => {
   if (!users.length) return;
 
-  let telecallers = users.filter(
-    (user) => user.role?.toLowerCase() === 'tele_caller'
-  );
+  // Get all users (no role filtering)
+  let allUsers = [...users];
 
-  // Apply search on telecallers only
+  // Apply search if exists
   if (searchTerm.trim() !== '') {
     const term = searchTerm.toLowerCase();
-
-    telecallers = telecallers.filter(user =>
-      user.name.toLowerCase().includes(term)
+    allUsers = allUsers.filter(user =>
+      user.name.toLowerCase().includes(term) ||
+      user.role?.toLowerCase().includes(term)
     );
   }
 
-  setFilteredUsers(telecallers);
+  setFilteredUsers(allUsers);
 }, [users, searchTerm]);
+
 
   // Fetch lead stages
   useEffect(() => {

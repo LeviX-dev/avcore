@@ -270,8 +270,8 @@ function App() {
             <Route
               path="/master/area"
               element={
-                <ProtectedRoute menuKey="master.area">
-                  <DefaultLayout userRole={userRole}>
+<ProtectedRoute menuKey="city">          
+          <DefaultLayout userRole={userRole}>
                     <PageTitle title="Area" />
                     <Area />
                   </DefaultLayout>
