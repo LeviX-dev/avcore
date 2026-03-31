@@ -152,7 +152,7 @@ export const autoCheckoutAt8PM = async (req, res) => {
 // =================================================
 // GET TODAY STATUS
 // =================================================
-export const getTodayStatus = async (req, res) => {
+export const getTodayStatus1 = async (req, res) => {
   try {
     if (!req.session?.user) {
       return res.status(401).json({ message: 'Unauthorized' });
@@ -189,6 +189,29 @@ export const getTodayStatus = async (req, res) => {
   }
 };
 
+
+export const getTodayStatus = async (req, res) => {
+  try {
+    const userId = req.session.user.id;
+
+    const [rows] = await db.query(`
+      SELECT * FROM attendance
+      WHERE user_id = ?
+      AND DATE(check_in_time) = CURDATE()
+      LIMIT 1
+    `, [userId]);
+
+    if (rows.length > 0) {
+      return res.json({ checkedIn: true });
+    } else {
+      return res.json({ checkedIn: false });
+    }
+
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: "Error fetching status" });
+  }
+};
 
 
 const TELECALLER_ROLES = [

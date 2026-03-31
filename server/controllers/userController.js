@@ -107,28 +107,28 @@ const ROLE_HIERARCHY = {
     description: 'Business Head (Sub Admin)'
   },
   tele_caller: {
-    canSee: ['tele_caller', 'field_marketing_executive'],
+    canSee: ['tele_caller', 'field_marketing_executive', 'admin', 'sub_admin'],
     description: 'Tele Caller'
   },
   digital_marketing: {
-    canSee: ['tele_caller' , 'digital_marketing'],
+    canSee: ['tele_caller' , 'digital_marketing' ,'admin', 'sub_admin' ],
     description: 'Digital Marketing'
   },
   
   field_marketing_executive: {
-    canSee: ['junior_autocad_designer' ,'field_marketing_executive'],
+    canSee: ['junior_autocad_designer' ,'field_marketing_executive', 'admin', 'sub_admin' ],
     description: 'Field Marketing Executive'
   },
   junior_autocad_designer: {
-    canSee: ['tech_sale_sound_engineer', 'technical_head' , 'junior_autocad_designer'],
+    canSee: ['tech_sale_sound_engineer', 'technical_head' , 'junior_autocad_designer' , 'admin', 'sub_admin'],
     description: 'Junior AutoCAD Designer'
   },
   senior_autocad_designer: {
-    canSee: ['project_manager' , 'senior_autocad_designer'],
+    canSee: ['project_manager' , 'senior_autocad_designer', 'admin', 'sub_admin' ],
     description: 'Senior AutoCAD Designer'
   },
   tech_sale_sound_engineer: {
-    canSee: ['technical_head', 'junior_autocad_designer' , 'tech_sale_sound_engineer'],
+    canSee: ['technical_head', 'junior_autocad_designer' , 'tech_sale_sound_engineer' , 'admin', 'sub_admin' ],
     description: 'Tech-sale Sound Engineer'
   },
   technical_head: {

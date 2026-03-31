@@ -120,7 +120,7 @@ const UpdateRawData: React.FC<UpdateDataModalProps> = ({
   const showToast = (
     message: string,
     type: 'success' | 'error' | 'warning' = 'success',
-    duration = 9000
+    duration = 9000,
   ) => {
     setToast({ message, type });
 
@@ -134,11 +134,11 @@ const UpdateRawData: React.FC<UpdateDataModalProps> = ({
     const fetchUsers = async () => {
       try {
         const response = await axios.get(`${BASE_URL}api/users/by-role`, {
-          withCredentials: true
+          withCredentials: true,
         });
-        
+
         console.log('API Response:', response.data);
-        
+
         if (response.data.success) {
           // Extract users array from the response
           const usersData = response.data.users || [];
@@ -154,33 +154,32 @@ const UpdateRawData: React.FC<UpdateDataModalProps> = ({
         console.error('Failed to fetch users:', error);
         setUsers([]);
         setFilteredUsers([]);
-        
+
         // Show error toast
         showToast('Failed to load users', 'error');
       }
     };
-    
+
     if (showEditPopup) {
       fetchUsers();
     }
   }, [showEditPopup]);
 
-useEffect(() => {
-  if (!showEditPopup || !editingClient) return;
+  useEffect(() => {
+    if (!showEditPopup || !editingClient) return;
 
-  // ❌ DO NOT PREFILL ASSIGNED USERS
-  // Always reset on popup open
+    // ❌ DO NOT PREFILL ASSIGNED USERS
+    // Always reset on popup open
 
-  setEditingClient(prev =>
-    prev
-      ? {
-          ...prev,
-          assigned_to: [] // 🔥 EMPTY by default
-        }
-      : prev
-  );
-
-}, [showEditPopup]);
+    setEditingClient((prev) =>
+      prev
+        ? {
+            ...prev,
+            assigned_to: [], // 🔥 EMPTY by default
+          }
+        : prev,
+    );
+  }, [showEditPopup]);
 
   // Filter users based on search term
   useEffect(() => {
@@ -188,184 +187,209 @@ useEffect(() => {
       setFilteredUsers(users);
     } else {
       const term = searchTerm.toLowerCase();
-      const filtered = users.filter(user =>
-        user.name.toLowerCase().includes(term) ||
-        (user.role && user.role.toLowerCase().includes(term)) ||
-        (user.role_label && user.role_label.toLowerCase().includes(term))
+      const filtered = users.filter(
+        (user) =>
+          user.name.toLowerCase().includes(term) ||
+          (user.role && user.role.toLowerCase().includes(term)) ||
+          (user.role_label && user.role_label.toLowerCase().includes(term)),
       );
       setFilteredUsers(filtered);
     }
   }, [searchTerm, users]);
 
-const handleUpdateClient = async (editingClient: Client) => {
-  try {
-    // 🔥 ADD VALIDATION: Check if at least one user is selected
-    if (!Array.isArray(editingClient.assigned_to) || editingClient.assigned_to.length === 0) {
-      showToast('⚠️ Please select at least one user to reassign.', 'warning', 3000);
-      return { success: false, message: "No user selected" };
-    }
-
-    // Prepare the data to send
-    const updateData: any = {
-      name: editingClient.name,
-      email: editingClient.email,
-      number: editingClient.number,
-      alternate_number: editingClient.alternate_number,
-      address: editingClient.address,
-      cat_id: editingClient.cat_id,
-      reference_id: editingClient.reference_id || editingClient.reference,
-      area_id: editingClient.area_id,
-      // 🔥 MODIFIED: Send the appropriate value based on what's being shown
-      city: editingClient.city,
-      location_link: editingClient.location_link,
-      room_length: editingClient.room_length,
-      room_width: editingClient.room_width,
-      room_height: editingClient.room_height,
-      p_type: editingClient.p_type,
-      budget_range: editingClient.budget_range,
-      current_stage: editingClient.current_stage,
-      time_to_complete: editingClient.time_to_complete,
-      site_visit_date: editingClient.site_visit_date,
-      demo_date: editingClient.demo_date,
-      ar_number: editingClient.ar_number,
-      architect_name: editingClient.architect_name,
-      ca_number: editingClient.ca_number,
-      e_number: editingClient.e_number,
-      sm_number: editingClient.sm_number,
-      pop_number: editingClient.pop_number,
-      other_number: editingClient.other_number,
-      lead_stage: editingClient.lead_stage,
-      quick_remark: editingClient.quick_remark,
-      detailed_remark: editingClient.detailed_remark,
-      followup_date: editingClient.followup_date,
-      assign_id: editingClient.assign_id,
-      category_other: editingClient.category_other,
-      reference_other: editingClient.reference_other,
-    };
-
-    // Auto-copy quick_remark to detailed_remark if quick_remark is selected and detailed_remark is empty
-    if (editingClient.quick_remark && !editingClient.detailed_remark) {
-      updateData.detailed_remark = editingClient.quick_remark;
-    }
-
-    // If assigned_to is provided and not empty, include it for reassignment
-    if (Array.isArray(editingClient.assigned_to) && editingClient.assigned_to.length > 0) {
-      updateData.assignedTo = editingClient.assigned_to;
-
-      // Also include leadStage for reassignment if provided
-      if (editingClient.lead_stage) {
-        updateData.leadStage = editingClient.lead_stage;
+  const handleUpdateClient = async (editingClient: Client) => {
+    try {
+      // 🔥 ADD VALIDATION: Check if at least one user is selected
+      if (
+        !Array.isArray(editingClient.assigned_to) ||
+        editingClient.assigned_to.length === 0
+      ) {
+        showToast(
+          '⚠️ Please select at least one user to reassign.',
+          'warning',
+          3000,
+        );
+        return { success: false, message: 'No user selected' };
       }
 
-      // You might want to add reassignment_date if needed
-      if (editingClient.reassignment_date) {
-        updateData.reassignment_date = editingClient.reassignment_date;
-      } else {
-        // Default to today's date if not provided
-        updateData.reassignment_date = new Date().toISOString().split('T')[0];
+      // Prepare the data to send
+      const updateData: any = {
+        name: editingClient.name,
+        email: editingClient.email,
+        number: editingClient.number,
+        alternate_number: editingClient.alternate_number,
+        address: editingClient.address,
+        cat_id: editingClient.cat_id,
+        reference_id: editingClient.reference_id || editingClient.reference,
+        area_id: editingClient.area_id,
+        // 🔥 MODIFIED: Send the appropriate value based on what's being shown
+        city: editingClient.city,
+        location_link: editingClient.location_link,
+        room_length: editingClient.room_length,
+        room_width: editingClient.room_width,
+        room_height: editingClient.room_height,
+        p_type: editingClient.p_type,
+        budget_range: editingClient.budget_range,
+        current_stage: editingClient.current_stage,
+        time_to_complete: editingClient.time_to_complete,
+        site_visit_date: editingClient.site_visit_date,
+        demo_date: editingClient.demo_date,
+        ar_number: editingClient.ar_number,
+        architect_name: editingClient.architect_name,
+        ca_number: editingClient.ca_number,
+        e_number: editingClient.e_number,
+        sm_number: editingClient.sm_number,
+        pop_number: editingClient.pop_number,
+        other_number: editingClient.other_number,
+        lead_stage: editingClient.lead_stage,
+        quick_remark: editingClient.quick_remark,
+        detailed_remark: editingClient.detailed_remark,
+        followup_date: editingClient.followup_date,
+        assign_id: editingClient.assign_id,
+        category_other: editingClient.category_other,
+        reference_other: editingClient.reference_other,
+      };
+
+      // Auto-copy quick_remark to detailed_remark if quick_remark is selected and detailed_remark is empty
+      if (editingClient.quick_remark && !editingClient.detailed_remark) {
+        updateData.detailed_remark = editingClient.quick_remark;
       }
 
-      // Include remark for reassignment
-      if (editingClient.detailed_remark) {
-        updateData.remark = editingClient.detailed_remark;
-      }
-    }
+      // If assigned_to is provided and not empty, include it for reassignment
+      if (
+        Array.isArray(editingClient.assigned_to) &&
+        editingClient.assigned_to.length > 0
+      ) {
+        updateData.assignedTo = editingClient.assigned_to;
 
-    const response = await axios.put(
-      `${BASE_URL}api/master-data/${editingClient.master_id}`,
-      updateData,
-      { withCredentials: true }
-    );
+        // Also include leadStage for reassignment if provided
+        if (editingClient.lead_stage) {
+          updateData.leadStage = editingClient.lead_stage;
+        }
 
-    const data = response.data;
+        // You might want to add reassignment_date if needed
+        if (editingClient.reassignment_date) {
+          updateData.reassignment_date = editingClient.reassignment_date;
+        } else {
+          // Default to today's date if not provided
+          updateData.reassignment_date = new Date().toISOString().split('T')[0];
+        }
 
-    if (response.status === 200) {
-      let alertMsg = "✅ Client updated successfully.";
-
-      // Show quick remark auto-copy notification
-      if (data.quick_remark_copied) {
-        alertMsg += "\n📝 Quick Remark copied to Detailed Remark.";
-      }
-
-      // Show inserted reassignment info
-      if (data.inserted && data.inserted.length) {
-        alertMsg += `\nAdded ${data.inserted.length} new reassignment(s).`;
-
-        // Optionally show details of inserted reassignments
-        if (data.inserted_details) {
-          data.inserted_details.forEach((detail: any) => {
-            alertMsg += `\n• ${detail.user_name} - ${detail.stage}`;
-          });
+        // Include remark for reassignment
+        if (editingClient.detailed_remark) {
+          updateData.remark = editingClient.detailed_remark;
         }
       }
 
-      // Show skipped duplicates info
-      if (data.skipped && data.skipped.length) {
-        const skippedList = data.skipped
-          .map((s: any) => `• ${s.finalName || s.user_name} (Stage: ${s.leadStage || s.stage})`)
-          .join("\n");
-        alertMsg += `\n\n⚠️ Skipped ${data.skipped.length} duplicate reassignment(s):\n${skippedList}`;
+      const response = await axios.put(
+        `${BASE_URL}api/master-data/${editingClient.master_id}`,
+        updateData,
+        { withCredentials: true },
+      );
+
+      const data = response.data;
+
+      if (response.status === 200) {
+        let alertMsg = '✅ Client updated successfully.';
+
+        // Show quick remark auto-copy notification
+        if (data.quick_remark_copied) {
+          alertMsg += '\n📝 Quick Remark copied to Detailed Remark.';
+        }
+
+        // Show inserted reassignment info
+        if (data.inserted && data.inserted.length) {
+          alertMsg += `\nAdded ${data.inserted.length} new reassignment(s).`;
+
+          // Optionally show details of inserted reassignments
+          if (data.inserted_details) {
+            data.inserted_details.forEach((detail: any) => {
+              alertMsg += `\n• ${detail.user_name} - ${detail.stage}`;
+            });
+          }
+        }
+
+        // Show skipped duplicates info
+        if (data.skipped && data.skipped.length) {
+          const skippedList = data.skipped
+            .map(
+              (s: any) =>
+                `• ${s.finalName || s.user_name} (Stage: ${
+                  s.leadStage || s.stage
+                })`,
+            )
+            .join('\n');
+          alertMsg += `\n\n⚠️ Skipped ${data.skipped.length} duplicate reassignment(s):\n${skippedList}`;
+        }
+
+        // Show reassignment remarks info if available
+        if (data.reassignment_remarks_added) {
+          alertMsg += `\n\n📝 Added reassignment remark to history.`;
+        }
+
+        // If there were reassignment changes, show summary
+        if (
+          (data.inserted && data.inserted.length > 0) ||
+          (data.skipped && data.skipped.length > 0)
+        ) {
+          alertMsg += `\n\n📊 Summary: ${
+            (data.inserted?.length || 0) + (data.skipped?.length || 0)
+          } total reassignment attempts.`;
+        }
+
+        showToast(alertMsg, 'success', 2000);
+
+        fetchRawData(); // Refresh the table
+        return { success: true };
+      } else {
+        return { success: false, message: 'Failed to update client' };
+      }
+    } catch (error: any) {
+      console.error('Update failed:', error);
+
+      let errorMessage = '❌ Failed to update client.';
+
+      if (error.response) {
+        // Server responded with error
+        console.error('Response error:', error.response.data);
+        console.error('Status:', error.response.status);
+
+        if (error.response.data.message) {
+          errorMessage = `❌ ${error.response.data.message}`;
+        } else if (error.response.data.error) {
+          errorMessage = `❌ ${error.response.data.error}`;
+        }
+
+        // Check for specific error types
+        if (
+          error.response.data.duplicates &&
+          error.response.data.duplicates.length > 0
+        ) {
+          errorMessage += `\n\n⚠️ Found ${error.response.data.duplicates.length} duplicate entries:`;
+          error.response.data.duplicates.forEach((dup: any) => {
+            errorMessage += `\n• ${dup.name || 'N/A'} (${
+              dup.number || 'No number'
+            })`;
+          });
+        }
+      } else if (error.request) {
+        // Request made but no response
+        console.error('No response received:', error.request);
+        errorMessage = '❌ No response from server. Check your connection.';
+      } else {
+        // Something else happened
+        console.error('Error:', error.message);
+        errorMessage = `❌ Error: ${error.message}`;
       }
 
-      // Show reassignment remarks info if available
-      if (data.reassignment_remarks_added) {
-        alertMsg += `\n\n📝 Added reassignment remark to history.`;
-      }
-
-      // If there were reassignment changes, show summary
-      if ((data.inserted && data.inserted.length > 0) || (data.skipped && data.skipped.length > 0)) {
-        alertMsg += `\n\n📊 Summary: ${(data.inserted?.length || 0) + (data.skipped?.length || 0)} total reassignment attempts.`;
-      }
-
-      showToast(alertMsg, 'success', 2000);
-
-      fetchRawData(); // Refresh the table
-      return { success: true };
-    } else {
-      return { success: false, message: "Failed to update client" };
+      showToast(errorMessage, 'error', 5000);
+      return {
+        success: false,
+        message: errorMessage,
+        error: error.response?.data || error.message,
+      };
     }
-  } catch (error: any) {
-    console.error("Update failed:", error);
-
-    let errorMessage = "❌ Failed to update client.";
-
-    if (error.response) {
-      // Server responded with error
-      console.error("Response error:", error.response.data);
-      console.error("Status:", error.response.status);
-
-      if (error.response.data.message) {
-        errorMessage = `❌ ${error.response.data.message}`;
-      } else if (error.response.data.error) {
-        errorMessage = `❌ ${error.response.data.error}`;
-      }
-
-      // Check for specific error types
-      if (error.response.data.duplicates && error.response.data.duplicates.length > 0) {
-        errorMessage += `\n\n⚠️ Found ${error.response.data.duplicates.length} duplicate entries:`;
-        error.response.data.duplicates.forEach((dup: any) => {
-          errorMessage += `\n• ${dup.name || 'N/A'} (${dup.number || 'No number'})`;
-        });
-      }
-    } else if (error.request) {
-      // Request made but no response
-      console.error("No response received:", error.request);
-      errorMessage = "❌ No response from server. Check your connection.";
-    } else {
-      // Something else happened
-      console.error("Error:", error.message);
-      errorMessage = `❌ Error: ${error.message}`;
-    }
-
-    showToast(errorMessage, 'error', 5000);
-    return {
-      success: false,
-      message: errorMessage,
-      error: error.response?.data || error.message
-    };
-  }
-};
-
+  };
 
   const [isNewRemark, setIsNewRemark] = useState(false);
 
@@ -414,12 +438,12 @@ const handleUpdateClient = async (editingClient: Client) => {
         budget_range:
           value === 'Other'
             ? prev.budget_range &&
-            ![
-              'Basic Range: Above ₹7 Lakh',
-              'Premium Range: Above ₹10 Lakh',
-              'Ultra-Premium Range: Above ₹15 Lakh',
-              'Elite Range: Above ₹25 Lakh',
-            ].includes(prev.budget_range)
+              ![
+                'Basic Range: Above ₹7 Lakh',
+                'Premium Range: Above ₹10 Lakh',
+                'Ultra-Premium Range: Above ₹15 Lakh',
+                'Elite Range: Above ₹25 Lakh',
+              ].includes(prev.budget_range)
               ? prev.budget_range
               : ''
             : value,
@@ -476,36 +500,39 @@ const handleUpdateClient = async (editingClient: Client) => {
     fetchQuickRemarks();
   }, []);
 
-const handleUserCheckboxChange = (userId: string, userName: string) => {
-  if (!editingClient) return;
+  const handleUserCheckboxChange = (userId: string, userName: string) => {
+    if (!editingClient) return;
 
-  const currentAssigned = Array.isArray(editingClient.assigned_to)
-    ? [...editingClient.assigned_to]
-    : [];
+    const currentAssigned = Array.isArray(editingClient.assigned_to)
+      ? [...editingClient.assigned_to]
+      : [];
 
-  // If user is already selected, deselect them
-  if (currentAssigned.includes(userId)) {
+    // If user is already selected, deselect them
+    if (currentAssigned.includes(userId)) {
+      setEditingClient({
+        ...editingClient,
+        assigned_to: currentAssigned.filter((id) => id !== userId),
+      });
+      return;
+    }
+
+    // If trying to select a different user, show toast and enforce single selection
+    if (currentAssigned.length === 1) {
+      // Show toast notification that only one user can be selected
+      showToast(
+        '⚠️ Only one user can be selected at a time. Please deselect the current user first.',
+        'warning',
+        3000,
+      );
+      return;
+    }
+
+    // If no user is selected, select this one
     setEditingClient({
       ...editingClient,
-      assigned_to: currentAssigned.filter(id => id !== userId)
+      assigned_to: [userId], // 🔥 Only this user selected
     });
-    return;
-  }
-
-  // If trying to select a different user, show toast and enforce single selection
-  if (currentAssigned.length === 1) {
-    // Show toast notification that only one user can be selected
-    showToast('⚠️ Only one user can be selected at a time. Please deselect the current user first.', 'warning', 3000);
-    return;
-  }
-
-  // If no user is selected, select this one
-  setEditingClient({
-    ...editingClient,
-    assigned_to: [userId] // 🔥 Only this user selected
-  });
-};
-
+  };
 
   // Handle select all filtered users
   const handleSelectAllFiltered = () => {
@@ -516,27 +543,29 @@ const handleUserCheckboxChange = (userId: string, userName: string) => {
       : [];
 
     // Get IDs of filtered users
-    const filteredUserIds = filteredUsers.map(user => user.user_id);
+    const filteredUserIds = filteredUsers.map((user) => user.user_id);
 
     // Check if all filtered users are already selected
-    const allFilteredSelected = filteredUserIds.every(id =>
-      currentAssigned.includes(id)
+    const allFilteredSelected = filteredUserIds.every((id) =>
+      currentAssigned.includes(id),
     );
 
     if (allFilteredSelected) {
       // Deselect all filtered users
       setEditingClient({
         ...editingClient,
-        assigned_to: currentAssigned.filter(id => !filteredUserIds.includes(id))
+        assigned_to: currentAssigned.filter(
+          (id) => !filteredUserIds.includes(id),
+        ),
       });
     } else {
       // Add all filtered users (avoiding duplicates)
       const newAssigned = Array.from(
-        new Set([...currentAssigned, ...filteredUserIds])
+        new Set([...currentAssigned, ...filteredUserIds]),
       );
       setEditingClient({
         ...editingClient,
-        assigned_to: newAssigned
+        assigned_to: newAssigned,
       });
     }
   };
@@ -556,22 +585,31 @@ const handleUserCheckboxChange = (userId: string, userName: string) => {
           </button>
         </div>
 
-<form onSubmit={async (e) => {
-  e.preventDefault();
-  
-  // 🔥 Add validation check before submission
-  if (!Array.isArray(editingClient.assigned_to) || editingClient.assigned_to.length === 0) {
-    showToast('⚠️ Please select at least one user to reassign.', 'warning', 3000);
-    return; // Stop form submission
-  }
-  
-  const result = await handleUpdateClient(editingClient);
-  if (result.success) {
-    setTimeout(() => {
-      closeEditPopup();
-    }, 2200);
-  }
-}}>
+        <form
+          onSubmit={async (e) => {
+            e.preventDefault();
+
+            // 🔥 Add validation check before submission
+            if (
+              !Array.isArray(editingClient.assigned_to) ||
+              editingClient.assigned_to.length === 0
+            ) {
+              showToast(
+                '⚠️ Please select at least one user to reassign.',
+                'warning',
+                3000,
+              );
+              return; // Stop form submission
+            }
+
+            const result = await handleUpdateClient(editingClient);
+            if (result.success) {
+              setTimeout(() => {
+                closeEditPopup();
+              }, 2200);
+            }
+          }}
+        >
           {/* Required Fields Section */}
           <div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
@@ -663,9 +701,8 @@ const handleUserCheckboxChange = (userId: string, userName: string) => {
                 </select>
 
                 {/* CATEGORY OTHER TEXTBOX */}
-                {categories.find(
-                  (c) => c.cat_id === editingClient.cat_id
-                )?.cat_name === 'Other' && (
+                {categories.find((c) => c.cat_id === editingClient.cat_id)
+                  ?.cat_name === 'Other' && (
                   <input
                     type="text"
                     name="category_other"
@@ -684,7 +721,9 @@ const handleUserCheckboxChange = (userId: string, userName: string) => {
                 </label>
                 <select
                   name="reference_id"
-                  value={editingClient.reference_id || editingClient.reference || ''}
+                  value={
+                    editingClient.reference_id || editingClient.reference || ''
+                  }
                   onChange={handleInputChange}
                   required
                   className="w-full p-2 border rounded-md text-sm
@@ -711,13 +750,16 @@ const handleUserCheckboxChange = (userId: string, userName: string) => {
                 {/* RESOURCE CONDITIONAL TEXTBOX */}
                 {(() => {
                   const selectedRef = references.find(
-                    (r) => r.reference_id === editingClient.reference_id
+                    (r) => r.reference_id === editingClient.reference_id,
                   )?.reference_name;
 
                   if (
-                    !['Architect', 'Existing Client Reference', 'Other', 'other'].includes(
-                      selectedRef || ''
-                    )
+                    ![
+                      'Architect',
+                      'Existing Client Reference',
+                      'Other',
+                      'other',
+                    ].includes(selectedRef || '')
                   ) {
                     return null;
                   }
@@ -751,7 +793,7 @@ const handleUserCheckboxChange = (userId: string, userName: string) => {
                     <label className="block mb-1 text-base font-semibold text-green-700 dark:text-green-600">
                       City
                     </label>
-                    
+
                     <select
                       name="area_id"
                       value={editingClient.area_id || ''}
@@ -761,7 +803,10 @@ const handleUserCheckboxChange = (userId: string, userName: string) => {
                       <option value="">Select City</option>
                       {area && area.length > 0 ? (
                         area.map((areaItem) => (
-                          <option key={areaItem.area_id} value={areaItem.area_id}>
+                          <option
+                            key={areaItem.area_id}
+                            value={areaItem.area_id}
+                          >
                             {areaItem.area_name}
                           </option>
                         ))
@@ -771,15 +816,18 @@ const handleUserCheckboxChange = (userId: string, userName: string) => {
                         </option>
                       )}
                     </select>
-                    
+
                     {/* Show original city value as reference if different from selected area */}
-                    {editingClient.original_city && 
-                     editingClient.original_city !== '' && 
-                     editingClient.original_city !== (area.find(a => a.area_id === Number(editingClient.area_id))?.area_name || '') && (
-                      <p className="text-xs text-gray-500 mt-1">
-                        Original City: {editingClient.original_city}
-                      </p>
-                    )}
+                    {editingClient.original_city &&
+                      editingClient.original_city !== '' &&
+                      editingClient.original_city !==
+                        (area.find(
+                          (a) => a.area_id === Number(editingClient.area_id),
+                        )?.area_name || '') && (
+                        <p className="text-xs text-gray-500 mt-1">
+                          Original City: {editingClient.original_city}
+                        </p>
+                      )}
                   </div>
 
                   {/* Room Dimensions (L / W / H) */}
@@ -896,22 +944,21 @@ const handleUserCheckboxChange = (userId: string, userName: string) => {
                   <option value="Other">Other</option>
                 </select>
 
-                {
-                  [
-                    'Basic Range: Above ₹7 Lakh',
-                    'Premium Range: Above ₹10 Lakh',
-                    'Ultra-Premium Range: Above ₹15 Lakh',
-                    'Elite Range: Above ₹25 Lakh',
-                  ].includes(editingClient.budget_range) === false && (
-                    <input
-                      type="text"
-                      name="budget_range_custom"
-                      value={editingClient.budget_range}
-                      onChange={handleInputChange}
-                      placeholder="Enter custom budget"
-                      className="w-full p-2 mt-2 border rounded text-sm dark:border-form-strokedark dark:bg-form-input dark:text-white"
-                    />
-                  )}
+                {[
+                  'Basic Range: Above ₹7 Lakh',
+                  'Premium Range: Above ₹10 Lakh',
+                  'Ultra-Premium Range: Above ₹15 Lakh',
+                  'Elite Range: Above ₹25 Lakh',
+                ].includes(editingClient.budget_range) === false && (
+                  <input
+                    type="text"
+                    name="budget_range_custom"
+                    value={editingClient.budget_range}
+                    onChange={handleInputChange}
+                    placeholder="Enter custom budget"
+                    className="w-full p-2 mt-2 border rounded text-sm dark:border-form-strokedark dark:bg-form-input dark:text-white"
+                  />
+                )}
               </div>
 
               {/* Current Stage */}
@@ -985,7 +1032,9 @@ const handleUserCheckboxChange = (userId: string, userName: string) => {
                   disabled
                   className="w-full p-2 border rounded text-sm dark:border-form-strokedark dark:bg-form-input dark:text-white bg-gray-100 cursor-not-allowed"
                 />
-                <p className="text-xs text-gray-500 mt-1">Entry date cannot be modified</p>
+                <p className="text-xs text-gray-500 mt-1">
+                  Entry date cannot be modified
+                </p>
               </div>
             </div>
           </div>
@@ -1102,8 +1151,18 @@ const handleUserCheckboxChange = (userId: string, userName: string) => {
                 <div className="mb-2">
                   <div className="relative">
                     <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                      <svg className="h-4 w-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                      <svg
+                        className="h-4 w-4 text-gray-400"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
+                        />
                       </svg>
                     </div>
                     <input
@@ -1119,8 +1178,18 @@ const handleUserCheckboxChange = (userId: string, userName: string) => {
                         onClick={() => setSearchTerm('')}
                         className="absolute inset-y-0 right-0 pr-2 flex items-center text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
                       >
-                        <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                        <svg
+                          className="h-4 w-4"
+                          fill="none"
+                          stroke="currentColor"
+                          viewBox="0 0 24 24"
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={2}
+                            d="M6 18L18 6M6 6l12 12"
+                          />
                         </svg>
                       </button>
                     )}
@@ -1143,16 +1212,20 @@ const handleUserCheckboxChange = (userId: string, userName: string) => {
                         className="text-xs px-3 py-1.5 bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300 rounded hover:bg-blue-200 dark:hover:bg-blue-800 transition-colors whitespace-nowrap"
                       >
                         {filteredUsers.length > 0 &&
-                          filteredUsers.every(user =>
+                        filteredUsers.every(
+                          (user) =>
                             Array.isArray(editingClient.assigned_to) &&
-                            editingClient.assigned_to.includes(user.user_id)
-                          )
+                            editingClient.assigned_to.includes(user.user_id),
+                        )
                           ? 'Deselect All Filtered'
                           : 'Select All Filtered'}
                       </button>
                     </div>
                     <span className="text-xs text-gray-500 dark:text-gray-400">
-                      {Array.isArray(editingClient.assigned_to) ? editingClient.assigned_to.length : 0} selected
+                      {Array.isArray(editingClient.assigned_to)
+                        ? editingClient.assigned_to.length
+                        : 0}{' '}
+                      selected
                     </span>
                   </div>
 
@@ -1163,13 +1236,15 @@ const handleUserCheckboxChange = (userId: string, userName: string) => {
                         // Helper function to format role display
                         const formatRoleForDisplay = (role: string) => {
                           if (!role) return 'No role';
-                          if (role.length > 18) return role.substring(0, 16) + '...';
+                          if (role.length > 18)
+                            return role.substring(0, 16) + '...';
                           return role;
                         };
 
-                        const isSelected = Array.isArray(editingClient.assigned_to) &&
+                        const isSelected =
+                          Array.isArray(editingClient.assigned_to) &&
                           editingClient.assigned_to.includes(user.user_id);
-                        
+
                         return (
                           <div
                             key={user.user_id}
@@ -1183,20 +1258,25 @@ const handleUserCheckboxChange = (userId: string, userName: string) => {
                               type="checkbox"
                               id={`user-${user.user_id}`}
                               checked={isSelected}
-                              onChange={() => handleUserCheckboxChange(user.user_id, user.name)}
+                              onChange={() =>
+                                handleUserCheckboxChange(
+                                  user.user_id,
+                                  user.name,
+                                )
+                              }
                               className="h-4 w-4 text-blue-600 rounded focus:ring-blue-500 focus:ring-offset-0 mt-1 flex-shrink-0"
                             />
                             <label
                               htmlFor={`user-${user.user_id}`}
                               className="ml-2 text-sm text-gray-700 dark:text-gray-300 cursor-pointer flex-1 min-w-0"
                             >
-                              <div 
+                              <div
                                 className="font-medium truncate mb-0.5"
                                 title={user.name}
                               >
                                 {user.name}
                               </div>
-                              <div 
+                              <div
                                 className="text-xs text-gray-500 dark:text-gray-400 truncate"
                                 title={user.role_label || user.role}
                               >
@@ -1211,46 +1291,53 @@ const handleUserCheckboxChange = (userId: string, userName: string) => {
                     <div className="text-center py-4 text-gray-500 dark:text-gray-400">
                       <div className="text-2xl mb-2">🔍</div>
                       <p className="text-sm">No users found</p>
-                      <p className="text-xs mt-1">Try a different search term</p>
+                      <p className="text-xs mt-1">
+                        Try a different search term
+                      </p>
                     </div>
                   )}
                 </div>
 
                 {/* Selected Users Preview */}
-                {Array.isArray(editingClient.assigned_to) && editingClient.assigned_to.length > 0 && (
-                  <div className="mt-2 p-2 bg-blue-50 dark:bg-blue-900/30 rounded border border-blue-200 dark:border-blue-800">
-                    <div className="text-xs text-blue-700 dark:text-blue-300 mb-1 font-medium">
-                      Selected Users ({editingClient.assigned_to.length}):
-                    </div>
-                    <div className="text-xs text-gray-600 dark:text-gray-400 flex flex-wrap gap-1">
-                      {editingClient.assigned_to.map(userId => {
-                        const user = users.find(u => u.user_id === userId);
-                        if (!user) return null;
-                        
-                        const displayText = `${user.name}${user.role_label ? ` (${user.role_label})` : ''}`;
-                        
-                        return (
-                          <span 
-                            key={userId}
-                            className="inline-flex items-center gap-1 px-2 py-1 bg-blue-100 dark:bg-blue-900/50 rounded text-blue-800 dark:text-blue-300 border border-blue-200 dark:border-blue-700 max-w-[160px]"
-                          >
-                            <span className="truncate" title={displayText}>
-                              {displayText}
-                            </span>
-                            <button
-                              type="button"
-                              onClick={() => handleUserCheckboxChange(userId, user.name)}
-                              className="text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300 text-xs font-bold flex-shrink-0"
-                              aria-label={`Remove ${user.name}`}
+                {Array.isArray(editingClient.assigned_to) &&
+                  editingClient.assigned_to.length > 0 && (
+                    <div className="mt-2 p-2 bg-blue-50 dark:bg-blue-900/30 rounded border border-blue-200 dark:border-blue-800">
+                      <div className="text-xs text-blue-700 dark:text-blue-300 mb-1 font-medium">
+                        Selected Users ({editingClient.assigned_to.length}):
+                      </div>
+                      <div className="text-xs text-gray-600 dark:text-gray-400 flex flex-wrap gap-1">
+                        {editingClient.assigned_to.map((userId) => {
+                          const user = users.find((u) => u.user_id === userId);
+                          if (!user) return null;
+
+                          const displayText = `${user.name}${
+                            user.role_label ? ` (${user.role_label})` : ''
+                          }`;
+
+                          return (
+                            <span
+                              key={userId}
+                              className="inline-flex items-center gap-1 px-2 py-1 bg-blue-100 dark:bg-blue-900/50 rounded text-blue-800 dark:text-blue-300 border border-blue-200 dark:border-blue-700 max-w-[160px]"
                             >
-                              ×
-                            </button>
-                          </span>
-                        );
-                      })}
+                              <span className="truncate" title={displayText}>
+                                {displayText}
+                              </span>
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  handleUserCheckboxChange(userId, user.name)
+                                }
+                                className="text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300 text-xs font-bold flex-shrink-0"
+                                aria-label={`Remove ${user.name}`}
+                              >
+                                ×
+                              </button>
+                            </span>
+                          );
+                        })}
+                      </div>
                     </div>
-                  </div>
-                )}
+                  )}
               </div>
 
               {/* Follow-up Date */}
@@ -1312,7 +1399,8 @@ const handleUserCheckboxChange = (userId: string, userName: string) => {
               editingClient.reassignment_remarks.length > 0 && (
                 <div className="mt-3">
                   <label className="text-md font-semibold mb-2 dark:text-white border-b pb-1">
-                    Reassignment History ({editingClient.reassignment_remarks.length})
+                    Reassignment History (
+                    {editingClient.reassignment_remarks.length})
                   </label>
 
                   <div className="bg-white dark:bg-boxdark border rounded-md p-2 max-h-60 overflow-y-auto space-y-1.5">
@@ -1320,10 +1408,10 @@ const handleUserCheckboxChange = (userId: string, userName: string) => {
                       .slice()
                       .sort((a: any, b: any) => {
                         const dateA = new Date(
-                          a?.reassignment_date || a?.created_at || 0
+                          a?.reassignment_date || a?.created_at || 0,
                         ).getTime();
                         const dateB = new Date(
-                          b?.reassignment_date || b?.created_at || 0
+                          b?.reassignment_date || b?.created_at || 0,
                         ).getTime();
                         return dateB - dateA;
                       })
@@ -1356,7 +1444,9 @@ const handleUserCheckboxChange = (userId: string, userName: string) => {
                                 </div>
 
                                 <span className="text-[10px] text-gray-500">
-                                  {remarkObj.reassignment_date || remarkObj.created_at || ''}
+                                  {remarkObj.reassignment_date ||
+                                    remarkObj.created_at ||
+                                    ''}
                                 </span>
                               </div>
 
@@ -1367,7 +1457,8 @@ const handleUserCheckboxChange = (userId: string, userName: string) => {
                                   </span>
                                   {remarkObj.role && (
                                     <span className="text-gray-400">
-                                      {' '}({remarkObj.role})
+                                      {' '}
+                                      ({remarkObj.role})
                                     </span>
                                   )}
                                   <span className="mx-1 text-gray-400">→</span>
@@ -1422,9 +1513,9 @@ const handleUserCheckboxChange = (userId: string, userName: string) => {
                 onChange={handleInputChange}
                 onFocus={() => {
                   if (!isNewRemark) {
-                    setEditingClient(prev => ({
+                    setEditingClient((prev) => ({
                       ...prev,
-                      detailed_remark: ''
+                      detailed_remark: '',
                     }));
                     setIsNewRemark(true);
                   }

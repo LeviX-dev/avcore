@@ -96,20 +96,22 @@ const Pagination: React.FC<PaginationProps> = ({
         <button
           onClick={() => onPageChange(currentPage - 1)}
           disabled={currentPage === 1}
-          className={`relative inline-flex items-center rounded-md border border-white/10 bg-white/5 px-4 py-2 text-sm font-medium text-gray-200 ${currentPage === 1
+          className={`relative inline-flex items-center rounded-md border border-white/10 bg-white/5 px-4 py-2 text-sm font-medium text-gray-200 ${
+            currentPage === 1
               ? 'cursor-not-allowed opacity-50'
               : 'hover:bg-white/10'
-            }`}
+          }`}
         >
           Previous
         </button>
         <button
           onClick={() => onPageChange(currentPage + 1)}
           disabled={currentPage === totalPages}
-          className={`relative ml-3 inline-flex items-center rounded-md border border-white/10 bg-white/5 px-4 py-2 text-sm font-medium text-gray-200 ${currentPage === totalPages
+          className={`relative ml-3 inline-flex items-center rounded-md border border-white/10 bg-white/5 px-4 py-2 text-sm font-medium text-gray-200 ${
+            currentPage === totalPages
               ? 'cursor-not-allowed opacity-50'
               : 'hover:bg-white/10'
-            }`}
+          }`}
         >
           Next
         </button>
@@ -137,10 +139,11 @@ const Pagination: React.FC<PaginationProps> = ({
             <button
               onClick={() => onPageChange(currentPage - 1)}
               disabled={currentPage === 1}
-              className={`relative inline-flex items-center rounded-l-md px-2 py-2 text-gray-400 inset-ring inset-ring-gray-700 focus:z-20 focus:outline-offset-0 ${currentPage === 1
+              className={`relative inline-flex items-center rounded-l-md px-2 py-2 text-gray-400 inset-ring inset-ring-gray-700 focus:z-20 focus:outline-offset-0 ${
+                currentPage === 1
                   ? 'cursor-not-allowed opacity-50'
                   : 'hover:bg-white/5'
-                }`}
+              }`}
             >
               <span className="sr-only">Previous</span>
               <svg
@@ -178,10 +181,11 @@ const Pagination: React.FC<PaginationProps> = ({
                 <button
                   key={pageNumber}
                   onClick={() => onPageChange(pageNumber)}
-                  className={`relative inline-flex items-center px-4 py-2 text-sm font-semibold focus:z-20 focus:outline-offset-0 ${isCurrent
+                  className={`relative inline-flex items-center px-4 py-2 text-sm font-semibold focus:z-20 focus:outline-offset-0 ${
+                    isCurrent
                       ? 'z-10 bg-indigo-500 text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-500'
                       : 'text-gray-200 inset-ring inset-ring-gray-700 hover:bg-white/5'
-                    } ${pageNumber > 9 ? 'px-3' : 'px-4'}`}
+                  } ${pageNumber > 9 ? 'px-3' : 'px-4'}`}
                 >
                   {pageNumber}
                 </button>
@@ -192,10 +196,11 @@ const Pagination: React.FC<PaginationProps> = ({
             <button
               onClick={() => onPageChange(currentPage + 1)}
               disabled={currentPage === totalPages}
-              className={`relative inline-flex items-center rounded-r-md px-2 py-2 text-gray-400 inset-ring inset-ring-gray-700 focus:z-20 focus:outline-offset-0 ${currentPage === totalPages
+              className={`relative inline-flex items-center rounded-r-md px-2 py-2 text-gray-400 inset-ring inset-ring-gray-700 focus:z-20 focus:outline-offset-0 ${
+                currentPage === totalPages
                   ? 'cursor-not-allowed opacity-50'
                   : 'hover:bg-white/5'
-                }`}
+              }`}
             >
               <span className="sr-only">Next</span>
               <svg
@@ -478,41 +483,38 @@ const RawData = () => {
 
   const [isLoading, setIsLoading] = useState(true);
 
-
   // Add these new state variables for role-based user assignment
-const [assignUsers, setAssignUsers] = useState<any[]>([]);
-const [assignCurrentUserRole, setAssignCurrentUserRole] = useState('');
-const [assignRolePermissions, setAssignRolePermissions] = useState<any>(null);
+  const [assignUsers, setAssignUsers] = useState<any[]>([]);
+  const [assignCurrentUserRole, setAssignCurrentUserRole] = useState('');
+  const [assignRolePermissions, setAssignRolePermissions] = useState<any>(null);
 
+  // Fetch users with role-based filtering when Assign popup opens
+  useEffect(() => {
+    const fetchAssignUsers = async () => {
+      if (!showAssignPopup) return;
 
-// Fetch users with role-based filtering when Assign popup opens
-useEffect(() => {
-  const fetchAssignUsers = async () => {
-    if (!showAssignPopup) return;
-    
-    try {
-      const response = await axios.get(`${BASE_URL}api/users/by-role`, {
-        withCredentials: true
-      });
-      
-      console.log('Assign users API response:', response.data);
-      
-      if (response.data.success) {
-        setAssignUsers(response.data.users || []);
-        setAssignCurrentUserRole(response.data.currentUserRole || '');
-        setAssignRolePermissions(response.data.permissions || null);
-      } else {
+      try {
+        const response = await axios.get(`${BASE_URL}api/users/by-role`, {
+          withCredentials: true,
+        });
+
+        console.log('Assign users API response:', response.data);
+
+        if (response.data.success) {
+          setAssignUsers(response.data.users || []);
+          setAssignCurrentUserRole(response.data.currentUserRole || '');
+          setAssignRolePermissions(response.data.permissions || null);
+        } else {
+          setAssignUsers([]);
+        }
+      } catch (error) {
+        console.error('Failed to fetch assign users:', error);
         setAssignUsers([]);
       }
-    } catch (error) {
-      console.error('Failed to fetch assign users:', error);
-      setAssignUsers([]);
-    }
-  };
-  
-  fetchAssignUsers();
-}, [showAssignPopup]);
+    };
 
+    fetchAssignUsers();
+  }, [showAssignPopup]);
 
   const [importErrors, setImportErrors] = useState([]);
 
@@ -773,20 +775,22 @@ useEffect(() => {
             <div className="mt-4 flex border-b border-gray-200 dark:border-gray-700">
               <button
                 onClick={() => setActiveTab('details')}
-                className={`px-4 py-2 font-medium text-sm transition-colors flex items-center gap-2 ${activeTab === 'details'
+                className={`px-4 py-2 font-medium text-sm transition-colors flex items-center gap-2 ${
+                  activeTab === 'details'
                     ? 'text-blue-600 dark:text-blue-400 border-b-2 border-blue-500'
                     : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-300'
-                  }`}
+                }`}
               >
                 <FontAwesomeIcon icon={faInfoCircle} className="h-4 w-4" />
                 Details
               </button>
               <button
                 onClick={() => setActiveTab('documents')}
-                className={`px-4 py-2 font-medium text-sm transition-colors flex items-center gap-2 ${activeTab === 'documents'
+                className={`px-4 py-2 font-medium text-sm transition-colors flex items-center gap-2 ${
+                  activeTab === 'documents'
                     ? 'text-blue-600 dark:text-blue-400 border-b-2 border-blue-500'
                     : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-300'
-                  }`}
+                }`}
               >
                 <FontAwesomeIcon icon={faFile} className="h-4 w-4" />
                 Documents
@@ -794,12 +798,12 @@ useEffect(() => {
                   documentsData.documents.length +
                   documentsData.videos.length >
                   0 && (
-                    <span className="ml-1 bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-300 text-xs font-semibold px-2 py-0.5 rounded-full">
-                      {documentsData.images.length +
-                        documentsData.documents.length +
-                        documentsData.videos.length}
-                    </span>
-                  )}
+                  <span className="ml-1 bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-300 text-xs font-semibold px-2 py-0.5 rounded-full">
+                    {documentsData.images.length +
+                      documentsData.documents.length +
+                      documentsData.videos.length}
+                  </span>
+                )}
               </button>
             </div>
           </div>
@@ -1029,7 +1033,6 @@ useEffect(() => {
                   </div>
                 )}
 
-            
                 {/* Dates Information - Only show if exists */}
                 {hasDates && (
                   <div className="bg-gradient-to-r from-emerald-50 to-teal-50 dark:from-emerald-900/20 dark:to-teal-900/20 p-3 rounded-lg border border-emerald-100 dark:border-emerald-800/30">
@@ -1138,7 +1141,7 @@ useEffect(() => {
                       )}
                       {hasField('time_to_complete') &&
                         selectedClientDetails.time_to_complete !==
-                        'Not Available' && (
+                          'Not Available' && (
                           <div>
                             <div className="text-xs text-gray-500 dark:text-gray-400">
                               Time to Complete
@@ -1208,17 +1211,18 @@ useEffect(() => {
                           </div>
                           <div className="font-medium text-black dark:text-white bg-white dark:bg-gray-800 p-2 rounded border border-gray-200 dark:border-gray-700">
                             <span
-                              className={`px-2 py-1 rounded-full text-xs ${selectedClientDetails.quick_remark ===
-                                  'Interested'
+                              className={`px-2 py-1 rounded-full text-xs ${
+                                selectedClientDetails.quick_remark ===
+                                'Interested'
                                   ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300'
                                   : selectedClientDetails.quick_remark ===
                                     'Not Interested'
-                                    ? 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300'
-                                    : selectedClientDetails.quick_remark ===
-                                      'Not Reachable'
-                                      ? 'bg-gray-100 text-gray-800 dark:bg-gray-900/30 dark:text-gray-300'
-                                      : 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300'
-                                }`}
+                                  ? 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300'
+                                  : selectedClientDetails.quick_remark ===
+                                    'Not Reachable'
+                                  ? 'bg-gray-100 text-gray-800 dark:bg-gray-900/30 dark:text-gray-300'
+                                  : 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300'
+                              }`}
                             >
                               {formatValue(selectedClientDetails.quick_remark)}
                             </span>
@@ -1541,22 +1545,27 @@ useEffect(() => {
 
   // In RawData component
 
-const location = useLocation();
+  const location = useLocation();
 
 
-useEffect(() => {
+  useEffect(() => {
   // Check if we were sent here with a specific stage filter
   if (location.state?.lead_stage) {
     const stage = location.state.lead_stage;
     const fromDashboard = location.state.from_dashboard;
 
-    console.log(`Filtering by stage: "${stage}" from dashboard: ${fromDashboard}`);
-    console.log('Raw data sample stages:', rawData.slice(0, 3).map(c => ({
-      name: c.name,
-      latest_leadStage: c.latest_leadStage,
-      lead_stage: c.lead_stage,
-      stage: c.stage,
-    })));
+    console.log(
+      `Filtering by stage: "${stage}" from dashboard: ${fromDashboard}`,
+    );
+    console.log(
+      'Raw data sample stages:',
+      rawData.slice(0, 3).map((c) => ({
+        name: c.name,
+        latest_leadStage: c.latest_leadStage,
+        lead_stage: c.lead_stage,
+        stage: c.stage,
+      })),
+    );
 
     // Clear any existing search
     setSearchTerm('');
@@ -1564,29 +1573,33 @@ useEffect(() => {
 
     // Handle "Others" stage - this includes empty/null stages
     if (stage === 'Others') {
-      console.log('Applying "Others" stage filter (includes empty/null stages)');
-      
+      console.log(
+        'Applying "Others" stage filter (includes empty/null stages)',
+      );
+
       const othersFiltered = rawData.filter((client) => {
         // Get the stage from any field
-        const clientStage = 
+        const clientStage =
           client.latest_leadStage?.trim() ||
           client.lead_stage?.trim() ||
           client.stage?.trim() ||
           '';
-        
+
         // Check if stage is empty, null, or contains "other"
-        const isOther = 
-          !clientStage || 
+        const isOther =
+          !clientStage ||
           clientStage === '' ||
           clientStage.toLowerCase().includes('other') ||
           clientStage === 'Others' ||
           clientStage === 'Other';
-        
+
         return isOther;
       });
 
-      console.log(`"Others" Stage Filter: Found ${othersFiltered.length} records`);
-      
+      console.log(
+        `"Others" Stage Filter: Found ${othersFiltered.length} records`,
+      );
+
       // Debug: Show what records were found
       if (othersFiltered.length > 0) {
         console.log(
@@ -1603,20 +1616,20 @@ useEffect(() => {
 
       setFilteredClients(othersFiltered);
       setSearchTerm(''); // Don't set search term for Others
-    } 
+    }
     // Handle "N/A" stage
     else if (stage === 'N/A') {
       console.log('Applying "N/A" stage filter');
-      
+
       const naFiltered = rawData.filter((client) => {
-        const clientStage = 
+        const clientStage =
           client.latest_leadStage?.trim() ||
           client.lead_stage?.trim() ||
           client.stage?.trim() ||
           '';
 
         // Check if stage is explicitly "N/A" or "Not Available"
-        const isNA = 
+        const isNA =
           clientStage.toLowerCase() === 'n/a' ||
           clientStage.toLowerCase() === 'not available' ||
           clientStage === 'N/A' ||
@@ -1627,28 +1640,30 @@ useEffect(() => {
 
       console.log(`"N/A" Stage Filter: Found ${naFiltered.length} records`);
       setFilteredClients(naFiltered);
-    } 
+    }
     // Handle specific stages like "Fresh Lead", "Cold Lead", etc.
     else {
       console.log(`Applying specific stage filter for: "${stage}"`);
-      
+
       // Set the stage in selected stages for UI
       setSelectedStages([stage]);
-      
+
       // Filter the data for exact stage match
       const stageFiltered = rawData.filter((client) => {
         // Check all stage fields
-        const clientStage = 
+        const clientStage =
           client.latest_leadStage?.trim() ||
           client.lead_stage?.trim() ||
           client.stage?.trim() ||
           '';
-        
+
         return clientStage === stage;
       });
 
-      console.log(`Specific stage filter "${stage}": Found ${stageFiltered.length} records`);
-      
+      console.log(
+        `Specific stage filter "${stage}": Found ${stageFiltered.length} records`,
+      );
+
       // Debug: Show what records were found
       if (stageFiltered.length > 0) {
         console.log(
@@ -1668,10 +1683,13 @@ useEffect(() => {
 
     // Keep the from_dashboard flag
     if (fromDashboard) {
-      window.history.replaceState({ 
-        lead_stage: stage,
-        from_dashboard: true 
-      }, document.title);
+      window.history.replaceState(
+        {
+          lead_stage: stage,
+          from_dashboard: true,
+        },
+        document.title,
+      );
     }
   }
 
@@ -1679,8 +1697,10 @@ useEffect(() => {
   if (location.state?.category_name) {
     const category = location.state.category_name;
     const fromDashboard = location.state.from_dashboard;
-    
-    console.log(`Filtering by category: "${category}" from dashboard: ${fromDashboard}`);
+
+    console.log(
+      `Filtering by category: "${category}" from dashboard: ${fromDashboard}`,
+    );
 
     // Clear any existing search
     setSearchTerm('');
@@ -1700,14 +1720,17 @@ useEffect(() => {
       const othersFiltered = rawData.filter((client) => {
         const clientCategory = (client.cat_name?.trim() || '').toLowerCase();
         // Look for "other" (with or without 's')
-        const isOther = clientCategory === 'other' || 
-                       clientCategory.includes('other') || 
-                       clientCategory === 'others';
+        const isOther =
+          clientCategory === 'other' ||
+          clientCategory.includes('other') ||
+          clientCategory === 'others';
         return isOther;
       });
-      
-      console.log(`Others Category Filter: Found ${othersFiltered.length} records`);
-      
+
+      console.log(
+        `Others Category Filter: Found ${othersFiltered.length} records`,
+      );
+
       // Debug: Show what category records were found
       if (othersFiltered.length > 0) {
         console.log(
@@ -1720,9 +1743,9 @@ useEffect(() => {
           })),
         );
       }
-      
+
       setFilteredClients(othersFiltered);
-      
+
       // Also set search term to "other" (lowercase) for proper filtering
       if (fromDashboard) {
         setSearchTerm('other');
@@ -1734,10 +1757,13 @@ useEffect(() => {
 
     // Keep the from_dashboard flag
     if (fromDashboard) {
-      window.history.replaceState({ 
-        category_name: category,
-        from_dashboard: true 
-      }, document.title);
+      window.history.replaceState(
+        {
+          category_name: category,
+          from_dashboard: true,
+        },
+        document.title,
+      );
     }
   }
 
@@ -1745,18 +1771,20 @@ useEffect(() => {
   if (location.state?.reference_name) {
     const reference = location.state.reference_name;
     const fromDashboard = location.state.from_dashboard;
-    
-    console.log(`Filtering by reference: "${reference}" from dashboard: ${fromDashboard}`);
-    
+
+    console.log(
+      `Filtering by reference: "${reference}" from dashboard: ${fromDashboard}`,
+    );
+
     // Clear any existing search
     setSearchTerm('');
-    
+
     // Handle special cases: N/A and Others
     if (reference === 'N/A') {
       // Filter by empty/null reference values
       const naFiltered = rawData.filter((client) => {
         const clientReference = client.reference_name?.trim() || '';
-        const isNA = 
+        const isNA =
           !clientReference ||
           clientReference === '' ||
           clientReference.toLowerCase() === 'n/a' ||
@@ -1765,23 +1793,29 @@ useEffect(() => {
           clientReference === 'Not Available';
         return isNA;
       });
-      
+
       console.log(`N/A Reference Filter: Found ${naFiltered.length} records`);
       setFilteredClients(naFiltered);
-    } 
-    else if (reference === 'Others' || reference.toLowerCase() === 'other') {
+    } else if (
+      reference === 'Others' ||
+      reference.toLowerCase() === 'other'
+    ) {
       // Filter by reference containing "other" (case-insensitive)
       const othersFiltered = rawData.filter((client) => {
-        const clientReference = (client.reference_name?.trim() || '').toLowerCase();
-        const isOther = 
+        const clientReference = (
+          client.reference_name?.trim() || ''
+        ).toLowerCase();
+        const isOther =
           clientReference === 'other' ||
           clientReference.includes('other') ||
           clientReference === 'others';
         return isOther;
       });
-      
-      console.log(`Others Reference Filter: Found ${othersFiltered.length} records`);
-      
+
+      console.log(
+        `Others Reference Filter: Found ${othersFiltered.length} records`,
+      );
+
       // Debug: Show what records were found
       if (othersFiltered.length > 0) {
         console.log(
@@ -1793,26 +1827,28 @@ useEffect(() => {
           })),
         );
       }
-      
+
       setFilteredClients(othersFiltered);
-      
+
       // Also set search term to "other" (lowercase) for proper filtering
       if (fromDashboard) {
         setSearchTerm('other');
       }
-    } 
-    else {
+    } else {
       // Normal reference filtering
       console.log(`Setting search term for reference: ${reference}`);
       setSearchTerm(reference);
     }
-    
+
     // Keep the from_dashboard flag in location state
     if (fromDashboard) {
-      window.history.replaceState({ 
-        reference_name: reference,
-        from_dashboard: true 
-      }, document.title);
+      window.history.replaceState(
+        {
+          reference_name: reference,
+          from_dashboard: true,
+        },
+        document.title,
+      );
     }
   }
 
@@ -1820,8 +1856,10 @@ useEffect(() => {
   if (location.state?.budget_range) {
     const budgetRange = location.state.budget_range;
     const fromDashboard = location.state.from_dashboard;
-    
-    console.log(`Filtering by budget range: "${budgetRange}" from dashboard: ${fromDashboard}`);
+
+    console.log(
+      `Filtering by budget range: "${budgetRange}" from dashboard: ${fromDashboard}`,
+    );
 
     // Clear any existing search
     setSearchTerm('');
@@ -1829,8 +1867,8 @@ useEffect(() => {
     if (budgetRange === 'Not Specified') {
       // Filter for "Not Available", empty, or N/A budget ranges
       const notSpecifiedFiltered = rawData.filter((client) => {
-        const clientBudget = (client.budget_range?.trim() || '');
-        const isNotSpecified = 
+        const clientBudget = client.budget_range?.trim() || '';
+        const isNotSpecified =
           !clientBudget ||
           clientBudget === '' ||
           clientBudget.toLowerCase() === 'not available' ||
@@ -1839,9 +1877,11 @@ useEffect(() => {
           clientBudget === 'Not Available';
         return isNotSpecified;
       });
-      
-      console.log(`Not Specified Budget Filter: Found ${notSpecifiedFiltered.length} records`);
-      
+
+      console.log(
+        `Not Specified Budget Filter: Found ${notSpecifiedFiltered.length} records`,
+      );
+
       // Debug: Show what records were found
       if (notSpecifiedFiltered.length > 0) {
         console.log(
@@ -1853,46 +1893,57 @@ useEffect(() => {
           })),
         );
       }
-      
+
       setFilteredClients(notSpecifiedFiltered);
       setSearchTerm(''); // Clear search term for this case
-    } 
-    else if (budgetRange === 'Other' || budgetRange === 'Others' || budgetRange.toLowerCase() === 'other') {
+    } else if (
+      budgetRange === 'Other' ||
+      budgetRange === 'Others' ||
+      budgetRange.toLowerCase() === 'other'
+    ) {
       // IMPORTANT: Your data has "7lack", not "other"
       // We need to filter for budget ranges that are NOT empty/N/A and NOT matching the standard ranges
       const standardRanges = [
         'basic range: above ₹7 lakh',
-        'premium range: above ₹10 lakh', 
+        'premium range: above ₹10 lakh',
         'ultra-premium range: above ₹15 lakh',
-        'elite range: above ₹25 lakh'
+        'elite range: above ₹25 lakh',
       ];
-      
+
       const otherFiltered = rawData.filter((client) => {
-        const clientBudget = (client.budget_range?.trim() || '').toLowerCase();
-        
+        const clientBudget = (
+          client.budget_range?.trim() || ''
+        ).toLowerCase();
+
         // Skip empty or "not available" budgets (those are "Not Specified")
-        if (!clientBudget || 
-            clientBudget === '' || 
-            clientBudget === 'not available' || 
-            clientBudget === 'n/a' ||
-            clientBudget === 'not specified') {
+        if (
+          !clientBudget ||
+          clientBudget === '' ||
+          clientBudget === 'not available' ||
+          clientBudget === 'n/a' ||
+          clientBudget === 'not specified'
+        ) {
           return false;
         }
-        
+
         // Check if it matches any standard range
-        const isStandardRange = standardRanges.some(range => 
-          clientBudget.includes(range) || range.includes(clientBudget)
+        const isStandardRange = standardRanges.some(
+          (range) =>
+            clientBudget.includes(range) || range.includes(clientBudget),
         );
-        
+
         // Check for "7lack" specifically
-        const is7Lack = clientBudget.includes('7lack') || clientBudget.includes('7 lakh');
-        
+        const is7Lack =
+          clientBudget.includes('7lack') || clientBudget.includes('7 lakh');
+
         // Return true if it's NOT a standard range OR if it's "7lack"
         return !isStandardRange || is7Lack;
       });
-      
-      console.log(`Other Budget Filter: Found ${otherFiltered.length} records`);
-      
+
+      console.log(
+        `Other Budget Filter: Found ${otherFiltered.length} records`,
+      );
+
       // Debug: Show what budget records were found
       if (otherFiltered.length > 0) {
         console.log(
@@ -1903,7 +1954,7 @@ useEffect(() => {
             master_id: c.master_id,
           })),
         );
-        
+
         // Set search term to the specific value (like "7lack")
         const firstBudget = otherFiltered[0].budget_range || '';
         if (firstBudget.includes('7lack') || firstBudget.includes('7 lakh')) {
@@ -1912,10 +1963,9 @@ useEffect(() => {
           setSearchTerm(firstBudget);
         }
       }
-      
+
       setFilteredClients(otherFiltered);
-    } 
-    else {
+    } else {
       // Normal budget filtering for specific ranges (like "Premium Range: Above ₹10 Lakh")
       console.log(`Setting search term for budget: ${budgetRange}`);
       setSearchTerm(budgetRange);
@@ -1923,319 +1973,514 @@ useEffect(() => {
 
     // Keep the from_dashboard flag
     if (fromDashboard) {
-      window.history.replaceState({ 
-        budget_range: budgetRange,
-        from_dashboard: true 
-      }, document.title);
+      window.history.replaceState(
+        {
+          budget_range: budgetRange,
+          from_dashboard: true,
+        },
+        document.title,
+      );
+    }
+  }
+
+  // 🔥 AREA FILTER HANDLER
+  // Handle area filter from Area-wise Leads chart
+  if (location.state?.area_name) {
+    const area = location.state.area_name;
+    const fromDashboard = location.state.from_dashboard;
+
+    console.log(`Filtering by area: "${area}" from dashboard: ${fromDashboard}`);
+
+    // Clear any existing search
+    setSearchTerm('');
+
+    if (area === 'N/A') {
+      // Filter by empty/null area values
+      const naFiltered = rawData.filter((client) => {
+        const clientArea = client.area?.trim() || '';
+        const isNA = 
+          !clientArea ||
+          clientArea === '' ||
+          clientArea.toLowerCase() === 'n/a' ||
+          clientArea.toLowerCase() === 'not available' ||
+          clientArea === 'N/A' ||
+          clientArea === 'Not Available';
+        return isNA;
+      });
+
+      console.log(`N/A Area Filter: Found ${naFiltered.length} records`);
+      setFilteredClients(naFiltered);
+    } else if (area === 'Others' || area.toLowerCase() === 'other') {
+      // Filter by area containing "other" (case-insensitive)
+      const othersFiltered = rawData.filter((client) => {
+        const clientArea = (client.area?.trim() || '').toLowerCase();
+        const isOther = 
+          clientArea === 'other' ||
+          clientArea.includes('other') ||
+          clientArea === 'others';
+        return isOther;
+      });
+
+      console.log(`Others Area Filter: Found ${othersFiltered.length} records`);
+
+      // Debug: Show what records were found
+      if (othersFiltered.length > 0) {
+        console.log('Others area records found:', othersFiltered.map((c) => ({
+          name: c.name,
+          area: c.area,
+          master_id: c.master_id,
+        })));
+      }
+
+      setFilteredClients(othersFiltered);
+
+      // Also set search term to "other" (lowercase) for proper filtering
+      if (fromDashboard) {
+        setSearchTerm('other');
+      }
+    } else {
+      // Normal area filtering
+      console.log(`Setting search term for area: ${area}`);
+      setSearchTerm(area);
+    }
+
+    // Keep the from_dashboard flag
+    if (fromDashboard) {
+      window.history.replaceState(
+        {
+          area_name: area,
+          from_dashboard: true,
+        },
+        document.title,
+      );
     }
   }
 
   // Add debug logging for stage data
   console.log('Stage data check:', {
     totalRecords: rawData.length,
-    freshLead: rawData.filter(c => 
-      (c.latest_leadStage === 'Fresh Lead' || 
-       c.lead_stage === 'Fresh Lead' || 
-       c.stage === 'Fresh Lead')
-    ).map(c => ({ name: c.name, stage: c.latest_leadStage || c.lead_stage || c.stage })),
-    coldLead: rawData.filter(c => 
-      (c.latest_leadStage === 'Cold Lead' || 
-       c.lead_stage === 'Cold Lead' || 
-       c.stage === 'Cold Lead')
-    ).map(c => ({ name: c.name, stage: c.latest_leadStage || c.lead_stage || c.stage })),
-    preSiteVisit: rawData.filter(c => 
-      (c.latest_leadStage === 'Pre Site Visit' || 
-       c.lead_stage === 'Pre Site Visit' || 
-       c.stage === 'Pre Site Visit')
-    ).map(c => ({ name: c.name, stage: c.latest_leadStage || c.lead_stage || c.stage })),
-    emptyStages: rawData.filter(c => 
-      !c.latest_leadStage && !c.lead_stage && !c.stage
-    ).map(c => ({ name: c.name, latest_leadStage: c.latest_leadStage, lead_stage: c.lead_stage, stage: c.stage })),
-    allStages: rawData.map(c => ({
+    freshLead: rawData
+      .filter(
+        (c) =>
+          c.latest_leadStage === 'Fresh Lead' ||
+          c.lead_stage === 'Fresh Lead' ||
+          c.stage === 'Fresh Lead',
+      )
+      .map((c) => ({
+        name: c.name,
+        stage: c.latest_leadStage || c.lead_stage || c.stage,
+      })),
+    coldLead: rawData
+      .filter(
+        (c) =>
+          c.latest_leadStage === 'Cold Lead' ||
+          c.lead_stage === 'Cold Lead' ||
+          c.stage === 'Cold Lead',
+      )
+      .map((c) => ({
+        name: c.name,
+        stage: c.latest_leadStage || c.lead_stage || c.stage,
+      })),
+    preSiteVisit: rawData
+      .filter(
+        (c) =>
+          c.latest_leadStage === 'Pre Site Visit' ||
+          c.lead_stage === 'Pre Site Visit' ||
+          c.stage === 'Pre Site Visit',
+      )
+      .map((c) => ({
+        name: c.name,
+        stage: c.latest_leadStage || c.lead_stage || c.stage,
+      })),
+    emptyStages: rawData
+      .filter((c) => !c.latest_leadStage && !c.lead_stage && !c.stage)
+      .map((c) => ({
+        name: c.name,
+        latest_leadStage: c.latest_leadStage,
+        lead_stage: c.lead_stage,
+        stage: c.stage,
+      })),
+    allStages: rawData.map((c) => ({
       name: c.name,
       latest_leadStage: c.latest_leadStage,
       lead_stage: c.lead_stage,
       stage: c.stage,
-      master_id: c.master_id
-    }))
+      master_id: c.master_id,
+    })),
   });
-
 }, [location.state, rawData]);
 
 
+  const applyFilters = () => {
+    let filtered = [...rawData];
+    const lowerSearch = searchTerm.toLowerCase();
 
-const applyFilters = () => {
-  let filtered = [...rawData];
-  const lowerSearch = searchTerm.toLowerCase();
+    // Check if this is a reference-specific filter from dashboard
+    const isReferenceFilter =
+      location.state?.reference_name &&
+      location.state?.from_dashboard &&
+      (searchTerm === location.state.reference_name ||
+        (location.state.reference_name === 'Others' &&
+          searchTerm.toLowerCase() === 'other'));
 
-  // Check if this is a reference-specific filter from dashboard
-  const isReferenceFilter = location.state?.reference_name && 
-                           location.state?.from_dashboard &&
-                           (searchTerm === location.state.reference_name || 
-                            (location.state.reference_name === 'Others' && searchTerm.toLowerCase() === 'other'));
+    // Check if this is a category-specific filter from dashboard
+    const isCategoryFilter =
+      location.state?.category_name &&
+      location.state?.from_dashboard &&
+      (searchTerm === location.state.category_name ||
+        (location.state.category_name === 'Others' &&
+          searchTerm.toLowerCase() === 'other') ||
+        (location.state.category_name === 'Other' &&
+          searchTerm.toLowerCase() === 'other'));
 
-  // Check if this is a category-specific filter from dashboard
-  const isCategoryFilter = location.state?.category_name && 
-                          location.state?.from_dashboard &&
-                          (searchTerm === location.state.category_name ||
-                           (location.state.category_name === 'Others' && searchTerm.toLowerCase() === 'other') ||
-                           (location.state.category_name === 'Other' && searchTerm.toLowerCase() === 'other'));
+    // Check if this is a budget-specific filter from dashboard
+    const isBudgetFilter =
+      location.state?.budget_range && location.state?.from_dashboard;
 
-  // Check if this is a budget-specific filter from dashboard
-  const isBudgetFilter = location.state?.budget_range && 
-                        location.state?.from_dashboard;
+    // Check if this is a stage-specific filter from dashboard
+    const isStageFilter =
+      location.state?.lead_stage &&
+      location.state?.from_dashboard &&
+      (searchTerm === location.state.lead_stage ||
+        (location.state.lead_stage === 'Others' &&
+          searchTerm.toLowerCase() === 'other'));
 
-  // Check if this is a stage-specific filter from dashboard
-  const isStageFilter = location.state?.lead_stage && 
-                       location.state?.from_dashboard &&
-                       (searchTerm === location.state.lead_stage ||
-                        (location.state.lead_stage === 'Others' && searchTerm.toLowerCase() === 'other'));
 
-  // Apply Search Term Filter
-  if (searchTerm) {
-    console.log(`Applying search filter for: "${searchTerm}"`);
-    
-    // Special handling for "Not Specified" budget filter
-  if (isBudgetFilter && location.state.budget_range === 'Not Specified') {
-    console.log(`Applying "Not Specified" budget filter`);
-    filtered = filtered.filter((client) => {
-      const clientBudget = (client.budget_range?.trim() || '').toLowerCase();
-      return !clientBudget ||
-             clientBudget === '' ||
-             clientBudget === 'not available' ||
-             clientBudget === 'n/a' ||
-             clientBudget === 'not specified';
-    });
-    console.log(`"Not Specified" budget filter results: ${filtered.length} records`);
-  }
-  // Special handling for "Other" budget filter
-  else if (isBudgetFilter && (location.state.budget_range === 'Other' || location.state.budget_range === 'Others')) {
-    console.log(`Applying "Other" budget filter`);
-    const standardRanges = [
-      'basic range: above ₹7 lakh',
-      'premium range: above ₹10 lakh', 
-      'ultra-premium range: above ₹15 lakh',
-      'elite range: above ₹25 lakh'
-    ];
-    
-    filtered = filtered.filter((client) => {
-      const clientBudget = (client.budget_range?.trim() || '').toLowerCase();
-      
-      // Skip empty/not available budgets (those are "Not Specified")
-      if (!clientBudget || 
-          clientBudget === '' || 
-          clientBudget === 'not available' || 
-          clientBudget === 'n/a' ||
-          clientBudget === 'not specified') {
-        return false;
+           const isAreaFilter =
+    location.state?.area_name &&
+    location.state?.from_dashboard &&
+    (searchTerm === location.state.area_name ||
+      (location.state.area_name === 'Others' &&
+        searchTerm.toLowerCase() === 'other'));
+
+
+
+    // Apply Search Term Filter
+    if (searchTerm) {
+      console.log(`Applying search filter for: "${searchTerm}"`);
+
+      // Special handling for "Not Specified" budget filter
+      if (isBudgetFilter && location.state.budget_range === 'Not Specified') {
+        console.log(`Applying "Not Specified" budget filter`);
+        filtered = filtered.filter((client) => {
+          const clientBudget = (
+            client.budget_range?.trim() || ''
+          ).toLowerCase();
+          return (
+            !clientBudget ||
+            clientBudget === '' ||
+            clientBudget === 'not available' ||
+            clientBudget === 'n/a' ||
+            clientBudget === 'not specified'
+          );
+        });
+        console.log(
+          `"Not Specified" budget filter results: ${filtered.length} records`,
+        );
       }
-      
-      // Check if it matches any standard range
-      const isStandardRange = standardRanges.some(range => 
-        clientBudget.includes(range) || range.includes(clientBudget)
-      );
-      
-      // Check for "7lack" specifically
-      const is7Lack = clientBudget.includes('7lack') || clientBudget.includes('7 lakh');
-      
-      // Return true if it's NOT a standard range OR if it's "7lack"
-      return !isStandardRange || is7Lack;
-    });
-    console.log(`"Other" budget filter results: ${filtered.length} records`);
-  }
-    // Special handling for "Others" category filter
-    else if (isCategoryFilter && (location.state.category_name === 'Others' || 
-                             location.state.category_name === 'Other' || 
-                             searchTerm.toLowerCase() === 'other')) {
-      console.log(`Applying "Others" category filter`);
-      filtered = filtered.filter((client) => {
-        const clientCategory = (client.cat_name?.toLowerCase() || '');
-        return clientCategory === 'other' || 
-               clientCategory.includes('other') ||
-               clientCategory === 'others';
-      });
-      console.log(`"Others" category filter results: ${filtered.length} records`);
-    }
-    // Special handling for "Others" reference filter
-    else if (isReferenceFilter && (location.state.reference_name === 'Others' || searchTerm.toLowerCase() === 'other')) {
-      console.log(`Applying "Others" reference filter`);
-      filtered = filtered.filter((client) => {
-        const clientReference = (client.reference_name?.toLowerCase() || '');
-        return clientReference === 'other' || 
-               clientReference.includes('other') ||
-               clientReference === 'others';
-      });
-      console.log(`"Others" reference filter results: ${filtered.length} records`);
-    }
-    // Special handling for "Others" stage filter
-// In applyFilters function, update the stage section:
-else if (isStageFilter && location.state.lead_stage === 'Others') {
-  console.log(`Applying "Others" stage filter in applyFilters`);
-  
-  filtered = filtered.filter((client) => {
-    // Get stage from any field
-    const clientStage = 
-      client.latest_leadStage?.trim() ||
-      client.lead_stage?.trim() ||
-      client.stage?.trim() ||
-      '';
-    
-    // Check if stage is empty, null, or contains "other"
-    const isOther = 
-      !clientStage || 
-      clientStage === '' ||
-      clientStage.toLowerCase().includes('other') ||
-      clientStage === 'Others' ||
-      clientStage === 'Other';
-    
-    return isOther;
-  });
-  
-  console.log(`"Others" stage filter results: ${filtered.length} records`);
-}
-
-    // Category-specific filter (exact category name)
-    else if (isCategoryFilter) {
-      console.log(`Applying category-specific filter for: "${searchTerm}"`);
-      filtered = filtered.filter((client) => {
-        const clientCategory = client.cat_name?.toLowerCase() || '';
-        const searchLower = searchTerm.toLowerCase();
-        return clientCategory === searchLower || clientCategory.includes(searchLower);
-      });
-      console.log(`Category-specific filter results: ${filtered.length} records`);
-    } 
-    // Reference-specific filter
-    else if (isReferenceFilter) {
-      console.log(`Applying reference-specific filter for: "${searchTerm}"`);
-      filtered = filtered.filter((client) => {
-        const clientReference = client.reference_name?.toLowerCase() || '';
-        const searchLower = searchTerm.toLowerCase();
-        return clientReference === searchLower || clientReference.includes(searchLower);
-      });
-      console.log(`Reference-specific filter results: ${filtered.length} records`);
-    } 
-    // Budget-specific filter (for specific range like "Basic Range: Above ₹7 Lakh")
-    else if (isBudgetFilter && searchTerm) {
-      console.log(`Applying budget-specific filter for: "${searchTerm}"`);
-      filtered = filtered.filter((client) => {
-        const clientBudget = client.budget_range?.toLowerCase() || '';
-        const searchLower = searchTerm.toLowerCase();
-        
-        // Handle specific budget range matching
-        if (searchLower.includes('7 lakh') || searchLower.includes('7lack')) {
-          return clientBudget.includes('7lack') || clientBudget.includes('7 lakh');
-        }
-        
-        return clientBudget === searchLower || clientBudget.includes(searchLower);
-      });
-      console.log(`Budget-specific filter results: ${filtered.length} records`);
-    }
-    else {
-      // Normal search - search in all fields INCLUDING reference_name, cat_name, budget_range
-      filtered = filtered.filter((client) => {
-        const searchFields = [
-          client.name?.toLowerCase() || '',
-          client.number?.toString() || '',
-          client.email?.toLowerCase() || '',
-          client.address?.toLowerCase() || '',
-          client.area?.toLowerCase() || '',
-          client.cat_name?.toLowerCase() || '',
-          client.master_id?.toString() || '',
-          client.status?.toLowerCase() || '',
-          client.assigned_to?.toLowerCase() || '',
-          client.city?.toLowerCase() || '',
-          client.stage?.toLowerCase() || client.lead_stage?.toLowerCase() || '',
-          client.reference_name?.toLowerCase() || '',
-          client.budget_range?.toLowerCase() || '',
-          client.category_other?.toLowerCase() || '',
-          client.reference_other?.toLowerCase() || '',
+      // Special handling for "Other" budget filter
+      else if (
+        isBudgetFilter &&
+        (location.state.budget_range === 'Other' ||
+          location.state.budget_range === 'Others')
+      ) {
+        console.log(`Applying "Other" budget filter`);
+        const standardRanges = [
+          'basic range: above ₹7 lakh',
+          'premium range: above ₹10 lakh',
+          'ultra-premium range: above ₹15 lakh',
+          'elite range: above ₹25 lakh',
         ];
-        return searchFields.some((field) => field.includes(lowerSearch));
+
+        filtered = filtered.filter((client) => {
+          const clientBudget = (
+            client.budget_range?.trim() || ''
+          ).toLowerCase();
+
+          // Skip empty/not available budgets (those are "Not Specified")
+          if (
+            !clientBudget ||
+            clientBudget === '' ||
+            clientBudget === 'not available' ||
+            clientBudget === 'n/a' ||
+            clientBudget === 'not specified'
+          ) {
+            return false;
+          }
+
+          // Check if it matches any standard range
+          const isStandardRange = standardRanges.some(
+            (range) =>
+              clientBudget.includes(range) || range.includes(clientBudget),
+          );
+
+          // Check for "7lack" specifically
+          const is7Lack =
+            clientBudget.includes('7lack') || clientBudget.includes('7 lakh');
+
+          // Return true if it's NOT a standard range OR if it's "7lack"
+          return !isStandardRange || is7Lack;
+        });
+        console.log(
+          `"Other" budget filter results: ${filtered.length} records`,
+        );
+      }
+      // Special handling for "Others" category filter
+      else if (
+        isCategoryFilter &&
+        (location.state.category_name === 'Others' ||
+          location.state.category_name === 'Other' ||
+          searchTerm.toLowerCase() === 'other')
+      ) {
+        console.log(`Applying "Others" category filter`);
+        filtered = filtered.filter((client) => {
+          const clientCategory = client.cat_name?.toLowerCase() || '';
+          return (
+            clientCategory === 'other' ||
+            clientCategory.includes('other') ||
+            clientCategory === 'others'
+          );
+        });
+        console.log(
+          `"Others" category filter results: ${filtered.length} records`,
+        );
+      }
+      // Special handling for "Others" reference filter
+      else if (
+        isReferenceFilter &&
+        (location.state.reference_name === 'Others' ||
+          searchTerm.toLowerCase() === 'other')
+      ) {
+        console.log(`Applying "Others" reference filter`);
+        filtered = filtered.filter((client) => {
+          const clientReference = client.reference_name?.toLowerCase() || '';
+          return (
+            clientReference === 'other' ||
+            clientReference.includes('other') ||
+            clientReference === 'others'
+          );
+        });
+        console.log(
+          `"Others" reference filter results: ${filtered.length} records`,
+        );
+      }
+      // Special handling for "Others" stage filter
+      // In applyFilters function, update the stage section:
+      else if (isStageFilter && location.state.lead_stage === 'Others') {
+        console.log(`Applying "Others" stage filter in applyFilters`);
+
+        filtered = filtered.filter((client) => {
+          // Get stage from any field
+          const clientStage =
+            client.latest_leadStage?.trim() ||
+            client.lead_stage?.trim() ||
+            client.stage?.trim() ||
+            '';
+
+          // Check if stage is empty, null, or contains "other"
+          const isOther =
+            !clientStage ||
+            clientStage === '' ||
+            clientStage.toLowerCase().includes('other') ||
+            clientStage === 'Others' ||
+            clientStage === 'Other';
+
+          return isOther;
+        });
+
+        console.log(
+          `"Others" stage filter results: ${filtered.length} records`,
+        );
+      }
+
+      // Category-specific filter (exact category name)
+      else if (isCategoryFilter) {
+        console.log(`Applying category-specific filter for: "${searchTerm}"`);
+        filtered = filtered.filter((client) => {
+          const clientCategory = client.cat_name?.toLowerCase() || '';
+          const searchLower = searchTerm.toLowerCase();
+          return (
+            clientCategory === searchLower ||
+            clientCategory.includes(searchLower)
+          );
+        });
+        console.log(
+          `Category-specific filter results: ${filtered.length} records`,
+        );
+      }
+      // Reference-specific filter
+      else if (isReferenceFilter) {
+        console.log(`Applying reference-specific filter for: "${searchTerm}"`);
+        filtered = filtered.filter((client) => {
+          const clientReference = client.reference_name?.toLowerCase() || '';
+          const searchLower = searchTerm.toLowerCase();
+          return (
+            clientReference === searchLower ||
+            clientReference.includes(searchLower)
+          );
+        });
+        console.log(
+          `Reference-specific filter results: ${filtered.length} records`,
+        );
+      }
+      // Budget-specific filter (for specific range like "Basic Range: Above ₹7 Lakh")
+      else if (isBudgetFilter && searchTerm) {
+        console.log(`Applying budget-specific filter for: "${searchTerm}"`);
+        filtered = filtered.filter((client) => {
+          const clientBudget = client.budget_range?.toLowerCase() || '';
+          const searchLower = searchTerm.toLowerCase();
+
+          // Handle specific budget range matching
+          if (searchLower.includes('7 lakh') || searchLower.includes('7lack')) {
+            return (
+              clientBudget.includes('7lack') || clientBudget.includes('7 lakh')
+            );
+          }
+
+          return (
+            clientBudget === searchLower || clientBudget.includes(searchLower)
+          );
+        });
+        console.log(
+          `Budget-specific filter results: ${filtered.length} records`,
+        );
+      } 
+      
+       else if (isAreaFilter && 
+             (location.state.area_name === 'Others' ||
+              searchTerm.toLowerCase() === 'other')) {
+      console.log(`Applying "Others" area filter`);
+      filtered = filtered.filter((client) => {
+        const clientArea = (client.area?.trim() || '').toLowerCase();
+        return (
+          clientArea === 'other' ||
+          clientArea.includes('other') ||
+          clientArea === 'others'
+        );
       });
-      console.log(`Normal search results: ${filtered.length} records`);
+      console.log(`"Others" area filter results: ${filtered.length} records`);
     }
-  }
+    // Area-specific filter
+    else if (isAreaFilter) {
+      console.log(`Applying area-specific filter for: "${searchTerm}"`);
+      filtered = filtered.filter((client) => {
+        const clientArea = (client.area?.trim() || '').toLowerCase();
+        const searchLower = searchTerm.toLowerCase();
+        return (
+          clientArea === searchLower ||
+          clientArea.includes(searchLower)
+        );
+      });
+      console.log(`Area-specific filter results: ${filtered.length} records`);
+    }
 
-  // Apply Entry Date Range Filter
-  if (selectedEntryFromDate || selectedEntryToDate) {
-    filtered = filtered.filter((client) => {
-      if (!client.assign_date) return false;
-
-      const clientDate = new Date(client.assign_date);
-
-      if (isNaN(clientDate.getTime())) return false;
-
-      let fromDateValid = true;
-      let toDateValid = true;
-
-      if (selectedEntryFromDate) {
-        const fromDate = new Date(selectedEntryFromDate);
-        fromDateValid = clientDate >= fromDate;
+    else {
+        // Normal search - search in all fields INCLUDING reference_name, cat_name, budget_range
+        filtered = filtered.filter((client) => {
+          const searchFields = [
+            client.name?.toLowerCase() || '',
+            client.number?.toString() || '',
+            client.email?.toLowerCase() || '',
+            client.address?.toLowerCase() || '',
+            client.area?.toLowerCase() || '',
+            client.cat_name?.toLowerCase() || '',
+            client.master_id?.toString() || '',
+            client.status?.toLowerCase() || '',
+            client.assigned_to?.toLowerCase() || '',
+            client.city?.toLowerCase() || '',
+            client.stage?.toLowerCase() ||
+              client.lead_stage?.toLowerCase() ||
+              '',
+            client.reference_name?.toLowerCase() || '',
+            client.budget_range?.toLowerCase() || '',
+            client.category_other?.toLowerCase() || '',
+            client.reference_other?.toLowerCase() || '',
+          ];
+          return searchFields.some((field) => field.includes(lowerSearch));
+        });
+        console.log(`Normal search results: ${filtered.length} records`);
       }
+    }
 
-      if (selectedEntryToDate) {
-        const toDate = new Date(selectedEntryToDate);
-        toDateValid = clientDate <= toDate;
-      }
+    // Apply Entry Date Range Filter
+    if (selectedEntryFromDate || selectedEntryToDate) {
+      filtered = filtered.filter((client) => {
+        if (!client.assign_date) return false;
 
-      return fromDateValid && toDateValid;
-    });
-  }
+        const clientDate = new Date(client.assign_date);
 
-  // Apply Followup Date Range Filter
-  if (selectedFollowupFromDate || selectedFollowupToDate) {
-    filtered = filtered.filter((client) => {
-      if (!client.followup_date) return false;
+        if (isNaN(clientDate.getTime())) return false;
 
-      const clientDate = new Date(client.followup_date);
+        let fromDateValid = true;
+        let toDateValid = true;
 
-      if (isNaN(clientDate.getTime())) return false;
+        if (selectedEntryFromDate) {
+          const fromDate = new Date(selectedEntryFromDate);
+          fromDateValid = clientDate >= fromDate;
+        }
 
-      let fromDateValid = true;
-      let toDateValid = true;
+        if (selectedEntryToDate) {
+          const toDate = new Date(selectedEntryToDate);
+          toDateValid = clientDate <= toDate;
+        }
 
-      if (selectedFollowupFromDate) {
-        const fromDate = new Date(selectedFollowupFromDate);
-        fromDateValid = clientDate >= fromDate;
-      }
+        return fromDateValid && toDateValid;
+      });
+    }
 
-      if (selectedFollowupToDate) {
-        const toDate = new Date(selectedFollowupToDate);
-        toDateValid = clientDate <= toDate;
-      }
+    // Apply Followup Date Range Filter
+    if (selectedFollowupFromDate || selectedFollowupToDate) {
+      filtered = filtered.filter((client) => {
+        if (!client.followup_date) return false;
 
-      return fromDateValid && toDateValid;
-    });
-  }
+        const clientDate = new Date(client.followup_date);
 
-  // Apply Stage Filter
-  if (selectedStages.length > 0) {
-    filtered = filtered.filter(
-      (client) =>
-        (client.stage && selectedStages.includes(client.stage)) ||
-        (client.lead_stage && selectedStages.includes(client.lead_stage)),
-    );
-  }
+        if (isNaN(clientDate.getTime())) return false;
 
-  // Apply Assigned User Filter
-  if (selectedUsers.length > 0) {
-    filtered = filtered.filter(
-      (client) =>
-        client.assigned_to && selectedUsers.includes(client.assigned_to),
-    );
-  }
+        let fromDateValid = true;
+        let toDateValid = true;
 
-  // Apply City Filter
-  if (selectedCities.length > 0) {
-    filtered = filtered.filter(
-      (client) => client.city && selectedCities.includes(client.city),
-    );
-  }
+        if (selectedFollowupFromDate) {
+          const fromDate = new Date(selectedFollowupFromDate);
+          fromDateValid = clientDate >= fromDate;
+        }
 
-  setFilteredClients(filtered);
-  setCurrentPage(1);
-};
+        if (selectedFollowupToDate) {
+          const toDate = new Date(selectedFollowupToDate);
+          toDateValid = clientDate <= toDate;
+        }
 
+        return fromDateValid && toDateValid;
+      });
+    }
+
+    // Apply Stage Filter
+    if (selectedStages.length > 0) {
+      filtered = filtered.filter(
+        (client) =>
+          (client.stage && selectedStages.includes(client.stage)) ||
+          (client.lead_stage && selectedStages.includes(client.lead_stage)),
+      );
+    }
+
+    // Apply Assigned User Filter
+    if (selectedUsers.length > 0) {
+      filtered = filtered.filter(
+        (client) =>
+          client.assigned_to && selectedUsers.includes(client.assigned_to),
+      );
+    }
+
+    // Apply City Filter
+    if (selectedCities.length > 0) {
+      filtered = filtered.filter(
+        (client) => client.city && selectedCities.includes(client.city),
+      );
+    }
+
+    setFilteredClients(filtered);
+    setCurrentPage(1);
+  };
 
   useEffect(() => {
     const lowerSearch = searchTerm.toLowerCase();
@@ -2705,240 +2950,241 @@ else if (isStageFilter && location.state.lead_stage === 'Others') {
   //   }
   // };
 
-
   const Loader = () => (
-  <div className="flex flex-col items-center justify-center py-20">
-    <div className="relative">
-      <div className="w-20 h-20 border-4 border-gray-200 dark:border-gray-700 rounded-full"></div>
-      <div className="absolute top-0 left-0 w-20 h-20 border-4 border-t-blue-500 border-r-transparent border-b-transparent border-l-transparent rounded-full animate-spin"></div>
+    <div className="flex flex-col items-center justify-center py-20">
+      <div className="relative">
+        <div className="w-20 h-20 border-4 border-gray-200 dark:border-gray-700 rounded-full"></div>
+        <div className="absolute top-0 left-0 w-20 h-20 border-4 border-t-blue-500 border-r-transparent border-b-transparent border-l-transparent rounded-full animate-spin"></div>
+      </div>
+      <p className="mt-6 text-gray-600 dark:text-gray-400 font-medium text-lg">
+        Loading master data...
+      </p>
+      <p className="mt-2 text-sm text-gray-500 dark:text-gray-500">
+        Please wait while we fetch your data
+      </p>
     </div>
-    <p className="mt-6 text-gray-600 dark:text-gray-400 font-medium text-lg">
-      Loading master data...
-    </p>
-    <p className="mt-2 text-sm text-gray-500 dark:text-gray-500">
-      Please wait while we fetch your data
-    </p>
-  </div>
-);
+  );
 
+  const fetchRawData = async () => {
+    setIsLoading(true); // Set loading to true before fetching
+    try {
+      const response = await fetch(`${BASE_URL}api/master-data`);
+      if (!response.ok) throw new Error('Network response was not ok');
 
+      const data = await response.json();
 
-const fetchRawData = async () => {
-  setIsLoading(true); // Set loading to true before fetching
-  try {
-    const response = await fetch(`${BASE_URL}api/master-data`);
-    if (!response.ok) throw new Error('Network response was not ok');
-
-    const data = await response.json();
-
-    const parseValue = (value) => {
-      if (
-        value === 'Not Available' ||
-        value === null ||
-        value === undefined
-      ) {
-        return '';
-      }
-      return value;
-    };
-
-    const parseIdValue = (value) => {
-      if (
-        value === 'Not Available' ||
-        value === null ||
-        value === undefined
-      ) {
-        return '';
-      }
-      return isNaN(value) ? value : Number(value);
-    };
-
-    // STAGE MAPPING FOR PERCENTAGE CALCULATION
-    const STAGE_PERCENTAGE_MAP: Record<string, number> = {
-      'Fresh Lead': 0,
-      'Cold Lead': 10,
-      'On Hold': 20,
-      'Positive Lead': 30,
-      'Pre Site Visit': 40,
-      Demo: 50,
-      'Quotation Pending': 60,
-      'Quotation Follow-up': 70,
-      'Post Site Visit': 80,
-      'Projection List': 90,
-      Drop: -1,
-      'Closed Deal': 100,
-    };
-
-    // Create an object to track the last non-Drop stage for each client
-    const lastNonDropStages: Record<number, string> = {};
-
-    // First pass: Identify and store last non-Drop stages for all clients
-    data.forEach((item: any) => {
-      const clientId = item.master_id;
-      const currentStage = parseValue(
-        item.stage || item.lead_stage || item.current_stage,
-      );
-      const cleanStage = currentStage ? currentStage.trim() : '';
-
-      // If this is not a Drop stage, store it as the last non-Drop stage
-      if (cleanStage && cleanStage !== 'Drop') {
-        lastNonDropStages[clientId] = cleanStage;
-      }
-    });
-
-    // Second pass: Process data and include previous_stage field
-    const formattedData = data.map((item: any) => {
-      const currentStage = parseValue(
-        item.stage || item.lead_stage || item.current_stage,
-      );
-      const cleanStage = currentStage ? currentStage.trim() : '';
-
-      // Get the last non-Drop stage for this client
-      let previousStage = lastNonDropStages[item.master_id] || '';
-
-      // Special handling: If current is Drop and we don't have a previous stage
-      if (cleanStage === 'Drop' && !previousStage) {
-        if (item.quotation_date || item.site_visit_date) {
-          previousStage = 'Quotation Pending';
-        } else if (item.demo_date) {
-          previousStage = 'Demo';
-        } else {
-          previousStage = 'Positive Lead';
+      const parseValue = (value) => {
+        if (
+          value === 'Not Available' ||
+          value === null ||
+          value === undefined
+        ) {
+          return '';
         }
-      }
-
-      // Calculate percentage based on stage (for Drop, use previous stage)
-      const stageForPercentage =
-        cleanStage === 'Drop' ? previousStage : cleanStage;
-      const status_percentage = stageForPercentage
-        ? STAGE_PERCENTAGE_MAP[stageForPercentage] || 0
-        : 0;
-
-      // 🔥 IMPORTANT: Determine display city with priority: area_name first, then city
-      let displayCity = '';
-      const areaName = parseValue(item.area_name);
-      const cityName = parseValue(item.city);
-      
-      if (areaName && areaName !== '' && areaName !== 'Not Available') {
-        displayCity = areaName; // Use area_name if available
-      } else if (cityName && cityName !== '' && cityName !== 'Not Available') {
-        displayCity = cityName; // Fallback to city if area_name not available
-      } else {
-        displayCity = ''; // Empty if neither available
-      }
-
-      return {
-        id: item.master_id,
-        master_id: item.master_id,
-        name: parseValue(item.name),
-        number: parseValue(item.number),
-        alternate_number: parseValue(item.alternate_number),
-        email: parseValue(item.email),
-        address: parseValue(item.address),
-
-        // Master data
-        area: parseValue(item.area_name),
-        area_id: parseIdValue(item.area_id),
-        cat_name: parseValue(item.cat_name),
-        cat_id: parseIdValue(item.cat_id),
-        reference_name: parseValue(item.reference_name),
-        reference_id: parseIdValue(item.reference_id),
-        status: parseValue(item.status),
-
-        // Other inputs
-        category_other: item.category_other || '',
-        reference_other: item.reference_other || '',
-
-        // Location and room details
-        city: displayCity, // 🔥 THIS IS THE KEY CHANGE - Use the prioritized display city
-        original_city: parseValue(item.city), // Keep original if needed elsewhere
-        original_area: parseValue(item.area_name), // Keep original if needed elsewhere
-        location_link: parseValue(item.location_link),
-        room_length: parseValue(item.room_length),
-        room_width: parseValue(item.room_width),
-        room_height: parseValue(item.room_height),
-        p_type: parseValue(item.p_type),
-        budget_range: parseValue(item.budget_range),
-        current_stage: parseValue(item.current_stage),
-        room_ready: parseValue(item.room_ready),
-        time_to_complete: parseValue(item.time_to_complete),
-        site_visit_date: parseValue(item.site_visit_date),
-        demo_date: parseValue(item.demo_date),
-
-        // Contact numbers
-        ar_number: parseValue(item.ar_number),
-        architect_name: parseValue(item.architect_name),
-        ca_number: parseValue(item.ca_number),
-        e_number: parseValue(item.e_number),
-        sm_number: parseValue(item.sm_number),
-        pop_number: parseValue(item.pop_number),
-        other_number: parseValue(item.other_number),
-
-        // Lead information
-        latest_leadStage: parseValue(item.latest_leadStage),
-        lead_stage: parseValue(item.lead_stage),
-
-        quick_remark: parseValue(item.quick_remark),
-        detailed_remark: parseValue(item.detailed_remark),
-
-        // Assignment fields
-        assign_date: parseValue(item.assign_date),
-        followup_date: parseValue(item.followup_date),
-        assignment_remark: parseValue(item.assignment_remark),
-        assigned_to: parseValue(item.assigned_to),
-        assigned_to_user_id: parseIdValue(item.assigned_to_user_id),
-        stage: cleanStage,
-        assign_type: parseValue(item.assign_type),
-
-        reassignment_remarks: Array.isArray(item.reassignment_remarks)
-          ? item.reassignment_remarks.map((remark: any) => {
-            if (typeof remark === 'string') {
-              return remark;
-            } else if (remark && typeof remark === 'object') {
-              return {
-                remark: remark.remark || '',
-                assignedTo: remark.assignedTo || '',
-                leadStage: remark.leadStage || '',
-                reassignment_date: remark.reassignment_date || '',
-                created_by_user: remark.created_by_user || 0,
-                created_at: remark.created_at || '',
-                name: remark.name || '',
-                role: remark.role || '',
-              };
-            }
-            return '';
-          })
-          : [],
-        previous_stage: previousStage,
-
-        // Calculated percentage for battery display
-        status_percentage: status_percentage,
-
-        // Flag to indicate if this is a Drop stage
-        is_drop_stage: cleanStage === 'Drop',
-
-        assign_id: parseIdValue(item.assign_id),
-
-        document_location_link: parseValue(item.document_location_link),
+        return value;
       };
-    });
 
-    console.log('Processed data with other inputs:', {
-      totalClients: formattedData.length,
-      sampleClient: formattedData[0],
-      hasCategoryOther: formattedData[0]?.category_other,
-      hasReferenceOther: formattedData[0]?.reference_other,
-    });
+      const parseIdValue = (value) => {
+        if (
+          value === 'Not Available' ||
+          value === null ||
+          value === undefined
+        ) {
+          return '';
+        }
+        return isNaN(value) ? value : Number(value);
+      };
 
-    setRawData(formattedData);
-    setFilteredClients(formattedData);
-    setCurrentPage(1);
-  } catch (error) {
-    console.error('Error fetching Master Data:', error);
-  } finally {
-    setIsLoading(false); // Set loading to false after fetching (whether success or error)
-  }
-};
+      // STAGE MAPPING FOR PERCENTAGE CALCULATION
+      const STAGE_PERCENTAGE_MAP: Record<string, number> = {
+        'Fresh Lead': 0,
+        'Cold Lead': 10,
+        'On Hold': 20,
+        'Positive Lead': 30,
+        'Pre Site Visit': 40,
+        Demo: 50,
+        'Quotation Pending': 60,
+        'Quotation Follow-up': 70,
+        'Post Site Visit': 80,
+        'Projection List': 90,
+        Drop: -1,
+        'Closed Deal': 100,
+      };
+
+      // Create an object to track the last non-Drop stage for each client
+      const lastNonDropStages: Record<number, string> = {};
+
+      // First pass: Identify and store last non-Drop stages for all clients
+      data.forEach((item: any) => {
+        const clientId = item.master_id;
+        const currentStage = parseValue(
+          item.stage || item.lead_stage || item.current_stage,
+        );
+        const cleanStage = currentStage ? currentStage.trim() : '';
+
+        // If this is not a Drop stage, store it as the last non-Drop stage
+        if (cleanStage && cleanStage !== 'Drop') {
+          lastNonDropStages[clientId] = cleanStage;
+        }
+      });
+
+      // Second pass: Process data and include previous_stage field
+      const formattedData = data.map((item: any) => {
+        const currentStage = parseValue(
+          item.stage || item.lead_stage || item.current_stage,
+        );
+        const cleanStage = currentStage ? currentStage.trim() : '';
+
+        // Get the last non-Drop stage for this client
+        let previousStage = lastNonDropStages[item.master_id] || '';
+
+        // Special handling: If current is Drop and we don't have a previous stage
+        if (cleanStage === 'Drop' && !previousStage) {
+          if (item.quotation_date || item.site_visit_date) {
+            previousStage = 'Quotation Pending';
+          } else if (item.demo_date) {
+            previousStage = 'Demo';
+          } else {
+            previousStage = 'Positive Lead';
+          }
+        }
+
+        // Calculate percentage based on stage (for Drop, use previous stage)
+        const stageForPercentage =
+          cleanStage === 'Drop' ? previousStage : cleanStage;
+        const status_percentage = stageForPercentage
+          ? STAGE_PERCENTAGE_MAP[stageForPercentage] || 0
+          : 0;
+
+        // 🔥 IMPORTANT: Determine display city with priority: area_name first, then city
+        let displayCity = '';
+        const areaName = parseValue(item.area_name);
+        const cityName = parseValue(item.city);
+
+        if (areaName && areaName !== '' && areaName !== 'Not Available') {
+          displayCity = areaName; // Use area_name if available
+        } else if (
+          cityName &&
+          cityName !== '' &&
+          cityName !== 'Not Available'
+        ) {
+          displayCity = cityName; // Fallback to city if area_name not available
+        } else {
+          displayCity = ''; // Empty if neither available
+        }
+
+        return {
+          id: item.master_id,
+          master_id: item.master_id,
+          name: parseValue(item.name),
+          number: parseValue(item.number),
+          alternate_number: parseValue(item.alternate_number),
+          email: parseValue(item.email),
+          address: parseValue(item.address),
+
+          // Master data
+          area: parseValue(item.area_name),
+          area_id: parseIdValue(item.area_id),
+          cat_name: parseValue(item.cat_name),
+          cat_id: parseIdValue(item.cat_id),
+          reference_name: parseValue(item.reference_name),
+          reference_id: parseIdValue(item.reference_id),
+          status: parseValue(item.status),
+
+          // Other inputs
+          category_other: item.category_other || '',
+          reference_other: item.reference_other || '',
+
+          // Location and room details
+          city: displayCity, // 🔥 THIS IS THE KEY CHANGE - Use the prioritized display city
+          original_city: parseValue(item.city), // Keep original if needed elsewhere
+          original_area: parseValue(item.area_name), // Keep original if needed elsewhere
+          location_link: parseValue(item.location_link),
+          room_length: parseValue(item.room_length),
+          room_width: parseValue(item.room_width),
+          room_height: parseValue(item.room_height),
+          p_type: parseValue(item.p_type),
+          budget_range: parseValue(item.budget_range),
+          current_stage: parseValue(item.current_stage),
+          room_ready: parseValue(item.room_ready),
+          time_to_complete: parseValue(item.time_to_complete),
+          site_visit_date: parseValue(item.site_visit_date),
+          demo_date: parseValue(item.demo_date),
+
+          // Contact numbers
+          ar_number: parseValue(item.ar_number),
+          architect_name: parseValue(item.architect_name),
+          ca_number: parseValue(item.ca_number),
+          e_number: parseValue(item.e_number),
+          sm_number: parseValue(item.sm_number),
+          pop_number: parseValue(item.pop_number),
+          other_number: parseValue(item.other_number),
+
+          // Lead information
+          latest_leadStage: parseValue(item.latest_leadStage),
+          lead_stage: parseValue(item.lead_stage),
+
+          quick_remark: parseValue(item.quick_remark),
+          detailed_remark: parseValue(item.detailed_remark),
+
+          // Assignment fields
+          assign_date: parseValue(item.assign_date),
+          followup_date: parseValue(item.followup_date),
+          assignment_remark: parseValue(item.assignment_remark),
+          assigned_to: parseValue(item.assigned_to),
+          assigned_to_user_id: parseIdValue(item.assigned_to_user_id),
+          stage: cleanStage,
+          assign_type: parseValue(item.assign_type),
+
+          reassignment_remarks: Array.isArray(item.reassignment_remarks)
+            ? item.reassignment_remarks.map((remark: any) => {
+                if (typeof remark === 'string') {
+                  return remark;
+                } else if (remark && typeof remark === 'object') {
+                  return {
+                    remark: remark.remark || '',
+                    assignedTo: remark.assignedTo || '',
+                    leadStage: remark.leadStage || '',
+                    reassignment_date: remark.reassignment_date || '',
+                    created_by_user: remark.created_by_user || 0,
+                    created_at: remark.created_at || '',
+                    name: remark.name || '',
+                    role: remark.role || '',
+                  };
+                }
+                return '';
+              })
+            : [],
+          previous_stage: previousStage,
+
+          // Calculated percentage for battery display
+          status_percentage: status_percentage,
+
+          // Flag to indicate if this is a Drop stage
+          is_drop_stage: cleanStage === 'Drop',
+
+          assign_id: parseIdValue(item.assign_id),
+
+          document_location_link: parseValue(item.document_location_link),
+        };
+      });
+
+      console.log('Processed data with other inputs:', {
+        totalClients: formattedData.length,
+        sampleClient: formattedData[0],
+        hasCategoryOther: formattedData[0]?.category_other,
+        hasReferenceOther: formattedData[0]?.reference_other,
+      });
+
+      setRawData(formattedData);
+      setFilteredClients(formattedData);
+      setCurrentPage(1);
+    } catch (error) {
+      console.error('Error fetching Master Data:', error);
+    } finally {
+      setIsLoading(false); // Set loading to false after fetching (whether success or error)
+    }
+  };
 
   // Call this in useEffect
   useEffect(() => {
@@ -3104,13 +3350,13 @@ const fetchRawData = async () => {
           } catch (secondError) {
             alert(
               secondError.response?.data?.message ||
-              'Cannot delete entry. Please check API endpoint.',
+                'Cannot delete entry. Please check API endpoint.',
             );
           }
         } else {
           alert(
             error.response?.data?.message ||
-            'Failed to delete entry. Please try again.',
+              'Failed to delete entry. Please try again.',
           );
         }
       }
@@ -3146,7 +3392,7 @@ const fetchRawData = async () => {
         if (res.data.success) {
           alert(
             res.data.message ||
-            `${selectedMasterIds.length} entries deleted successfully.`,
+              `${selectedMasterIds.length} entries deleted successfully.`,
           );
         } else {
           alert(res.data.message || 'Failed to delete selected entries.');
@@ -3161,8 +3407,8 @@ const fetchRawData = async () => {
 
         alert(
           error.response?.data?.message ||
-          error.response?.data?.error ||
-          'Failed to delete selected entries. Please try again.',
+            error.response?.data?.error ||
+            'Failed to delete selected entries. Please try again.',
         );
       }
     }
@@ -3282,65 +3528,65 @@ const fetchRawData = async () => {
     is_drop_stage = false,
     previous_stage = '',
   }) => {
-      const cleanStage = stage ? stage.trim() : '';
-      const percentage = status_percentage;
+    const cleanStage = stage ? stage.trim() : '';
+    const percentage = status_percentage;
 
-      // Get progress bar color based on exact stage-to-color mapping
-      const getProgressColor = (stage: string) => {
-        const stageLower = stage.toLowerCase().trim();
+    // Get progress bar color based on exact stage-to-color mapping
+    const getProgressColor = (stage: string) => {
+      const stageLower = stage.toLowerCase().trim();
 
-        // Exact mapping from color table
-        if (stageLower.includes('fresh'))
-          return 'bg-[#FFFFFF] border border-gray-300';
-        if (stageLower.includes('cold')) return 'bg-[#A9A9A9]';
-        if (stageLower.includes('on hold')) return 'bg-[#FDFD96]';
-        if (stageLower.includes('positive')) return 'bg-[#ADD8E6]';
-        if (stageLower.includes('pre site')) return 'bg-[#E0B0FF]';
-        if (stageLower.includes('past site') || stageLower.includes('post site'))
-          return 'bg-[#593E67]';
-        if (stageLower.includes('demo')) return 'bg-[#FFB6C1]';
-        if (stageLower.includes('quote pending')) return 'bg-[#FFA500]';
-        if (stageLower.includes('quote followup')) return 'bg-[#A52A2A]';
-        if (stageLower.includes('projection')) return 'bg-[#90EE90]';
-        if (stageLower.includes('drop')) return 'bg-[#FF0000]';
-        if (stageLower.includes('closed')) return 'bg-[#006400]';
+      // Exact mapping from color table
+      if (stageLower.includes('fresh'))
+        return 'bg-[#FFFFFF] border border-gray-300';
+      if (stageLower.includes('cold')) return 'bg-[#A9A9A9]';
+      if (stageLower.includes('on hold')) return 'bg-[#FDFD96]';
+      if (stageLower.includes('positive')) return 'bg-[#ADD8E6]';
+      if (stageLower.includes('pre site')) return 'bg-[#E0B0FF]';
+      if (stageLower.includes('past site') || stageLower.includes('post site'))
+        return 'bg-[#593E67]';
+      if (stageLower.includes('demo')) return 'bg-[#FFB6C1]';
+      if (stageLower.includes('quote pending')) return 'bg-[#FFA500]';
+      if (stageLower.includes('quote followup')) return 'bg-[#A52A2A]';
+      if (stageLower.includes('projection')) return 'bg-[#90EE90]';
+      if (stageLower.includes('drop')) return 'bg-[#FF0000]';
+      if (stageLower.includes('closed')) return 'bg-[#006400]';
 
-        // Fallback
-        return 'bg-[#A9A9A9]';
-      };
-
-      return (
-        <div className="flex flex-col items-center w-16">
-          {/* Percentage Display - Medium size */}
-          <div className="text-sm font-bold text-gray-900 dark:text-white mb-0.5">
-            {percentage}%
-          </div>
-
-          {/* Progress Bar Container - Very thin */}
-          <div className="w-full h-1.5 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden mb-0.5">
-            {/* Progress Fill with exact color */}
-            <div
-              className={`h-full rounded-full ${getProgressColor(
-                cleanStage,
-              )} transition-all duration-300`}
-              style={{ width: `${percentage}%` }}
-            />
-          </div>
-
-          {/* Stage Name - Smaller text */}
-          <div className="w-full text-center">
-            <div className="text-[10px] font-medium text-gray-700 dark:text-gray-300 truncate">
-              {is_drop_stage ? previous_stage || cleanStage : cleanStage || 'N/A'}
-            </div>
-            {is_drop_stage && (
-              <div className="text-[8px] text-red-500 font-medium mt-0.5">
-                DROPPED
-              </div>
-            )}
-          </div>
-        </div>
-      );
+      // Fallback
+      return 'bg-[#A9A9A9]';
     };
+
+    return (
+      <div className="flex flex-col items-center w-16">
+        {/* Percentage Display - Medium size */}
+        <div className="text-sm font-bold text-gray-900 dark:text-white mb-0.5">
+          {percentage}%
+        </div>
+
+        {/* Progress Bar Container - Very thin */}
+        <div className="w-full h-1.5 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden mb-0.5">
+          {/* Progress Fill with exact color */}
+          <div
+            className={`h-full rounded-full ${getProgressColor(
+              cleanStage,
+            )} transition-all duration-300`}
+            style={{ width: `${percentage}%` }}
+          />
+        </div>
+
+        {/* Stage Name - Smaller text */}
+        <div className="w-full text-center">
+          <div className="text-[10px] font-medium text-gray-700 dark:text-gray-300 truncate">
+            {is_drop_stage ? previous_stage || cleanStage : cleanStage || 'N/A'}
+          </div>
+          {is_drop_stage && (
+            <div className="text-[8px] text-red-500 font-medium mt-0.5">
+              DROPPED
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  };
   // Helper function to get percentage from stage
   const getPercentageFromStage = (stage: string): number => {
     return STAGE_PERCENTAGE_MAP[stage] || 0;
@@ -3460,9 +3706,6 @@ const fetchRawData = async () => {
     rawData,
   ]);
 
-
-
-
   // Apply filters when any filter changes
   useEffect(() => {
     applyFilters();
@@ -3504,8 +3747,8 @@ const fetchRawData = async () => {
             client.assigned_to?.toLowerCase() || '',
             client.city?.toLowerCase() || '',
             client.stage?.toLowerCase() ||
-            client.lead_stage?.toLowerCase() ||
-            '',
+              client.lead_stage?.toLowerCase() ||
+              '',
           ];
           return searchFields.some((field) => field.includes(lowerSearch));
         });
@@ -3810,298 +4053,369 @@ const fetchRawData = async () => {
   return (
     <div>
       <div className="sticky top-0 z-50 w-full bg-white/95 dark:bg-boxdark/95 backdrop-blur-sm shadow-lg border-b border-gray-200/80 dark:border-gray-800 mb-4">
-  <div className="px-4 py-3">
-    {/* All in one line */}
-    <div className="flex flex-wrap items-center gap-3">
-      {/* Lead count badge */}
-      <span className="inline-flex items-center px-3 py-1.5 rounded-full text-sm font-medium bg-gradient-to-r from-blue-100 to-blue-200 dark:from-blue-900/30 dark:to-blue-800/30 text-blue-800 dark:text-blue-300 border border-blue-200 dark:border-blue-700/30 whitespace-nowrap">
-        <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-        </svg>
-        {totalItems}
-      </span>
-
-      {/* Record count input - increased height */}
-      <div className="relative w-32">
-        <div className="absolute inset-y-0 left-0 pl-2 flex items-center pointer-events-none">
-          <svg className="h-4 w-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-          </svg>
-        </div>
-        <input
-          type="number"
-          className="w-full pl-8 pr-7 py-2 text-sm border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-          placeholder="Show N"
-          value={customRecordCount}
-          onChange={handleCustomRecordInput}
-          min="1"
-        />
-        {customRecordCount && (
-          <button
-            onClick={clearCustomRecordCount}
-            className="absolute inset-y-0 right-0 pr-2 flex items-center text-gray-400 hover:text-gray-600"
-          >
-            <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-            </svg>
-          </button>
-        )}
-      </div>
-
-      {/* Search input - increased height and width */}
-      <div className="relative w-55">
-        <div className="absolute inset-y-0 left-0 pl-2 flex items-center pointer-events-none">
-          <svg className="h-4 w-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-          </svg>
-        </div>
-        <input
-          type="text"
-          className="w-full pl-8 pr-3 py-2 text-sm border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-          placeholder="Search name, category, status..."
-          value={searchTerm}
-          onChange={(e) => setSearchTerm(e.target.value)}
-        />
-      </div>
-
-  {/* Action buttons - compact single line */}
-<div className="flex items-center gap-2 flex-nowrap overflow-x-auto">
-
-  {selectedClients.length > 0 && (
-    <button
-      className="bg-red-500 hover:bg-red-600 text-white px-3 py-1.5 rounded-md text-xs font-medium flex items-center gap-1.5 shadow-sm whitespace-nowrap"
-      onClick={handleBulkDelete}
-    >
-      <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-          d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
-        />
-      </svg>
-      Delete ({selectedClients.length})
-    </button>
-  )}
-
-  <button
-    onClick={clearFilters}
-    className="bg-gradient-to-r from-gray-600 to-gray-700 hover:from-gray-700 hover:to-gray-800 text-white px-3 py-1.5 rounded-md text-xs font-medium flex items-center gap-1.5 shadow-sm whitespace-nowrap"
-  >
-    <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-        d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
-      />
-    </svg>
-    Reset
-  </button>
-
-  <button
-    onClick={() => setShowAddPopup(true)}
-    className="bg-gradient-to-r from-purple-600 to-purple-700 hover:from-purple-700 hover:to-purple-800 text-white px-3 py-1.5 rounded-md text-xs font-medium flex items-center gap-1.5 shadow-sm whitespace-nowrap"
-  >
-    <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-        d="M12 4v16m8-8H4"
-      />
-    </svg>
-    Add
-  </button>
-
-
-  <button
-    onClick={() => {
-      if (selectedMasterIds.length === 0) {
-        alert('Please select at least one record to assign/reassign');
-        return;
-      }
-      setShowAssignPopup(true);
-    }}
-    disabled={selectedMasterIds.length === 0}
-    className={`bg-gradient-to-r from-green-600 to-green-700 text-white px-3 py-1.5 rounded-md text-xs font-medium flex items-center gap-1.5 shadow-sm whitespace-nowrap ${
-      selectedMasterIds.length === 0
-        ? 'opacity-50 cursor-not-allowed'
-        : 'hover:from-green-700 hover:to-green-800'
-    }`}
-  >
-    <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-        d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197m13.5-6a3.5 3.5 0 11-7 0 3.5 3.5 0 017 0z"
-      />
-    </svg>
-    {selectedMasterIds.length > 1
-      ? `Reassign (${selectedMasterIds.length})`
-      : 'ReAssign'}
-  </button>
-
-</div>
-
-    </div>
-  </div>
-</div>
-
-    {showAssignPopup && (
-  <div className="fixed inset-0 z-[9999] bg-black/70 flex justify-center items-center">
-    <div className="bg-white dark:bg-boxdark p-3 rounded-lg shadow-lg w-full max-w-2xl max-h-[70vh] overflow-y-auto border dark:border-strokedark">
-      {/* HEADER */}
-      <div className="flex items-center justify-between gap-4 border-b pb-3 mb-4 dark:border-strokedark">
-        <h2 className="text-lg sm:text-xl font-semibold text-black dark:text-white">
-          Assign Selected Records ({selectedMasterIds.length})
-        </h2>
-
-        <button
-          onClick={() => setShowAssignPopup(false)}
-          className="text-xl text-gray-500 hover:text-red-500"
-        >
-          ×
-        </button>
-      </div>
-
-    
-
-      {/* FORM */}
-      <form onSubmit={handleAssignSubmit} className="space-y-4">
-        {/* ASSIGN TO */}
-        <div>
-          <label className="block font-semibold text-green-600 mb-2">
-            Assign To
-          </label>
-
-          <div className="border rounded p-3 max-h-48 overflow-y-auto dark:border-form-strokedark dark:bg-form-input">
-            {assignUsers.length > 0 ? (
-              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-2">
-                {assignUsers.map((user) => {
-                  const checked = assignData.assignedTo.includes(user.name);
-
-                  return (
-                    <label
-                      key={user.user_id || user.id}
-                      className="flex items-start gap-2 p-2 rounded cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800"
-                    >
-                      <input
-                        type="checkbox"
-                        checked={checked}
-                        onChange={() =>
-                          setAssignData({
-                            ...assignData,
-                            assignedTo: checked
-                              ? assignData.assignedTo.filter(
-                                  (u) => u !== user.name,
-                                )
-                              : [...assignData.assignedTo, user.name],
-                          })
-                        }
-                        className="mt-1"
-                      />
-
-                      <div className="text-sm">
-                        <div className="font-medium text-black dark:text-white">
-                          {user.name}
-                        </div>
-                        <div className="text-xs text-gray-500 dark:text-gray-400">
-                          {user.role_label || user.role}
-                        </div>
-                      </div>
-                    </label>
-                  );
-                })}
-              </div>
-            ) : (
-              <div className="text-center py-4 text-gray-500 dark:text-gray-400">
-                <p className="text-sm">No users available to assign</p>
-                <p className="text-xs mt-1">You don't have permission to assign to any users</p>
-              </div>
-            )}
-          </div>
-
-          <p className="text-sm mt-1 text-blue-600">
-            Selected: {assignData.assignedTo.length}
-          </p>
-        </div>
-
-        {/* LEAD STAGE + FOLLOWUP DATE */}
-        <div>
-          <label className="block font-semibold text-green-600 mb-2">
-            Lead Details
-          </label>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            {/* Lead Stage */}
-            <div>
-              <label className="block mb-1 text-sm font-medium text-black dark:text-white">
-                Lead Stage *
-              </label>
-              <select
-                name="leadStage"
-                value={assignData.leadStage}
-                onChange={handleChange}
-                required
-                className="w-full border rounded p-2 dark:border-form-strokedark dark:bg-form-input dark:text-white"
+        <div className="px-4 py-3">
+          {/* All in one line */}
+          <div className="flex flex-wrap items-center gap-3">
+            {/* Lead count badge */}
+            <span className="inline-flex items-center px-3 py-1.5 rounded-full text-sm font-medium bg-gradient-to-r from-blue-100 to-blue-200 dark:from-blue-900/30 dark:to-blue-800/30 text-blue-800 dark:text-blue-300 border border-blue-200 dark:border-blue-700/30 whitespace-nowrap">
+              <svg
+                className="w-4 h-4 mr-1"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
               >
-                <option value="">Select Lead Stage</option>
-                {leadStages.map((stage, i) => (
-                  <option key={i} value={stage}>
-                    {stage}
-                  </option>
-                ))}
-              </select>
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth="2"
+                  d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
+                />
+              </svg>
+              {totalItems}
+            </span>
+
+            {/* Record count input - increased height */}
+            <div className="relative w-32">
+              <div className="absolute inset-y-0 left-0 pl-2 flex items-center pointer-events-none">
+                <svg
+                  className="h-4 w-4 text-gray-400"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
+                  />
+                </svg>
+              </div>
+              <input
+                type="number"
+                className="w-full pl-8 pr-7 py-2 text-sm border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                placeholder="Show N"
+                value={customRecordCount}
+                onChange={handleCustomRecordInput}
+                min="1"
+              />
+              {customRecordCount && (
+                <button
+                  onClick={clearCustomRecordCount}
+                  className="absolute inset-y-0 right-0 pr-2 flex items-center text-gray-400 hover:text-gray-600"
+                >
+                  <svg
+                    className="h-4 w-4"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M6 18L18 6M6 6l12 12"
+                    />
+                  </svg>
+                </button>
+              )}
             </div>
 
-            {/* Followup Date */}
-            <div>
-              <label className="block mb-1 text-sm font-medium text-black dark:text-white">
-                Followup Date *
-              </label>
+            {/* Search input - increased height and width */}
+            <div className="relative w-55">
+              <div className="absolute inset-y-0 left-0 pl-2 flex items-center pointer-events-none">
+                <svg
+                  className="h-4 w-4 text-gray-400"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
+                  />
+                </svg>
+              </div>
               <input
-                type="date"
-                name="reassignmentDate"
-                value={assignData.reassignmentDate}
-                onChange={handleChange}
-                required
-                className="w-full border rounded p-2 dark:border-form-strokedark dark:bg-form-input dark:text-white"
+                type="text"
+                className="w-full pl-8 pr-3 py-2 text-sm border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                placeholder="Search name, category, status..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
               />
             </div>
+
+            {/* Action buttons - compact single line */}
+            <div className="flex items-center gap-2 flex-nowrap overflow-x-auto">
+              {selectedClients.length > 0 && (
+                <button
+                  className="bg-red-500 hover:bg-red-600 text-white px-3 py-1.5 rounded-md text-xs font-medium flex items-center gap-1.5 shadow-sm whitespace-nowrap"
+                  onClick={handleBulkDelete}
+                >
+                  <svg
+                    className="h-3.5 w-3.5"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
+                    />
+                  </svg>
+                  Delete ({selectedClients.length})
+                </button>
+              )}
+
+              <button
+                onClick={clearFilters}
+                className="bg-gradient-to-r from-gray-600 to-gray-700 hover:from-gray-700 hover:to-gray-800 text-white px-3 py-1.5 rounded-md text-xs font-medium flex items-center gap-1.5 shadow-sm whitespace-nowrap"
+              >
+                <svg
+                  className="h-3.5 w-3.5"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
+                  />
+                </svg>
+                Reset
+              </button>
+
+              <button
+                onClick={() => setShowAddPopup(true)}
+                className="bg-gradient-to-r from-purple-600 to-purple-700 hover:from-purple-700 hover:to-purple-800 text-white px-3 py-1.5 rounded-md text-xs font-medium flex items-center gap-1.5 shadow-sm whitespace-nowrap"
+              >
+                <svg
+                  className="h-3.5 w-3.5"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M12 4v16m8-8H4"
+                  />
+                </svg>
+                Add
+              </button>
+
+              <button
+                onClick={() => {
+                  if (selectedMasterIds.length === 0) {
+                    alert(
+                      'Please select at least one record to assign/reassign',
+                    );
+                    return;
+                  }
+                  setShowAssignPopup(true);
+                }}
+                disabled={selectedMasterIds.length === 0}
+                className={`bg-gradient-to-r from-green-600 to-green-700 text-white px-3 py-1.5 rounded-md text-xs font-medium flex items-center gap-1.5 shadow-sm whitespace-nowrap ${
+                  selectedMasterIds.length === 0
+                    ? 'opacity-50 cursor-not-allowed'
+                    : 'hover:from-green-700 hover:to-green-800'
+                }`}
+              >
+                <svg
+                  className="h-3.5 w-3.5"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197m13.5-6a3.5 3.5 0 11-7 0 3.5 3.5 0 017 0z"
+                  />
+                </svg>
+                {selectedMasterIds.length > 1
+                  ? `Reassign (${selectedMasterIds.length})`
+                  : 'ReAssign'}
+              </button>
+            </div>
           </div>
         </div>
+      </div>
 
-        {/* REMARK */}
-        <div>
-          <label className="block mb-1 font-medium text-black dark:text-white">
-            Remark
-          </label>
-          <textarea
-            name="remark"
-            value={assignData.remark}
-            onChange={handleChange}
-            rows={3}
-            className="w-full border rounded p-2 dark:border-form-strokedark dark:bg-form-input dark:text-white"
-          />
+      {showAssignPopup && (
+        <div className="fixed inset-0 z-[9999] bg-black/70 flex justify-center items-center">
+          <div className="bg-white dark:bg-boxdark p-3 rounded-lg shadow-lg w-full max-w-2xl max-h-[70vh] overflow-y-auto border dark:border-strokedark">
+            {/* HEADER */}
+            <div className="flex items-center justify-between gap-4 border-b pb-3 mb-4 dark:border-strokedark">
+              <h2 className="text-lg sm:text-xl font-semibold text-black dark:text-white">
+                Assign Selected Records ({selectedMasterIds.length})
+              </h2>
+
+              <button
+                onClick={() => setShowAssignPopup(false)}
+                className="text-xl text-gray-500 hover:text-red-500"
+              >
+                ×
+              </button>
+            </div>
+
+            {/* FORM */}
+            <form onSubmit={handleAssignSubmit} className="space-y-4">
+              {/* ASSIGN TO */}
+              <div>
+                <label className="block font-semibold text-green-600 mb-2">
+                  Assign To
+                </label>
+
+                <div className="border rounded p-3 max-h-48 overflow-y-auto dark:border-form-strokedark dark:bg-form-input">
+                  {assignUsers.length > 0 ? (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-2">
+                      {assignUsers.map((user) => {
+                        const checked = assignData.assignedTo.includes(
+                          user.name,
+                        );
+
+                        return (
+                          <label
+                            key={user.user_id || user.id}
+                            className="flex items-start gap-2 p-2 rounded cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800"
+                          >
+                            <input
+                              type="checkbox"
+                              checked={checked}
+                              onChange={() =>
+                                setAssignData({
+                                  ...assignData,
+                                  assignedTo: checked
+                                    ? assignData.assignedTo.filter(
+                                        (u) => u !== user.name,
+                                      )
+                                    : [...assignData.assignedTo, user.name],
+                                })
+                              }
+                              className="mt-1"
+                            />
+
+                            <div className="text-sm">
+                              <div className="font-medium text-black dark:text-white">
+                                {user.name}
+                              </div>
+                              <div className="text-xs text-gray-500 dark:text-gray-400">
+                                {user.role_label || user.role}
+                              </div>
+                            </div>
+                          </label>
+                        );
+                      })}
+                    </div>
+                  ) : (
+                    <div className="text-center py-4 text-gray-500 dark:text-gray-400">
+                      <p className="text-sm">No users available to assign</p>
+                      <p className="text-xs mt-1">
+                        You don't have permission to assign to any users
+                      </p>
+                    </div>
+                  )}
+                </div>
+
+                <p className="text-sm mt-1 text-blue-600">
+                  Selected: {assignData.assignedTo.length}
+                </p>
+              </div>
+
+              {/* LEAD STAGE + FOLLOWUP DATE */}
+              <div>
+                <label className="block font-semibold text-green-600 mb-2">
+                  Lead Details
+                </label>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  {/* Lead Stage */}
+                  <div>
+                    <label className="block mb-1 text-sm font-medium text-black dark:text-white">
+                      Lead Stage *
+                    </label>
+                    <select
+                      name="leadStage"
+                      value={assignData.leadStage}
+                      onChange={handleChange}
+                      required
+                      className="w-full border rounded p-2 dark:border-form-strokedark dark:bg-form-input dark:text-white"
+                    >
+                      <option value="">Select Lead Stage</option>
+                      {leadStages.map((stage, i) => (
+                        <option key={i} value={stage}>
+                          {stage}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  {/* Followup Date */}
+                  <div>
+                    <label className="block mb-1 text-sm font-medium text-black dark:text-white">
+                      Followup Date *
+                    </label>
+                    <input
+                      type="date"
+                      name="reassignmentDate"
+                      value={assignData.reassignmentDate}
+                      onChange={handleChange}
+                      required
+                      className="w-full border rounded p-2 dark:border-form-strokedark dark:bg-form-input dark:text-white"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* REMARK */}
+              <div>
+                <label className="block mb-1 font-medium text-black dark:text-white">
+                  Remark
+                </label>
+                <textarea
+                  name="remark"
+                  value={assignData.remark}
+                  onChange={handleChange}
+                  rows={3}
+                  className="w-full border rounded p-2 dark:border-form-strokedark dark:bg-form-input dark:text-white"
+                />
+              </div>
+
+              {/* ACTION BUTTONS */}
+              <div className="flex justify-end gap-3 pt-4 border-t dark:border-strokedark">
+                <button
+                  type="button"
+                  onClick={() => setShowAssignPopup(false)}
+                  className="px-5 py-2 rounded border text-gray-700 dark:text-gray-300"
+                >
+                  Cancel
+                </button>
+
+                <button
+                  type="submit"
+                  disabled={
+                    !assignData.assignedTo.length ||
+                    !assignData.leadStage ||
+                    !assignData.reassignmentDate
+                  }
+                  className="px-6 py-2 rounded bg-green-600 text-white disabled:opacity-50"
+                >
+                  Assign
+                </button>
+              </div>
+            </form>
+          </div>
         </div>
-
-        {/* ACTION BUTTONS */}
-        <div className="flex justify-end gap-3 pt-4 border-t dark:border-strokedark">
-          <button
-            type="button"
-            onClick={() => setShowAssignPopup(false)}
-            className="px-5 py-2 rounded border text-gray-700 dark:text-gray-300"
-          >
-            Cancel
-          </button>
-
-          <button
-            type="submit"
-            disabled={
-              !assignData.assignedTo.length ||
-              !assignData.leadStage ||
-              !assignData.reassignmentDate
-            }
-            className="px-6 py-2 rounded bg-green-600 text-white disabled:opacity-50"
-          >
-            Assign
-          </button>
-        </div>
-      </form>
-    </div>
-  </div>
-)}
-
+      )}
 
       {/* Update Data Modal Component */}
       <UpdateRawData
@@ -4251,786 +4565,797 @@ const fetchRawData = async () => {
         </div>
       )}
 
+      {/* Main Data Table */}
+      <div className="h-[calc(100vh-180px)] overflow-y-auto mt-2">
+        {isLoading ? (
+          <Loader />
+        ) : (
+          <div className="max-w-full overflow-auto rounded-lg border border-stroke bg-white shadow-default dark:border-strokedark dark:bg-boxdark">
+            <div className="overflow-x-auto">
+              <table className="w-full table-auto">
+                <thead>
+                  <tr className="bg-gradient-to-r from-gray-50 to-gray-100 dark:from-meta-4 dark:to-gray-800 border-b-2 border-gray-200 dark:border-gray-700">
+                    {/* Checkbox Column */}
+                    <th className="py-5 px-4">
+                      <input
+                        type="checkbox"
+                        checked={(() => {
+                          const currentEntries = filteredClients.slice(
+                            (currentPage - 1) * itemsPerPage,
+                            currentPage * itemsPerPage,
+                          );
+                          return (
+                            currentEntries.length > 0 &&
+                            currentEntries.every((client) =>
+                              selectedClients.includes(client.id),
+                            )
+                          );
+                        })()}
+                        onChange={handleSelectAll}
+                        className="h-4.5 w-4.5 text-blue-600 rounded border-gray-300 focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-boxdark"
+                      />
+                    </th>
 
-    {/* Main Data Table */}
-<div className="h-[calc(100vh-180px)] overflow-y-auto mt-2">
-  {isLoading ? (
-    <Loader />
-  ) : (
-    <div className="max-w-full overflow-auto rounded-lg border border-stroke bg-white shadow-default dark:border-strokedark dark:bg-boxdark">
-      <div className="overflow-x-auto">
-        <table className="w-full table-auto">
-          <thead>
-            <tr className="bg-gradient-to-r from-gray-50 to-gray-100 dark:from-meta-4 dark:to-gray-800 border-b-2 border-gray-200 dark:border-gray-700">
-              {/* Checkbox Column */}
-              <th className="py-5 px-4">
-                <input
-                  type="checkbox"
-                  checked={(() => {
-                    const currentEntries = filteredClients.slice(
-                      (currentPage - 1) * itemsPerPage,
-                      currentPage * itemsPerPage,
-                    );
-                    return (
-                      currentEntries.length > 0 &&
-                      currentEntries.every((client) =>
-                        selectedClients.includes(client.id),
-                      )
-                    );
-                  })()}
-                  onChange={handleSelectAll}
-                  className="h-4.5 w-4.5 text-blue-600 rounded border-gray-300 focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-boxdark"
-                />
-              </th>
-
-              {/* Entry Date Column with Filter */}
-              <th className="py-5 px-4 relative">
-                <div
-                  ref={entryDateRef}
-                  className="flex items-center justify-between gap-2"
-                >
-                  <span className="text-xs font-extrabold uppercase tracking-wider text-gray-700 dark:text-gray-300">
-                    Entry Date
-                  </span>
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      e.preventDefault();
-                      closeAllDropdowns();
-                      setShowEntryDateCalendar(!showEntryDateCalendar);
-                    }}
-                    className="text-gray-500 hover:text-blue-600 dark:text-gray-400 dark:hover:text-blue-400 focus:outline-none transition-colors"
-                  >
-                    <FontAwesomeIcon
-                      icon={faChevronDown}
-                      className={`h-3 w-3 transition-transform duration-200 ${showEntryDateCalendar ? 'rotate-180' : ''
-                        }`}
-                    />
-                  </button>
-                </div>
-
-                {/* Entry Date Calendar Dropdown */}
-                {showEntryDateCalendar && (
-                  <div className="absolute top-full left-0 mt-1 z-50 bg-white dark:bg-boxdark border border-gray-300 dark:border-gray-700 rounded-lg shadow-lg p-4 min-w-[250px]">
-                    <div className="flex justify-between items-center mb-3">
-                      <span className="font-semibold text-sm dark:text-white">
-                        Select Entry Date Range
-                      </span>
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setSelectedEntryFromDate('');
-                          setSelectedEntryToDate('');
-                          applyFilters();
-                          setShowEntryDateCalendar(false);
-                        }}
-                        className="text-xs font-medium text-blue-600 hover:text-blue-800 dark:text-blue-400 transition-colors"
+                    {/* Entry Date Column with Filter */}
+                    <th className="py-5 px-4 relative">
+                      <div
+                        ref={entryDateRef}
+                        className="flex items-center justify-between gap-2"
                       >
-                        Clear
-                      </button>
-                    </div>
-
-                    <div className="space-y-3">
-                      <div>
-                        <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">
-                          From Date
-                        </label>
-                        <input
-                          type="date"
-                          value={selectedEntryFromDate}
-                          onChange={(e) => {
-                            e.stopPropagation();
-                            setSelectedEntryFromDate(e.target.value);
-                          }}
-                          onClick={(e) => e.stopPropagation()}
-                          className="w-full p-2 border border-gray-300 dark:border-gray-600 rounded-lg text-sm font-medium dark:bg-form-input dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                        />
-                      </div>
-
-                      <div>
-                        <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">
-                          To Date
-                        </label>
-                        <input
-                          type="date"
-                          value={selectedEntryToDate}
-                          onChange={(e) => {
-                            e.stopPropagation();
-                            setSelectedEntryToDate(e.target.value);
-                          }}
-                          onClick={(e) => e.stopPropagation()}
-                          className="w-full p-2 border border-gray-300 dark:border-gray-600 rounded-lg text-sm font-medium dark:bg-form-input dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                        />
-                      </div>
-                    </div>
-
-                    <div className="mt-4">
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          applyFilters();
-                          setShowEntryDateCalendar(false);
-                        }}
-                        className="w-full py-2.5 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white text-sm font-semibold rounded-lg transition-all duration-200 shadow-md hover:shadow-lg"
-                      >
-                        Apply Filter
-                      </button>
-                    </div>
-                  </div>
-                )}
-              </th>
-
-              {/* FollowUp Date Column with Filter */}
-              <th className="py-5 px-4 relative">
-                <div
-                  ref={followupDateRef}
-                  className="flex items-center justify-between gap-2"
-                >
-                  <span className="text-xs font-extrabold uppercase tracking-wider text-gray-700 dark:text-gray-300">
-                    FollowUp Date
-                  </span>
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      closeAllDropdowns();
-                      setShowFollowupDateCalendar(
-                        !showFollowupDateCalendar,
-                      );
-                    }}
-                    className="text-gray-500 hover:text-blue-600 dark:text-gray-400 dark:hover:text-blue-400 focus:outline-none transition-colors"
-                  >
-                    <FontAwesomeIcon
-                      icon={faChevronDown}
-                      className={`h-3 w-3 transition-transform duration-200 ${showFollowupDateCalendar ? 'rotate-180' : ''
-                        }`}
-                    />
-                  </button>
-                </div>
-
-                {/* FollowUp Date Calendar Dropdown */}
-                {showFollowupDateCalendar && (
-                  <div className="absolute top-full left-0 mt-1 z-50 bg-white dark:bg-boxdark border border-gray-300 dark:border-gray-700 rounded-lg shadow-lg p-4 min-w-[250px]">
-                    <div className="flex justify-between items-center mb-3">
-                      <span className="font-semibold text-sm dark:text-white">
-                        Select Followup Date Range
-                      </span>
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setSelectedFollowupFromDate('');
-                          setSelectedFollowupToDate('');
-                          applyFilters();
-                          setShowFollowupDateCalendar(false);
-                        }}
-                        className="text-xs font-medium text-blue-600 hover:text-blue-800 dark:text-blue-400 transition-colors"
-                      >
-                        Clear
-                      </button>
-                    </div>
-
-                    <div className="space-y-3">
-                      <div>
-                        <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">
-                          From Date
-                        </label>
-                        <input
-                          type="date"
-                          value={selectedFollowupFromDate}
-                          onChange={(e) => {
-                            e.stopPropagation();
-                            setSelectedFollowupFromDate(e.target.value);
-                          }}
-                          onClick={(e) => e.stopPropagation()}
-                          className="w-full p-2 border border-gray-300 dark:border-gray-600 rounded-lg text-sm font-medium dark:bg-form-input dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                        />
-                      </div>
-
-                      <div>
-                        <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">
-                          To Date
-                        </label>
-                        <input
-                          type="date"
-                          value={selectedFollowupToDate}
-                          onChange={(e) => {
-                            e.stopPropagation();
-                            setSelectedFollowupToDate(e.target.value);
-                          }}
-                          onClick={(e) => e.stopPropagation()}
-                          className="w-full p-2 border border-gray-300 dark:border-gray-600 rounded-lg text-sm font-medium dark:bg-form-input dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                        />
-                      </div>
-                    </div>
-
-                    <div className="mt-4">
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          applyFilters();
-                          setShowFollowupDateCalendar(false);
-                        }}
-                        className="w-full py-2.5 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white text-sm font-semibold rounded-lg transition-all duration-200 shadow-md hover:shadow-lg"
-                      >
-                        Apply Filter
-                      </button>
-                    </div>
-                  </div>
-                )}
-              </th>
-
-              {/* Name Column */}
-              <th className="py-5 px-4">
-                <div className="text-xs font-extrabold uppercase tracking-wider text-gray-700 dark:text-gray-300">
-                  Name
-                </div>
-              </th>
-
-              {/* Contact Column */}
-              <th className="py-5 px-4">
-                <div className="text-xs font-extrabold uppercase tracking-wider text-gray-700 dark:text-gray-300">
-                  Contact
-                </div>
-              </th>
-
-              {/* City Column with Filter */}
-              <th className="py-5 px-4 relative">
-                <div
-                  ref={cityFilterRef}
-                  className="flex items-center justify-between gap-2"
-                >
-                  <span className="text-xs font-extrabold uppercase tracking-wider text-gray-700 dark:text-gray-300">
-                    City
-                  </span>
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      closeAllDropdowns();
-                      setShowCityFilter(!showCityFilter);
-                    }}
-                    className="text-gray-500 hover:text-blue-600 dark:text-gray-400 dark:hover:text-blue-400 focus:outline-none transition-colors"
-                  >
-                    <FontAwesomeIcon
-                      icon={faFilter}
-                      className={`h-3 w-3 transition-colors duration-200 ${selectedCities.length > 0 ? 'text-blue-600' : ''
-                        } ${showCityFilter ? 'text-blue-600' : ''}`}
-                    />
-                  </button>
-                </div>
-
-                {/* City Filter Dropdown */}
-                {showCityFilter && (
-                  <div className="absolute top-full left-0 mt-1 z-50 bg-white dark:bg-boxdark border border-gray-300 dark:border-gray-700 rounded-lg shadow-lg p-4 min-w-[200px] max-h-[300px] overflow-y-auto">
-                    <div className="flex justify-between items-center mb-3">
-                      <span className="font-semibold text-sm dark:text-white">
-                        Filter Cities
-                      </span>
-                      <div className="flex gap-2">
+                        <span className="text-xs font-extrabold uppercase tracking-wider text-gray-700 dark:text-gray-300">
+                          Entry Date
+                        </span>
                         <button
                           onClick={(e) => {
                             e.stopPropagation();
-                            setSelectedCities([]);
-                            setShowCityFilter(false);
+                            e.preventDefault();
+                            closeAllDropdowns();
+                            setShowEntryDateCalendar(!showEntryDateCalendar);
                           }}
-                          className="text-xs font-medium text-blue-600 hover:text-blue-800 dark:text-blue-400 transition-colors"
+                          className="text-gray-500 hover:text-blue-600 dark:text-gray-400 dark:hover:text-blue-400 focus:outline-none transition-colors"
                         >
-                          Clear All
-                        </button>
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setShowCityFilter(false);
-                          }}
-                          className="text-xs font-medium text-gray-500 hover:text-gray-700 dark:text-gray-400 transition-colors"
-                        >
-                          ×
+                          <FontAwesomeIcon
+                            icon={faChevronDown}
+                            className={`h-3 w-3 transition-transform duration-200 ${
+                              showEntryDateCalendar ? 'rotate-180' : ''
+                            }`}
+                          />
                         </button>
                       </div>
-                    </div>
 
-                    {availableCities.length > 0 ? (
-                      <>
-                        {availableCities.map((city) => (
-                          <div
-                            key={city}
-                            className="flex items-center mb-2"
-                          >
-                            <input
-                              type="checkbox"
-                              id={`city-${city}`}
-                              checked={selectedCities.includes(city)}
-                              onChange={(e) => {
-                                e.stopPropagation();
-                                handleCitySelect(city);
-                              }}
-                              onClick={(e) => e.stopPropagation()}
-                              className="h-3.5 w-3.5 mr-2.5 text-blue-600 rounded border-gray-300 focus:ring-2 focus:ring-blue-500"
-                            />
-                            <label
-                              htmlFor={`city-${city}`}
-                              className="text-sm font-medium dark:text-white cursor-pointer truncate hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
+                      {/* Entry Date Calendar Dropdown */}
+                      {showEntryDateCalendar && (
+                        <div className="absolute top-full left-0 mt-1 z-50 bg-white dark:bg-boxdark border border-gray-300 dark:border-gray-700 rounded-lg shadow-lg p-4 min-w-[250px]">
+                          <div className="flex justify-between items-center mb-3">
+                            <span className="font-semibold text-sm dark:text-white">
+                              Select Entry Date Range
+                            </span>
+                            <button
                               onClick={(e) => {
                                 e.stopPropagation();
-                                handleCitySelect(city);
+                                setSelectedEntryFromDate('');
+                                setSelectedEntryToDate('');
+                                applyFilters();
+                                setShowEntryDateCalendar(false);
                               }}
+                              className="text-xs font-medium text-blue-600 hover:text-blue-800 dark:text-blue-400 transition-colors"
                             >
-                              {city}
-                            </label>
+                              Clear
+                            </button>
                           </div>
-                        ))}
-                      </>
-                    ) : (
-                      <div className="text-sm font-medium text-gray-500 dark:text-gray-400 italic py-3 text-center">
-                        No cities available
-                      </div>
-                    )}
 
-                    {selectedCities.length > 0 && (
-                      <div className="mt-4 pt-3 border-t border-gray-200 dark:border-gray-700">
-                        <div className="text-xs font-semibold text-gray-600 dark:text-gray-400 mb-2">
-                          Selected ({selectedCities.length}):
-                        </div>
-                        <div className="flex flex-wrap gap-1.5">
-                          {selectedCities.map((city) => (
-                            <span
-                              key={city}
-                              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold bg-gradient-to-r from-teal-50 to-teal-100 dark:from-teal-900/30 dark:to-teal-800/20 text-teal-800 dark:text-teal-300 border border-teal-200 dark:border-teal-700/30 shadow-sm"
+                          <div className="space-y-3">
+                            <div>
+                              <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">
+                                From Date
+                              </label>
+                              <input
+                                type="date"
+                                value={selectedEntryFromDate}
+                                onChange={(e) => {
+                                  e.stopPropagation();
+                                  setSelectedEntryFromDate(e.target.value);
+                                }}
+                                onClick={(e) => e.stopPropagation()}
+                                className="w-full p-2 border border-gray-300 dark:border-gray-600 rounded-lg text-sm font-medium dark:bg-form-input dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                              />
+                            </div>
+
+                            <div>
+                              <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">
+                                To Date
+                              </label>
+                              <input
+                                type="date"
+                                value={selectedEntryToDate}
+                                onChange={(e) => {
+                                  e.stopPropagation();
+                                  setSelectedEntryToDate(e.target.value);
+                                }}
+                                onClick={(e) => e.stopPropagation()}
+                                className="w-full p-2 border border-gray-300 dark:border-gray-600 rounded-lg text-sm font-medium dark:bg-form-input dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                              />
+                            </div>
+                          </div>
+
+                          <div className="mt-4">
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                applyFilters();
+                                setShowEntryDateCalendar(false);
+                              }}
+                              className="w-full py-2.5 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white text-sm font-semibold rounded-lg transition-all duration-200 shadow-md hover:shadow-lg"
                             >
-                              City: {city}
+                              Apply Filter
+                            </button>
+                          </div>
+                        </div>
+                      )}
+                    </th>
+
+                    {/* FollowUp Date Column with Filter */}
+                    <th className="py-5 px-4 relative">
+                      <div
+                        ref={followupDateRef}
+                        className="flex items-center justify-between gap-2"
+                      >
+                        <span className="text-xs font-extrabold uppercase tracking-wider text-gray-700 dark:text-gray-300">
+                          FollowUp Date
+                        </span>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            closeAllDropdowns();
+                            setShowFollowupDateCalendar(
+                              !showFollowupDateCalendar,
+                            );
+                          }}
+                          className="text-gray-500 hover:text-blue-600 dark:text-gray-400 dark:hover:text-blue-400 focus:outline-none transition-colors"
+                        >
+                          <FontAwesomeIcon
+                            icon={faChevronDown}
+                            className={`h-3 w-3 transition-transform duration-200 ${
+                              showFollowupDateCalendar ? 'rotate-180' : ''
+                            }`}
+                          />
+                        </button>
+                      </div>
+
+                      {/* FollowUp Date Calendar Dropdown */}
+                      {showFollowupDateCalendar && (
+                        <div className="absolute top-full left-0 mt-1 z-50 bg-white dark:bg-boxdark border border-gray-300 dark:border-gray-700 rounded-lg shadow-lg p-4 min-w-[250px]">
+                          <div className="flex justify-between items-center mb-3">
+                            <span className="font-semibold text-sm dark:text-white">
+                              Select Followup Date Range
+                            </span>
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setSelectedFollowupFromDate('');
+                                setSelectedFollowupToDate('');
+                                applyFilters();
+                                setShowFollowupDateCalendar(false);
+                              }}
+                              className="text-xs font-medium text-blue-600 hover:text-blue-800 dark:text-blue-400 transition-colors"
+                            >
+                              Clear
+                            </button>
+                          </div>
+
+                          <div className="space-y-3">
+                            <div>
+                              <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">
+                                From Date
+                              </label>
+                              <input
+                                type="date"
+                                value={selectedFollowupFromDate}
+                                onChange={(e) => {
+                                  e.stopPropagation();
+                                  setSelectedFollowupFromDate(e.target.value);
+                                }}
+                                onClick={(e) => e.stopPropagation()}
+                                className="w-full p-2 border border-gray-300 dark:border-gray-600 rounded-lg text-sm font-medium dark:bg-form-input dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                              />
+                            </div>
+
+                            <div>
+                              <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">
+                                To Date
+                              </label>
+                              <input
+                                type="date"
+                                value={selectedFollowupToDate}
+                                onChange={(e) => {
+                                  e.stopPropagation();
+                                  setSelectedFollowupToDate(e.target.value);
+                                }}
+                                onClick={(e) => e.stopPropagation()}
+                                className="w-full p-2 border border-gray-300 dark:border-gray-600 rounded-lg text-sm font-medium dark:bg-form-input dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                              />
+                            </div>
+                          </div>
+
+                          <div className="mt-4">
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                applyFilters();
+                                setShowFollowupDateCalendar(false);
+                              }}
+                              className="w-full py-2.5 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white text-sm font-semibold rounded-lg transition-all duration-200 shadow-md hover:shadow-lg"
+                            >
+                              Apply Filter
+                            </button>
+                          </div>
+                        </div>
+                      )}
+                    </th>
+
+                    {/* Name Column */}
+                    <th className="py-5 px-4">
+                      <div className="text-xs font-extrabold uppercase tracking-wider text-gray-700 dark:text-gray-300">
+                        Name
+                      </div>
+                    </th>
+
+                    {/* Contact Column */}
+                    <th className="py-5 px-4">
+                      <div className="text-xs font-extrabold uppercase tracking-wider text-gray-700 dark:text-gray-300">
+                        Contact
+                      </div>
+                    </th>
+
+                    {/* City Column with Filter */}
+                    <th className="py-5 px-4 relative">
+                      <div
+                        ref={cityFilterRef}
+                        className="flex items-center justify-between gap-2"
+                      >
+                        <span className="text-xs font-extrabold uppercase tracking-wider text-gray-700 dark:text-gray-300">
+                          City
+                        </span>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            closeAllDropdowns();
+                            setShowCityFilter(!showCityFilter);
+                          }}
+                          className="text-gray-500 hover:text-blue-600 dark:text-gray-400 dark:hover:text-blue-400 focus:outline-none transition-colors"
+                        >
+                          <FontAwesomeIcon
+                            icon={faFilter}
+                            className={`h-3 w-3 transition-colors duration-200 ${
+                              selectedCities.length > 0 ? 'text-blue-600' : ''
+                            } ${showCityFilter ? 'text-blue-600' : ''}`}
+                          />
+                        </button>
+                      </div>
+
+                      {/* City Filter Dropdown */}
+                      {showCityFilter && (
+                        <div className="absolute top-full left-0 mt-1 z-50 bg-white dark:bg-boxdark border border-gray-300 dark:border-gray-700 rounded-lg shadow-lg p-4 min-w-[200px] max-h-[300px] overflow-y-auto">
+                          <div className="flex justify-between items-center mb-3">
+                            <span className="font-semibold text-sm dark:text-white">
+                              Filter Cities
+                            </span>
+                            <div className="flex gap-2">
                               <button
-                                onClick={() => handleCitySelect(city)}
-                                className="ml-1 text-teal-600 hover:text-teal-800 dark:text-teal-400 transition-colors"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setSelectedCities([]);
+                                  setShowCityFilter(false);
+                                }}
+                                className="text-xs font-medium text-blue-600 hover:text-blue-800 dark:text-blue-400 transition-colors"
+                              >
+                                Clear All
+                              </button>
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setShowCityFilter(false);
+                                }}
+                                className="text-xs font-medium text-gray-500 hover:text-gray-700 dark:text-gray-400 transition-colors"
                               >
                                 ×
                               </button>
-                            </span>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                )}
-              </th>
-
-              {/* User Assign Column with Filter */}
-              <th className="py-5 px-4 relative">
-                <div
-                  ref={userFilterRef}
-                  className="flex items-center justify-between gap-2"
-                >
-                  <span className="text-xs font-extrabold uppercase tracking-wider text-gray-700 dark:text-gray-300">
-                    User Assign
-                  </span>
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      closeAllDropdowns();
-                      setShowUserFilter(!showUserFilter);
-                    }}
-                    className="text-gray-500 hover:text-blue-600 dark:text-gray-400 dark:hover:text-blue-400 focus:outline-none transition-colors"
-                  >
-                    <FontAwesomeIcon
-                      icon={faFilter}
-                      className={`h-3 w-3 transition-colors duration-200 ${selectedUsers.length > 0 ? 'text-blue-600' : ''
-                        } ${showUserFilter ? 'text-blue-600' : ''}`}
-                    />
-                  </button>
-                </div>
-
-                {/* Assigned User Filter Dropdown */}
-                {showUserFilter && (
-                  <div className="absolute top-full right-0 mt-1 z-50 bg-white dark:bg-boxdark border border-gray-300 dark:border-gray-700 rounded-lg shadow-lg p-4 min-w-[220px] max-h-[300px] overflow-y-auto">
-                    <div className="flex justify-between items-center mb-3">
-                      <span className="font-semibold text-sm dark:text-white">
-                        Filter Users
-                      </span>
-                      <div className="flex gap-2">
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setSelectedUsers([]);
-                          }}
-                          className="text-xs font-medium text-blue-600 hover:text-blue-800 dark:text-blue-400 transition-colors"
-                        >
-                          Clear All
-                        </button>
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setShowUserFilter(false);
-                          }}
-                          className="text-xs font-medium text-gray-500 hover:text-gray-700 dark:text-gray-400 transition-colors"
-                        >
-                          ×
-                        </button>
-                      </div>
-                    </div>
-
-                    {users.length > 0 ? (
-                      <>
-                        {users.map((user) => (
-                          <div
-                            key={user.id}
-                            className="flex items-center mb-2"
-                          >
-                            <input
-                              type="checkbox"
-                              id={`user-${user.id}`}
-                              checked={selectedUsers.includes(user.name)}
-                              onChange={(e) => {
-                                e.stopPropagation();
-                                handleUserSelect(user.name);
-                              }}
-                              onClick={(e) => e.stopPropagation()}
-                              className="h-3.5 w-3.5 mr-2.5 text-blue-600 rounded border-gray-300 focus:ring-2 focus:ring-blue-500"
-                            />
-                            <label
-                              htmlFor={`user-${user.id}`}
-                              className="text-sm font-medium dark:text-white cursor-pointer truncate hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
-                            >
-                              {user.name} ({user.role})
-                            </label>
+                            </div>
                           </div>
-                        ))}
-                      </>
-                    ) : (
-                      <div className="text-sm font-medium text-gray-500 dark:text-gray-400 italic py-3 text-center">
-                        Loading users...
-                      </div>
-                    )}
 
-                    {selectedUsers.length > 0 && (
-                      <div className="mt-4 pt-3 border-t border-gray-200 dark:border-gray-700">
-                        <div className="text-xs font-semibold text-gray-600 dark:text-gray-400 mb-2">
-                          Selected ({selectedUsers.length}):
+                          {availableCities.length > 0 ? (
+                            <>
+                              {availableCities.map((city) => (
+                                <div
+                                  key={city}
+                                  className="flex items-center mb-2"
+                                >
+                                  <input
+                                    type="checkbox"
+                                    id={`city-${city}`}
+                                    checked={selectedCities.includes(city)}
+                                    onChange={(e) => {
+                                      e.stopPropagation();
+                                      handleCitySelect(city);
+                                    }}
+                                    onClick={(e) => e.stopPropagation()}
+                                    className="h-3.5 w-3.5 mr-2.5 text-blue-600 rounded border-gray-300 focus:ring-2 focus:ring-blue-500"
+                                  />
+                                  <label
+                                    htmlFor={`city-${city}`}
+                                    className="text-sm font-medium dark:text-white cursor-pointer truncate hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      handleCitySelect(city);
+                                    }}
+                                  >
+                                    {city}
+                                  </label>
+                                </div>
+                              ))}
+                            </>
+                          ) : (
+                            <div className="text-sm font-medium text-gray-500 dark:text-gray-400 italic py-3 text-center">
+                              No cities available
+                            </div>
+                          )}
+
+                          {selectedCities.length > 0 && (
+                            <div className="mt-4 pt-3 border-t border-gray-200 dark:border-gray-700">
+                              <div className="text-xs font-semibold text-gray-600 dark:text-gray-400 mb-2">
+                                Selected ({selectedCities.length}):
+                              </div>
+                              <div className="flex flex-wrap gap-1.5">
+                                {selectedCities.map((city) => (
+                                  <span
+                                    key={city}
+                                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold bg-gradient-to-r from-teal-50 to-teal-100 dark:from-teal-900/30 dark:to-teal-800/20 text-teal-800 dark:text-teal-300 border border-teal-200 dark:border-teal-700/30 shadow-sm"
+                                  >
+                                    City: {city}
+                                    <button
+                                      onClick={() => handleCitySelect(city)}
+                                      className="ml-1 text-teal-600 hover:text-teal-800 dark:text-teal-400 transition-colors"
+                                    >
+                                      ×
+                                    </button>
+                                  </span>
+                                ))}
+                              </div>
+                            </div>
+                          )}
                         </div>
-                        <div className="flex flex-wrap gap-1.5">
-                          {selectedUsers.map((user) => (
-                            <span
-                              key={user}
-                              className="inline-flex items-center px-3 py-1.5 rounded-full text-xs font-semibold bg-gradient-to-r from-purple-50 to-purple-100 dark:from-purple-900/30 dark:to-purple-800/20 text-purple-800 dark:text-purple-300 border border-purple-200 dark:border-purple-700/30 shadow-sm truncate max-w-[100px]"
-                            >
-                              {user}
-                            </span>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                )}
-              </th>
+                      )}
+                    </th>
 
-              {/* Status Column */}
-              <th className="py-5 px-2">
-                <div className="text-xs font-extrabold uppercase tracking-wider text-gray-700 dark:text-gray-300">
-                  Status
-                </div>
-              </th>
-
-              {/* Stage Column with Filter */}
-              <th className="py-5 px-4 relative">
-                <div
-                  ref={stageFilterRef}
-                  className="flex items-center justify-between gap-2"
-                >
-                  <span className="text-xs font-extrabold uppercase tracking-wider text-gray-700 dark:text-gray-300">
-                    Stage
-                  </span>
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      closeAllDropdowns();
-                      setShowStageFilter(!showStageFilter);
-                    }}
-                    className="text-gray-500 hover:text-blue-600 dark:text-gray-400 dark:hover:text-blue-400 focus:outline-none transition-colors"
-                  >
-                    <FontAwesomeIcon
-                      icon={faFilter}
-                      className={`h-3 w-3 transition-colors duration-200 ${selectedStages.length > 0 ? 'text-blue-600' : ''
-                        } ${showStageFilter ? 'text-blue-600' : ''}`}
-                    />
-                  </button>
-                </div>
-
-                {/* Stage Filter Dropdown */}
-                {showStageFilter && (
-                  <div className="absolute top-full right-0 mt-1 z-50 bg-white dark:bg-boxdark border border-gray-300 dark:border-gray-700 rounded-lg shadow-lg p-4 min-w-[220px] max-h-[300px] overflow-y-auto">
-                    <div className="flex justify-between items-center mb-3">
-                      <span className="font-semibold text-sm dark:text-white">
-                        Filter Stages
-                      </span>
-                      <div className="flex gap-2">
+                    {/* User Assign Column with Filter */}
+                    <th className="py-5 px-4 relative">
+                      <div
+                        ref={userFilterRef}
+                        className="flex items-center justify-between gap-2"
+                      >
+                        <span className="text-xs font-extrabold uppercase tracking-wider text-gray-700 dark:text-gray-300">
+                          User Assign
+                        </span>
                         <button
                           onClick={(e) => {
                             e.stopPropagation();
-                            setSelectedStages([]);
+                            closeAllDropdowns();
+                            setShowUserFilter(!showUserFilter);
                           }}
-                          className="text-xs font-medium text-blue-600 hover:text-blue-800 dark:text-blue-400 transition-colors"
-                        >
-                          Clear All
-                        </button>
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setShowStageFilter(false);
-                          }}
-                          className="text-xs font-medium text-gray-500 hover:text-gray-700 dark:text-gray-400 transition-colors"
-                        >
-                          ×
-                        </button>
-                      </div>
-                    </div>
-
-                    {leadStages.length > 0 ? (
-                      <>
-                        {leadStages.map((stage) => (
-                          <div
-                            key={stage}
-                            className="flex items-center mb-2"
-                          >
-                            <input
-                              type="checkbox"
-                              id={`stage-${stage}`}
-                              checked={selectedStages.includes(stage)}
-                              onChange={(e) => {
-                                e.stopPropagation();
-                                handleStageSelect(stage);
-                              }}
-                              onClick={(e) => e.stopPropagation()}
-                              className="h-3.5 w-3.5 mr-2.5 text-blue-600 rounded border-gray-300 focus:ring-2 focus:ring-blue-500"
-                            />
-                            <label
-                              htmlFor={`stage-${stage}`}
-                              className="text-sm font-medium dark:text-white cursor-pointer truncate hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
-                            >
-                              {stage || 'Unknown'}
-                            </label>
-                          </div>
-                        ))}
-                      </>
-                    ) : (
-                      <div className="text-sm font-medium text-gray-500 dark:text-gray-400 italic py-3 text-center">
-                        Loading stages...
-                      </div>
-                    )}
-
-                    {selectedStages.length > 0 && (
-                      <div className="mt-4 pt-3 border-t border-gray-200 dark:border-gray-700">
-                        <div className="text-xs font-semibold text-gray-600 dark:text-gray-400 mb-2">
-                          Selected ({selectedStages.length}):
-                        </div>
-                        <div className="flex flex-wrap gap-1.5">
-                          {selectedStages.map((stage) => (
-                            <span
-                              key={stage}
-                              className="inline-flex items-center px-3 py-1.5 rounded-full text-xs font-semibold bg-gradient-to-r from-blue-50 to-blue-100 dark:from-blue-900/30 dark:to-blue-800/20 text-blue-800 dark:text-blue-300 border border-blue-200 dark:border-blue-700/30 shadow-sm truncate max-w-[100px]"
-                            >
-                              {stage}
-                            </span>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                )}
-              </th>
-
-              {/* Remark Column */}
-              <th className="py-5 px-4">
-                <div className="text-xs font-extrabold uppercase tracking-wider text-gray-700 dark:text-gray-300">
-                  Remark
-                </div>
-              </th>
-
-              {/* Actions Column */}
-              <th className="py-5 px-4">
-                <div className="text-xs font-extrabold uppercase tracking-wider text-gray-700 dark:text-gray-300">
-                  Actions
-                </div>
-              </th>
-            </tr>
-          </thead>
-
-          <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
-            {currentItems.map((client, index) => (
-              <tr
-                key={client.id}
-                className="hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors duration-150 border-b border-gray-100 dark:border-gray-700 last:border-b-0"
-              >
-                {/* Select Checkbox */}
-                <td className="py-4 px-4">
-                  <input
-                    type="checkbox"
-                    checked={selectedClients.includes(client.id)}
-                    onChange={() =>
-                      handleSelect(client.id, client.master_id)
-                    }
-                    className="h-4.5 w-4.5 text-blue-600 rounded border-gray-300 focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-boxdark"
-                  />
-                </td>
-
-                {/* Entry Date */}
-                <td className="py-4 px-4">
-                  <div className="font-semibold text-sm bg-gradient-to-r from-blue-50 to-blue-100 dark:from-blue-900/20 dark:to-blue-800/10 px-3 py-1.5 rounded-lg text-blue-800 dark:text-blue-300 border border-blue-100 dark:border-blue-800/30 shadow-sm">
-                    {formatDate(client.assign_date)}
-                  </div>
-                </td>
-
-                {/* FollowUp Date */}
-                <td className="py-4 px-4">
-                  <div
-                    className={`inline-flex items-center px-3 py-1.5 rounded-lg font-semibold text-sm border shadow-sm ${new Date(client.followup_date) < new Date()
-                        ? 'bg-gradient-to-r from-red-50 to-red-100 dark:from-red-900/20 dark:to-red-800/10 text-red-800 dark:text-red-300 border-red-200 dark:border-red-800/30'
-                        : 'bg-gradient-to-r from-green-50 to-green-100 dark:from-green-900/20 dark:to-green-800/10 text-green-800 dark:text-green-300 border-green-200 dark:border-green-800/30'
-                      }`}
-                  >
-                    {formatDate(client.followup_date)}
-                  </div>
-                </td>
-                {/* Client Name - Now with enhanced styling */}
-                <td className="py-4 px-4">
-                  <div
-                    onClick={() => {
-                      setSelectedClientDetails(client);
-                      setShowDetailsModal(true);
-                    }}
-                    className="group cursor-pointer"
-                  >
-                    <div className="text-sm font-bold text-gray-900 dark:text-gray-100 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors duration-200">
-                      {client.name}
-                    </div>
-                    <div className="mt-1 flex items-center">
-                      <div className="w-full h-px bg-gradient-to-r from-gray-300 to-gray-100 dark:from-gray-600 dark:to-gray-800 group-hover:from-blue-400 group-hover:to-blue-200 dark:group-hover:from-blue-500 dark:group-hover:to-blue-300 transition-all duration-300"></div>
-                      <div className="ml-2 opacity-0 group-hover:opacity-100 transform translate-x-2 group-hover:translate-x-0 transition-all duration-300">
-                        <FontAwesomeIcon
-                          icon={faEye}
-                          className="text-xs text-gray-400 group-hover:text-blue-500 dark:group-hover:text-blue-400"
-                        />
-                      </div>
-                    </div>
-                  </div>
-                </td>
-
-                {/* Contact */}
-                <td className="py-4 px-4">
-                  <div className="bg-gradient-to-r from-gray-50 to-gray-100 dark:from-gray-700 dark:to-gray-800 text-gray-800 dark:text-gray-300 px-3 py-1.5 rounded-lg font-medium text-sm border border-gray-200 dark:border-gray-600 shadow-sm">
-                    {client.number}
-                  </div>
-                </td>
-
-                {/* City */}
-                <td className="py-4 px-4">
-                  <div className="flex flex-col gap-1">
-                    <div className="font-semibold text-gray-800 dark:text-gray-200 text-sm">
-                      {client.city || '—'}
-                    </div>
-                    {client.document_location_link && (
-                      <div>
-                        <a
-                          href={client.document_location_link}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="inline-flex items-center gap-1.5 px-3 py-1 text-xs font-medium bg-gradient-to-r from-blue-50 to-blue-100 dark:from-blue-900/30 dark:to-blue-800/20 text-blue-700 dark:text-blue-300 rounded-lg hover:from-blue-100 hover:to-blue-200 dark:hover:from-blue-800/40 dark:hover:to-blue-700/30 transition-all duration-200 border border-blue-200 dark:border-blue-700/30 shadow-sm"
-                          title="Open location link"
+                          className="text-gray-500 hover:text-blue-600 dark:text-gray-400 dark:hover:text-blue-400 focus:outline-none transition-colors"
                         >
                           <FontAwesomeIcon
-                            icon={faMapMarker}
-                            className="w-3 h-3"
+                            icon={faFilter}
+                            className={`h-3 w-3 transition-colors duration-200 ${
+                              selectedUsers.length > 0 ? 'text-blue-600' : ''
+                            } ${showUserFilter ? 'text-blue-600' : ''}`}
                           />
-                          <span>Location</span>
-                        </a>
+                        </button>
                       </div>
-                    )}
-                  </div>
-                </td>
 
-                {/* User Assign */}
-                <td className="py-4 px-4">
-                  <div className="bg-gradient-to-r from-purple-50 to-purple-100 dark:from-purple-900/20 dark:to-purple-800/10 text-purple-800 dark:text-purple-300 px-3 py-1.5 rounded-lg font-semibold text-sm border border-purple-200 dark:border-purple-800/30 shadow-sm text-center">
-                    {client.assigned_to}
-                  </div>
-                </td>
+                      {/* Assigned User Filter Dropdown */}
+                      {showUserFilter && (
+                        <div className="absolute top-full right-0 mt-1 z-50 bg-white dark:bg-boxdark border border-gray-300 dark:border-gray-700 rounded-lg shadow-lg p-4 min-w-[220px] max-h-[300px] overflow-y-auto">
+                          <div className="flex justify-between items-center mb-3">
+                            <span className="font-semibold text-sm dark:text-white">
+                              Filter Users
+                            </span>
+                            <div className="flex gap-2">
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setSelectedUsers([]);
+                                }}
+                                className="text-xs font-medium text-blue-600 hover:text-blue-800 dark:text-blue-400 transition-colors"
+                              >
+                                Clear All
+                              </button>
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setShowUserFilter(false);
+                                }}
+                                className="text-xs font-medium text-gray-500 hover:text-gray-700 dark:text-gray-400 transition-colors"
+                              >
+                                ×
+                              </button>
+                            </div>
+                          </div>
 
-                {/* Status Column (Progress Bar) */}
-                <td className="py-4 px-2">
-                  <ProgressStatus
-                    stage={client.stage || client.lead_stage}
-                    status_percentage={client.status_percentage}
-                    is_drop_stage={client.is_drop_stage}
-                    previous_stage={client.previous_stage}
-                  />
-                </td>
+                          {users.length > 0 ? (
+                            <>
+                              {users.map((user) => (
+                                <div
+                                  key={user.id}
+                                  className="flex items-center mb-2"
+                                >
+                                  <input
+                                    type="checkbox"
+                                    id={`user-${user.id}`}
+                                    checked={selectedUsers.includes(user.name)}
+                                    onChange={(e) => {
+                                      e.stopPropagation();
+                                      handleUserSelect(user.name);
+                                    }}
+                                    onClick={(e) => e.stopPropagation()}
+                                    className="h-3.5 w-3.5 mr-2.5 text-blue-600 rounded border-gray-300 focus:ring-2 focus:ring-blue-500"
+                                  />
+                                  <label
+                                    htmlFor={`user-${user.id}`}
+                                    className="text-sm font-medium dark:text-white cursor-pointer truncate hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
+                                  >
+                                    {user.name} ({user.role})
+                                  </label>
+                                </div>
+                              ))}
+                            </>
+                          ) : (
+                            <div className="text-sm font-medium text-gray-500 dark:text-gray-400 italic py-3 text-center">
+                              Loading users...
+                            </div>
+                          )}
 
-                {/* Stage Column */}
-                <td className="py-4 px-4">
-                  <div className="bg-gradient-to-r from-orange-50 to-orange-100 dark:from-orange-900/20 dark:to-orange-800/10 text-orange-800 dark:text-orange-300 px-3 py-1.5 rounded-lg font-semibold text-sm border border-orange-200 dark:border-orange-800/30 shadow-sm text-center">
-                    {client.stage || client.lead_stage || 'N/A'}
-                  </div>
-                </td>
+                          {selectedUsers.length > 0 && (
+                            <div className="mt-4 pt-3 border-t border-gray-200 dark:border-gray-700">
+                              <div className="text-xs font-semibold text-gray-600 dark:text-gray-400 mb-2">
+                                Selected ({selectedUsers.length}):
+                              </div>
+                              <div className="flex flex-wrap gap-1.5">
+                                {selectedUsers.map((user) => (
+                                  <span
+                                    key={user}
+                                    className="inline-flex items-center px-3 py-1.5 rounded-full text-xs font-semibold bg-gradient-to-r from-purple-50 to-purple-100 dark:from-purple-900/30 dark:to-purple-800/20 text-purple-800 dark:text-purple-300 border border-purple-200 dark:border-purple-700/30 shadow-sm truncate max-w-[100px]"
+                                  >
+                                    {user}
+                                  </span>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </th>
 
-                {/* Remark */}
-                <td className="py-4 px-4">
-                  <div className="group relative">
-                    <div className="font-medium text-gray-700 dark:text-gray-300 text-sm truncate max-w-[200px]">
-                      {client.detailed_remark ||
-                        client.detailed_remark ||
-                        'N/A'}
-                    </div>
-                    <button
-                      className="ml-2 text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300 font-semibold text-xs transition-colors"
-                      onClick={() =>
-                        handleShowRemark(
-                          client.detailed_remark || client.detailed_remark,
-                        )
-                      }
+                    {/* Status Column */}
+                    <th className="py-5 px-2">
+                      <div className="text-xs font-extrabold uppercase tracking-wider text-gray-700 dark:text-gray-300">
+                        Status
+                      </div>
+                    </th>
+
+                    {/* Stage Column with Filter */}
+                    <th className="py-5 px-4 relative">
+                      <div
+                        ref={stageFilterRef}
+                        className="flex items-center justify-between gap-2"
+                      >
+                        <span className="text-xs font-extrabold uppercase tracking-wider text-gray-700 dark:text-gray-300">
+                          Stage
+                        </span>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            closeAllDropdowns();
+                            setShowStageFilter(!showStageFilter);
+                          }}
+                          className="text-gray-500 hover:text-blue-600 dark:text-gray-400 dark:hover:text-blue-400 focus:outline-none transition-colors"
+                        >
+                          <FontAwesomeIcon
+                            icon={faFilter}
+                            className={`h-3 w-3 transition-colors duration-200 ${
+                              selectedStages.length > 0 ? 'text-blue-600' : ''
+                            } ${showStageFilter ? 'text-blue-600' : ''}`}
+                          />
+                        </button>
+                      </div>
+
+                      {/* Stage Filter Dropdown */}
+                      {showStageFilter && (
+                        <div className="absolute top-full right-0 mt-1 z-50 bg-white dark:bg-boxdark border border-gray-300 dark:border-gray-700 rounded-lg shadow-lg p-4 min-w-[220px] max-h-[300px] overflow-y-auto">
+                          <div className="flex justify-between items-center mb-3">
+                            <span className="font-semibold text-sm dark:text-white">
+                              Filter Stages
+                            </span>
+                            <div className="flex gap-2">
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setSelectedStages([]);
+                                }}
+                                className="text-xs font-medium text-blue-600 hover:text-blue-800 dark:text-blue-400 transition-colors"
+                              >
+                                Clear All
+                              </button>
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setShowStageFilter(false);
+                                }}
+                                className="text-xs font-medium text-gray-500 hover:text-gray-700 dark:text-gray-400 transition-colors"
+                              >
+                                ×
+                              </button>
+                            </div>
+                          </div>
+
+                          {leadStages.length > 0 ? (
+                            <>
+                              {leadStages.map((stage) => (
+                                <div
+                                  key={stage}
+                                  className="flex items-center mb-2"
+                                >
+                                  <input
+                                    type="checkbox"
+                                    id={`stage-${stage}`}
+                                    checked={selectedStages.includes(stage)}
+                                    onChange={(e) => {
+                                      e.stopPropagation();
+                                      handleStageSelect(stage);
+                                    }}
+                                    onClick={(e) => e.stopPropagation()}
+                                    className="h-3.5 w-3.5 mr-2.5 text-blue-600 rounded border-gray-300 focus:ring-2 focus:ring-blue-500"
+                                  />
+                                  <label
+                                    htmlFor={`stage-${stage}`}
+                                    className="text-sm font-medium dark:text-white cursor-pointer truncate hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
+                                  >
+                                    {stage || 'Unknown'}
+                                  </label>
+                                </div>
+                              ))}
+                            </>
+                          ) : (
+                            <div className="text-sm font-medium text-gray-500 dark:text-gray-400 italic py-3 text-center">
+                              Loading stages...
+                            </div>
+                          )}
+
+                          {selectedStages.length > 0 && (
+                            <div className="mt-4 pt-3 border-t border-gray-200 dark:border-gray-700">
+                              <div className="text-xs font-semibold text-gray-600 dark:text-gray-400 mb-2">
+                                Selected ({selectedStages.length}):
+                              </div>
+                              <div className="flex flex-wrap gap-1.5">
+                                {selectedStages.map((stage) => (
+                                  <span
+                                    key={stage}
+                                    className="inline-flex items-center px-3 py-1.5 rounded-full text-xs font-semibold bg-gradient-to-r from-blue-50 to-blue-100 dark:from-blue-900/30 dark:to-blue-800/20 text-blue-800 dark:text-blue-300 border border-blue-200 dark:border-blue-700/30 shadow-sm truncate max-w-[100px]"
+                                  >
+                                    {stage}
+                                  </span>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </th>
+
+                    {/* Remark Column */}
+                    <th className="py-5 px-4">
+                      <div className="text-xs font-extrabold uppercase tracking-wider text-gray-700 dark:text-gray-300">
+                        Remark
+                      </div>
+                    </th>
+
+                    {/* Actions Column */}
+                    <th className="py-5 px-4">
+                      <div className="text-xs font-extrabold uppercase tracking-wider text-gray-700 dark:text-gray-300">
+                        Actions
+                      </div>
+                    </th>
+                  </tr>
+                </thead>
+
+                <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
+                  {currentItems.map((client, index) => (
+                    <tr
+                      key={client.id}
+                      className="hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors duration-150 border-b border-gray-100 dark:border-gray-700 last:border-b-0"
                     >
-                      More
-                    </button>
-                  </div>
-                </td>
+                      {/* Select Checkbox */}
+                      <td className="py-4 px-4">
+                        <input
+                          type="checkbox"
+                          checked={selectedClients.includes(client.id)}
+                          onChange={() =>
+                            handleSelect(client.id, client.master_id)
+                          }
+                          className="h-4.5 w-4.5 text-blue-600 rounded border-gray-300 focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-boxdark"
+                        />
+                      </td>
 
-                {/* Action Buttons */}
-                <td className="py-4 px-4">
-                  <div className="flex justify-center gap-1">
-                    <ActionButton
-                      onClick={() => handleEditClick(client)}
-                      title="Edit"
-                      variant="edit"
-                      className="w-8 h-8 hover:scale-105 transition-transform"
-                    >
-                      <FontAwesomeIcon icon={faEdit} className="text-xs" />
-                    </ActionButton>
-                    <ActionButton
-                      onClick={() => handleSingleDelete(client.master_id)}
-                      title="Delete"
-                      variant="delete"
-                      className="w-8 h-8 hover:scale-105 transition-transform"
-                    >
-                      <FontAwesomeIcon icon={faTrash} className="text-xs" />
-                    </ActionButton>
-                  </div>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+                      {/* Entry Date */}
+                      <td className="py-4 px-4">
+                        <div className="font-semibold text-sm bg-gradient-to-r from-blue-50 to-blue-100 dark:from-blue-900/20 dark:to-blue-800/10 px-3 py-1.5 rounded-lg text-blue-800 dark:text-blue-300 border border-blue-100 dark:border-blue-800/30 shadow-sm">
+                          {formatDate(client.assign_date)}
+                        </div>
+                      </td>
+
+                      {/* FollowUp Date */}
+                      <td className="py-4 px-4">
+                        <div
+                          className={`inline-flex items-center px-3 py-1.5 rounded-lg font-semibold text-sm border shadow-sm ${
+                            new Date(client.followup_date) < new Date()
+                              ? 'bg-gradient-to-r from-red-50 to-red-100 dark:from-red-900/20 dark:to-red-800/10 text-red-800 dark:text-red-300 border-red-200 dark:border-red-800/30'
+                              : 'bg-gradient-to-r from-green-50 to-green-100 dark:from-green-900/20 dark:to-green-800/10 text-green-800 dark:text-green-300 border-green-200 dark:border-green-800/30'
+                          }`}
+                        >
+                          {formatDate(client.followup_date)}
+                        </div>
+                      </td>
+                      {/* Client Name - Now with enhanced styling */}
+                      <td className="py-4 px-4">
+                        <div
+                          onClick={() => {
+                            setSelectedClientDetails(client);
+                            setShowDetailsModal(true);
+                          }}
+                          className="group cursor-pointer"
+                        >
+                          <div className="text-sm font-bold text-gray-900 dark:text-gray-100 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors duration-200">
+                            {client.name}
+                          </div>
+                          <div className="mt-1 flex items-center">
+                            <div className="w-full h-px bg-gradient-to-r from-gray-300 to-gray-100 dark:from-gray-600 dark:to-gray-800 group-hover:from-blue-400 group-hover:to-blue-200 dark:group-hover:from-blue-500 dark:group-hover:to-blue-300 transition-all duration-300"></div>
+                            <div className="ml-2 opacity-0 group-hover:opacity-100 transform translate-x-2 group-hover:translate-x-0 transition-all duration-300">
+                              <FontAwesomeIcon
+                                icon={faEye}
+                                className="text-xs text-gray-400 group-hover:text-blue-500 dark:group-hover:text-blue-400"
+                              />
+                            </div>
+                          </div>
+                        </div>
+                      </td>
+
+                      {/* Contact */}
+                      <td className="py-4 px-4">
+                        <div className="bg-gradient-to-r from-gray-50 to-gray-100 dark:from-gray-700 dark:to-gray-800 text-gray-800 dark:text-gray-300 px-3 py-1.5 rounded-lg font-medium text-sm border border-gray-200 dark:border-gray-600 shadow-sm">
+                          {client.number}
+                        </div>
+                      </td>
+
+                      {/* City */}
+                      <td className="py-4 px-4">
+                        <div className="flex flex-col gap-1">
+                          <div className="font-semibold text-gray-800 dark:text-gray-200 text-sm">
+                            {client.city || '—'}
+                          </div>
+                          {client.document_location_link && (
+                            <div>
+                              <a
+                                href={client.document_location_link}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="inline-flex items-center gap-1.5 px-3 py-1 text-xs font-medium bg-gradient-to-r from-blue-50 to-blue-100 dark:from-blue-900/30 dark:to-blue-800/20 text-blue-700 dark:text-blue-300 rounded-lg hover:from-blue-100 hover:to-blue-200 dark:hover:from-blue-800/40 dark:hover:to-blue-700/30 transition-all duration-200 border border-blue-200 dark:border-blue-700/30 shadow-sm"
+                                title="Open location link"
+                              >
+                                <FontAwesomeIcon
+                                  icon={faMapMarker}
+                                  className="w-3 h-3"
+                                />
+                                <span>Location</span>
+                              </a>
+                            </div>
+                          )}
+                        </div>
+                      </td>
+
+                      {/* User Assign */}
+                      <td className="py-4 px-4">
+                        <div className="bg-gradient-to-r from-purple-50 to-purple-100 dark:from-purple-900/20 dark:to-purple-800/10 text-purple-800 dark:text-purple-300 px-3 py-1.5 rounded-lg font-semibold text-sm border border-purple-200 dark:border-purple-800/30 shadow-sm text-center">
+                          {client.assigned_to}
+                        </div>
+                      </td>
+
+                      {/* Status Column (Progress Bar) */}
+                      <td className="py-4 px-2">
+                        <ProgressStatus
+                          stage={client.stage || client.lead_stage}
+                          status_percentage={client.status_percentage}
+                          is_drop_stage={client.is_drop_stage}
+                          previous_stage={client.previous_stage}
+                        />
+                      </td>
+
+                      {/* Stage Column */}
+                      <td className="py-4 px-4">
+                        <div className="bg-gradient-to-r from-orange-50 to-orange-100 dark:from-orange-900/20 dark:to-orange-800/10 text-orange-800 dark:text-orange-300 px-3 py-1.5 rounded-lg font-semibold text-sm border border-orange-200 dark:border-orange-800/30 shadow-sm text-center">
+                          {client.stage || client.lead_stage || 'N/A'}
+                        </div>
+                      </td>
+
+                      {/* Remark */}
+                      <td className="py-4 px-4">
+                        <div className="group relative">
+                          <div className="font-medium text-gray-700 dark:text-gray-300 text-sm truncate max-w-[200px]">
+                            {client.detailed_remark ||
+                              client.detailed_remark ||
+                              'N/A'}
+                          </div>
+                          <button
+                            className="ml-2 text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300 font-semibold text-xs transition-colors"
+                            onClick={() =>
+                              handleShowRemark(
+                                client.detailed_remark ||
+                                  client.detailed_remark,
+                              )
+                            }
+                          >
+                            More
+                          </button>
+                        </div>
+                      </td>
+
+                      {/* Action Buttons */}
+                      <td className="py-4 px-4">
+                        <div className="flex justify-center gap-1">
+                          <ActionButton
+                            onClick={() => handleEditClick(client)}
+                            title="Edit"
+                            variant="edit"
+                            className="w-8 h-8 hover:scale-105 transition-transform"
+                          >
+                            <FontAwesomeIcon
+                              icon={faEdit}
+                              className="text-xs"
+                            />
+                          </ActionButton>
+                          <ActionButton
+                            onClick={() => handleSingleDelete(client.master_id)}
+                            title="Delete"
+                            variant="delete"
+                            className="w-8 h-8 hover:scale-105 transition-transform"
+                          >
+                            <FontAwesomeIcon
+                              icon={faTrash}
+                              className="text-xs"
+                            />
+                          </ActionButton>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            {/* Pagination (remains unchanged) */}
+            {totalItems > 0 && (
+              <Pagination
+                currentPage={currentPage}
+                totalPages={totalPages}
+                onPageChange={handlePageChange}
+                totalItems={totalItems}
+                itemsPerPage={itemsPerPage}
+                showingStart={showingStart}
+                showingEnd={showingEnd}
+              />
+            )}
+          </div>
+        )}
       </div>
-
-      {/* Pagination (remains unchanged) */}
-      {totalItems > 0 && (
-        <Pagination
-          currentPage={currentPage}
-          totalPages={totalPages}
-          onPageChange={handlePageChange}
-          totalItems={totalItems}
-          itemsPerPage={itemsPerPage}
-          showingStart={showingStart}
-          showingEnd={showingEnd}
-        />
-      )}
-    </div>
-  )}
-</div>
-
 
       {/* Active Filters Display */}
       {(selectedEntryFromDate ||
@@ -5041,148 +5366,161 @@ const fetchRawData = async () => {
         selectedUsers.length > 0 ||
         selectedCities.length > 0 ||
         location.state?.category_name) && (
-          <div className="flex items-center gap-2 mb-4 p-2 bg-gray-50 dark:bg-gray-800 rounded">
-            <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
-              Active filters:
-            </span>
-            <div className="flex flex-wrap gap-2">
-              {(selectedEntryFromDate || selectedEntryToDate) && (
-                <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300">
-                  Entry: {selectedEntryFromDate || 'Any'} to{' '}
-                  {selectedEntryToDate || 'Any'}
-                  <button
-                    onClick={() => {
-                      setSelectedEntryFromDate('');
-                      setSelectedEntryToDate('');
-                    }}
-                    className="ml-1 text-blue-600 hover:text-blue-800 dark:text-blue-400"
-                  >
-                    ×
-                  </button>
-                </span>
-              )}
-              {(selectedFollowupFromDate || selectedFollowupToDate) && (
-                <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300">
-                  Followup: {selectedFollowupFromDate || 'Any'} to{' '}
-                  {selectedFollowupToDate || 'Any'}
-                  <button
-                    onClick={() => {
-                      setSelectedFollowupFromDate('');
-                      setSelectedFollowupToDate('');
-                    }}
-                    className="ml-1 text-green-600 hover:text-green-800 dark:text-green-400"
-                  >
-                    ×
-                  </button>
-                </span>
-              )}
-              {selectedStages.map((stage) => (
-                <span
-                  key={stage}
-                  className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-300"
+        <div className="flex items-center gap-2 mb-4 p-2 bg-gray-50 dark:bg-gray-800 rounded">
+          <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
+            Active filters:
+          </span>
+          <div className="flex flex-wrap gap-2">
+            {(selectedEntryFromDate || selectedEntryToDate) && (
+              <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300">
+                Entry: {selectedEntryFromDate || 'Any'} to{' '}
+                {selectedEntryToDate || 'Any'}
+                <button
+                  onClick={() => {
+                    setSelectedEntryFromDate('');
+                    setSelectedEntryToDate('');
+                  }}
+                  className="ml-1 text-blue-600 hover:text-blue-800 dark:text-blue-400"
                 >
-                  Stage: {stage}
-                  <button
-                    onClick={() => handleStageSelect(stage)}
-                    className="ml-1 text-purple-600 hover:text-purple-800 dark:text-purple-400"
-                  >
-                    ×
-                  </button>
-                </span>
-              ))}
-              {selectedUsers.map((user) => (
-                <span
-                  key={user}
-                  className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-300"
+                  ×
+                </button>
+              </span>
+            )}
+            {(selectedFollowupFromDate || selectedFollowupToDate) && (
+              <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300">
+                Followup: {selectedFollowupFromDate || 'Any'} to{' '}
+                {selectedFollowupToDate || 'Any'}
+                <button
+                  onClick={() => {
+                    setSelectedFollowupFromDate('');
+                    setSelectedFollowupToDate('');
+                  }}
+                  className="ml-1 text-green-600 hover:text-green-800 dark:text-green-400"
                 >
-                  User: {user}
-                  <button
-                    onClick={() => handleUserSelect(user)}
-                    className="ml-1 text-orange-600 hover:text-orange-800 dark:text-orange-400"
-                  >
-                    ×
-                  </button>
-                </span>
-              ))}
-              {selectedCities.map((city) => (
-                <span
-                  key={city}
-                  className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs bg-teal-100 text-teal-800 dark:bg-teal-900 dark:text-teal-300"
+                  ×
+                </button>
+              </span>
+            )}
+            {selectedStages.map((stage) => (
+              <span
+                key={stage}
+                className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-300"
+              >
+                Stage: {stage}
+                <button
+                  onClick={() => handleStageSelect(stage)}
+                  className="ml-1 text-purple-600 hover:text-purple-800 dark:text-purple-400"
                 >
-                  City: {city}
-                  <button
-                    onClick={() => handleCitySelect(city)}
-                    className="ml-1 text-teal-600 hover:text-teal-800 dark:text-teal-400"
-                  >
-                    ×
-                  </button>
-                </span>
-              ))}
-              {location.state?.category_name && (
-                <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs bg-indigo-100 text-indigo-800 dark:bg-indigo-900 dark:text-indigo-300">
-                  Category: {location.state.category_name}
-                  <button
-                    onClick={() => {
-                      // Clear category filter
-                      window.history.replaceState({}, document.title);
-                      setSearchTerm('');
-                      setFilteredClients(rawData);
-                    }}
-                    className="ml-1 text-indigo-600 hover:text-indigo-800 dark:text-indigo-400"
-                  >
-                    ×
-                  </button>
-                </span>
-              )}
+                  ×
+                </button>
+              </span>
+            ))}
+            {selectedUsers.map((user) => (
+              <span
+                key={user}
+                className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-300"
+              >
+                User: {user}
+                <button
+                  onClick={() => handleUserSelect(user)}
+                  className="ml-1 text-orange-600 hover:text-orange-800 dark:text-orange-400"
+                >
+                  ×
+                </button>
+              </span>
+            ))}
+            {selectedCities.map((city) => (
+              <span
+                key={city}
+                className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs bg-teal-100 text-teal-800 dark:bg-teal-900 dark:text-teal-300"
+              >
+                City: {city}
+                <button
+                  onClick={() => handleCitySelect(city)}
+                  className="ml-1 text-teal-600 hover:text-teal-800 dark:text-teal-400"
+                >
+                  ×
+                </button>
+              </span>
+            ))}
+            {location.state?.category_name && (
+              <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs bg-indigo-100 text-indigo-800 dark:bg-indigo-900 dark:text-indigo-300">
+                Category: {location.state.category_name}
+                <button
+                  onClick={() => {
+                    // Clear category filter
+                    window.history.replaceState({}, document.title);
+                    setSearchTerm('');
+                    setFilteredClients(rawData);
+                  }}
+                  className="ml-1 text-indigo-600 hover:text-indigo-800 dark:text-indigo-400"
+                >
+                  ×
+                </button>
+              </span>
+            )}
 
-{location.state?.reference_name && (
-  <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs bg-pink-100 text-pink-800 dark:bg-pink-900 dark:text-pink-300">
-    Source: {location.state.reference_name}
+            {location.state?.reference_name && (
+              <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs bg-pink-100 text-pink-800 dark:bg-pink-900 dark:text-pink-300">
+                Source: {location.state.reference_name}
+                <button
+                  onClick={() => {
+                    // Clear reference filter completely
+                    window.history.replaceState({}, document.title);
+                    setSearchTerm('');
+                    setFilteredClients(rawData); // Reset to all data
+                  }}
+                  className="ml-1 text-pink-600 hover:text-pink-800 dark:text-pink-400"
+                >
+                  ×
+                </button>
+              </span>
+            )}
+
+            {location.state?.budget_range && (
+              <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs bg-teal-100 text-teal-800 dark:bg-teal-900 dark:text-teal-300">
+                Budget: {location.state.budget_range}
+                <button
+                  onClick={() => {
+                    // Clear budget filter
+                    window.history.replaceState({}, document.title);
+                    setSearchTerm('');
+                    setFilteredClients(rawData);
+                  }}
+                  className="ml-1 text-teal-600 hover:text-teal-800 dark:text-teal-400"
+                >
+                  ×
+                </button>
+              </span>
+            )}
+
+            {/* Active Filters Display - add this inside the existing active filters section */}
+{location.state?.area_name && (
+  <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs bg-teal-100 text-teal-800 dark:bg-teal-900 dark:text-teal-300">
+    Area: {location.state.area_name}
     <button
       onClick={() => {
-        // Clear reference filter completely
+        // Clear area filter
         window.history.replaceState({}, document.title);
         setSearchTerm('');
-        setFilteredClients(rawData); // Reset to all data
+        setFilteredClients(rawData);
       }}
-      className="ml-1 text-pink-600 hover:text-pink-800 dark:text-pink-400"
+      className="ml-1 text-teal-600 hover:text-teal-800 dark:text-teal-400"
     >
       ×
     </button>
   </span>
 )}
 
-              {location.state?.budget_range && (
-                <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs bg-teal-100 text-teal-800 dark:bg-teal-900 dark:text-teal-300">
-                  Budget: {location.state.budget_range}
-                  <button
-                    onClick={() => {
-                      // Clear budget filter
-                      window.history.replaceState({}, document.title);
-                      setSearchTerm('');
-                      setFilteredClients(rawData);
-                    }}
-                    className="ml-1 text-teal-600 hover:text-teal-800 dark:text-teal-400"
-                  >
-                    ×
-                  </button>
-                </span>
-              )}
-
-
-
-
-              <button
-                onClick={clearFilters}
-                className="ml-2 text-sm text-red-600 hover:text-red-800 dark:text-red-400 dark:hover:text-red-300 font-medium"
-              >
-                Clear all filters
-              </button>
-            </div>
+            <button
+              onClick={clearFilters}
+              className="ml-2 text-sm text-red-600 hover:text-red-800 dark:text-red-400 dark:hover:text-red-300 font-medium"
+            >
+              Clear all filters
+            </button>
           </div>
-        )}
-
-  
+        </div>
+      )}
 
       {openRemark && (
         <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-50">
@@ -5224,7 +5562,6 @@ const fetchRawData = async () => {
           </div>
         </div>
       )}
-
 
       {/* Add Single Data Popup */}
       <InsertDataModal

@@ -381,12 +381,13 @@ export const getDashboardLeadCounts = async (req, res) => {
       FROM raw_data
     `);
 
+ 
     // ===== DROP COUNT =====
-    const [dropRows] = await db.execute(`
-      SELECT COUNT(*) AS drop_count
-      FROM raw_data
-      WHERE lead_stage = 'Drop'
-    `);
+const [dropRows] = await db.execute(`
+  SELECT COUNT(*) AS drop_count
+  FROM raw_data
+  WHERE lead_stage IN ('Drop', 'loss')
+`);
 
     // ===== CLOSED COUNT (NOW INCLUDES Closed Deal, Execution, Pre Execution) =====
     const closedStages = ['Closed Deal', 'Execution', 'Pre Execution'];
@@ -1401,6 +1402,61 @@ export const getCategorySummary = async (req, res) => {
   } catch (err) {
     console.error(err);
     res.status(500).json({ message: "Category summary error" });
+  }
+};
+
+
+export const getAreaSummary = async (req, res) => {
+  try {
+    const user = req.session.user;
+    if (!user) return res.status(401).json({ message: "Unauthorized" });
+
+    const [userResult] = await db.query(
+      "SELECT name FROM users WHERE user_id = ?",
+      [user.id]
+    );
+    const currentUserName = userResult[0]?.name || "";
+
+    let query = `
+      SELECT a.area_name AS label,
+             COUNT(DISTINCT rd.master_id) AS total
+      FROM area a
+      LEFT JOIN raw_data rd ON rd.area_id = a.area_id
+      LEFT JOIN (
+        SELECT r1.master_id, r1.assignedTo
+        FROM reassignment r1
+        INNER JOIN (
+          SELECT master_id, MAX(id) max_id
+          FROM reassignment
+          GROUP BY master_id
+        ) r2 ON r1.id = r2.max_id
+      ) lr ON lr.master_id = rd.master_id
+      WHERE a.area_name IS NOT NULL AND a.area_name != ''
+    `;
+
+    const params = [];
+
+    if (isTelecallerLike(user.role)) {
+      query += ` AND lr.assignedTo = ?`;
+      params.push(currentUserName);
+    } else if (!isAdminLike(user.role) && !isManagementLike(user.role)) {
+      query += ` AND lr.assignedTo = ?`;
+      params.push(currentUserName);
+    }
+
+    query += ` GROUP BY a.area_id, a.area_name
+              ORDER BY total DESC`;
+
+    const [rows] = await db.query(query, params);
+
+    const summary = {};
+    rows.forEach(r => (summary[r.label] = Number(r.total)));
+
+    res.json({ summary });
+
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: "Area summary error" });
   }
 };
 

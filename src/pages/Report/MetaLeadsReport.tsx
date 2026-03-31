@@ -425,8 +425,9 @@ const MetaReports: React.FC = () => {
                   <th className="p-2 text-left font-semibold">Mobile</th>
                   <th className="p-2 text-left font-semibold">Email</th>
                   <th className="p-2 text-left font-semibold">City</th>
-                  <th className="p-2 text-left font-semibold">Created</th>
+                  <th className="p-2 text-left font-semibold">Entry Date</th>
                 </tr>
+                
               </thead>
               <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
                 {loading ? (

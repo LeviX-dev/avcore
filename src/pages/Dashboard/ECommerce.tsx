@@ -5492,9 +5492,11 @@ const ECommerce: React.FC = () => {
         const data = await res.json();
         console.log('Attendance data:', data);
         
-        if (!data.checkedIn && !attendanceMarked) {
-          setShowAttendanceModal(true);
-        } else {
+      if (!data.checkedIn && !attendanceMarked) {
+  setShowAttendanceModal(true);
+}
+
+         else {
           setShowAttendanceModal(false);
           setAttendanceMarked(true);
         }

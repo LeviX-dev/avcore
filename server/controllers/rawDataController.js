@@ -4765,7 +4765,7 @@ export const getLeadStage = async (req, res) => {
 };
 
 
-export const getQuickRemark = async (req, res) => {
+export const getQuickRemark1 = async (req, res) => {
   try {
     const query = `SHOW COLUMNS FROM raw_data WHERE Field = 'quick_remark'`;
     const [rows] = await db.query(query);
@@ -4782,6 +4782,36 @@ export const getQuickRemark = async (req, res) => {
       .map((value) => value.trim().replace(/^'(.*)'$/, '$1')); 
 
     res.status(200).json(values);
+  } catch (error) {
+    console.error('Error fetching quick_remark enum options:', error);
+    res.status(500).json({ message: 'Internal server error' });
+  }
+};
+
+export const getQuickRemark = async (req, res) => {
+  try {
+    const query = `SHOW COLUMNS FROM raw_data WHERE Field = 'quick_remark'`;
+    const [rows] = await db.query(query);
+
+    if (rows.length === 0) {
+      return res.status(404).json({ message: 'Field not found' });
+    }
+
+    const enumStr = rows[0].Type; 
+
+    const values = enumStr
+      .match(/enum\((.*)\)/)[1]   
+      .split(',')
+      .map((value) => value.trim().replace(/^'(.*)'$/, '$1')); 
+
+    // Filter out the values you don't want to show on frontend
+    const filteredValues = values.filter(value => 
+      value !== 'Interested' && 
+      value !== 'Not Interested' && 
+      value !== 'Purchase from other'
+    );
+
+    res.status(200).json(filteredValues);
   } catch (error) {
     console.error('Error fetching quick_remark enum options:', error);
     res.status(500).json({ message: 'Internal server error' });
@@ -4821,7 +4851,7 @@ export const getReassignmentByMaster = async (req, res) => {
 
 
 // In your backend (e.g., dropLeadsController.js)
-export const getDropLeadsFullData = async (req, res) => {
+export const getDropLeadsFullData1 = async (req, res) => {
   try {
     if (!req.session.user) {
       return res.status(401).json({ message: "Unauthorized: No session" });
@@ -5170,6 +5200,355 @@ export const getDropLeadsFullData = async (req, res) => {
   }
 };
 
+// In your backend (e.g., dropLeadsController.js)
+export const getDropLeadsFullData = async (req, res) => {
+  try {
+    if (!req.session.user) {
+      return res.status(401).json({ message: "Unauthorized: No session" });
+    }
+
+    const { id: userId, role } = req.session.user;
+    const today = new Date().toISOString().slice(0, 10);
+    
+    // Get pagination and filter parameters from query
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 10;
+    const offset = (page - 1) * limit;
+    
+    // Get filter parameters
+    const search = req.query.search || '';
+    const entryFromDate = req.query.entryFromDate;
+    const entryToDate = req.query.entryToDate;
+    const followupFromDate = req.query.followupFromDate;
+    const followupToDate = req.query.followupToDate;
+    const stages = req.query.stages ? req.query.stages.split(',') : [];
+    const users = req.query.users ? req.query.users.split(',') : [];
+    const cities = req.query.cities ? req.query.cities.split(',') : [];
+
+    /* ================= CURRENT USER ================= */
+    const [userResult] = await db.query(
+      "SELECT name FROM users WHERE user_id = ?",
+      [userId]
+    );
+    const currentUserName = userResult[0]?.name || '';
+
+    /* ================= COUNT TOTAL RECORDS ================= */
+    let countQuery = `
+      SELECT COUNT(DISTINCT rd.master_id) as total
+      FROM raw_data rd
+      LEFT JOIN (
+        SELECT r1.*, ROW_NUMBER() OVER (PARTITION BY master_id ORDER BY id DESC) rn
+        FROM reassignment r1
+      ) lr ON rd.master_id = lr.master_id AND lr.rn = 1
+      WHERE (rd.lead_stage IN ('Drop', 'loss') OR lr.leadStage IN ('Drop', 'loss'))
+    `;
+
+    let countParams = [];
+
+    /* ================= SEARCH FILTER ================= */
+    if (search) {
+      countQuery += ` AND (
+        rd.name LIKE ? OR 
+        rd.number LIKE ? OR 
+        rd.email LIKE ? OR 
+        rd.address LIKE ? OR 
+        rd.city LIKE ? OR 
+        rd.lead_stage LIKE ? OR 
+        lr.assignedTo LIKE ?
+      )`;
+      const searchPattern = `%${search}%`;
+      countParams.push(searchPattern, searchPattern, searchPattern, searchPattern, searchPattern, searchPattern, searchPattern);
+    }
+
+    /* ================= DATE FILTERS ================= */
+    if (entryFromDate) {
+      countQuery += ` AND DATE(rd.assign_date) >= ?`;
+      countParams.push(entryFromDate);
+    }
+    if (entryToDate) {
+      countQuery += ` AND DATE(rd.assign_date) <= ?`;
+      countParams.push(entryToDate);
+    }
+    if (followupFromDate) {
+      countQuery += ` AND DATE(rd.followup_date) >= ?`;
+      countParams.push(followupFromDate);
+    }
+    if (followupToDate) {
+      countQuery += ` AND DATE(rd.followup_date) <= ?`;
+      countParams.push(followupToDate);
+    }
+
+    /* ================= STAGE FILTER ================= */
+    if (stages.length > 0) {
+      countQuery += ` AND rd.lead_stage IN (?)`;
+      countParams.push(stages);
+    }
+
+    /* ================= USER FILTER ================= */
+    if (users.length > 0) {
+      countQuery += ` AND lr.assignedTo IN (?)`;
+      countParams.push(users);
+    }
+
+    /* ================= CITY FILTER ================= */
+    if (cities.length > 0) {
+      countQuery += ` AND rd.city IN (?)`;
+      countParams.push(cities);
+    }
+
+    /* ================= ROLE FILTER FOR COUNT ================= */
+    if (isTelecallerLike(role)) {
+      countQuery += ` AND lr.assignedTo = ?`;
+      countParams.push(currentUserName);
+    } else if (isAdminLike(role)) {
+      // no filter
+    } else if (!isManagementLike(role)) {
+      countQuery += ` AND lr.assignedTo = ?`;
+      countParams.push(currentUserName);
+    }
+
+    const [countResult] = await db.query(countQuery, countParams);
+    const total = countResult[0]?.total || 0;
+
+    /* ================= MAIN QUERY WITH PAGINATION ================= */
+    let query = `
+      SELECT 
+        rd.master_id,
+        IFNULL(rd.name, 'Not Available') AS name,
+        IFNULL(rd.number, 'Not Available') AS number,
+        IFNULL(rd.alternate_number, 'Not Available') AS alternate_number,
+        IFNULL(rd.email, 'Not Available') AS email,
+        IFNULL(rd.address, 'Not Available') AS address,
+        IFNULL(rd.city, 'Not Available') AS city,
+        IFNULL(rd.status, 'Not Available') AS status,
+        IFNULL(rd.lead_status, 'Not Available') AS lead_status,
+        IFNULL(rd.lead_stage, 'Not Available') AS lead_stage,
+        IFNULL(rd.current_stage, 'Not Available') AS current_stage,
+        IFNULL(rd.created_by_user, 'Not Available') AS created_by_user,
+        IFNULL(rd.assign_id, 'Not Available') AS assign_id,
+        IFNULL(rd.followup_date, 'Not Available') AS followup_date,
+        IFNULL(rd.cat_id, 'Not Available') AS cat_id,
+        IFNULL(rd.reference_id, 'Not Available') AS reference_id,
+        IFNULL(rd.area_id, 'Not Available') AS area_id,
+        IFNULL(rd.room_length, 'Not Available') AS room_length,
+        IFNULL(rd.room_width, 'Not Available') AS room_width,
+        IFNULL(rd.room_height, 'Not Available') AS room_height,
+        IFNULL(rd.location_link, 'Not Available') AS location_link,
+        IFNULL(rd.p_type, 'Not Available') AS p_type,
+        IFNULL(rd.budget_range, 'Not Available') AS budget_range,
+        IFNULL(rd.time_to_complete, 'Not Available') AS time_to_complete,
+        IFNULL(rd.site_visit_date, 'Not Available') AS site_visit_date,
+        IFNULL(rd.demo_date, 'Not Available') AS demo_date,
+        IFNULL(rd.lead_activity, 0) AS lead_activity,
+        IFNULL(rd.ar_number, 'Not Available') AS ar_number,
+        IFNULL(rd.architect_name, 'Not Available') AS architect_name,
+        IFNULL(rd.ca_number, 'Not Available') AS ca_number,
+        IFNULL(rd.e_number, 'Not Available') AS e_number,
+        IFNULL(rd.sm_number, 'Not Available') AS sm_number,
+        IFNULL(rd.pop_number, 'Not Available') AS pop_number,
+        IFNULL(rd.other_number, 'Not Available') AS other_number,
+        IFNULL(rd.quick_remark, 'Not Available') AS quick_remark,
+        IFNULL(rd.detailed_remark, 'Not Available') AS detailed_remark,
+        IFNULL(a.area_name, 'Not Available') AS area_name,
+        IFNULL(c.cat_name, 'Not Available') AS cat_name,
+        IFNULL(ref.reference_name, 'Not Available') AS reference_name,
+        IFNULL(DATE(asg.assign_date), 'Not Available') AS assign_date,
+        lr.id AS reassignment_id,
+        lr.reassignment_date,
+        lr.assignedTo AS reassigned_to,
+        lr.remark AS reassignment_remark,
+        lr.leadStage AS reassignment_lead_stage,
+        IFNULL(u.name, 'Not Available') AS telecaller_name,
+        u.user_id AS assigned_to_user_id,
+        MAX(tct.tc_remark) AS call_remark,
+        MAX(tct.tc_call_duration) AS call_duration,
+        GROUP_CONCAT(p.product_name) AS products,
+        MAX(d.location_link) AS document_location_link
+
+      FROM raw_data rd
+
+      LEFT JOIN area a ON rd.area_id = a.area_id
+      LEFT JOIN category c ON rd.cat_id = c.cat_id
+      LEFT JOIN reference ref ON rd.reference_id = ref.reference_id
+      LEFT JOIN assignments asg ON rd.assign_id = asg.assign_id
+      LEFT JOIN (
+        SELECT r1.*, ROW_NUMBER() OVER (PARTITION BY master_id ORDER BY id DESC) rn
+        FROM reassignment r1
+      ) lr ON rd.master_id = lr.master_id AND lr.rn = 1
+      LEFT JOIN users u ON lr.assignedTo = u.name
+      LEFT JOIN tele_caller_table tct ON rd.master_id = tct.master_id
+      LEFT JOIN product_mapping pm ON rd.master_id = pm.master_id
+      LEFT JOIN product p ON p.product_id = pm.product_id
+      LEFT JOIN documents d ON d.master_id = rd.master_id
+
+      WHERE (rd.lead_stage IN ('Drop', 'loss') OR lr.leadStage IN ('Drop', 'loss'))
+    `;
+
+    let params = [];
+
+    /* ================= SEARCH FILTER ================= */
+    if (search) {
+      query += ` AND (
+        rd.name LIKE ? OR 
+        rd.number LIKE ? OR 
+        rd.email LIKE ? OR 
+        rd.address LIKE ? OR 
+        rd.city LIKE ? OR 
+        rd.lead_stage LIKE ? OR 
+        lr.assignedTo LIKE ?
+      )`;
+      const searchPattern = `%${search}%`;
+      params.push(searchPattern, searchPattern, searchPattern, searchPattern, searchPattern, searchPattern, searchPattern);
+    }
+
+    /* ================= DATE FILTERS ================= */
+    if (entryFromDate) {
+      query += ` AND DATE(rd.assign_date) >= ?`;
+      params.push(entryFromDate);
+    }
+    if (entryToDate) {
+      query += ` AND DATE(rd.assign_date) <= ?`;
+      params.push(entryToDate);
+    }
+    if (followupFromDate) {
+      query += ` AND DATE(rd.followup_date) >= ?`;
+      params.push(followupFromDate);
+    }
+    if (followupToDate) {
+      query += ` AND DATE(rd.followup_date) <= ?`;
+      params.push(followupToDate);
+    }
+
+    /* ================= STAGE FILTER ================= */
+    if (stages.length > 0) {
+      query += ` AND rd.lead_stage IN (?)`;
+      params.push(stages);
+    }
+
+    /* ================= USER FILTER ================= */
+    if (users.length > 0) {
+      query += ` AND lr.assignedTo IN (?)`;
+      params.push(users);
+    }
+
+    /* ================= CITY FILTER ================= */
+    if (cities.length > 0) {
+      query += ` AND rd.city IN (?)`;
+      params.push(cities);
+    }
+
+    /* ================= ROLE FILTER ================= */
+    if (isTelecallerLike(role)) {
+      query += ` AND lr.assignedTo = ?`;
+      params.push(currentUserName);
+    } else if (isAdminLike(role)) {
+      // no filter
+    } else if (!isManagementLike(role)) {
+      query += ` AND lr.assignedTo = ?`;
+      params.push(currentUserName);
+    }
+
+    query += ` GROUP BY rd.master_id ORDER BY rd.master_id DESC LIMIT ? OFFSET ?`;
+    
+    // Add pagination parameters
+    params.push(limit, offset);
+
+    const [rows] = await db.query(query, params);
+
+    /* ================= OTHER INPUTS ================= */
+    const masterIds = rows.map(r => r.master_id);
+    let otherInputsRows = [];
+
+    if (masterIds.length) {
+      const [otherInputs] = await db.query(
+        `SELECT master_id, cat_id, reference_id, input_text
+         FROM raw_data_other_inputs
+         WHERE master_id IN (?)
+         ORDER BY created_at DESC`,
+        [masterIds]
+      );
+      otherInputsRows = otherInputs;
+    }
+
+    /* ================= REASSIGNMENT HISTORY ================= */
+    let reassignmentRows = [];
+    if (masterIds.length) {
+      const [reassignments] = await db.query(
+        `SELECT rm.*, u.name, u.role
+         FROM reassignment rm
+         LEFT JOIN users u ON u.user_id = rm.created_by_user
+         WHERE rm.master_id IN (?)
+         ORDER BY rm.reassignment_date DESC, rm.created_at DESC`,
+        [masterIds]
+      );
+      reassignmentRows = reassignments;
+    }
+
+    /* ================= FINAL MAP ================= */
+    const formattedRows = rows.map(row => {
+      const rowCatId = parseInt(row.cat_id);
+      const rowRefId = parseInt(row.reference_id);
+
+      const categoryOther =
+        otherInputsRows.find(
+          oi => oi.master_id === row.master_id && oi.cat_id === rowCatId
+        )?.input_text || '';
+
+      const referenceOther =
+        otherInputsRows.find(
+          oi => oi.master_id === row.master_id && oi.reference_id === rowRefId
+        )?.input_text || '';
+
+      const reassignments = reassignmentRows
+        .filter(r => r.master_id === row.master_id)
+        .map(r => ({
+          remark: r.remark || '',
+          assignedTo: r.assignedTo || '',
+          leadStage: r.leadStage || '',
+          created_by_user: r.created_by_user || '',
+          created_at: r.created_at
+            ? new Date(r.created_at).toLocaleString('en-GB')
+            : '',
+          reassignment_date: r.reassignment_date
+            ? new Date(r.reassignment_date).toLocaleString('en-GB')
+            : '',
+          name: r.name || '',
+          role: r.role || ''
+        }));
+
+      return {
+        ...row,
+        category_other: categoryOther,
+        reference_other: referenceOther,
+        reassignment_remarks: reassignments,
+        latest_assignedTo: reassignments[0]?.assignedTo || '',
+        latest_leadStage: reassignments[0]?.leadStage || '',
+        assign_date: row.assign_date
+      };
+    });
+
+    // Calculate pagination info
+    const totalPages = Math.ceil(total / limit);
+
+    return res.status(200).json({
+      success: true,
+      total: total,
+      currentPage: page,
+      totalPages: totalPages,
+      limit: limit,
+      dropLeads: formattedRows,
+      showing: {
+        from: offset + 1,
+        to: Math.min(offset + limit, total),
+        total: total
+      }
+    });
+
+  } catch (error) {
+    console.error("❌ Error in getDropLeadsFullData:", error);
+    res.status(500).json({ message: "Failed to fetch drop leads data" });
+  }
+};
 
 
 // export const getClosedLeadsFullData = async (req, res) => {
@@ -5924,8 +6303,6 @@ export const getClosedLeadsFullData = async (req, res) => {
 };
 
 
-
-
 export const getDemoLeadsFullData = async (req, res) => {
   try {
     if (!req.session.user) {
@@ -6137,7 +6514,6 @@ export const getDemoLeadsFullData = async (req, res) => {
     res.status(500).json({ message: "Failed to fetch demo leads data" });
   }
 };
-
 
 
 // export const getQuotationPendingLeadsFullData = async (req, res) => {
@@ -8352,7 +8728,7 @@ export const getInactiveLeadDetails = async (req, res) => {
 // };
 
 
-export const getEmployeeDetailedReport = async (req, res) => {
+export const getEmployeeDetailedReport1 = async (req, res) => {
   try {
     if (!req.session?.user) {
       return res.status(401).json({ message: "Unauthorized" });
@@ -8488,6 +8864,207 @@ export const getEmployeeDetailedReport = async (req, res) => {
   }
 };
 
+export const getEmployeeDetailedReport = async (req, res) => {
+  try {
+    if (!req.session?.user) {
+      return res.status(401).json({ message: "Unauthorized" });
+    }
+
+    const { role } = req.session.user;
+
+    if (!isAdminLike(role) && !isManagementLike(role)) {
+      return res.status(403).json({ message: "Access denied" });
+    }
+
+    const query = `
+    WITH latest_assignment AS (
+        SELECT 
+            r.*,
+            ROW_NUMBER() OVER (
+                PARTITION BY r.master_id, r.assignedTo
+                ORDER BY r.created_at DESC
+            ) AS rn
+        FROM reassignment r
+    ),
+
+    lead_conversion_status AS (
+        SELECT 
+            la.master_id,
+            la.assignedTo,
+            la.leadStage,
+            CASE
+                WHEN u.role = 'tele_caller' AND la.leadStage = 'Pre Site Visit' THEN 1
+                WHEN u.role = 'field_marketing_executive' AND la.leadStage = 'Quotation Pending' THEN 1
+                WHEN u.role = 'junior_autocad_designer' AND la.leadStage = 'Quotation Follow-up' THEN 1
+                WHEN u.role = 'tech_sale_sound_engineer' AND la.leadStage IN ('Demo','Pre Site Visit','Projection List') THEN 1
+                WHEN u.role = 'technical_head' AND la.leadStage = 'Projection List' THEN 1
+                ELSE 0
+            END AS is_converted
+        FROM latest_assignment la
+        INNER JOIN users u ON u.name = la.assignedTo
+        WHERE la.rn = 1
+    ),
+
+    -- Track Drop and Loss leads
+    drop_loss_status AS (
+        SELECT 
+            la.master_id,
+            la.assignedTo,
+            la.leadStage,
+            CASE 
+                WHEN la.leadStage = 'Drop' THEN 'Drop'
+                WHEN la.leadStage = 'loss' THEN 'Loss'
+                ELSE NULL
+            END AS drop_loss_type,
+            la.reassignment_date AS drop_loss_date,
+            la.remark AS drop_loss_remark
+        FROM latest_assignment la
+        WHERE la.rn = 1 
+          AND (la.leadStage = 'Drop' OR la.leadStage = 'loss')
+    )
+
+    SELECT
+        u.name AS employee_name,
+        u.role,
+        rd.master_id,
+        rd.name AS lead_name,
+        rd.number,
+        rd.email,
+        rd.city,
+        a.assign_date,
+        la.leadStage AS stage,
+        la.remark,
+        la.reassignment_date,
+        IFNULL(lcs.is_converted,0) AS is_converted,
+        -- Add drop/loss information
+        dl.drop_loss_type,
+        dl.drop_loss_date,
+        dl.drop_loss_remark,
+        -- Track if this lead was ever dropped or lost
+        CASE 
+            WHEN dl.drop_loss_type IS NOT NULL THEN 1 
+            ELSE 0 
+        END AS is_dropped_or_lost
+    FROM latest_assignment la
+
+    INNER JOIN users u 
+        ON u.name = la.assignedTo
+
+    INNER JOIN raw_data rd
+        ON rd.master_id = la.master_id
+
+    LEFT JOIN assignments a
+        ON a.assign_id = la.assign_id
+
+    LEFT JOIN lead_conversion_status lcs
+        ON la.master_id = lcs.master_id 
+        AND la.assignedTo = lcs.assignedTo
+
+    LEFT JOIN drop_loss_status dl
+        ON la.master_id = dl.master_id 
+        AND la.assignedTo = dl.assignedTo
+
+    WHERE la.rn = 1
+
+    ORDER BY u.name, la.reassignment_date DESC
+    `;
+
+    const [rows] = await db.query(query);
+
+    // 🔹 Group data by employee
+    const employeeMap = {};
+
+    rows.forEach(row => {
+      if (!employeeMap[row.employee_name]) {
+        employeeMap[row.employee_name] = {
+          employee_name: row.employee_name,
+          role: row.role,
+          total_assigned: 0,
+          converted_count: 0,
+          not_converted_count: 0,
+          // Add drop/loss tracking
+          drop_count: 0,
+          loss_count: 0,
+          total_dropped_lost: 0,
+          lead_details: []
+        };
+      }
+
+      const employee = employeeMap[row.employee_name];
+
+      employee.total_assigned += 1;
+
+      // Track conversions
+      if (row.is_converted === 1) {
+        employee.converted_count += 1;
+      } else {
+        employee.not_converted_count += 1;
+      }
+
+      // Track drop and loss
+      if (row.drop_loss_type === 'Drop') {
+        employee.drop_count += 1;
+        employee.total_dropped_lost += 1;
+      } else if (row.drop_loss_type === 'Loss') {
+        employee.loss_count += 1;
+        employee.total_dropped_lost += 1;
+      }
+
+      employee.lead_details.push({
+        master_id: row.master_id,
+        lead_name: row.lead_name,
+        number: row.number,
+        email: row.email,
+        city: row.city,
+        assign_date: row.assign_date,
+        stage: row.stage,
+        remark: row.remark,
+        reassignment_date: row.reassignment_date,
+        is_converted: row.is_converted,
+        conversion_status: row.is_converted ? "Converted" : "Not Converted",
+        // Add drop/loss details
+        is_dropped_or_lost: row.is_dropped_or_lost,
+        drop_loss_type: row.drop_loss_type,
+        drop_loss_date: row.drop_loss_date,
+        drop_loss_remark: row.drop_loss_remark,
+        drop_loss_status: row.drop_loss_type ? 
+          (row.drop_loss_type === 'Drop' ? 'Dropped' : 'Lost') : 'Active'
+      });
+    });
+
+    const result = Object.values(employeeMap);
+
+    // Calculate summary statistics
+    const summary = {
+      total_employees: result.length,
+      total_leads_assigned: result.reduce((sum, emp) => sum + emp.total_assigned, 0),
+      total_converted: result.reduce((sum, emp) => sum + emp.converted_count, 0),
+      total_not_converted: result.reduce((sum, emp) => sum + emp.not_converted_count, 0),
+      total_dropped: result.reduce((sum, emp) => sum + emp.drop_count, 0),
+      total_lost: result.reduce((sum, emp) => sum + emp.loss_count, 0),
+      total_dropped_lost: result.reduce((sum, emp) => sum + emp.total_dropped_lost, 0),
+      conversion_rate: ((result.reduce((sum, emp) => sum + emp.converted_count, 0) / 
+                         result.reduce((sum, emp) => sum + emp.total_assigned, 0)) * 100).toFixed(2),
+      drop_loss_rate: ((result.reduce((sum, emp) => sum + emp.total_dropped_lost, 0) / 
+                        result.reduce((sum, emp) => sum + emp.total_assigned, 0)) * 100).toFixed(2)
+    };
+
+    res.status(200).json({
+      success: true,
+      totalEmployees: result.length,
+      summary: summary,
+      data: result
+    });
+
+  } catch (error) {
+    console.error("❌ Employee detailed report error:", error);
+
+    res.status(500).json({
+      message: "Failed to fetch employee report",
+      error: error.message
+    });
+  }
+};
 
 
 export const getEmployeeLeadList = async (req, res) => {

@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useRef } from 'react';
 import { motion } from 'framer-motion';
 import { 
@@ -49,6 +50,8 @@ import {
   faTasks,
   faCalendarAlt,
   faTrashAlt,
+  faImage,
+  faFileAlt,
 } from '@fortawesome/free-solid-svg-icons';
 import { BASE_URL } from '../../../public/config.js';
 import axios from 'axios';
@@ -86,6 +89,9 @@ interface ReassignmentRemark {
 }
 
 interface Lead {
+  original_area: any;
+  original_city: any;
+  stage: string;
   area_name: string;
   master_id: number;
   name: string;
@@ -494,6 +500,17 @@ const ClosedLeadsPage: React.FC = () => {
     videos: [] 
   }); 
 
+  // Add these state variables for documents tab in details modal
+const [activeTab, setActiveTab] = useState('details');
+const [modalDocumentsData, setModalDocumentsData] = useState({
+  images: [],
+  documents: [],
+  videos: [],
+});
+const [loadingModalDocs, setLoadingModalDocs] = useState(false);
+const [modalDocsFetched, setModalDocsFetched] = useState(false);
+
+
   const [openRemark, setOpenRemark] = useState<string | null>(null);
   const [showDocsPopup, setShowDocsPopup] = useState(false);
   const [uploadFiles, setUploadFiles] = useState<File[]>([]);
@@ -818,6 +835,68 @@ const fetchClosedLeads = async (): Promise<void> => {
   }
 };
 
+
+// Reset when client changes
+useEffect(() => {
+  if (selectedLeadDetails) {
+    setActiveTab('details');
+    setModalDocsFetched(false);
+    setModalDocumentsData({ images: [], documents: [], videos: [] });
+  }
+}, [selectedLeadDetails?.master_id]);
+
+// Fetch documents when switching to documents tab
+useEffect(() => {
+  if (activeTab === 'documents' && selectedLeadDetails?.master_id && !modalDocsFetched) {
+    fetchDocumentsForModal();
+  }
+}, [activeTab, selectedLeadDetails?.master_id]);
+
+
+const fetchDocumentsForModal = async () => {
+  if (!selectedLeadDetails?.master_id || modalDocsFetched) return;
+
+  setLoadingModalDocs(true);
+  
+  try {
+    const response = await axios.get(
+      `${BASE_URL}api/documents/${selectedLeadDetails.master_id}`,
+      { withCredentials: true },
+    );
+
+    const images = [];
+    const documents = [];
+    const videos = [];
+
+    response.data.documents.forEach((doc) => {
+      let filePath = doc.document_path
+        .replace(/^server\//, '')
+        .replace(/\\/g, '/');
+
+      if (!filePath.startsWith('uploads/')) filePath = `uploads/${filePath}`;
+      const fullUrl = `${BASE_URL}${filePath}`;
+
+      const obj = {
+        ...doc,
+        url: fullUrl,
+        document_name: doc.document_name || `Document ${doc.doc_id}`,
+        file_extension: doc.file_extension || '',
+      };
+
+      if (doc.document_type === 'image') images.push(obj);
+      else if (doc.document_type === 'video') videos.push(obj);
+      else documents.push(obj);
+    });
+
+    setModalDocumentsData({ images, documents, videos });
+    setModalDocsFetched(true);
+  } catch (e) {
+    console.error('Error fetching documents:', e);
+    setModalDocumentsData({ images: [], documents: [], videos: [] });
+  } finally {
+    setLoadingModalDocs(false);
+  }
+};
 
   // Fetch other data
   const fetchCategories = async () => {
@@ -1466,145 +1545,172 @@ const fetchClosedLeads = async (): Promise<void> => {
     }
   };
 
-  // Detail modal render function
+
   const renderDetailsModal = () => {
-    if (!selectedLeadDetails) return null;
+  if (!selectedLeadDetails) return null;
 
-    const isEmpty = (value: any) => {
-      return !value || 
-             value === '' || 
-             value === 'Not Available' || 
-             value === 'N/A' ||
-             value === 'null' ||
-             value === null ||
-             value === undefined ||
-             value === 'Not Found';
-    };
+  const EMPTY_POSTER = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNDAwIiBoZWlnaHQ9IjIyNSIgdmlld0JveD0iMCAwIDQwMCAyMjUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+PHJlY3Qgd2lkdGg9IjQwMCIgaGVpZ2h0PSIyMjUiIGZpbGw9IiNlNWU3ZWIiLz48dGV4dCB4PSIyMDAiIHk9IjExMiIgZm9udC1zaXplPSIyMCIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZmlsbD0iIzY2NiI+VmlkZW88L3RleHQ+PC9zdmc+';
+  const EMPTY_IMAGE = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTUwIiBoZWlnaHQ9IjE1MCIgdmlld0JveD0iMCAwIDE1MCAxNTAiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+PHJlY3Qgd2lkdGg9IjE1MCIgaGVpZ2h0PSIxNTAiIGZpbGw9IiNlNWU3ZWIiLz48dGV4dCB4PSI3NSIgeT0iNzUiIGZvbnQtc2l6ZT0iMTQiIHRleHQtYW5jaG9yPSJtaWRkbGUiIGZpbGw9IiM2NjYiPkltYWdlPC90ZXh0Pjwvc3ZnPg==';
 
-    const formatValue = (value: any) => {
-      if (isEmpty(value)) return 'N/A';
-      return value;
-    };
+  const isEmpty = (value: any) => {
+    return !value || 
+           value === '' || 
+           value === 'Not Available' || 
+           value === 'N/A' ||
+           value === 'null' ||
+           value === null ||
+           value === undefined ||
+           value === 'Not Found';
+  };
 
-    // Function to check if a field exists and is not empty
-    const hasField = (fieldName: keyof Lead) => {
-      return selectedLeadDetails[fieldName] && !isEmpty(selectedLeadDetails[fieldName]);
-    };
+  const formatValue = (value: any) => {
+    if (isEmpty(value)) return 'N/A';
+    return value;
+  };
 
-    // Check for various contact numbers
-    const hasContactNumbers = 
-      hasField('ar_number') ||
-      hasField('ca_number') ||
-      hasField('e_number') ||
-      hasField('sm_number') ||
-      hasField('pop_number') ||
-      hasField('other_number') ||
-      hasField('architect_name') ||
-      hasField('alternate_number');
+  const hasField = (fieldName: keyof Lead) => {
+    return selectedLeadDetails[fieldName] && !isEmpty(selectedLeadDetails[fieldName]);
+  };
 
-    // Check for lead info
-    const hasLeadInfo = 
-      hasField('cat_name') ||
-      hasField('category_other') ||
-      hasField('reference_name') ||
-      hasField('reference_other') ||
-      hasField('area') ||
-      hasField('area_name');
+  // Check for various contact numbers
+  const hasContactNumbers = 
+    hasField('ar_number') ||
+    hasField('ca_number') ||
+    hasField('e_number') ||
+    hasField('sm_number') ||
+    hasField('pop_number') ||
+    hasField('other_number') ||
+    hasField('architect_name') ||
+    hasField('alternate_number');
 
-    // Check for project details
-    const hasProjectDetails = 
-      hasField('room_length') ||
-      hasField('room_width') ||
-      hasField('room_height') ||
-      hasField('p_type') ||
-      hasField('budget_range') ||
-      hasField('time_to_complete') ||
-      hasField('room_ready');
+  // Check for lead info
+  const hasLeadInfo = 
+    hasField('cat_name') ||
+    hasField('category_other') ||
+    hasField('reference_name') ||
+    hasField('reference_other') ||
+    hasField('area') ||
+    hasField('area_name');
 
-    // Check for lead stages
-    const hasLeadStages = 
-      hasField('lead_stage') ||
-      hasField('current_stage') ||
-      hasField('lead_status') ||
-      hasField('status') ||
-      hasField('status_percentage') ||
-      hasField('latest_leadStage');
+  // Check for project details
+  const hasProjectDetails = 
+    hasField('room_length') ||
+    hasField('room_width') ||
+    hasField('room_height') ||
+    hasField('p_type') ||
+    hasField('budget_range') ||
+    hasField('time_to_complete') ||
+    hasField('room_ready');
 
-    // Check for dates
-    const hasDates = 
-      hasField('assign_date') ||
-      hasField('followup_date') ||
-      hasField('site_visit_date') ||
-      hasField('demo_date');
+  // Check for dates
+  const hasDates = 
+    hasField('assign_date') ||
+    hasField('followup_date') ||
+    hasField('site_visit_date') ||
+    hasField('demo_date');
 
-    // Check for assignment info
-    const hasAssignmentInfo = 
-      hasField('assigned_to') ||
-      hasField('telecaller_name') ||
-      hasField('latest_assignedTo') ||
-      hasField('reassigned_to') ||
-      hasField('assigned_user_name');
+  // Check for links
+  const hasLinks = 
+    hasField('document_location_link') ||
+    hasField('location_link');
 
-    // Check for links
-    const hasLinks = 
-      hasField('document_location_link') ||
-      hasField('location_link');
+  // Check for remarks
+  const hasRemarks = 
+    hasField('quick_remark') ||
+    hasField('detailed_remark');
 
-    // Check for remarks
-    const hasRemarks = 
-      hasField('quick_remark') ||
-      hasField('detailed_remark');
+  const getFileIcon = (extension) => {
+    const ext = extension?.toLowerCase() || '';
+    if (ext.includes('pdf')) return '📕';
+    if (ext.includes('doc')) return '📄';
+    if (ext.includes('xls')) return '📊';
+    if (ext.includes('ppt')) return '📽️';
+    if (ext.includes('txt')) return '📝';
+    return '📎';
+  };
 
-    return (
-      <div className="fixed inset-0 bg-black/60 flex justify-center items-center z-[9999] p-4 backdrop-blur-sm">
-        <div className="bg-white dark:bg-boxdark rounded-xl shadow-2xl w-full max-w-2xl max-h-[85vh] overflow-hidden border border-gray-200 dark:border-gray-800">
-          {/* Compact Header */}
-          <div className="sticky top-0 bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-gray-800 dark:to-gray-900 p-4 border-b border-gray-200 dark:border-gray-800">
-            <div className="flex justify-between items-start">
-              <div className="flex-1">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 bg-gradient-to-br from-green-500 to-emerald-600 rounded-lg flex items-center justify-center shadow-lg">
-                    <span className="text-white font-bold text-lg">
-                      {selectedLeadDetails.name?.charAt(0) || 'C'}
+  return (
+    <div className="fixed inset-0 bg-black/60 flex justify-center items-center z-[9999] p-4 backdrop-blur-sm">
+      <div className="bg-white dark:bg-boxdark rounded-xl shadow-2xl w-full max-w-2xl max-h-[85vh] overflow-hidden border border-gray-200 dark:border-gray-800">
+        {/* Compact Header with Tabs */}
+        <div className="sticky top-0 z-10 bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-gray-800 dark:to-gray-900 p-4 border-b border-gray-200 dark:border-gray-800">
+          <div className="flex justify-between items-start">
+            <div className="flex-1">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 bg-gradient-to-br from-green-500 to-emerald-600 rounded-lg flex items-center justify-center shadow-lg">
+                  <span className="text-white font-bold text-lg">
+                    {selectedLeadDetails.name?.charAt(0) || 'C'}
+                  </span>
+                </div>
+                <div>
+                  <h2 className="text-xl font-bold text-black dark:text-white truncate max-w-xs">
+                    {formatValue(selectedLeadDetails.name)}
+                  </h2>
+                  <div className="flex items-center gap-3 text-xs text-gray-600 dark:text-gray-400 mt-1 flex-wrap">
+                    <span className="bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 px-2 py-0.5 rounded-full">
+                      ID: {selectedLeadDetails.master_id}
                     </span>
-                  </div>
-                  <div>
-                    <h2 className="text-xl font-bold text-black dark:text-white truncate max-w-xs">
-                      {formatValue(selectedLeadDetails.name)}
-                    </h2>
-                    <div className="flex items-center gap-3 text-xs text-gray-600 dark:text-gray-400 mt-1 flex-wrap">
-                      <span className="bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 px-2 py-0.5 rounded-full">
-                        Created: {formatValue(selectedLeadDetails.assign_date || selectedLeadDetails.created_at)}
-                      </span>
-                      {hasField('latest_assignedTo') && (
-                        <>
-                          <span>•</span>
-                          <span className="bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 px-2 py-0.5 rounded-full">
-                            Latest: {formatValue(selectedLeadDetails.latest_assignedTo || selectedLeadDetails.assigned_user_name)}
-                          </span>
-                        </>
-                      )}
-                    </div>
+                    <span className="bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 px-2 py-0.5 rounded-full">
+                      Created: {formatValue(selectedLeadDetails.assign_date || selectedLeadDetails.created_at)}
+                    </span>
                   </div>
                 </div>
               </div>
-              <button
-                onClick={() => {
-                  setShowDetailsModal(false);
-                  setSelectedLeadDetails(null);
-                }}
-                className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 text-xl p-1 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors"
-              >
-                ×
-              </button>
             </div>
+            <button
+              onClick={() => {
+                setShowDetailsModal(false);
+                setSelectedLeadDetails(null);
+              }}
+              className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 text-xl p-1 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors"
+            >
+              ×
+            </button>
           </div>
 
-          {/* Compact Content - Scrollable */}
-          <div className="overflow-y-auto max-h-[calc(85vh-140px)]">
+          {/* Tabs Navigation */}
+          <div className="mt-4 flex border-b border-gray-200 dark:border-gray-700">
+            <button
+              onClick={() => setActiveTab('details')}
+              className={`px-4 py-2 font-medium text-sm transition-colors flex items-center gap-2 ${
+                activeTab === 'details'
+                  ? 'text-blue-600 dark:text-blue-400 border-b-2 border-blue-500'
+                  : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-300'
+              }`}
+            >
+              <FontAwesomeIcon icon={faInfoCircle} className="h-4 w-4" />
+              Details
+            </button>
+            <button
+              onClick={() => setActiveTab('documents')}
+              className={`px-4 py-2 font-medium text-sm transition-colors flex items-center gap-2 ${
+                activeTab === 'documents'
+                  ? 'text-blue-600 dark:text-blue-400 border-b-2 border-blue-500'
+                  : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-300'
+              }`}
+            >
+              <FontAwesomeIcon icon={faFile} className="h-4 w-4" />
+              Documents
+              {modalDocumentsData.images.length +
+                modalDocumentsData.documents.length +
+                modalDocumentsData.videos.length >
+                0 && (
+                <span className="ml-1 bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-300 text-xs font-semibold px-2 py-0.5 rounded-full">
+                  {modalDocumentsData.images.length +
+                    modalDocumentsData.documents.length +
+                    modalDocumentsData.videos.length}
+                </span>
+              )}
+            </button>
+          </div>
+        </div>
+
+        {/* Tab Content */}
+        <div className="overflow-y-auto max-h-[calc(85vh-140px)]">
+          {activeTab === 'details' ? (
+            // Details Tab Content
             <div className="p-4 space-y-4">
-              
-              {/* Contact Info - Always show if lead exists */}
+              {/* Contact Info */}
               <div className="bg-gradient-to-r from-gray-50 to-gray-100 dark:from-gray-800/50 dark:to-gray-900/50 p-3 rounded-lg border border-gray-200 dark:border-gray-700">
                 <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2 flex items-center gap-2">
                   <FontAwesomeIcon icon={faPhone} className="h-4 w-4 text-blue-500" />
@@ -1670,7 +1776,7 @@ const fetchClosedLeads = async (): Promise<void> => {
                 </div>
               </div>
 
-              {/* Additional Contact Numbers - Only show if exists */}
+              {/* Additional Contact Numbers */}
               {hasContactNumbers && (
                 <div className="bg-gradient-to-r from-indigo-50 to-purple-50 dark:from-indigo-900/20 dark:to-purple-900/20 p-3 rounded-lg border border-indigo-100 dark:border-indigo-800/30">
                   <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2 flex items-center gap-2">
@@ -1738,7 +1844,7 @@ const fetchClosedLeads = async (): Promise<void> => {
                 </div>
               )}
 
-              {/* Lead & Category Information - Only show if exists */}
+              {/* Lead & Category Information */}
               {hasLeadInfo && (
                 <div className="bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20 p-3 rounded-lg border border-blue-100 dark:border-blue-800/30">
                   <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2 flex items-center gap-2">
@@ -1784,9 +1890,7 @@ const fetchClosedLeads = async (): Promise<void> => {
                 </div>
               )}
 
-
-
-              {/* Dates Information - Only show if exists */}
+              {/* Dates Information */}
               {hasDates && (
                 <div className="bg-gradient-to-r from-emerald-50 to-teal-50 dark:from-emerald-900/20 dark:to-teal-900/20 p-3 rounded-lg border border-emerald-100 dark:border-emerald-800/30">
                   <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2 flex items-center gap-2">
@@ -1834,7 +1938,7 @@ const fetchClosedLeads = async (): Promise<void> => {
                 </div>
               )}
 
-              {/* Project Details - Only show if exists */}
+              {/* Project Details */}
               {hasProjectDetails && (
                 <div className="bg-gradient-to-r from-amber-50 to-yellow-50 dark:from-amber-900/20 dark:to-yellow-900/20 p-3 rounded-lg border border-amber-100 dark:border-amber-800/30">
                   <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2 flex items-center gap-2">
@@ -1887,7 +1991,7 @@ const fetchClosedLeads = async (): Promise<void> => {
                 </div>
               )}
 
-              {/* Links - Only show if exists */}
+              {/* Links */}
               {hasLinks && (
                 <div className="bg-gradient-to-r from-blue-50 to-cyan-50 dark:from-blue-900/20 dark:to-cyan-900/20 p-3 rounded-lg border border-blue-100 dark:border-blue-800/30">
                   <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2 flex items-center gap-2">
@@ -1921,7 +2025,7 @@ const fetchClosedLeads = async (): Promise<void> => {
                 </div>
               )}
 
-              {/* Remarks - Only show if exists */}
+              {/* Remarks */}
               {hasRemarks && (
                 <div className="bg-gradient-to-r from-gray-50 to-slate-50 dark:from-gray-800/50 dark:to-slate-900/50 p-3 rounded-lg border border-gray-200 dark:border-gray-700">
                   <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2 flex items-center gap-2">
@@ -1956,7 +2060,7 @@ const fetchClosedLeads = async (): Promise<void> => {
                 </div>
               )}
 
-              {/* Reassignment History - Only show if exists */}
+              {/* Reassignment History */}
               {selectedLeadDetails.reassignment_remarks && 
                 Array.isArray(selectedLeadDetails.reassignment_remarks) && 
                 selectedLeadDetails.reassignment_remarks.length > 0 && (
@@ -1970,7 +2074,6 @@ const fetchClosedLeads = async (): Promise<void> => {
                     {(() => {
                       const remarks = selectedLeadDetails.reassignment_remarks;
                       if (remarks.length > 0 && typeof remarks[0] === 'object' && 'remark' in remarks[0]) {
-                        // Array of objects (full reassignment data)
                         return (remarks as ReassignmentRemark[]).slice(0, 4).map((remarkObj, index) => (
                           <div key={index} className="p-3 bg-white dark:bg-gray-800 rounded-lg shadow-sm border dark:border-gray-700">
                             <div className="flex justify-between items-start">
@@ -2001,11 +2104,193 @@ const fetchClosedLeads = async (): Promise<void> => {
                 </div>
               )}
             </div>
-          </div>
+          ) : (
+            // Documents Tab Content
+            <div className="p-4">
+              {loadingModalDocs ? (
+                <div className="flex justify-center items-center py-12">
+                  <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500"></div>
+                  <span className="ml-3 text-gray-600 dark:text-gray-400">Loading documents...</span>
+                </div>
+              ) : (
+                <>
+                  {/* Total Count */}
+                  <div className="mb-6 p-4 bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20 rounded-lg border border-blue-200 dark:border-blue-800/30">
+                    <div className="flex items-center justify-between">
+                      <h3 className="font-semibold text-gray-700 dark:text-gray-300">Documents Summary</h3>
+                      <span className="text-2xl font-bold text-blue-600 dark:text-blue-400">
+                        {modalDocumentsData.images.length + modalDocumentsData.documents.length + modalDocumentsData.videos.length}
+                      </span>
+                    </div>
+                    <div className="grid grid-cols-3 gap-3 mt-3">
+                      <div className="text-center p-3 bg-white dark:bg-gray-800 rounded-lg border border-blue-200 dark:border-blue-700/30">
+                        <div className="text-lg font-bold text-blue-600 dark:text-blue-400">{modalDocumentsData.images.length}</div>
+                        <div className="text-sm text-gray-600 dark:text-gray-400">Images</div>
+                      </div>
+                      <div className="text-center p-3 bg-white dark:bg-gray-800 rounded-lg border border-green-200 dark:border-green-700/30">
+                        <div className="text-lg font-bold text-green-600 dark:text-green-400">{modalDocumentsData.documents.length}</div>
+                        <div className="text-sm text-gray-600 dark:text-gray-400">Documents</div>
+                      </div>
+                      <div className="text-center p-3 bg-white dark:bg-gray-800 rounded-lg border border-purple-200 dark:border-purple-700/30">
+                        <div className="text-lg font-bold text-purple-600 dark:text-purple-400">{modalDocumentsData.videos.length}</div>
+                        <div className="text-sm text-gray-600 dark:text-gray-400">Videos</div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Images Section */}
+                  {modalDocumentsData.images.length > 0 && (
+                    <div className="mb-6">
+                      <h4 className="font-semibold text-gray-700 dark:text-gray-300 mb-3 flex items-center gap-2">
+                        <FontAwesomeIcon icon={faImage} className="h-4 w-4 text-blue-500" />
+                        Images ({modalDocumentsData.images.length})
+                      </h4>
+                      <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                        {modalDocumentsData.images.map((image, index) => (
+                          <div key={index} className="relative group">
+                            <img
+                              src={image.url}
+                              className="w-full h-32 object-cover rounded-lg border"
+                              onError={(e) => {
+                                e.currentTarget.onerror = null;
+                                e.currentTarget.src = EMPTY_IMAGE;
+                              }}
+                            />
+                            <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity rounded-lg flex items-center justify-center">
+                              <a
+                                href={image.url}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="text-white bg-blue-500 hover:bg-blue-600 px-3 py-1 rounded text-sm mr-2"
+                              >
+                                View
+                              </a>
+                              {image.remark && (
+                                <div className="absolute bottom-0 left-0 right-0 bg-black/70 text-white text-xs p-2 rounded-b-lg">
+                                  {image.remark}
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Documents Section */}
+                  {modalDocumentsData.documents.length > 0 && (
+                    <div className="mb-6">
+                      <h4 className="font-semibold text-gray-700 dark:text-gray-300 mb-3 flex items-center gap-2">
+                        <FontAwesomeIcon icon={faFileAlt} className="h-4 w-4 text-green-500" />
+                        Documents ({modalDocumentsData.documents.length})
+                      </h4>
+                      <div className="space-y-2">
+                        {modalDocumentsData.documents.map((doc, index) => (
+                          <div
+                            key={index}
+                            className="flex items-center justify-between p-3 bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+                          >
+                            <div className="flex items-center gap-3">
+                              <div className="text-xl">{getFileIcon(doc.file_extension)}</div>
+                              <div className="min-w-0">
+                                <div className="font-medium text-gray-800 dark:text-gray-200 truncate">
+                                  {doc.document_name}
+                                </div>
+                                {doc.remark && (
+                                  <div className="text-sm text-gray-600 dark:text-gray-400 truncate">
+                                    {doc.remark}
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              {doc.uploaded_at && (
+                                <span className="text-xs text-gray-500 dark:text-gray-400">
+                                  {new Date(doc.uploaded_at).toLocaleDateString()}
+                                </span>
+                              )}
+                              <a
+                                href={doc.url}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="px-3 py-1 bg-green-500 hover:bg-green-600 text-white text-sm rounded transition-colors"
+                              >
+                                Open
+                              </a>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Videos Section */}
+                  {modalDocumentsData.videos.length > 0 && (
+                    <div className="mb-6">
+                      <h4 className="font-semibold text-gray-700 dark:text-gray-300 mb-3 flex items-center gap-2">
+                        <FontAwesomeIcon icon={faVideo} className="h-4 w-4 text-purple-500" />
+                        Videos ({modalDocumentsData.videos.length})
+                      </h4>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        {modalDocumentsData.videos.map((video, index) => (
+                          <div
+                            key={index}
+                            className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden"
+                          >
+                            <div className="aspect-video bg-black">
+                              <video controls className="w-full h-full" poster={EMPTY_POSTER}>
+                                <source src={video.url} type="video/mp4" />
+                              </video>
+                            </div>
+                            <div className="p-3">
+                              <div className="flex justify-between items-start">
+                                <div className="font-medium text-gray-800 dark:text-gray-200">
+                                  Video {index + 1}
+                                </div>
+                                <a
+                                  href={video.url}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="px-2 py-1 bg-purple-500 hover:bg-purple-600 text-white text-xs rounded transition-colors"
+                                >
+                                  Download
+                                </a>
+                              </div>
+                              {video.remark && (
+                                <div className="mt-2 text-sm text-gray-600 dark:text-gray-400">
+                                  {video.remark}
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* No Documents Message */}
+                  {modalDocumentsData.images.length === 0 &&
+                    modalDocumentsData.documents.length === 0 &&
+                    modalDocumentsData.videos.length === 0 && (
+                      <div className="text-center py-12">
+                        <FontAwesomeIcon icon={faFile} className="text-4xl text-gray-400 dark:text-gray-600 mb-3" />
+                        <h3 className="text-lg font-semibold text-gray-600 dark:text-gray-400">
+                          No Documents Found
+                        </h3>
+                        <p className="text-gray-500 dark:text-gray-500 mt-1">
+                          No documents have been uploaded for this client.
+                        </p>
+                      </div>
+                    )}
+                </>
+              )}
+            </div>
+          )}
         </div>
       </div>
-    );
-  };
+    </div>
+  );
+};
 
   // Combined Documents/Upload Modal
   const renderDocsModal = () => {

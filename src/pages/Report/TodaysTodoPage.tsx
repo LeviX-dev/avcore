@@ -37,7 +37,9 @@ import {
   faCalendarAlt,
   faTasks,
   faUsers ,
-  faTrashAlt
+  faTrashAlt,
+  faImage,
+  faFileAlt
 } from '@fortawesome/free-solid-svg-icons';
 import { BASE_URL } from '../../../public/config.js';
 import axios from 'axios';
@@ -481,6 +483,17 @@ const TodaysTodoPage: React.FC = () => {
     documents: [], 
     videos: [] 
   });
+
+  // Add these state variables for documents tab
+const [activeTab, setActiveTab] = useState('details');
+const [documentsData, setDocumentsData] = useState({
+  images: [],
+  documents: [],
+  videos: [],
+});
+const [loadingDocs, setLoadingDocs] = useState(false);
+const [docsFetched, setDocsFetched] = useState(false);
+
   const [showDocsPopup, setShowDocsPopup] = useState(false);
   const [uploadFiles, setUploadFiles] = useState<File[]>([]);
   const [uploadType, setUploadType] = useState<'image' | 'documents' | 'video'>('documents');
@@ -552,19 +565,22 @@ const handleShowRemark = (text) => {
 
 
 
-
-// Detail modal render function
 const renderDetailsModal = () => {
   if (!selectedLeadDetails) return null;
 
+  const EMPTY_POSTER = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNDAwIiBoZWlnaHQ9IjIyNSIgdmlld0JveD0iMCAwIDQwMCAyMjUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+PHJlY3Qgd2lkdGg9IjQwMCIgaGVpZ2h0PSIyMjUiIGZpbGw9IiNlNWU3ZWIiLz48dGV4dCB4PSIyMDAiIHk9IjExMiIgZm9udC1zaXplPSIyMCIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZmlsbD0iIzY2NiI+VmlkZW88L3RleHQ+PC9zdmc+';
+  const EMPTY_IMAGE = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTUwIiBoZWlnaHQ9IjE1MCIgdmlld0JveD0iMCAwIDE1MCAxNTAiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+PHJlY3Qgd2lkdGg9IjE1MCIgaGVpZ2h0PSIxNTAiIGZpbGw9IiNlNWU3ZWIiLz48dGV4dCB4PSI3NSIgeT0iNzUiIGZvbnQtc2l6ZT0iMTQiIHRleHQtYW5jaG9yPSJtaWRkbGUiIGZpbGw9IiM2NjYiPkltYWdlPC90ZXh0Pjwvc3ZnPg==';
+
   const isEmpty = (value) => {
-    return !value || 
-           value === '' || 
-           value === 'Not Available' || 
-           value === 'N/A' ||
-           value === 'null' ||
-           value === null ||
-           value === undefined;
+    return (
+      !value ||
+      value === '' ||
+      value === 'Not Available' ||
+      value === 'N/A' ||
+      value === 'null' ||
+      value === null ||
+      value === undefined
+    );
   };
 
   const formatValue = (value) => {
@@ -572,13 +588,15 @@ const renderDetailsModal = () => {
     return value;
   };
 
-  // Function to check if a field exists and is not empty
   const hasField = (fieldName) => {
-    return selectedLeadDetails[fieldName] && !isEmpty(selectedLeadDetails[fieldName]);
+    return (
+      selectedLeadDetails[fieldName] &&
+      !isEmpty(selectedLeadDetails[fieldName])
+    );
   };
 
   // Check for various contact numbers
-  const hasContactNumbers = 
+  const hasContactNumbers =
     hasField('ar_number') ||
     hasField('ca_number') ||
     hasField('e_number') ||
@@ -589,15 +607,14 @@ const renderDetailsModal = () => {
     hasField('alternate_number');
 
   // Check for lead info
-  const hasLeadInfo = 
+  const hasLeadInfo =
     hasField('cat_name') ||
     hasField('category_other') ||
     hasField('reference_name') ||
-    hasField('reference_other') ||
-    hasField('area');
+    hasField('reference_other');
 
   // Check for project details
-  const hasProjectDetails = 
+  const hasProjectDetails =
     hasField('room_length') ||
     hasField('room_width') ||
     hasField('room_height') ||
@@ -606,44 +623,34 @@ const renderDetailsModal = () => {
     hasField('time_to_complete') ||
     hasField('room_ready');
 
-  // Check for lead stages
-  const hasLeadStages = 
-    hasField('lead_stage') ||
-    hasField('current_stage') ||
-    hasField('lead_status') ||
-    hasField('status') ||
-    hasField('status_percentage') ||
-    hasField('latest_leadStage');
-
   // Check for dates
-  const hasDates = 
+  const hasDates =
     hasField('assign_date') ||
     hasField('followup_date') ||
     hasField('site_visit_date') ||
     hasField('demo_date');
 
-  // Check for assignment info
-  const hasAssignmentInfo = 
-    hasField('assigned_to') ||
-    hasField('telecaller_name') ||
-    hasField('latest_assignedTo') ||
-    hasField('reassigned_to');
-
   // Check for links
-  const hasLinks = 
-    hasField('document_location_link') ||
-    hasField('location_link');
+  const hasLinks = hasField('document_location_link') || hasField('location_link');
 
   // Check for remarks
-  const hasRemarks = 
-    hasField('quick_remark') ||
-    hasField('detailed_remark');
+  const hasRemarks = hasField('quick_remark') || hasField('detailed_remark');
+
+  const getFileIcon = (extension) => {
+    const ext = extension?.toLowerCase() || '';
+    if (ext.includes('pdf')) return '📕';
+    if (ext.includes('doc')) return '📄';
+    if (ext.includes('xls')) return '📊';
+    if (ext.includes('ppt')) return '📽️';
+    if (ext.includes('txt')) return '📝';
+    return '📎';
+  };
 
   return (
     <div className="fixed inset-0 bg-black/60 flex justify-center items-center z-[9999] p-4 backdrop-blur-sm">
       <div className="bg-white dark:bg-boxdark rounded-xl shadow-2xl w-full max-w-2xl max-h-[85vh] overflow-hidden border border-gray-200 dark:border-gray-800">
-        {/* Compact Header */}
-        <div className="sticky top-0 bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-gray-800 dark:to-gray-900 p-4 border-b border-gray-200 dark:border-gray-800">
+        {/* Compact Header with Tabs */}
+        <div className="sticky top-0 z-10 bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-gray-800 dark:to-gray-900 p-4 border-b border-gray-200 dark:border-gray-800">
           <div className="flex justify-between items-start">
             <div className="flex-1">
               <div className="flex items-center gap-3">
@@ -658,16 +665,11 @@ const renderDetailsModal = () => {
                   </h2>
                   <div className="flex items-center gap-3 text-xs text-gray-600 dark:text-gray-400 mt-1 flex-wrap">
                     <span className="bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 px-2 py-0.5 rounded-full">
+                      ID: {selectedLeadDetails.master_id}
+                    </span>
+                    <span className="bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 px-2 py-0.5 rounded-full">
                       Created: {selectedLeadDetails.assign_date || 'N/A'}
                     </span>
-                    {hasField('latest_assignedTo') && (
-                      <>
-                        <span>•</span>
-                        <span className="bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 px-2 py-0.5 rounded-full">
-                          Latest: {selectedLeadDetails.latest_assignedTo}
-                        </span>
-                      </>
-                    )}
                   </div>
                 </div>
               </div>
@@ -682,419 +684,580 @@ const renderDetailsModal = () => {
               ×
             </button>
           </div>
+
+          {/* Tabs Navigation */}
+          <div className="mt-4 flex border-b border-gray-200 dark:border-gray-700">
+            <button
+              onClick={() => setActiveTab('details')}
+              className={`px-4 py-2 font-medium text-sm transition-colors flex items-center gap-2 ${
+                activeTab === 'details'
+                  ? 'text-blue-600 dark:text-blue-400 border-b-2 border-blue-500'
+                  : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-300'
+              }`}
+            >
+              <FontAwesomeIcon icon={faInfoCircle} className="h-4 w-4" />
+              Details
+            </button>
+            <button
+              onClick={() => setActiveTab('documents')}
+              className={`px-4 py-2 font-medium text-sm transition-colors flex items-center gap-2 ${
+                activeTab === 'documents'
+                  ? 'text-blue-600 dark:text-blue-400 border-b-2 border-blue-500'
+                  : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-300'
+              }`}
+            >
+              <FontAwesomeIcon icon={faFile} className="h-4 w-4" />
+              Documents
+              {documentsData.images.length +
+                documentsData.documents.length +
+                documentsData.videos.length >
+                0 && (
+                <span className="ml-1 bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-300 text-xs font-semibold px-2 py-0.5 rounded-full">
+                  {documentsData.images.length +
+                    documentsData.documents.length +
+                    documentsData.videos.length}
+                </span>
+              )}
+            </button>
+          </div>
         </div>
 
-        {/* Compact Content - Scrollable */}
+        {/* Tab Content */}
         <div className="overflow-y-auto max-h-[calc(85vh-140px)]">
-          <div className="p-4 space-y-4">
-            
-            {/* Contact Info - Always show if lead exists */}
-            <div className="bg-gradient-to-r from-gray-50 to-gray-100 dark:from-gray-800/50 dark:to-gray-900/50 p-3 rounded-lg border border-gray-200 dark:border-gray-700">
-              <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2 flex items-center gap-2">
-                <FontAwesomeIcon icon={faPhone} className="h-4 w-4 text-blue-500" />
-                Contact Information
-              </h3>
-              <div className="grid grid-cols-2 gap-3 text-sm">
-                {hasField('name') && (
-                  <div>
-                    <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">Name</div>
-                    <div className="font-medium text-black dark:text-white bg-white dark:bg-gray-800 px-2 py-1 rounded truncate">
-                      {formatValue(selectedLeadDetails.name)}
-                    </div>
-                  </div>
-                )}
-                {hasField('number') && (
-                  <div>
-                    <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">Phone</div>
-                    <div className="font-medium text-black dark:text-white bg-white dark:bg-gray-800 px-2 py-1 rounded truncate">
-                      {formatValue(selectedLeadDetails.number)}
-                    </div>
-                  </div>
-                )}
-                {hasField('email') && (
-                  <div>
-                    <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">Email</div>
-                    <div className="font-medium text-black dark:text-white bg-white dark:bg-gray-800 px-2 py-1 rounded truncate">
-                      {formatValue(selectedLeadDetails.email)}
-                    </div>
-                  </div>
-                )}
-                {hasField('alternate_number') && (
-                  <div>
-                    <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">Alternate Phone</div>
-                    <div className="font-medium text-black dark:text-white bg-white dark:bg-gray-800 px-2 py-1 rounded truncate">
-                      {formatValue(selectedLeadDetails.alternate_number)}
-                    </div>
-                  </div>
-                )}
-                {hasField('address') && (
-                  <div className="col-span-2">
-                    <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">Address</div>
-                    <div className="font-medium text-black dark:text-white bg-white dark:bg-gray-800 px-2 py-1 rounded truncate">
-                      {formatValue(selectedLeadDetails.address)}
-                    </div>
-                  </div>
-                )}
-                {hasField('city') && (
-                  <div>
-                    <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">City</div>
-                    <div className="font-medium text-black dark:text-white bg-white dark:bg-gray-800 px-2 py-1 rounded truncate">
-                      {formatValue(selectedLeadDetails.city)}
-                    </div>
-                  </div>
-                )}
-                {hasField('area') && (
-                  <div>
-                    <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">Area</div>
-                    <div className="font-medium text-black dark:text-white bg-white dark:bg-gray-800 px-2 py-1 rounded truncate">
-                      {formatValue(selectedLeadDetails.area)}
-                    </div>
-                  </div>
-                )}
-              </div>
-            </div>
-
-            {/* Additional Contact Numbers - Only show if exists */}
-            {hasContactNumbers && (
-              <div className="bg-gradient-to-r from-indigo-50 to-purple-50 dark:from-indigo-900/20 dark:to-purple-900/20 p-3 rounded-lg border border-indigo-100 dark:border-indigo-800/30">
+          {activeTab === 'details' ? (
+            // Details Tab Content (your existing details content)
+            <div className="p-4 space-y-4">
+              {/* Contact Info */}
+              <div className="bg-gradient-to-r from-gray-50 to-gray-100 dark:from-gray-800/50 dark:to-gray-900/50 p-3 rounded-lg border border-gray-200 dark:border-gray-700">
                 <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2 flex items-center gap-2">
-                  <FontAwesomeIcon icon={faUsers} className="h-4 w-4 text-indigo-500" />
-                  Additional Contacts
-                </h3>
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 text-sm">
-                  {hasField('architect_name') && (
-                    <div>
-                      <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">Architect</div>
-                      <div className="font-medium text-black dark:text-white truncate">
-                        {formatValue(selectedLeadDetails.architect_name)}
-                      </div>
-                    </div>
-                  )}
-                  {hasField('ar_number') && (
-                    <div>
-                      <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">Architect Number</div>
-                      <div className="font-medium text-black dark:text-white">
-                        {formatValue(selectedLeadDetails.ar_number)}
-                      </div>
-                    </div>
-                  )}
-                  {hasField('ca_number') && (
-                    <div>
-                      <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">CA Number</div>
-                      <div className="font-medium text-black dark:text-white">
-                        {formatValue(selectedLeadDetails.ca_number)}
-                      </div>
-                    </div>
-                  )}
-                  {hasField('e_number') && (
-                    <div>
-                      <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">Electrician</div>
-                      <div className="font-medium text-black dark:text-white">
-                        {formatValue(selectedLeadDetails.e_number)}
-                      </div>
-                    </div>
-                  )}
-                  {hasField('sm_number') && (
-                    <div>
-                      <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">Site Manager</div>
-                      <div className="font-medium text-black dark:text-white">
-                        {formatValue(selectedLeadDetails.sm_number)}
-                      </div>
-                    </div>
-                  )}
-                  {hasField('pop_number') && (
-                    <div>
-                      <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">POP Number</div>
-                      <div className="font-medium text-black dark:text-white">
-                        {formatValue(selectedLeadDetails.pop_number)}
-                      </div>
-                    </div>
-                  )}
-                  {hasField('other_number') && (
-                    <div>
-                      <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">Other Number</div>
-                      <div className="font-medium text-black dark:text-white">
-                        {formatValue(selectedLeadDetails.other_number)}
-                      </div>
-                    </div>
-                  )}
-                </div>
-              </div>
-            )}
-
-            {/* Lead & Category Information - Only show if exists */}
-            {hasLeadInfo && (
-              <div className="bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20 p-3 rounded-lg border border-blue-100 dark:border-blue-800/30">
-                <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2 flex items-center gap-2">
-                  <FontAwesomeIcon icon={faInfoCircle} className="h-4 w-4 text-blue-500" />
-                  Lead Details
-                </h3>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  {hasField('cat_name') && (
-                    <div>
-                      <div className="text-xs text-gray-500 dark:text-gray-400">Category</div>
-                      <div className="font-medium text-black dark:text-white truncate">
-                        {formatValue(selectedLeadDetails.cat_name)}
-                        {hasField('category_other') && (
-                          <span className="text-xs text-blue-600 dark:text-blue-400 ml-2">
-                            ({selectedLeadDetails.category_other})
-                          </span>
-                        )}
-                      </div>
-                    </div>
-                  )}
-                  {hasField('reference_name') && (
-                    <div>
-                      <div className="text-xs text-gray-500 dark:text-gray-400">Reference</div>
-                      <div className="font-medium text-black dark:text-white truncate">
-                        {formatValue(selectedLeadDetails.reference_name)}
-                        {hasField('reference_other') && (
-                          <span className="text-xs text-blue-600 dark:text-blue-400 ml-2">
-                            ({selectedLeadDetails.reference_other})
-                          </span>
-                        )}
-                      </div>
-                    </div>
-                  )}
-                </div>
-              </div>
-            )}
-
-          
-
-            {/* Dates Information - Only show if exists */}
-            {hasDates && (
-              <div className="bg-gradient-to-r from-emerald-50 to-teal-50 dark:from-emerald-900/20 dark:to-teal-900/20 p-3 rounded-lg border border-emerald-100 dark:border-emerald-800/30">
-                <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2 flex items-center gap-2">
-                  <FontAwesomeIcon icon={faCalendarAlt} className="h-4 w-4 text-emerald-500" />
-                  Dates
+                  <FontAwesomeIcon icon={faUser} className="h-4 w-4 text-blue-500" />
+                  Contact Information
                 </h3>
                 <div className="grid grid-cols-2 gap-3 text-sm">
-                  {hasField('assign_date') && (
+                  {hasField('name') && (
                     <div>
-                      <div className="text-xs text-gray-500 dark:text-gray-400">Entry Date</div>
-                      <div className="font-medium text-black dark:text-white">
-                        {formatValue(selectedLeadDetails.assign_date)}
+                      <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">Name</div>
+                      <div className="font-medium text-black dark:text-white bg-white dark:bg-gray-800 px-2 py-1 rounded truncate">
+                        {formatValue(selectedLeadDetails.name)}
                       </div>
                     </div>
                   )}
-                  {hasField('followup_date') && (
+                  {hasField('number') && (
                     <div>
-                      <div className="text-xs text-gray-500 dark:text-gray-400">Follow-up Date</div>
-                      <div className={`font-medium ${
-                        selectedLeadDetails.followup_date && new Date(selectedLeadDetails.followup_date) < new Date()
-                          ? 'text-red-600 dark:text-red-400'
-                          : 'text-green-600 dark:text-green-400'
-                      }`}>
-                        {formatValue(selectedLeadDetails.followup_date)}
+                      <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">Phone</div>
+                      <div className="font-medium text-black dark:text-white bg-white dark:bg-gray-800 px-2 py-1 rounded truncate">
+                        {formatValue(selectedLeadDetails.number)}
                       </div>
                     </div>
                   )}
-                  {hasField('site_visit_date') && (
+                  {hasField('email') && (
                     <div>
-                      <div className="text-xs text-gray-500 dark:text-gray-400">Site Visit</div>
-                      <div className="font-medium text-black dark:text-white">
-                        {formatValue(selectedLeadDetails.site_visit_date)}
+                      <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">Email</div>
+                      <div className="font-medium text-black dark:text-white bg-white dark:bg-gray-800 px-2 py-1 rounded truncate">
+                        {formatValue(selectedLeadDetails.email)}
                       </div>
                     </div>
                   )}
-                  {hasField('demo_date') && (
+                  {hasField('alternate_number') && (
                     <div>
-                      <div className="text-xs text-gray-500 dark:text-gray-400">Demo Date</div>
-                      <div className="font-medium text-black dark:text-white">
-                        {formatValue(selectedLeadDetails.demo_date)}
+                      <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">Alternate Phone</div>
+                      <div className="font-medium text-black dark:text-white bg-white dark:bg-gray-800 px-2 py-1 rounded truncate">
+                        {formatValue(selectedLeadDetails.alternate_number)}
+                      </div>
+                    </div>
+                  )}
+                  {hasField('address') && (
+                    <div className="col-span-2">
+                      <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">Address</div>
+                      <div className="font-medium text-black dark:text-white bg-white dark:bg-gray-800 px-2 py-1 rounded truncate">
+                        {formatValue(selectedLeadDetails.address)}
+                      </div>
+                    </div>
+                  )}
+                  {hasField('city') && (
+                    <div>
+                      <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">City</div>
+                      <div className="font-medium text-black dark:text-white bg-white dark:bg-gray-800 px-2 py-1 rounded truncate">
+                        {formatValue(selectedLeadDetails.city)}
+                      </div>
+                    </div>
+                  )}
+                  {hasField('area') && (
+                    <div>
+                      <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">Area</div>
+                      <div className="font-medium text-black dark:text-white bg-white dark:bg-gray-800 px-2 py-1 rounded truncate">
+                        {formatValue(selectedLeadDetails.area)}
                       </div>
                     </div>
                   )}
                 </div>
               </div>
-            )}
 
-            {/* Project Details - Only show if exists */}
-            {hasProjectDetails && (
-              <div className="bg-gradient-to-r from-amber-50 to-yellow-50 dark:from-amber-900/20 dark:to-yellow-900/20 p-3 rounded-lg border border-amber-100 dark:border-amber-800/30">
-                <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2 flex items-center gap-2">
-                  <FontAwesomeIcon icon={faFile} className="h-4 w-4 text-amber-500" />
-                  Project Details
-                </h3>
-                <div className="grid grid-cols-2 gap-3 text-sm">
-                  {(hasField('room_length') || hasField('room_width')) && (
-                    <div>
-                      <div className="text-xs text-gray-500 dark:text-gray-400">Room Size</div>
-                      <div className="font-medium text-black dark:text-white">
-                        {formatValue(selectedLeadDetails.room_length)} × {formatValue(selectedLeadDetails.room_width)}
-                        {hasField('room_height') && ` × ${formatValue(selectedLeadDetails.room_height)}`}
+              {/* Additional Contact Numbers */}
+              {hasContactNumbers && (
+                <div className="bg-gradient-to-r from-indigo-50 to-purple-50 dark:from-indigo-900/20 dark:to-purple-900/20 p-3 rounded-lg border border-indigo-100 dark:border-indigo-800/30">
+                  <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2 flex items-center gap-2">
+                    <FontAwesomeIcon icon={faUsers} className="h-4 w-4 text-indigo-500" />
+                    Additional Contacts
+                  </h3>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 text-sm">
+                    {hasField('architect_name') && (
+                      <div>
+                        <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">Architect</div>
+                        <div className="font-medium text-black dark:text-white truncate">
+                          {formatValue(selectedLeadDetails.architect_name)}
+                        </div>
                       </div>
-                    </div>
-                  )}
-                  {hasField('p_type') && (
-                    <div>
-                      <div className="text-xs text-gray-500 dark:text-gray-400">Type</div>
-                      <div className="font-medium text-black dark:text-white truncate">
-                        {formatValue(selectedLeadDetails.p_type)}
+                    )}
+                    {hasField('ar_number') && (
+                      <div>
+                        <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">Architect Number</div>
+                        <div className="font-medium text-black dark:text-white">
+                          {formatValue(selectedLeadDetails.ar_number)}
+                        </div>
                       </div>
-                    </div>
-                  )}
-                  {hasField('budget_range') && (
-                    <div>
-                      <div className="text-xs text-gray-500 dark:text-gray-400">Budget Range</div>
-                      <div className="font-medium text-black dark:text-white">
-                        {formatValue(selectedLeadDetails.budget_range)}
+                    )}
+                    {hasField('ca_number') && (
+                      <div>
+                        <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">CA Number</div>
+                        <div className="font-medium text-black dark:text-white">
+                          {formatValue(selectedLeadDetails.ca_number)}
+                        </div>
                       </div>
-                    </div>
-                  )}
-                  {hasField('time_to_complete') && selectedLeadDetails.time_to_complete !== "Not Available" && (
-                    <div>
-                      <div className="text-xs text-gray-500 dark:text-gray-400">Time to Complete</div>
-                      <div className="font-medium text-black dark:text-white">
-                        {formatValue(selectedLeadDetails.time_to_complete)}
+                    )}
+                    {hasField('e_number') && (
+                      <div>
+                        <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">Electrician</div>
+                        <div className="font-medium text-black dark:text-white">
+                          {formatValue(selectedLeadDetails.e_number)}
+                        </div>
                       </div>
-                    </div>
-                  )}
-                  {hasField('room_ready') && (
-                    <div>
-                      <div className="text-xs text-gray-500 dark:text-gray-400">Room Ready</div>
-                      <div className="font-medium text-black dark:text-white">
-                        {formatValue(selectedLeadDetails.room_ready)}
+                    )}
+                    {hasField('sm_number') && (
+                      <div>
+                        <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">Site Manager</div>
+                        <div className="font-medium text-black dark:text-white">
+                          {formatValue(selectedLeadDetails.sm_number)}
+                        </div>
                       </div>
-                    </div>
-                  )}
+                    )}
+                    {hasField('pop_number') && (
+                      <div>
+                        <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">POP Number</div>
+                        <div className="font-medium text-black dark:text-white">
+                          {formatValue(selectedLeadDetails.pop_number)}
+                        </div>
+                      </div>
+                    )}
+                    {hasField('other_number') && (
+                      <div>
+                        <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">Other Number</div>
+                        <div className="font-medium text-black dark:text-white">
+                          {formatValue(selectedLeadDetails.other_number)}
+                        </div>
+                      </div>
+                    )}
+                  </div>
                 </div>
-              </div>
-            )}
+              )}
 
-            {/* Links - Only show if exists */}
-            {hasLinks && (
-              <div className="bg-gradient-to-r from-blue-50 to-cyan-50 dark:from-blue-900/20 dark:to-cyan-900/20 p-3 rounded-lg border border-blue-100 dark:border-blue-800/30">
-                <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2 flex items-center gap-2">
-                  <FontAwesomeIcon icon={faMapMarkerAlt} className="h-4 w-4 text-blue-500" />
-                  Links
-                </h3>
-                <div className="space-y-2">
-                  {hasField('document_location_link') && (
-                    <a
-                      href={selectedLeadDetails.document_location_link}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="inline-flex items-center gap-2 px-3 py-2 text-sm bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 rounded-lg hover:bg-blue-200 dark:hover:bg-blue-800/50 transition-colors border border-blue-200 dark:border-blue-700"
-                    >
-                      <FontAwesomeIcon icon={faFile} className="h-3 w-3" />
-                      Document Location Link
-                    </a>
-                  )}
-                  {hasField('location_link') && (
-                    <a
-                      href={selectedLeadDetails.location_link}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="inline-flex items-center gap-2 px-3 py-2 text-sm bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 rounded-lg hover:bg-green-200 dark:hover:bg-green-800/50 transition-colors border border-green-200 dark:border-green-700"
-                    >
-                      <FontAwesomeIcon icon={faMapMarkerAlt} className="h-3 w-3" />
-                      Location Link
-                    </a>
-                  )}
-                </div>
-              </div>
-            )}
-
-            {/* Remarks - Only show if exists */}
-            {hasRemarks && (
-              <div className="bg-gradient-to-r from-gray-50 to-slate-50 dark:from-gray-800/50 dark:to-slate-900/50 p-3 rounded-lg border border-gray-200 dark:border-gray-700">
-                <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2 flex items-center gap-2">
-                  <FontAwesomeIcon icon={faInfoCircle} className="h-4 w-4 text-gray-500" />
-                  Remarks
-                </h3>
-                <div className="text-sm">
-                  {hasField('quick_remark') && (
-                    <div className="mb-2">
-                      <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">Quick Remark</div>
-                      <div className="font-medium text-black dark:text-white bg-white dark:bg-gray-800 p-2 rounded border border-gray-200 dark:border-gray-700">
-                        <span className={`px-2 py-1 rounded-full text-xs ${
-                          selectedLeadDetails.quick_remark === "Interested" ? "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300" :
-                          selectedLeadDetails.quick_remark === "Not Interested" ? "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300" :
-                          selectedLeadDetails.quick_remark === "Not Reachable" ? "bg-gray-100 text-gray-800 dark:bg-gray-900/30 dark:text-gray-300" :
-                          "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300"
-                        }`}>
-                          {formatValue(selectedLeadDetails.quick_remark)}
-                        </span>
-                      </div>
-                    </div>
-                  )}
-                  {hasField('detailed_remark') && (
-                    <div>
-                      <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">Detailed Remark</div>
-                      <div className="text-black dark:text-white bg-white dark:bg-gray-800 p-2 rounded border border-gray-200 dark:border-gray-700 whitespace-pre-line">
-                        {formatValue(selectedLeadDetails.detailed_remark)}
-                      </div>
-                    </div>
-                  )}
-                </div>
-              </div>
-            )}
-
-            {/* Reassignment History - Only show if exists */}
-            {selectedLeadDetails.reassignment_remarks && 
-              Array.isArray(selectedLeadDetails.reassignment_remarks) && 
-              selectedLeadDetails.reassignment_remarks.length > 0 && (
-              <div className="mt-4">
-                <h3 className="text-sm font-semibold mb-3 dark:text-white flex items-center gap-2">
-                  <FontAwesomeIcon icon={faUser} className="h-4 w-4 text-yellow-500" />
-                  Reassignments ({selectedLeadDetails.reassignment_remarks.length})
-                </h3>
-                
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                  {(() => {
-                    const remarks = selectedLeadDetails.reassignment_remarks;
-                    if (remarks.length > 0 && typeof remarks[0] === 'object' && 'remark' in remarks[0]) {
-                      // Array of objects (full reassignment data)
-                      return (remarks as any[]).slice(0, 4).map((remarkObj, index) => (
-                        <div key={index} className="p-3 bg-white dark:bg-gray-800 rounded-lg shadow-sm border dark:border-gray-700">
-                          <div className="flex justify-between items-start">
-                            <div>
-                              <div className="font-medium text-sm mb-1">
-                                <span className="text-blue-600">{remarkObj.name || 'Unknown'}</span>
-                                <span className="mx-2 text-gray-400">→</span>
-                                <span className="text-green-600">{remarkObj.assignedTo || 'Unknown'}</span>
-                              </div>
-                              <div className="text-xs text-gray-500 mb-1">
-                                {remarkObj.created_at} • {remarkObj.leadStage || 'Cold Lead'}
-                              </div>
-                            </div>
-                            <span className="text-xs bg-gray-100 dark:bg-gray-700 px-2 py-1 rounded">#{index + 1}</span>
-                          </div>
-                          
-                          {remarkObj.remark && (
-                            <div className="text-sm text-gray-700 dark:text-gray-300 mt-2 pt-2 border-t">
-                              {remarkObj.remark}
-                            </div>
+              {/* Lead & Category Information */}
+              {hasLeadInfo && (
+                <div className="bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20 p-3 rounded-lg border border-blue-100 dark:border-blue-800/30">
+                  <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2 flex items-center gap-2">
+                    <FontAwesomeIcon icon={faInfoCircle} className="h-4 w-4 text-blue-500" />
+                    Lead Details
+                  </h3>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    {hasField('cat_name') && (
+                      <div>
+                        <div className="text-xs text-gray-500 dark:text-gray-400">Category</div>
+                        <div className="font-medium text-black dark:text-white truncate">
+                          {formatValue(selectedLeadDetails.cat_name)}
+                          {hasField('category_other') && (
+                            <span className="text-xs text-blue-600 dark:text-blue-400 ml-2">
+                              ({selectedLeadDetails.category_other})
+                            </span>
                           )}
                         </div>
-                      ));
-                    } else if (remarks.length > 0 && typeof remarks[0] === 'string') {
-                      // Array of strings (legacy format)
-                      return (remarks as string[]).slice(0, 4).map((remark, index) => (
-                        <div key={index} className="p-3 bg-white dark:bg-gray-800 rounded-lg shadow-sm border dark:border-gray-700">
-                          <div className="flex justify-between items-start">
-                            <div>
-                              <div className="font-medium text-sm mb-1">
-                                <span className="text-gray-700 dark:text-gray-300">Remark #{index + 1}</span>
+                      </div>
+                    )}
+                    {hasField('reference_name') && (
+                      <div>
+                        <div className="text-xs text-gray-500 dark:text-gray-400">Reference</div>
+                        <div className="font-medium text-black dark:text-white truncate">
+                          {formatValue(selectedLeadDetails.reference_name)}
+                          {hasField('reference_other') && (
+                            <span className="text-xs text-blue-600 dark:text-blue-400 ml-2">
+                              ({selectedLeadDetails.reference_other})
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* Dates Information */}
+              {hasDates && (
+                <div className="bg-gradient-to-r from-emerald-50 to-teal-50 dark:from-emerald-900/20 dark:to-teal-900/20 p-3 rounded-lg border border-emerald-100 dark:border-emerald-800/30">
+                  <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2 flex items-center gap-2">
+                    <FontAwesomeIcon icon={faCalendarAlt} className="h-4 w-4 text-emerald-500" />
+                    Dates
+                  </h3>
+                  <div className="grid grid-cols-2 gap-3 text-sm">
+                    {hasField('assign_date') && (
+                      <div>
+                        <div className="text-xs text-gray-500 dark:text-gray-400">Entry Date</div>
+                        <div className="font-medium text-black dark:text-white">
+                          {formatValue(selectedLeadDetails.assign_date)}
+                        </div>
+                      </div>
+                    )}
+                    {hasField('followup_date') && (
+                      <div>
+                        <div className="text-xs text-gray-500 dark:text-gray-400">Follow-up Date</div>
+                        <div className={`font-medium ${
+                          selectedLeadDetails.followup_date && new Date(selectedLeadDetails.followup_date) < new Date()
+                            ? 'text-red-600 dark:text-red-400'
+                            : 'text-green-600 dark:text-green-400'
+                        }`}>
+                          {formatValue(selectedLeadDetails.followup_date)}
+                        </div>
+                      </div>
+                    )}
+                    {hasField('site_visit_date') && (
+                      <div>
+                        <div className="text-xs text-gray-500 dark:text-gray-400">Site Visit</div>
+                        <div className="font-medium text-black dark:text-white">
+                          {formatValue(selectedLeadDetails.site_visit_date)}
+                        </div>
+                      </div>
+                    )}
+                    {hasField('demo_date') && (
+                      <div>
+                        <div className="text-xs text-gray-500 dark:text-gray-400">Demo Date</div>
+                        <div className="font-medium text-black dark:text-white">
+                          {formatValue(selectedLeadDetails.demo_date)}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* Project Details */}
+              {hasProjectDetails && (
+                <div className="bg-gradient-to-r from-amber-50 to-yellow-50 dark:from-amber-900/20 dark:to-yellow-900/20 p-3 rounded-lg border border-amber-100 dark:border-amber-800/30">
+                  <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2 flex items-center gap-2">
+                    <FontAwesomeIcon icon={faFile} className="h-4 w-4 text-amber-500" />
+                    Project Details
+                  </h3>
+                  <div className="grid grid-cols-2 gap-3 text-sm">
+                    {(hasField('room_length') || hasField('room_width')) && (
+                      <div>
+                        <div className="text-xs text-gray-500 dark:text-gray-400">Room Size</div>
+                        <div className="font-medium text-black dark:text-white">
+                          {formatValue(selectedLeadDetails.room_length)} ×{' '}
+                          {formatValue(selectedLeadDetails.room_width)}
+                          {hasField('room_height') &&
+                            ` × ${formatValue(selectedLeadDetails.room_height)}`}
+                        </div>
+                      </div>
+                    )}
+                    {hasField('p_type') && (
+                      <div>
+                        <div className="text-xs text-gray-500 dark:text-gray-400">Type</div>
+                        <div className="font-medium text-black dark:text-white truncate">
+                          {formatValue(selectedLeadDetails.p_type)}
+                        </div>
+                      </div>
+                    )}
+                    {hasField('budget_range') && (
+                      <div>
+                        <div className="text-xs text-gray-500 dark:text-gray-400">Budget Range</div>
+                        <div className="font-medium text-black dark:text-white">
+                          {formatValue(selectedLeadDetails.budget_range)}
+                        </div>
+                      </div>
+                    )}
+                    {hasField('time_to_complete') && selectedLeadDetails.time_to_complete !== 'Not Available' && (
+                      <div>
+                        <div className="text-xs text-gray-500 dark:text-gray-400">Time to Complete</div>
+                        <div className="font-medium text-black dark:text-white">
+                          {formatValue(selectedLeadDetails.time_to_complete)}
+                        </div>
+                      </div>
+                    )}
+                    {hasField('room_ready') && (
+                      <div>
+                        <div className="text-xs text-gray-500 dark:text-gray-400">Room Ready</div>
+                        <div className="font-medium text-black dark:text-white">
+                          {formatValue(selectedLeadDetails.room_ready)}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* Links */}
+              {hasLinks && (
+                <div className="bg-gradient-to-r from-blue-50 to-cyan-50 dark:from-blue-900/20 dark:to-cyan-900/20 p-3 rounded-lg border border-blue-100 dark:border-blue-800/30">
+                  <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2 flex items-center gap-2">
+                    <FontAwesomeIcon icon={faMapMarkerAlt} className="h-4 w-4 text-blue-500" />
+                    Links
+                  </h3>
+                  <div className="space-y-2">
+                    {hasField('document_location_link') && (
+                      <a
+                        href={selectedLeadDetails.document_location_link}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-2 px-3 py-2 text-sm bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 rounded-lg hover:bg-blue-200 dark:hover:bg-blue-800/50 transition-colors border border-blue-200 dark:border-blue-700"
+                      >
+                        <FontAwesomeIcon icon={faFile} className="h-3 w-3" />
+                        Document Location Link
+                      </a>
+                    )}
+                    {hasField('location_link') && (
+                      <a
+                        href={selectedLeadDetails.location_link}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-2 px-3 py-2 text-sm bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 rounded-lg hover:bg-green-200 dark:hover:bg-green-800/50 transition-colors border border-green-200 dark:border-green-700"
+                      >
+                        <FontAwesomeIcon icon={faMapMarkerAlt} className="h-3 w-3" />
+                        Location Link
+                      </a>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* Remarks */}
+              {hasRemarks && (
+                <div className="bg-gradient-to-r from-gray-50 to-slate-50 dark:from-gray-800/50 dark:to-slate-900/50 p-3 rounded-lg border border-gray-200 dark:border-gray-700">
+                  <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2 flex items-center gap-2">
+                    <FontAwesomeIcon icon={faInfoCircle} className="h-4 w-4 text-gray-500" />
+                    Remarks
+                  </h3>
+                  <div className="text-sm">
+                    {hasField('quick_remark') && (
+                      <div className="mb-2">
+                        <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">Quick Remark</div>
+                        <div className="font-medium text-black dark:text-white bg-white dark:bg-gray-800 p-2 rounded border border-gray-200 dark:border-gray-700">
+                          <span
+                            className={`px-2 py-1 rounded-full text-xs ${
+                              selectedLeadDetails.quick_remark === 'Interested'
+                                ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300'
+                                : selectedLeadDetails.quick_remark === 'Not Interested'
+                                ? 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300'
+                                : selectedLeadDetails.quick_remark === 'Not Reachable'
+                                ? 'bg-gray-100 text-gray-800 dark:bg-gray-900/30 dark:text-gray-300'
+                                : 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300'
+                            }`}
+                          >
+                            {formatValue(selectedLeadDetails.quick_remark)}
+                          </span>
+                        </div>
+                      </div>
+                    )}
+                    {hasField('detailed_remark') && (
+                      <div>
+                        <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">Detailed Remark</div>
+                        <div className="text-black dark:text-white bg-white dark:bg-gray-800 p-2 rounded border border-gray-200 dark:border-gray-700 whitespace-pre-line">
+                          {formatValue(selectedLeadDetails.detailed_remark)}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
+          ) : (
+            // Documents Tab Content
+            <div className="p-4">
+              {loadingDocs ? (
+                <div className="flex justify-center items-center py-12">
+                  <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500"></div>
+                  <span className="ml-3 text-gray-600 dark:text-gray-400">Loading documents...</span>
+                </div>
+              ) : (
+                <>
+                  {/* Total Count */}
+                  <div className="mb-6 p-4 bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20 rounded-lg border border-blue-200 dark:border-blue-800/30">
+                    <div className="flex items-center justify-between">
+                      <h3 className="font-semibold text-gray-700 dark:text-gray-300">Documents Summary</h3>
+                      <span className="text-2xl font-bold text-blue-600 dark:text-blue-400">
+                        {documentsData.images.length + documentsData.documents.length + documentsData.videos.length}
+                      </span>
+                    </div>
+                    <div className="grid grid-cols-3 gap-3 mt-3">
+                      <div className="text-center p-3 bg-white dark:bg-gray-800 rounded-lg border border-blue-200 dark:border-blue-700/30">
+                        <div className="text-lg font-bold text-blue-600 dark:text-blue-400">{documentsData.images.length}</div>
+                        <div className="text-sm text-gray-600 dark:text-gray-400">Images</div>
+                      </div>
+                      <div className="text-center p-3 bg-white dark:bg-gray-800 rounded-lg border border-green-200 dark:border-green-700/30">
+                        <div className="text-lg font-bold text-green-600 dark:text-green-400">{documentsData.documents.length}</div>
+                        <div className="text-sm text-gray-600 dark:text-gray-400">Documents</div>
+                      </div>
+                      <div className="text-center p-3 bg-white dark:bg-gray-800 rounded-lg border border-purple-200 dark:border-purple-700/30">
+                        <div className="text-lg font-bold text-purple-600 dark:text-purple-400">{documentsData.videos.length}</div>
+                        <div className="text-sm text-gray-600 dark:text-gray-400">Videos</div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Images Section */}
+                  {documentsData.images.length > 0 && (
+                    <div className="mb-6">
+                      <h4 className="font-semibold text-gray-700 dark:text-gray-300 mb-3 flex items-center gap-2">
+                        <FontAwesomeIcon icon={faImage} className="h-4 w-4 text-blue-500" />
+                        Images ({documentsData.images.length})
+                      </h4>
+                      <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                        {documentsData.images.map((image, index) => (
+                          <div key={index} className="relative group">
+                            <img
+                              src={image.url}
+                              className="w-full h-32 object-cover rounded-lg border"
+                              onError={(e) => {
+                                e.currentTarget.onerror = null;
+                                e.currentTarget.src = EMPTY_IMAGE;
+                              }}
+                            />
+                            <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity rounded-lg flex items-center justify-center">
+                              <a
+                                href={image.url}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="text-white bg-blue-500 hover:bg-blue-600 px-3 py-1 rounded text-sm mr-2"
+                              >
+                                View
+                              </a>
+                              {image.remark && (
+                                <div className="absolute bottom-0 left-0 right-0 bg-black/70 text-white text-xs p-2 rounded-b-lg">
+                                  {image.remark}
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Documents Section */}
+                  {documentsData.documents.length > 0 && (
+                    <div className="mb-6">
+                      <h4 className="font-semibold text-gray-700 dark:text-gray-300 mb-3 flex items-center gap-2">
+                        <FontAwesomeIcon icon={faFileAlt} className="h-4 w-4 text-green-500" />
+                        Documents ({documentsData.documents.length})
+                      </h4>
+                      <div className="space-y-2">
+                        {documentsData.documents.map((doc, index) => (
+                          <div
+                            key={index}
+                            className="flex items-center justify-between p-3 bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+                          >
+                            <div className="flex items-center gap-3">
+                              <div className="text-xl">{getFileIcon(doc.file_extension)}</div>
+                              <div className="min-w-0">
+                                <div className="font-medium text-gray-800 dark:text-gray-200 truncate">
+                                  {doc.document_name}
+                                </div>
+                                {doc.remark && (
+                                  <div className="text-sm text-gray-600 dark:text-gray-400 truncate">
+                                    {doc.remark}
+                                  </div>
+                                )}
                               </div>
                             </div>
-                            <span className="text-xs bg-gray-100 dark:bg-gray-700 px-2 py-1 rounded">#{index + 1}</span>
+                            <div className="flex items-center gap-2">
+                              {doc.uploaded_at && (
+                                <span className="text-xs text-gray-500 dark:text-gray-400">
+                                  {new Date(doc.uploaded_at).toLocaleDateString()}
+                                </span>
+                              )}
+                              <a
+                                href={doc.url}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="px-3 py-1 bg-green-500 hover:bg-green-600 text-white text-sm rounded transition-colors"
+                              >
+                                Open
+                              </a>
+                            </div>
                           </div>
-                          
-                          <div className="text-sm text-gray-700 dark:text-gray-300 mt-2">
-                            {remark}
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Videos Section */}
+                  {documentsData.videos.length > 0 && (
+                    <div className="mb-6">
+                      <h4 className="font-semibold text-gray-700 dark:text-gray-300 mb-3 flex items-center gap-2">
+                        <FontAwesomeIcon icon={faVideo} className="h-4 w-4 text-purple-500" />
+                        Videos ({documentsData.videos.length})
+                      </h4>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        {documentsData.videos.map((video, index) => (
+                          <div
+                            key={index}
+                            className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden"
+                          >
+                            <div className="aspect-video bg-black">
+                              <video controls className="w-full h-full" poster={EMPTY_POSTER}>
+                                <source src={video.url} type="video/mp4" />
+                              </video>
+                            </div>
+                            <div className="p-3">
+                              <div className="flex justify-between items-start">
+                                <div className="font-medium text-gray-800 dark:text-gray-200">
+                                  Video {index + 1}
+                                </div>
+                                <a
+                                  href={video.url}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="px-2 py-1 bg-purple-500 hover:bg-purple-600 text-white text-xs rounded transition-colors"
+                                >
+                                  Download
+                                </a>
+                              </div>
+                              {video.remark && (
+                                <div className="mt-2 text-sm text-gray-600 dark:text-gray-400">
+                                  {video.remark}
+                                </div>
+                              )}
+                            </div>
                           </div>
-                        </div>
-                      ));
-                    }
-                    return null;
-                  })()}
-                </div>
-              </div>
-            )}
-          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* No Documents Message */}
+                  {documentsData.images.length === 0 &&
+                    documentsData.documents.length === 0 &&
+                    documentsData.videos.length === 0 && (
+                      <div className="text-center py-12">
+                        <FontAwesomeIcon icon={faFile} className="text-4xl text-gray-400 dark:text-gray-600 mb-3" />
+                        <h3 className="text-lg font-semibold text-gray-600 dark:text-gray-400">
+                          No Documents Found
+                        </h3>
+                        <p className="text-gray-500 dark:text-gray-500 mt-1">
+                          No documents have been uploaded for this client.
+                        </p>
+                      </div>
+                    )}
+                </>
+              )}
+            </div>
+          )}
         </div>
       </div>
     </div>
@@ -1102,6 +1265,66 @@ const renderDetailsModal = () => {
 };
 
 
+// Reset when client changes
+useEffect(() => {
+  if (selectedLeadDetails) {
+    setActiveTab('details');
+    setDocsFetched(false);
+    setDocumentsData({ images: [], documents: [], videos: [] });
+  }
+}, [selectedLeadDetails?.master_id]);
+
+// Fetch documents when switching to documents tab
+useEffect(() => {
+  if (activeTab === 'documents' && selectedLeadDetails?.master_id && !docsFetched) {
+    fetchDocumentsForModal();
+  }
+}, [activeTab, selectedLeadDetails?.master_id]);
+
+const fetchDocumentsForModal = async () => {
+  if (!selectedLeadDetails?.master_id || docsFetched) return;
+
+  setLoadingDocs(true);
+  
+  try {
+    const response = await axios.get(
+      `${BASE_URL}api/documents/${selectedLeadDetails.master_id}`,
+      { withCredentials: true },
+    );
+
+    const images = [];
+    const documents = [];
+    const videos = [];
+
+    response.data.documents.forEach((doc) => {
+      let filePath = doc.document_path
+        .replace(/^server\//, '')
+        .replace(/\\/g, '/');
+
+      if (!filePath.startsWith('uploads/')) filePath = `uploads/${filePath}`;
+      const fullUrl = `${BASE_URL}${filePath}`;
+
+      const obj = {
+        ...doc,
+        url: fullUrl,
+        document_name: doc.document_name || `Document ${doc.doc_id}`,
+        file_extension: doc.file_extension || '',
+      };
+
+      if (doc.document_type === 'image') images.push(obj);
+      else if (doc.document_type === 'video') videos.push(obj);
+      else documents.push(obj);
+    });
+
+    setDocumentsData({ images, documents, videos });
+    setDocsFetched(true);
+  } catch (e) {
+    console.error('Error fetching documents:', e);
+    setDocumentsData({ images: [], documents: [], videos: [] });
+  } finally {
+    setLoadingDocs(false);
+  }
+};
 
 
 // Add these state variables near your other state declarations (around line ~200)
@@ -3386,23 +3609,23 @@ const renderDocsModal = () => {
 </td>
 
 
-
    {/* Client Name - Now with enhanced styling */}
 <td className="py-4 px-4">
-  <div 
-    onClick={() => {
-      setSelectedLeadDetails(lead);
-      setShowDetailsModal(true);
-    }}
-    className="group cursor-pointer"
-  >
+<div 
+  onClick={() => {
+    setSelectedLeadDetails(lead);
+    setShowDetailsModal(true);
+  }}
+  className="group cursor-pointer"
+>
+
     <div className="text-sm font-bold text-gray-900 dark:text-gray-100 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors duration-200">
       {lead.name}
     </div>
     <div className="mt-1 flex items-center">
       <div className="w-full h-px bg-gradient-to-r from-gray-300 to-gray-100 dark:from-gray-600 dark:to-gray-800 group-hover:from-blue-400 group-hover:to-blue-200 dark:group-hover:from-blue-500 dark:group-hover:to-blue-300 transition-all duration-300"></div>
       <div className="ml-2 opacity-0 group-hover:opacity-100 transform translate-x-2 group-hover:translate-x-0 transition-all duration-300">
-        <FontAwesomeIcon 
+        <FontAwesomeIcon
           icon={faEye} 
           className="text-xs text-gray-400 group-hover:text-blue-500 dark:group-hover:text-blue-400" 
         />

@@ -1,17 +1,12 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion } from 'framer-motion';
 import Chart from 'react-apexcharts';
 import { 
   BarChart3, 
-  PieChart, 
-  Filter, 
   Layers, 
   Users, 
-  Activity,
-  TrendingUp,
-  Download,
-  RefreshCw
+  MapPin
 } from 'lucide-react';
 import { BASE_URL } from '../../../public/config.js';
 
@@ -49,6 +44,7 @@ const StatisticsDashboard = () => {
   const [categoryChartData, setCategoryChartData] = useState<Record<string, number> | null>(null);
   const [referenceChartData, setReferenceChartData] = useState<Record<string, number> | null>(null);
   const [budgetRangeChartData, setBudgetRangeChartData] = useState<Record<string, number> | null>(null);
+  const [areaChartData, setAreaChartData] = useState<Record<string, number> | null>(null);
 
   const navigate = useNavigate();
 
@@ -176,6 +172,11 @@ const StatisticsDashboard = () => {
           .then(res => res.json())
           .then(data => setReferenceChartData(normalizeChartData(data.summary || {}))),
         
+        // Area Summary
+        fetchWithSession(`${BASE_URL}api/dashboard/area-summary`)
+          .then(res => res.json())
+          .then(data => setAreaChartData(normalizeChartData(data.summary || {}))),
+
         // Budget Range Summary (if admin)
         (isAdminOrSubAdmin || isProjectManager)
           ? fetchWithSession(`${BASE_URL}api/dashboard/budget-range-summary`)
@@ -231,6 +232,11 @@ const StatisticsDashboard = () => {
     navigate('/master-data', { state: { budget_range: formatDisplayValue(budgetRange), from_dashboard: true } });
   };
 
+  const handleGoToAreaLeads = (area?: string) => {
+    if (!area) { navigate('/master-data'); return; }
+    navigate('/master-data', { state: { area_name: formatDisplayValue(area), from_dashboard: true } });
+  };
+
   // Lead stages for chart
   const ALL_LEAD_STAGES = Object.keys(leadStageColors);
   const normalizedLeadChartData = ALL_LEAD_STAGES.map(
@@ -247,7 +253,18 @@ const StatisticsDashboard = () => {
   const chartOptions: ApexCharts.ApexOptions = {
     chart: {
       type: 'bar',
-      toolbar: { show: true },
+      toolbar: { 
+        show: true,
+        tools: {
+          download: false, // Remove download option
+          selection: true,
+          zoom: true,
+          zoomin: true,
+          zoomout: true,
+          pan: true,
+          reset: true
+        }
+      },
       events: {
         dataPointSelection: function (event, chartContext, config) {
           const stage = normalizedLeadChartData[config.dataPointIndex][0];
@@ -303,6 +320,7 @@ const StatisticsDashboard = () => {
   const buildBarOptions = (
     data: Record<string, number> | null,
     title: string,
+    onClickHandler?: (category: string) => void
   ): ApexCharts.ApexOptions => {
     const categories = data ? Object.keys(data).map((key) => formatDisplayValue(key)) : [];
     const colors = categories.map((category) => {
@@ -315,20 +333,31 @@ const StatisticsDashboard = () => {
         ? '#10B981'
         : title.includes('Budget')
         ? '#3B82F6'
+        : title.includes('Area')
+        ? '#EC489A'
         : '#3B82F6';
     });
 
     return {
       chart: {
         type: 'bar',
-        toolbar: { show: true },
+        toolbar: { 
+          show: true,
+          tools: {
+            download: false, // Remove download option
+            selection: true,
+            zoom: true,
+            zoomin: true,
+            zoomout: true,
+            pan: true,
+            reset: true
+          }
+        },
         events: {
           dataPointSelection: function (event, chartContext, config) {
             const category = categories[config.dataPointIndex];
-            if (category) {
-              if (title.includes('Category')) handleGoToCategoryLeads(category);
-              else if (title.includes('Reference')) handleGoToReferenceLeads(category);
-              else if (title.includes('Budget')) handleGoToBudgetRangeLeads(category);
+            if (category && onClickHandler) {
+              onClickHandler(category);
             }
           },
         },
@@ -372,11 +401,13 @@ const StatisticsDashboard = () => {
   const filteredCategoryData = filterChartData(categoryChartData, showZeroValues);
   const filteredBudgetRangeData = filterChartData(budgetRangeChartData, showZeroValues);
   const filteredReferenceData = filterChartData(referenceChartData, showZeroValues);
+  const filteredAreaData = filterChartData(areaChartData, showZeroValues);
 
   const hasChartData = chartData && Object.keys(chartData).length > 0;
   const hasCategoryData = filteredCategoryData && Object.keys(filteredCategoryData).length > 0;
   const hasBudgetRangeData = filteredBudgetRangeData && Object.keys(filteredBudgetRangeData).length > 0;
   const hasReferenceData = filteredReferenceData && Object.keys(filteredReferenceData).length > 0;
+  const hasAreaData = filteredAreaData && Object.keys(filteredAreaData).length > 0;
 
   if (!isAuthenticated) {
     return (
@@ -391,7 +422,6 @@ const StatisticsDashboard = () => {
 
   return (
     <div className="space-y-8">
-   
       {isLoading ? (
         <div className="flex items-center justify-center h-64">
           <div className="text-center">
@@ -401,7 +431,7 @@ const StatisticsDashboard = () => {
         </div>
       ) : (
         <>
-          {/* Lead Stage Summary Chart - MOVED FROM ECOMMERCE */}
+          {/* Lead Stage Summary Chart */}
           {hasChartData && !isProjectManager && (       
             <motion.div
               initial={{ opacity: 0, y: 30 }}
@@ -438,7 +468,7 @@ const StatisticsDashboard = () => {
             </motion.div>
           )}
 
-          {/* Charts Section - MOVED FROM ECOMMERCE */}
+          {/* Charts Section */}
           {!isProjectManager && (hasCategoryData || hasReferenceData) && showCharts && (  
             <motion.div
               initial={{ opacity: 0, y: 30 }}
@@ -464,7 +494,12 @@ const StatisticsDashboard = () => {
                         </div>
                         <Layers className="w-5 h-5 text-indigo-500" />
                       </div>
-                      <Chart options={buildBarOptions(filteredCategoryData, 'Category')} series={buildBarSeries(filteredCategoryData)} type="bar" height={350} />
+                      <Chart 
+                        options={buildBarOptions(filteredCategoryData, 'Category', handleGoToCategoryLeads)} 
+                        series={buildBarSeries(filteredCategoryData)} 
+                        type="bar" 
+                        height={350} 
+                      />
                       <div className="mt-3 text-xs text-gray-500 dark:text-gray-400 text-center">
                         <span className="inline-flex items-center">
                           <svg className="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -502,7 +537,12 @@ const StatisticsDashboard = () => {
                         </div>
                         <Users className="w-5 h-5 text-green-500" />
                       </div>
-                      <Chart options={buildBarOptions(filteredReferenceData, 'Reference')} series={buildBarSeries(filteredReferenceData)} type="bar" height={350} />
+                      <Chart 
+                        options={buildBarOptions(filteredReferenceData, 'Reference', handleGoToReferenceLeads)} 
+                        series={buildBarSeries(filteredReferenceData)} 
+                        type="bar" 
+                        height={350} 
+                      />
                       <div className="mt-3 text-xs text-gray-500 dark:text-gray-400 text-center">
                         <span className="inline-flex items-center">
                           <svg className="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -522,37 +562,86 @@ const StatisticsDashboard = () => {
                     </div>
                   )}
                 </div>
+              </div>
+            </motion.div>
+          )}
 
-                {/* BUDGET RANGE BAR CHART – ADMIN / SUB-ADMIN ONLY */}
-                {isAdminOrSubAdmin && showCharts && hasBudgetRangeData && (
-                  <motion.div
-                    initial={{ opacity: 0, y: 30 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: 0.6 }}
-                    className="col-span-12 mt-6"
-                  >
-                    <div className="bg-white dark:bg-boxdark p-6 rounded-xl shadow-lg border border-gray-200 dark:border-gray-700">
-                      <div className="flex justify-between items-center mb-4">
-                        <div>
-                          <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">Budget Range-wise Leads</h2>
-                          <p className="text-sm text-gray-500 dark:text-gray-400">
-                            Distribution of leads by budget range - Click any bar to view leads in that range
-                          </p>
-                        </div>
-                        <BarChart3 className="w-5 h-5 text-emerald-500" />
-                      </div>
-                      <Chart options={buildBarOptions(filteredBudgetRangeData, 'Budget')} series={buildBarSeries(filteredBudgetRangeData)} type="bar" height={360} />
-                      <div className="mt-3 text-xs text-gray-500 dark:text-gray-400 text-center">
-                        <span className="inline-flex items-center">
-                          <svg className="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 15l-2 5L9 9l11 4-5 2zm0 0l5 5M7.188 2.239l.777 2.897M5.136 7.965l-2.898-.777M13.95 4.05l-2.122 2.122m-5.657 5.656l-2.12 2.122" />
-                          </svg>
-                          Click on any budget range bar to view leads in that range
-                        </span>
-                      </div>
+          {/* AREA CHART - FULL WIDTH */}
+          {hasAreaData && showCharts && (
+            <motion.div
+              initial={{ opacity: 0, y: 30 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.5 }}
+              className="mt-6"
+            >
+              <div className="col-span-12">
+                <div className="bg-white dark:bg-boxdark p-6 rounded-xl shadow-lg border border-gray-200 dark:border-gray-700">
+                  <div className="flex justify-between items-center mb-4">
+                    <div>
+                      <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
+                        {isAdminOrSubAdmin ? 'Area-wise Active Leads' : 'Your Leads by Area'}
+                      </h2>
+                      <p className="text-sm text-gray-500 dark:text-gray-400">
+                        {isAdminOrSubAdmin
+                          ? `Showing ${Object.keys(filteredAreaData).length} areas in Maharashtra - Click any bar to view leads in that area`
+                          : `Your leads across ${Object.keys(filteredAreaData).length} areas - Click to view`}
+                      </p>
                     </div>
-                  </motion.div>
-                )}
+                    <MapPin className="w-5 h-5 text-pink-500" />
+                  </div>
+                  <Chart 
+                    options={buildBarOptions(filteredAreaData, 'Area', handleGoToAreaLeads)} 
+                    series={buildBarSeries(filteredAreaData)} 
+                    type="bar" 
+                    height={450} 
+                  />
+                  <div className="mt-3 text-xs text-gray-500 dark:text-gray-400 text-center">
+                    <span className="inline-flex items-center">
+                      <svg className="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 15l-2 5L9 9l11 4-5 2zm0 0l5 5M7.188 2.239l.777 2.897M5.136 7.965l-2.898-.777M13.95 4.05l-2.122 2.122m-5.657 5.656l-2.12 2.122" />
+                      </svg>
+                      Click on any area bar to view leads in that area
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </motion.div>
+          )}
+
+          {/* BUDGET RANGE BAR CHART – ADMIN / SUB-ADMIN ONLY - FULL WIDTH */}
+          {isAdminOrSubAdmin && showCharts && hasBudgetRangeData && (
+            <motion.div
+              initial={{ opacity: 0, y: 30 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.6 }}
+              className="mt-6"
+            >
+              <div className="col-span-12">
+                <div className="bg-white dark:bg-boxdark p-6 rounded-xl shadow-lg border border-gray-200 dark:border-gray-700">
+                  <div className="flex justify-between items-center mb-4">
+                    <div>
+                      <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">Budget Range-wise Leads</h2>
+                      <p className="text-sm text-gray-500 dark:text-gray-400">
+                        Distribution of leads by budget range - Click any bar to view leads in that range
+                      </p>
+                    </div>
+                    <BarChart3 className="w-5 h-5 text-emerald-500" />
+                  </div>
+                  <Chart 
+                    options={buildBarOptions(filteredBudgetRangeData, 'Budget', handleGoToBudgetRangeLeads)} 
+                    series={buildBarSeries(filteredBudgetRangeData)} 
+                    type="bar" 
+                    height={360} 
+                  />
+                  <div className="mt-3 text-xs text-gray-500 dark:text-gray-400 text-center">
+                    <span className="inline-flex items-center">
+                      <svg className="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 15l-2 5L9 9l11 4-5 2zm0 0l5 5M7.188 2.239l.777 2.897M5.136 7.965l-2.898-.777M13.95 4.05l-2.122 2.122m-5.657 5.656l-2.12 2.122" />
+                      </svg>
+                      Click on any budget range bar to view leads in that range
+                    </span>
+                  </div>
+                </div>
               </div>
             </motion.div>
           )}

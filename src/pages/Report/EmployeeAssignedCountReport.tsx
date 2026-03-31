@@ -18,6 +18,9 @@ interface EmployeeReport {
   total_assigned: number;
   converted_count: number;
   not_converted_count: number;
+  drop_count: number;        // NEW
+  loss_count: number;        // NEW
+  total_dropped_lost: number; // NEW
   lead_details: any[];
 }
 
@@ -31,9 +34,14 @@ interface LeadData {
   remark: string;
   assign_date: string | null;
   reassignment_date: string | null;
+  drop_loss_type?: string;    // NEW - 'Drop' or 'loss'
+  drop_loss_date?: string | null;  // NEW
+  drop_loss_remark?: string | null; // NEW
+  drop_loss_status?: string;   // NEW - 'Dropped', 'Lost', or 'Active'
+  is_dropped_or_lost?: number; // NEW - 1 or 0
 }
 
-const PAGE_SIZE = 5;
+const PAGE_SIZE = 10;
 
 const EmployeeDetailedReport = () => {
   const [loading, setLoading] = useState(true);
@@ -106,9 +114,12 @@ const EmployeeDetailedReport = () => {
       );
 
       if (response.data.success) {
-        // Ensure each employee has valid lead_details
+        // Ensure each employee has valid lead_details and drop/loss counts
         const processedData = (response.data.data || []).map((emp: EmployeeReport) => ({
           ...emp,
+          drop_count: emp.drop_count || 0,
+          loss_count: emp.loss_count || 0,
+          total_dropped_lost: emp.total_dropped_lost || 0,
           lead_details: Array.isArray(emp.lead_details) ? emp.lead_details : []
         }));
         
@@ -206,7 +217,20 @@ const EmployeeDetailedReport = () => {
     switch(type) {
       case 'converted': return 'Converted';
       case 'not_converted': return 'Not Converted';
+      case 'drop': return 'Dropped';
+      case 'loss': return 'Lost';
       default: return 'All';
+    }
+  };
+
+  const getDropLossBadgeColor = (status: string) => {
+    switch(status) {
+      case 'Dropped':
+        return 'bg-red-100 text-red-700';
+      case 'Lost':
+        return 'bg-purple-100 text-purple-700';
+      default:
+        return 'bg-gray-100 text-gray-700';
     }
   };
 
@@ -266,16 +290,18 @@ const EmployeeDetailedReport = () => {
         ) : (
           <>
             <table className="w-full text-sm">
-          <thead>
-<tr className="bg-gray-50 border-b border-gray-200">
-  <th className="p-3 text-left font-medium text-gray-600">Employee</th>
-  <th className="p-3 text-left font-medium text-gray-600">Role</th>
-  <th className="p-3 text-center font-medium text-gray-600">Total Assign</th>
-  <th className="p-3 text-center font-medium text-gray-600">Converted</th>
-  <th className="p-3 text-center font-medium text-gray-600">Not Converted</th>
-  <th className="p-3 text-center font-medium text-gray-600">Success Ratio</th>
-</tr>
-</thead>
+              <thead>
+                <tr className="bg-gray-50 border-b border-gray-200">
+                  <th className="p-3 text-left font-medium text-gray-600">Employee</th>
+                  <th className="p-3 text-left font-medium text-gray-600">Role</th>
+                  <th className="p-3 text-center font-medium text-gray-600">Total Assign</th>
+                  <th className="p-3 text-center font-medium text-gray-600">Converted</th>
+                  <th className="p-3 text-center font-medium text-gray-600">Pending</th>
+                  <th className="p-3 text-center font-medium text-gray-600">Drop</th>
+                  <th className="p-3 text-center font-medium text-gray-600">Loss</th>
+                  <th className="p-3 text-center font-medium text-gray-600">Conversion Ratio</th>
+                </tr>
+              </thead>
 
               <tbody className="divide-y divide-gray-100">
                 {paginatedData.length > 0 ? (
@@ -310,39 +336,57 @@ const EmployeeDetailedReport = () => {
                           {employee.not_converted_count}
                         </button>
                       </td>
-                      <td className="p-3 text-center w-[220px]">
-  {(() => {
-    const percent =
-      employee.total_assigned > 0
-        ? (employee.converted_count / employee.total_assigned) * 100
-        : 0;
-
-    return (
-      <div className="flex flex-col items-center gap-1">
-        
-        {/* Progress Bar */}
-        <div className="w-full bg-gray-200 rounded-full h-2 overflow-hidden">
-          <div
-            className="bg-green-500 h-2 transition-all"
-            style={{ width: `${percent}%` }}
-          />
-        </div>
-
-        {/* Percentage */}
-        <span className="text-xs font-medium text-gray-700">
-          {percent.toFixed(2)}%
-        </span>
-      </div>
-    );
-  })()}
+                      {/* NEW Drop Column */}
+                   <td className="p-3 text-center">
+  <span
+    className="inline-flex items-center justify-center min-w-[2rem] px-2 py-1 rounded-md bg-red-100 text-red-700 text-sm"
+    title={`${employee.drop_count || 0} dropped leads`}
+  >
+    {employee.drop_count || 0}
+  </span>
 </td>
 
+{/* Loss Column */}
+<td className="p-3 text-center">
+  <span
+    className="inline-flex items-center justify-center min-w-[2rem] px-2 py-1 rounded-md bg-purple-100 text-purple-700 text-sm"
+    title={`${employee.loss_count || 0} lost leads`}
+  >
+    {employee.loss_count || 0}
+  </span>
+</td>
+
+                      <td className="p-3 text-center w-[220px]">
+                        {(() => {
+                          const percent =
+                            employee.total_assigned > 0
+                              ? (employee.converted_count / employee.total_assigned) * 100
+                              : 0;
+
+                          return (
+                            <div className="flex flex-col items-center gap-1">
+                              {/* Progress Bar */}
+                              <div className="w-full bg-gray-200 rounded-full h-2 overflow-hidden">
+                                <div
+                                  className="bg-green-500 h-2 transition-all"
+                                  style={{ width: `${percent}%` }}
+                                />
+                              </div>
+
+                              {/* Percentage */}
+                              <span className="text-xs font-medium text-gray-700">
+                                {percent.toFixed(2)}%
+                              </span>
+                            </div>
+                          );
+                        })()}
+                      </td>
                     </tr>
                   ))
                 ) : (
                   <tr>
-                    <td colSpan={6} className="p-8 text-center text-gray-500">
-                      No employees found
+<td colSpan={8} className="p-8 text-center text-gray-500">     
+                   No employees found
                     </td>
                   </tr>
                 )}
@@ -382,7 +426,7 @@ const EmployeeDetailedReport = () => {
         )}
       </div>
 
-      {/* Leads Modal */}
+       {/* Leads Modal */}
       {selectedLeadModal && selectedLeadModal.visible && (
 <div className="fixed inset-0 bg-black/20 flex items-start justify-center pt-22 p-4 z-50">      
     <div className="bg-white rounded-lg w-full max-w-3xl max-h-[80vh] flex flex-col">
@@ -518,6 +562,7 @@ const EmployeeDetailedReport = () => {
           </div>
         </div>
       )}
+
     </div>
   );
 };

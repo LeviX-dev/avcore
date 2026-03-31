@@ -103,9 +103,15 @@ const handleAttendanceToggle = async () => {
       setIsCheckedIn(false);
       setCurrentTime(new Date()); // 👈 update once
     }
-  } catch (err: any) {
+  } 
+  catch (err: any) {
+  if (err?.response?.status === 409) {
+    alert("Already checked in");
+    setIsCheckedIn(true); // ✅ force sync
+  } else {
     alert(err?.response?.data?.message || 'Attendance action failed');
   }
+}
 };
 
   return (

@@ -13,7 +13,7 @@ getBudgetRangeSummary,
 getQuotationPendingLeads , getQuotationFollowupLeads , getDemoLeads ,  getProjectionLeads , 
 getTodaysMissedCombinedCount ,getClosedLeadsCount ,  getClosedLeadsExeCount , getManagerProcessesCount ,getDailyExecutionProcessesCount ,
 
-getDashboardLeadCounts , getExecutionDashboardCounts , 
+getDashboardLeadCounts , getExecutionDashboardCounts , getAreaSummary , 
 
      } from "../controllers/dashboardController.js";
 
@@ -63,6 +63,7 @@ router.get('/leads/demo', getDemoLeads);
 
 router.get('/lead-summary', getLeadStageSummary);
 router.get('/category-summary', getCategorySummary);
+router.get('/area-summary', getAreaSummary);
 router.get('/reference-summary', getReferenceSummary);
 
 router.get(

@@ -743,12 +743,12 @@ const ViewQuotation = () => {
           </h1>
 
           <p className="font-bold text-[13px] text-black uppercase mb-2 tracking-wide">
-            AUDIO VIDEO CONSULTANT
+            ALL ABOUT AUDIO VIDEO
           </p>
 
           <div className="text-[12px] text-black font-bold uppercase leading-tight mb-1">
             <p>
-              SHOP NO 1 & 2, 1ST FLOOR GAYATRI BUILDING, BESIDE JUPITER
+              OFFICE NO 1 & 2, 1ST FLOOR GAYATRI BUILDING, BESIDE JUPITER
               HOSPITAL, BANER 411045, PUNE.
             </p>
           </div>

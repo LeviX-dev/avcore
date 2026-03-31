@@ -25,6 +25,8 @@ import {
   faTasks,
   faCalendarAlt,
   faTrashAlt,
+  faFileAlt,
+  faImage,
 } from '@fortawesome/free-solid-svg-icons';
 import Breadcrumb from '../../components/Breadcrumbs/Breadcrumb.js';
 import axios from 'axios';
@@ -424,9 +426,41 @@ const ProgressStatus: React.FC<{
     if (stageLower.includes('quote followup')) return 'bg-[#A52A2A]';
     if (stageLower.includes('projection')) return 'bg-[#90EE90]';
     if (stageLower.includes('drop')) return 'bg-[#FF0000]';
+    if (stageLower.includes('loss')) return 'bg-[#8B0000]'; // 🔥 ADD THIS LINE for Loss stage
     if (stageLower.includes('closed')) return 'bg-[#006400]';
 
     return 'bg-[#A9A9A9]';
+  };
+
+  // 🔥 ADD THIS FUNCTION to get the display stage text
+  const getDisplayStage = (stage: string) => {
+    const stageLower = stage.toLowerCase().trim();
+    if (stageLower === 'loss') return 'Loss';
+    return stage;
+  };
+
+  // Determine what to show in the stage text
+  const getStageText = () => {
+    if (is_drop_stage) {
+      // For Drop leads, show the previous stage
+      return previous_stage || cleanStage;
+    }
+    // For Loss leads, show "Loss" instead of "loss"
+    if (cleanStage.toLowerCase() === 'loss') {
+      return 'Loss';
+    }
+    return cleanStage || 'N/A';
+  };
+
+  // Determine if we should show DROPPED or LOSS badge
+  const getBadgeText = () => {
+    if (cleanStage.toLowerCase() === 'loss') {
+      return 'LOSS'; // Show LOSS badge for loss leads
+    }
+    if (is_drop_stage) {
+      return 'DROPPED';
+    }
+    return null;
   };
 
   return (
@@ -446,11 +480,13 @@ const ProgressStatus: React.FC<{
 
       <div className="w-full text-center">
         <div className="text-[10px] font-medium text-gray-700 dark:text-gray-300 truncate">
-          {is_drop_stage ? previous_stage || cleanStage : cleanStage || 'N/A'}
+          {getStageText()}
         </div>
-        {is_drop_stage && (
-          <div className="text-[8px] text-red-500 font-medium mt-0.5">
-            DROPPED
+        {getBadgeText() && (
+          <div className={`text-[8px] font-medium mt-0.5 ${
+            getBadgeText() === 'LOSS' ? 'text-purple-600' : 'text-red-500'
+          }`}>
+            {getBadgeText()}
           </div>
         )}
       </div>
@@ -477,6 +513,18 @@ const DropLeadsPage: React.FC = () => {
     documents: [],
     videos: [],
   });
+
+  // Add these state variables for documents tab in details modal
+const [activeTab, setActiveTab] = useState('details');
+const [modalDocumentsData, setModalDocumentsData] = useState({
+  images: [],
+  documents: [],
+  videos: [],
+});
+const [loadingModalDocs, setLoadingModalDocs] = useState(false);
+const [modalDocsFetched, setModalDocsFetched] = useState(false);
+
+
   const [showDocsPopup, setShowDocsPopup] = useState(false);
   const [uploadFiles, setUploadFiles] = useState<File[]>([]);
   const [uploadType, setUploadType] = useState<'image' | 'documents' | 'video'>(
@@ -488,7 +536,7 @@ const DropLeadsPage: React.FC = () => {
   const [leadStage, setLeadStage] = useState('');
   const [selectedUsers, setSelectedUsers] = useState<string[]>([]);
   const [users, setUsers] = useState<any[]>([]);
-  const [leadStages, setLeadStages] = useState<string[]>([]);
+const [leadStages, setLeadStages] = useState<string[]>(['Drop', 'loss']);
 
   // Filter states
   const [showEntryDateCalendar, setShowEntryDateCalendar] = useState(false);
@@ -677,25 +725,31 @@ const fetchDropLeads = async () => {
       const dropLeadsArray = data.dropLeads || [];
       
       const processedData = dropLeadsArray.map((item: any) => {
-        // For drop leads, the current stage is always "Drop"
-        const currentStage = 'Drop';
-        const cleanStage = 'Drop';
-
-        // Find previous stage from reassignment remarks
+        // 🔥 CRITICAL FIX: Get the actual lead stage from the item
+        // Check both lead_stage and reassignment_lead_stage
+        let currentStage = item.lead_stage || item.reassignment_lead_stage || '';
+        
+        // Clean up the stage
+        const cleanStage = currentStage.trim();
+        
+        // Determine if this is a Drop or Loss stage
+        const isDropStage = cleanStage === 'Drop';
+        const isLossStage = cleanStage === 'loss';
+        
+        // For Drop stages, find previous stage
         let previousStage = '';
         const reassignmentRemarks = processReassignmentRemarks(
           item.reassignment_remarks,
         );
 
-        // Find the most recent non-drop stage from reassignment remarks
-        if (reassignmentRemarks.length > 0) {
+        // Only process previous stage for Drop leads (not for Loss)
+        if (isDropStage && reassignmentRemarks.length > 0) {
           const nonDropRemarks = reassignmentRemarks.filter(
             (remark: any) =>
-              remark.leadStage && remark.leadStage.trim() !== 'Drop',
+              remark.leadStage && remark.leadStage.trim() !== 'Drop' && remark.leadStage.trim() !== 'loss',
           );
 
           if (nonDropRemarks.length > 0) {
-            // Sort by date to get most recent
             const sorted = nonDropRemarks.sort((a: any, b: any) => {
               const dateA = a.reassignment_date
                 ? new Date(a.reassignment_date).getTime()
@@ -703,21 +757,26 @@ const fetchDropLeads = async () => {
               const dateB = b.reassignment_date
                 ? new Date(b.reassignment_date).getTime()
                 : 0;
-              return dateB - dateA; // Most recent first
+              return dateB - dateA;
             });
             previousStage = sorted[0]?.leadStage?.trim() || '';
           }
         }
 
-        // If no previous stage found, use default
-        if (!previousStage) {
-          previousStage = 'Positive Lead'; // Default for drop leads
+        // If no previous stage found and it's Drop, use default
+        if (isDropStage && !previousStage) {
+          previousStage = 'Positive Lead';
         }
 
-        // Calculate percentage based on previous stage
-        const status_percentage = previousStage
-          ? STAGE_PERCENTAGE_MAP[previousStage] || 0
-          : 0;
+        // Calculate percentage based on previous stage for Drop, or current stage for Loss
+        let status_percentage = 0;
+        if (isDropStage) {
+          status_percentage = previousStage ? STAGE_PERCENTAGE_MAP[previousStage] || 0 : 0;
+        } else if (isLossStage) {
+          status_percentage = 0; // Loss leads have 0%
+        } else {
+          status_percentage = STAGE_PERCENTAGE_MAP[cleanStage] || 0;
+        }
 
         // Get assigned user info
         const assignedTo = parseValue(
@@ -735,17 +794,17 @@ const fetchDropLeads = async () => {
 
         const followupDate = parseValue(item.followup_date);
 
-        // 🔥 IMPORTANT: Determine display city with priority: area_name first, then city
+        // Determine display city
         let displayCity = '';
         const areaName = parseValue(item.area_name);
         const cityName = parseValue(item.city);
         
         if (areaName && areaName !== '' && areaName !== 'Not Available') {
-          displayCity = areaName; // Use area_name if available
+          displayCity = areaName;
         } else if (cityName && cityName !== '' && cityName !== 'Not Available') {
-          displayCity = cityName; // Fallback to city if area_name not available
+          displayCity = cityName;
         } else {
-          displayCity = ''; // Empty if neither available
+          displayCity = '';
         }
 
         return {
@@ -754,13 +813,13 @@ const fetchDropLeads = async () => {
           number: parseValue(item.number),
           email: parseValue(item.email),
           address: parseValue(item.address),
-          city: displayCity, // 🔥 THIS IS THE KEY CHANGE - Use the prioritized display city
-          original_city: parseValue(item.city), // Keep original if needed elsewhere
-          original_area: parseValue(item.area_name), // Keep original if needed elsewhere
+          city: displayCity,
+          original_city: parseValue(item.city),
+          original_area: parseValue(item.area_name),
           cat_id: parseIdValue(item.cat_id),
           status: parseValue(item.status),
           lead_status: parseValue(item.lead_status),
-          lead_stage: cleanStage,
+          lead_stage: cleanStage, // Keep the original stage (Drop or loss)
           created_at: parseValue(item.created_at),
           quick_remark: parseValue(item.quick_remark),
           detailed_remark: parseValue(item.detailed_remark),
@@ -800,7 +859,7 @@ const fetchDropLeads = async () => {
 
           // Battery-related fields
           status_percentage: status_percentage,
-          is_drop_stage: true,
+          is_drop_stage: isDropStage, // Only true for Drop, false for Loss
           previous_stage: previousStage,
 
           // Additional fields for EditRawData
@@ -825,22 +884,13 @@ const fetchDropLeads = async () => {
       // Set the data
       setDropLeads(sortedData);
       
-      // 🔥 UPDATED: Extract unique cities from the prioritized displayCity field
+      // Extract unique cities
       const cities = sortedData
-        .map(lead => lead.city?.trim()) // This now uses the prioritized displayCity
+        .map(lead => lead.city?.trim())
         .filter(city => city && city !== '' && city !== 'Not Available' && city !== 'N/A')
         .filter((city, index, self) => self.indexOf(city) === index)
         .sort() as string[];
       setAvailableCities(cities);
-
-      // Debug log to verify the changes
-      console.log('📊 Drop Leads Processed:', {
-        totalLeads: sortedData.length,
-        sampleLead: sortedData[0],
-        city: sortedData[0]?.city, // Should show area_name first
-        original_city: sortedData[0]?.original_city,
-        original_area: sortedData[0]?.original_area,
-      });
       
     } else {
       console.error('Error fetching drop leads:', data);
@@ -853,6 +903,68 @@ const fetchDropLeads = async () => {
     setTotalLeads(0);
   } finally {
     setLoading(false);
+  }
+};
+
+// Reset when client changes
+useEffect(() => {
+  if (selectedLeadDetails) {
+    setActiveTab('details');
+    setModalDocsFetched(false);
+    setModalDocumentsData({ images: [], documents: [], videos: [] });
+  }
+}, [selectedLeadDetails?.master_id]);
+
+// Fetch documents when switching to documents tab
+useEffect(() => {
+  if (activeTab === 'documents' && selectedLeadDetails?.master_id && !modalDocsFetched) {
+    fetchDocumentsForModal();
+  }
+}, [activeTab, selectedLeadDetails?.master_id]);
+
+
+const fetchDocumentsForModal = async () => {
+  if (!selectedLeadDetails?.master_id || modalDocsFetched) return;
+
+  setLoadingModalDocs(true);
+  
+  try {
+    const response = await axios.get(
+      `${BASE_URL}api/documents/${selectedLeadDetails.master_id}`,
+      { withCredentials: true },
+    );
+
+    const images = [];
+    const documents = [];
+    const videos = [];
+
+    response.data.documents.forEach((doc) => {
+      let filePath = doc.document_path
+        .replace(/^server\//, '')
+        .replace(/\\/g, '/');
+
+      if (!filePath.startsWith('uploads/')) filePath = `uploads/${filePath}`;
+      const fullUrl = `${BASE_URL}${filePath}`;
+
+      const obj = {
+        ...doc,
+        url: fullUrl,
+        document_name: doc.document_name || `Document ${doc.doc_id}`,
+        file_extension: doc.file_extension || '',
+      };
+
+      if (doc.document_type === 'image') images.push(obj);
+      else if (doc.document_type === 'video') videos.push(obj);
+      else documents.push(obj);
+    });
+
+    setModalDocumentsData({ images, documents, videos });
+    setModalDocsFetched(true);
+  } catch (e) {
+    console.error('Error fetching documents:', e);
+    setModalDocumentsData({ images: [], documents: [], videos: [] });
+  } finally {
+    setLoadingModalDocs(false);
   }
 };
 
@@ -1087,14 +1199,20 @@ const fetchDropLeads = async () => {
     }
   };
 
-  const fetchLeadStages = async () => {
-    try {
-      const response = await axios.get(`${BASE_URL}api/leadstage`);
-      setLeadStages(response.data);
-    } catch (error) {
-      console.error('Error fetching lead stages:', error);
-    }
-  };
+const fetchLeadStages = async () => {
+  try {
+    const response = await axios.get(`${BASE_URL}api/leadstage`);
+    // Filter to only include Drop and loss
+    const filteredStages = response.data.filter(
+      (stage: string) => stage === 'Drop' || stage === 'loss'
+    );
+    setLeadStages(filteredStages);
+  } catch (error) {
+    console.error('Error fetching lead stages:', error);
+    // Fallback to manual list
+    setLeadStages(['Drop', 'loss']);
+  }
+};
 
   // Apply filters when filter criteria change
 useEffect(() => {
@@ -1556,146 +1674,170 @@ const clearCustomRecordCount = () => {
     }
   };
 
-  // Detail modal render function
   const renderDetailsModal = () => {
-    if (!selectedLeadDetails) return null;
+  if (!selectedLeadDetails) return null;
 
-    const isEmpty = (value: any) => {
-      return (
-        !value ||
-        value === '' ||
-        value === 'Not Available' ||
-        value === 'N/A' ||
-        value === 'null' ||
-        value === null ||
-        value === undefined ||
-        value === 'Not Found'
-      );
-    };
+  const EMPTY_POSTER = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNDAwIiBoZWlnaHQ9IjIyNSIgdmlld0JveD0iMCAwIDQwMCAyMjUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+PHJlY3Qgd2lkdGg9IjQwMCIgaGVpZ2h0PSIyMjUiIGZpbGw9IiNlNWU3ZWIiLz48dGV4dCB4PSIyMDAiIHk9IjExMiIgZm9udC1zaXplPSIyMCIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZmlsbD0iIzY2NiI+VmlkZW88L3RleHQ+PC9zdmc+';
+  const EMPTY_IMAGE = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTUwIiBoZWlnaHQ9IjE1MCIgdmlld0JveD0iMCAwIDE1MCAxNTAiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+PHJlY3Qgd2lkdGg9IjE1MCIgaGVpZ2h0PSIxNTAiIGZpbGw9IiNlNWU3ZWIiLz48dGV4dCB4PSI3NSIgeT0iNzUiIGZvbnQtc2l6ZT0iMTQiIHRleHQtYW5jaG9yPSJtaWRkbGUiIGZpbGw9IiM2NjYiPkltYWdlPC90ZXh0Pjwvc3ZnPg==';
 
-    const formatValue = (value: any) => {
-      if (isEmpty(value)) return 'N/A';
-      return value;
-    };
-
-    const hasField = (fieldName: keyof DropLead) => {
-      return (
-        selectedLeadDetails[fieldName] &&
-        !isEmpty(selectedLeadDetails[fieldName])
-      );
-    };
-
-    // Check for various contact numbers
-    const hasContactNumbers =
-      hasField('ar_number') ||
-      hasField('ca_number') ||
-      hasField('e_number') ||
-      hasField('sm_number') ||
-      hasField('pop_number') ||
-      hasField('other_number') ||
-      hasField('architect_name') ||
-      hasField('alternate_number');
-
-    // Check for lead info
-    const hasLeadInfo =
-      hasField('cat_name') ||
-      hasField('category_other') ||
-      hasField('reference_name') ||
-      hasField('reference_other') ||
-      hasField('area_name');
-
-    // Check for project details
-    const hasProjectDetails =
-      hasField('room_length') ||
-      hasField('room_width') ||
-      hasField('room_height') ||
-      hasField('p_type') ||
-      hasField('budget_range') ||
-      hasField('time_to_complete') ||
-      hasField('room_ready');
-
-    // Check for lead stages
-    const hasLeadStages =
-      hasField('lead_stage') ||
-      hasField('current_stage') ||
-      hasField('lead_status') ||
-      hasField('status') ||
-      hasField('status_percentage') ||
-      hasField('latest_leadStage');
-
-    // Check for dates
-    const hasDates =
-      hasField('assign_date') ||
-      hasField('followup_date') ||
-      hasField('site_visit_date') ||
-      hasField('demo_date');
-
-    // Check for assignment info
-    const hasAssignmentInfo =
-      hasField('assigned_to') ||
-      hasField('telecaller_name') ||
-      hasField('latest_assignedTo') ||
-      hasField('reassigned_to') ||
-      hasField('assigned_user_name');
-
-    // Check for links
-    const hasLinks =
-      hasField('document_location_link') || hasField('location_link');
-
-    // Check for remarks
-    const hasRemarks = hasField('quick_remark') || hasField('detailed_remark');
-
+  const isEmpty = (value: any) => {
     return (
-      <div className="fixed inset-0 bg-black/60 flex justify-center items-center z-[9999] p-4 backdrop-blur-sm">
-        <div className="bg-white dark:bg-boxdark rounded-xl shadow-2xl w-full max-w-2xl max-h-[85vh] overflow-hidden border border-gray-200 dark:border-gray-800">
-          {/* Compact Header */}
-          <div className="sticky top-0 bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-gray-800 dark:to-gray-900 p-4 border-b border-gray-200 dark:border-gray-800">
-            <div className="flex justify-between items-start">
-              <div className="flex-1">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-purple-600 rounded-lg flex items-center justify-center shadow-lg">
-                    <span className="text-white font-bold text-lg">
-                      {selectedLeadDetails.name?.charAt(0) || 'C'}
+      !value ||
+      value === '' ||
+      value === 'Not Available' ||
+      value === 'N/A' ||
+      value === 'null' ||
+      value === null ||
+      value === undefined ||
+      value === 'Not Found'
+    );
+  };
+
+  const formatValue = (value: any) => {
+    if (isEmpty(value)) return 'N/A';
+    return value;
+  };
+
+  const hasField = (fieldName: keyof DropLead) => {
+    return (
+      selectedLeadDetails[fieldName] &&
+      !isEmpty(selectedLeadDetails[fieldName])
+    );
+  };
+
+  // Check for various contact numbers
+  const hasContactNumbers =
+    hasField('ar_number') ||
+    hasField('ca_number') ||
+    hasField('e_number') ||
+    hasField('sm_number') ||
+    hasField('pop_number') ||
+    hasField('other_number') ||
+    hasField('architect_name') ||
+    hasField('alternate_number');
+
+  // Check for lead info
+  const hasLeadInfo =
+    hasField('cat_name') ||
+    hasField('category_other') ||
+    hasField('reference_name') ||
+    hasField('reference_other') ||
+    hasField('area_name');
+
+  // Check for project details
+  const hasProjectDetails =
+    hasField('room_length') ||
+    hasField('room_width') ||
+    hasField('room_height') ||
+    hasField('p_type') ||
+    hasField('budget_range') ||
+    hasField('time_to_complete') ||
+    hasField('room_ready');
+
+  // Check for dates
+  const hasDates =
+    hasField('assign_date') ||
+    hasField('followup_date') ||
+    hasField('site_visit_date') ||
+    hasField('demo_date');
+
+  // Check for links
+  const hasLinks =
+    hasField('document_location_link') || hasField('location_link');
+
+  // Check for remarks
+  const hasRemarks = hasField('quick_remark') || hasField('detailed_remark');
+
+  const getFileIcon = (extension) => {
+    const ext = extension?.toLowerCase() || '';
+    if (ext.includes('pdf')) return '📕';
+    if (ext.includes('doc')) return '📄';
+    if (ext.includes('xls')) return '📊';
+    if (ext.includes('ppt')) return '📽️';
+    if (ext.includes('txt')) return '📝';
+    return '📎';
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black/60 flex justify-center items-center z-[9999] p-4 backdrop-blur-sm">
+      <div className="bg-white dark:bg-boxdark rounded-xl shadow-2xl w-full max-w-2xl max-h-[85vh] overflow-hidden border border-gray-200 dark:border-gray-800">
+        {/* Compact Header with Tabs */}
+        <div className="sticky top-0 z-10 bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-gray-800 dark:to-gray-900 p-4 border-b border-gray-200 dark:border-gray-800">
+          <div className="flex justify-between items-start">
+            <div className="flex-1">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-purple-600 rounded-lg flex items-center justify-center shadow-lg">
+                  <span className="text-white font-bold text-lg">
+                    {selectedLeadDetails.name?.charAt(0) || 'C'}
+                  </span>
+                </div>
+                <div>
+                  <h2 className="text-xl font-bold text-black dark:text-white truncate max-w-xs">
+                    {formatValue(selectedLeadDetails.name)}
+                  </h2>
+                  <div className="flex items-center gap-3 text-xs text-gray-600 dark:text-gray-400 mt-1 flex-wrap">
+                    <span className="bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 px-2 py-0.5 rounded-full">
+                      ID: {selectedLeadDetails.master_id}
                     </span>
-                  </div>
-                  <div>
-                    <h2 className="text-xl font-bold text-black dark:text-white truncate max-w-xs">
-                      {formatValue(selectedLeadDetails.name)}
-                    </h2>
-                    <div className="flex items-center gap-3 text-xs text-gray-600 dark:text-gray-400 mt-1 flex-wrap">
-                      <span className="bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 px-2 py-0.5 rounded-full">
-                        Created: {formatValue(selectedLeadDetails.assign_date)}
-                      </span>
-                      {hasField('latest_assignedTo') && (
-                        <>
-                          <span>•</span>
-                          <span className="bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 px-2 py-0.5 rounded-full">
-                            Latest:{' '}
-                            {formatValue(
-                              selectedLeadDetails.latest_assignedTo ||
-                                selectedLeadDetails.assigned_user_name,
-                            )}
-                          </span>
-                        </>
-                      )}
-                    </div>
+                    <span className="bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 px-2 py-0.5 rounded-full">
+                      Created: {formatValue(selectedLeadDetails.assign_date)}
+                    </span>
                   </div>
                 </div>
               </div>
-              <button
-                onClick={() => {
-                  setShowDetailsModal(false);
-                  setSelectedLeadDetails(null);
-                }}
-                className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 text-xl p-1 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors"
-              >
-                ×
-              </button>
             </div>
+            <button
+              onClick={() => {
+                setShowDetailsModal(false);
+                setSelectedLeadDetails(null);
+              }}
+              className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 text-xl p-1 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors"
+            >
+              ×
+            </button>
           </div>
 
-          {/* Compact Content - Scrollable */}
-          <div className="overflow-y-auto max-h-[calc(85vh-140px)]">
+          {/* Tabs Navigation */}
+          <div className="mt-4 flex border-b border-gray-200 dark:border-gray-700">
+            <button
+              onClick={() => setActiveTab('details')}
+              className={`px-4 py-2 font-medium text-sm transition-colors flex items-center gap-2 ${
+                activeTab === 'details'
+                  ? 'text-blue-600 dark:text-blue-400 border-b-2 border-blue-500'
+                  : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-300'
+              }`}
+            >
+              <FontAwesomeIcon icon={faInfoCircle} className="h-4 w-4" />
+              Details
+            </button>
+            <button
+              onClick={() => setActiveTab('documents')}
+              className={`px-4 py-2 font-medium text-sm transition-colors flex items-center gap-2 ${
+                activeTab === 'documents'
+                  ? 'text-blue-600 dark:text-blue-400 border-b-2 border-blue-500'
+                  : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-300'
+              }`}
+            >
+              <FontAwesomeIcon icon={faFile} className="h-4 w-4" />
+              Documents
+              {modalDocumentsData.images.length +
+                modalDocumentsData.documents.length +
+                modalDocumentsData.videos.length >
+                0 && (
+                <span className="ml-1 bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-300 text-xs font-semibold px-2 py-0.5 rounded-full">
+                  {modalDocumentsData.images.length +
+                    modalDocumentsData.documents.length +
+                    modalDocumentsData.videos.length}
+                </span>
+              )}
+            </button>
+          </div>
+        </div>
+
+        {/* Tab Content */}
+        <div className="overflow-y-auto max-h-[calc(85vh-140px)]">
+          {activeTab === 'details' ? (
+            // Details Tab Content (your existing details content)
             <div className="p-4 space-y-4">
               {/* Contact Info */}
               <div className="bg-gradient-to-r from-gray-50 to-gray-100 dark:from-gray-800/50 dark:to-gray-900/50 p-3 rounded-lg border border-gray-200 dark:border-gray-700">
@@ -1888,8 +2030,7 @@ const clearCustomRecordCount = () => {
                           {formatValue(selectedLeadDetails.cat_name)}
                           {hasField('category_other') && (
                             <span className="text-xs text-blue-600 dark:text-blue-400 ml-2">
-                              ({formatValue(selectedLeadDetails.category_other)}
-                              )
+                              ({formatValue(selectedLeadDetails.category_other)})
                             </span>
                           )}
                         </div>
@@ -1904,9 +2045,7 @@ const clearCustomRecordCount = () => {
                           {formatValue(selectedLeadDetails.reference_name)}
                           {hasField('reference_other') && (
                             <span className="text-xs text-blue-600 dark:text-blue-400 ml-2">
-                              (
-                              {formatValue(selectedLeadDetails.reference_other)}
-                              )
+                              ({formatValue(selectedLeadDetails.reference_other)})
                             </span>
                           )}
                         </div>
@@ -1925,8 +2064,6 @@ const clearCustomRecordCount = () => {
                   </div>
                 </div>
               )}
-
-          
 
               {/* Dates Information */}
               {hasDates && (
@@ -2248,11 +2385,193 @@ const clearCustomRecordCount = () => {
                   </div>
                 )}
             </div>
-          </div>
+          ) : (
+            // Documents Tab Content
+            <div className="p-4">
+              {loadingModalDocs ? (
+                <div className="flex justify-center items-center py-12">
+                  <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500"></div>
+                  <span className="ml-3 text-gray-600 dark:text-gray-400">Loading documents...</span>
+                </div>
+              ) : (
+                <>
+                  {/* Total Count */}
+                  <div className="mb-6 p-4 bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20 rounded-lg border border-blue-200 dark:border-blue-800/30">
+                    <div className="flex items-center justify-between">
+                      <h3 className="font-semibold text-gray-700 dark:text-gray-300">Documents Summary</h3>
+                      <span className="text-2xl font-bold text-blue-600 dark:text-blue-400">
+                        {modalDocumentsData.images.length + modalDocumentsData.documents.length + modalDocumentsData.videos.length}
+                      </span>
+                    </div>
+                    <div className="grid grid-cols-3 gap-3 mt-3">
+                      <div className="text-center p-3 bg-white dark:bg-gray-800 rounded-lg border border-blue-200 dark:border-blue-700/30">
+                        <div className="text-lg font-bold text-blue-600 dark:text-blue-400">{modalDocumentsData.images.length}</div>
+                        <div className="text-sm text-gray-600 dark:text-gray-400">Images</div>
+                      </div>
+                      <div className="text-center p-3 bg-white dark:bg-gray-800 rounded-lg border border-green-200 dark:border-green-700/30">
+                        <div className="text-lg font-bold text-green-600 dark:text-green-400">{modalDocumentsData.documents.length}</div>
+                        <div className="text-sm text-gray-600 dark:text-gray-400">Documents</div>
+                      </div>
+                      <div className="text-center p-3 bg-white dark:bg-gray-800 rounded-lg border border-purple-200 dark:border-purple-700/30">
+                        <div className="text-lg font-bold text-purple-600 dark:text-purple-400">{modalDocumentsData.videos.length}</div>
+                        <div className="text-sm text-gray-600 dark:text-gray-400">Videos</div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Images Section */}
+                  {modalDocumentsData.images.length > 0 && (
+                    <div className="mb-6">
+                      <h4 className="font-semibold text-gray-700 dark:text-gray-300 mb-3 flex items-center gap-2">
+                        <FontAwesomeIcon icon={faImage} className="h-4 w-4 text-blue-500" />
+                        Images ({modalDocumentsData.images.length})
+                      </h4>
+                      <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                        {modalDocumentsData.images.map((image, index) => (
+                          <div key={index} className="relative group">
+                            <img
+                              src={image.url}
+                              className="w-full h-32 object-cover rounded-lg border"
+                              onError={(e) => {
+                                e.currentTarget.onerror = null;
+                                e.currentTarget.src = EMPTY_IMAGE;
+                              }}
+                            />
+                            <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity rounded-lg flex items-center justify-center">
+                              <a
+                                href={image.url}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="text-white bg-blue-500 hover:bg-blue-600 px-3 py-1 rounded text-sm mr-2"
+                              >
+                                View
+                              </a>
+                              {image.remark && (
+                                <div className="absolute bottom-0 left-0 right-0 bg-black/70 text-white text-xs p-2 rounded-b-lg">
+                                  {image.remark}
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Documents Section */}
+                  {modalDocumentsData.documents.length > 0 && (
+                    <div className="mb-6">
+                      <h4 className="font-semibold text-gray-700 dark:text-gray-300 mb-3 flex items-center gap-2">
+                        <FontAwesomeIcon icon={faFileAlt} className="h-4 w-4 text-green-500" />
+                        Documents ({modalDocumentsData.documents.length})
+                      </h4>
+                      <div className="space-y-2">
+                        {modalDocumentsData.documents.map((doc, index) => (
+                          <div
+                            key={index}
+                            className="flex items-center justify-between p-3 bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+                          >
+                            <div className="flex items-center gap-3">
+                              <div className="text-xl">{getFileIcon(doc.file_extension)}</div>
+                              <div className="min-w-0">
+                                <div className="font-medium text-gray-800 dark:text-gray-200 truncate">
+                                  {doc.document_name}
+                                </div>
+                                {doc.remark && (
+                                  <div className="text-sm text-gray-600 dark:text-gray-400 truncate">
+                                    {doc.remark}
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              {doc.uploaded_at && (
+                                <span className="text-xs text-gray-500 dark:text-gray-400">
+                                  {new Date(doc.uploaded_at).toLocaleDateString()}
+                                </span>
+                              )}
+                              <a
+                                href={doc.url}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="px-3 py-1 bg-green-500 hover:bg-green-600 text-white text-sm rounded transition-colors"
+                              >
+                                Open
+                              </a>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Videos Section */}
+                  {modalDocumentsData.videos.length > 0 && (
+                    <div className="mb-6">
+                      <h4 className="font-semibold text-gray-700 dark:text-gray-300 mb-3 flex items-center gap-2">
+                        <FontAwesomeIcon icon={faVideo} className="h-4 w-4 text-purple-500" />
+                        Videos ({modalDocumentsData.videos.length})
+                      </h4>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        {modalDocumentsData.videos.map((video, index) => (
+                          <div
+                            key={index}
+                            className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden"
+                          >
+                            <div className="aspect-video bg-black">
+                              <video controls className="w-full h-full" poster={EMPTY_POSTER}>
+                                <source src={video.url} type="video/mp4" />
+                              </video>
+                            </div>
+                            <div className="p-3">
+                              <div className="flex justify-between items-start">
+                                <div className="font-medium text-gray-800 dark:text-gray-200">
+                                  Video {index + 1}
+                                </div>
+                                <a
+                                  href={video.url}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="px-2 py-1 bg-purple-500 hover:bg-purple-600 text-white text-xs rounded transition-colors"
+                                >
+                                  Download
+                                </a>
+                              </div>
+                              {video.remark && (
+                                <div className="mt-2 text-sm text-gray-600 dark:text-gray-400">
+                                  {video.remark}
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* No Documents Message */}
+                  {modalDocumentsData.images.length === 0 &&
+                    modalDocumentsData.documents.length === 0 &&
+                    modalDocumentsData.videos.length === 0 && (
+                      <div className="text-center py-12">
+                        <FontAwesomeIcon icon={faFile} className="text-4xl text-gray-400 dark:text-gray-600 mb-3" />
+                        <h3 className="text-lg font-semibold text-gray-600 dark:text-gray-400">
+                          No Documents Found
+                        </h3>
+                        <p className="text-gray-500 dark:text-gray-500 mt-1">
+                          No documents have been uploaded for this client.
+                        </p>
+                      </div>
+                    )}
+                </>
+              )}
+            </div>
+          )}
         </div>
       </div>
-    );
-  };
+    </div>
+  );
+};
 
   // Combined Documents/Upload Modal
   const renderDocsModal = () => {
@@ -3093,20 +3412,20 @@ const clearCustomRecordCount = () => {
                 </button>
               </span>
             )}
-            {selectedStages.map((stage) => (
-              <span
-                key={stage}
-                className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-300"
-              >
-                Stage: {stage}
-                <button
-                  onClick={() => handleStageSelect(stage)}
-                  className="ml-1 text-purple-600 hover:text-purple-800 dark:text-purple-400"
-                >
-                  ×
-                </button>
-              </span>
-            ))}
+           {selectedStages.map((stage) => (
+  <span
+    key={stage}
+    className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-300"
+  >
+    Stage: {stage === 'loss' ? 'Loss' : stage}
+    <button
+      onClick={() => handleStageSelect(stage)}
+      className="ml-1 text-purple-600 hover:text-purple-800 dark:text-purple-400"
+    >
+      ×
+    </button>
+  </span>
+))}
             {selectedUsersFilter.map((user) => (
               <span
                 key={user}
@@ -3674,98 +3993,90 @@ const clearCustomRecordCount = () => {
                         </button>
                       </div>
 
-                      {/* Stage Filter Dropdown */}
-                      {showStageFilter && (
-                        <div className="absolute top-full right-0 mt-1 z-50 bg-white dark:bg-boxdark border border-gray-300 dark:border-gray-700 rounded-lg shadow-lg p-4 min-w-[220px] max-h-[300px] overflow-y-auto">
-                          <div className="flex justify-between items-center mb-3">
-                            <span className="font-semibold text-sm dark:text-white">
-                              Filter Stages
-                            </span>
-                            <div className="flex gap-2">
-                              <button
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  setSelectedStages([]);
-                                  applyFilters();
-                                  setShowStageFilter(false);
-                                }}
-                                className="text-xs font-medium text-blue-600 hover:text-blue-800 dark:text-blue-400 transition-colors"
-                              >
-                                Clear All
-                              </button>
-                              <button
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  setShowStageFilter(false);
-                                }}
-                                className="text-xs font-medium text-gray-500 hover:text-gray-700 dark:text-gray-400 transition-colors"
-                              >
-                                ×
-                              </button>
-                            </div>
-                          </div>
+{showStageFilter && (
+  <div className="absolute top-full right-0 mt-1 z-50 bg-white dark:bg-boxdark border border-gray-300 dark:border-gray-700 rounded-lg shadow-lg p-4 min-w-[220px] max-h-[300px] overflow-y-auto">
+    <div className="flex justify-between items-center mb-3">
+      <span className="font-semibold text-sm dark:text-white">
+        Filter Stages
+      </span>
+      <div className="flex gap-2">
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            setSelectedStages([]);
+            applyFilters();
+            setShowStageFilter(false);
+          }}
+          className="text-xs font-medium text-blue-600 hover:text-blue-800 dark:text-blue-400 transition-colors"
+        >
+          Clear All
+        </button>
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            setShowStageFilter(false);
+          }}
+          className="text-xs font-medium text-gray-500 hover:text-gray-700 dark:text-gray-400 transition-colors"
+        >
+          ×
+        </button>
+      </div>
+    </div>
 
-                          {leadStages.length > 0 ? (
-                            <>
-                              {leadStages.map((stage) => (
-                                <div
-                                  key={stage}
-                                  className="flex items-center mb-2"
-                                >
-                                  <input
-                                    type="checkbox"
-                                    id={`stage-${stage}`}
-                                    checked={selectedStages.includes(stage)}
-                                    onChange={(e) => {
-                                      e.stopPropagation();
-                                      handleStageSelect(stage);
-                                    }}
-                                    onClick={(e) => e.stopPropagation()}
-                                    className="h-3.5 w-3.5 mr-2.5 text-blue-600 rounded border-gray-300 focus:ring-2 focus:ring-blue-500"
-                                  />
-                                  <label
-                                    htmlFor={`stage-${stage}`}
-                                    className="text-sm font-medium dark:text-white cursor-pointer truncate hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
-                                  >
-                                    {stage || 'Unknown'}
-                                  </label>
-                                </div>
-                              ))}
-                            </>
-                          ) : (
-                            <div className="text-sm font-medium text-gray-500 dark:text-gray-400 italic py-3 text-center">
-                              Loading stages...
-                            </div>
-                          )}
+{/* Stage Filter Dropdown - Update the label */}
+{['Drop', 'loss'].map((stage) => (
+  <div key={stage} className="flex items-center mb-2">
+    <input
+      type="checkbox"
+      id={`stage-${stage}`}
+      checked={selectedStages.includes(stage)}
+      onChange={(e) => {
+        e.stopPropagation();
+        handleStageSelect(stage);
+      }}
+      onClick={(e) => e.stopPropagation()}
+      className="h-3.5 w-3.5 mr-2.5 text-blue-600 rounded border-gray-300 focus:ring-2 focus:ring-blue-500"
+    />
+    <label
+      htmlFor={`stage-${stage}`}
+      className="text-sm font-medium dark:text-white cursor-pointer truncate hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
+    >
+      {stage === 'loss' ? 'Loss' : stage}
+    </label>
+  </div>
+))}
 
-                          {selectedStages.length > 0 && (
-                            <div className="mt-4 pt-3 border-t border-gray-200 dark:border-gray-700">
-                              <div className="text-xs font-semibold text-gray-600 dark:text-gray-400 mb-2">
-                                Selected ({selectedStages.length}):
-                              </div>
-                              <div className="flex flex-wrap gap-1.5">
-                                {selectedStages.map((stage) => (
-                                  <span
-                                    key={stage}
-                                    className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-300"
-                                  >
-                                    Stage: {stage}
-                                    <button
-                                      onClick={() => {
-                                        handleStageSelect(stage);
-                                        setShowStageFilter(false);
-                                      }}
-                                      className="ml-1 text-purple-600 hover:text-purple-800 dark:text-purple-400"
-                                    >
-                                      ×
-                                    </button>
-                                  </span>
-                                ))}
-                              </div>
-                            </div>
-                          )}
-                        </div>
-                      )}
+    {/* Remove the existing leadStages mapping that might still be there */}
+    
+    {selectedStages.length > 0 && (
+      <div className="mt-4 pt-3 border-t border-gray-200 dark:border-gray-700">
+        <div className="text-xs font-semibold text-gray-600 dark:text-gray-400 mb-2">
+          Selected ({selectedStages.length}):
+        </div>
+        <div className="flex flex-wrap gap-1.5">
+          {selectedStages.map((stage) => (
+            <span
+              key={stage}
+              className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-300"
+            >
+              Stage: {stage === 'loss' ? 'Loss' : stage}
+              <button
+                onClick={() => {
+                  handleStageSelect(stage);
+                  setShowStageFilter(false);
+                }}
+                className="ml-1 text-purple-600 hover:text-purple-800 dark:text-purple-400"
+              >
+                ×
+              </button>
+            </span>
+          ))}
+        </div>
+      </div>
+    )}
+  </div>
+)}
+
                     </th>
 
                     <th className="py-5 px-4">
@@ -3916,13 +4227,12 @@ const clearCustomRecordCount = () => {
                         </div>
                       </td>
 
-                      {/* Stage */}
-                      <td className="py-4 px-4">
-                        <div className="text-xs font-semibold bg-gradient-to-r from-orange-50 to-orange-100 dark:from-orange-900/30 dark:to-orange-800/20 text-orange-800 dark:text-orange-300 px-3 py-1.5 rounded-lg border border-orange-200 dark:border-orange-700/30 shadow-sm text-center">
-                          {lead.lead_stage || 'N/A'}
-                        </div>
-                      </td>
-
+{/* Stage Column */}
+<td className="py-4 px-4">
+  <div className="text-xs font-semibold bg-gradient-to-r from-orange-50 to-orange-100 dark:from-orange-900/30 dark:to-orange-800/20 text-orange-800 dark:text-orange-300 px-3 py-1.5 rounded-lg border border-orange-200 dark:border-orange-700/30 shadow-sm text-center">
+    {lead.lead_stage === 'loss' ? 'Loss' : (lead.lead_stage || 'N/A')}
+  </div>
+</td>
                       {/* Remark */}
                       <td className="py-4 px-4">
                         <span
