@@ -12,7 +12,7 @@ import {
   updateProcess ,
   addChecklist , getChecklists , updateChecklist ,
   addChecklistItem , getChecklistItemsByChecklist , toggleChecklistItemStatus ,updateChecklistItem ,
-   deleteChecklistItem ,
+   deleteChecklistItem ,getPreExecutionChecklistsWithItems , getExecutionChecklistsWithItems ,
 
 
 
@@ -65,6 +65,6 @@ router.put("/checklist-item/:id", updateChecklistItem)  // New route for updatin
 router.put("/checklist-item/toggle-status/:id", toggleChecklistItemStatus)
 router.delete("/checklist-item/:id", deleteChecklistItem)  // New route for deleting item
 
-
-
+router.get("/sujit/pre-execution-checklists", getPreExecutionChecklistsWithItems);
+router.get("/sujit/execution-checklists", getExecutionChecklistsWithItems);
 export default router;

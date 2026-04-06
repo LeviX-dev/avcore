@@ -5320,6 +5320,8 @@ const ECommerce: React.FC = () => {
   const [isCheckingIn, setIsCheckingIn] = useState(false);
   const [attendanceCheckCompleted, setAttendanceCheckCompleted] = useState(false);
 
+  // const [quotationFollowup, setQuotationFollowup] = useState<number | null>(null);
+
   const ADMIN_LIKE_ROLES = ['admin', 'sub_admin'];
   const ADMIN_AND_SUB_ADMIN_ROLES = ['admin', 'sub_admin'];
 
@@ -5340,6 +5342,11 @@ const ECommerce: React.FC = () => {
     'senior-autocad-designer',
     'senior_autocad_designer',
     'technical_head',
+      'av_engineer',
+  'acoustic_engineer',
+  'acoustic_designer',
+   'hr_executive',
+  
   ];
 
   const ROLES_WITH_QUOTATION_PROJECTION = [
@@ -5547,6 +5554,7 @@ const ECommerce: React.FC = () => {
                 setfollowups(data.missed || 0);
                 setUpcomingAssigned(data.upcoming || 0);
                 setTodaysMissedCombined(data.today_missed_total || 0);
+                setQuotationFollowup(data.quotation_followup || 0);
               }
             }),
         ]).then(() => {
@@ -5623,7 +5631,7 @@ const ECommerce: React.FC = () => {
       onClick: handleGoToTodaysMissedCombined,
       clickable: true,
     },
-    {
+        {
       title: 'Upcoming Followups',
       value: formatDisplayValue(upcomingAssigned),
       icon: CalendarCheck,
@@ -5648,6 +5656,16 @@ const ECommerce: React.FC = () => {
           onClick: () => navigate('/quatation-pending'),
           clickable: true,
         },
+          {
+        title: 'Quotation Follow-up',
+        value: formatDisplayValue(quotationFollowup),
+        icon: Hourglass,
+        color: 'text-orange-700',
+        bgGradient: 'from-orange-500/10 to-orange-600/5',
+        borderColor: 'border-orange-300/50',
+        onClick: () => handleGoToTotalLeads('Quotation Follow-up'),
+        clickable: true,
+      },
         {
           title: 'Projection List',
           value: formatDisplayValue(projectionLeads),

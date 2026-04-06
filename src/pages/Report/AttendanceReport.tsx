@@ -390,6 +390,63 @@ const exportExcel = async () => {
 
         {/* Table Card */}
         <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden">
+          {/* Pagination on Top */}
+          {filteredRows.length > 0 && (
+            <div className="px-4 py-3 border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-700/50">
+              <div className="flex flex-col sm:flex-row justify-between items-center gap-4">
+                <div className="text-sm text-gray-600 dark:text-gray-400">
+                  Showing <span className="font-medium">{(page - 1) * PAGE_SIZE + 1}</span> to{' '}
+                  <span className="font-medium">{Math.min(page * PAGE_SIZE, filteredRows.length)}</span> of{' '}
+                  <span className="font-medium">{filteredRows.length}</span> results
+                </div>
+                
+                <div className="flex items-center gap-2">
+                  <button
+                    disabled={page === 1}
+                    onClick={() => setPage(p => p - 1)}
+                    className="inline-flex items-center gap-1 px-3 py-1.5 border border-gray-300 dark:border-gray-600 rounded-md text-sm hover:bg-gray-100 dark:hover:bg-gray-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                  >
+                    ← Previous
+                  </button>
+                  
+                  <div className="flex items-center gap-1">
+                    {[...Array(totalPages)].map((_, i) => {
+                      const pageNum = i + 1;
+                      if (
+                        pageNum === 1 ||
+                        pageNum === totalPages ||
+                        (pageNum >= page - 1 && pageNum <= page + 1)
+                      ) {
+                        return (
+                          <button
+                            key={pageNum}
+                            onClick={() => setPage(pageNum)}
+                            className={`w-8 h-8 rounded-md text-sm ${
+                              page === pageNum
+                                ? 'bg-blue-600 text-white'
+                                : 'border border-gray-300 dark:border-gray-600 hover:bg-gray-100 dark:hover:bg-gray-700'
+                            }`}
+                          >
+                            {pageNum}
+                          </button>
+                        );
+                      }
+                      return null;
+                    })}
+                  </div>
+                  
+                  <button
+                    disabled={page === totalPages}
+                    onClick={() => setPage(p => p + 1)}
+                    className="inline-flex items-center gap-1 px-3 py-1.5 border border-gray-300 dark:border-gray-600 rounded-md text-sm hover:bg-gray-100 dark:hover:bg-gray-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                  >
+                    Next →
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+          
           <div className="overflow-x-auto">
             <table className="w-full min-w-full">
               <thead className="bg-gray-50 dark:bg-gray-700">
@@ -401,7 +458,7 @@ const exportExcel = async () => {
                   <th className="p-3 text-left text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wider">Check Out Time</th>
                   <th className="p-3 text-left text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wider">Status</th>
                   <th className="p-3 text-left text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wider">Auto Checkout</th>
-                </tr>
+                 </tr>
               </thead>
 
               <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
@@ -412,21 +469,21 @@ const exportExcel = async () => {
                   >
                     <td className="p-3">
                       <div className="font-medium text-gray-900 dark:text-white">{r.user_name}</div>
-                    </td>
+                     </td>
                     <td className="p-3">
                       <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200">
                         {r.role}
                       </span>
-                    </td>
+                     </td>
                     <td className="p-3 text-sm text-gray-700 dark:text-gray-300">
                       {formatDateOnly(r.attendance_date)}
-                    </td>
+                     </td>
                     <td className="p-3 text-sm text-gray-700 dark:text-gray-300">
                       {formatTimeTo12Hour(r.check_in_datetime)}
-                    </td>
+                     </td>
                     <td className="p-3 text-sm text-gray-700 dark:text-gray-300">
                       {formatTimeTo12Hour(r.check_out_datetime)}
-                    </td>
+                     </td>
                     <td className="p-3">
                       <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
                         r.status === 'Present'
@@ -435,7 +492,7 @@ const exportExcel = async () => {
                       }`}>
                         {r.status}
                       </span>
-                    </td>
+                     </td>
                     <td className="p-3">
                       <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
                         r.auto_checkout
@@ -444,12 +501,12 @@ const exportExcel = async () => {
                       }`}>
                         {r.auto_checkout ? 'Yes' : 'No'}
                       </span>
-                    </td>
-                  </tr>
+                     </td>
+                   </tr>
                 ))}
 
                 {paginatedRows.length === 0 && (
-                  <tr>
+                   <tr>
                     <td colSpan={7} className="p-8 text-center">
                       <div className="flex flex-col items-center justify-center">
                         <div className="text-3xl mb-2">📊</div>
@@ -458,14 +515,14 @@ const exportExcel = async () => {
                           {rows.length === 0 ? 'No data available' : 'Try adjusting your filters'}
                         </p>
                       </div>
-                    </td>
-                  </tr>
+                     </td>
+                   </tr>
                 )}
               </tbody>
             </table>
           </div>
 
-          {/* Pagination */}
+          {/* Pagination on Bottom */}
           {filteredRows.length > 0 && (
             <div className="px-4 py-3 border-t border-gray-200 dark:border-gray-700">
               <div className="flex flex-col sm:flex-row justify-between items-center gap-4">

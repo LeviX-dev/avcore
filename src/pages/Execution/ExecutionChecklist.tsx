@@ -21,7 +21,7 @@ const ExecutionChecklist = () => {
     try {
       // Fetch checklists
       const checklistRes = await axios.get(
-        `${BASE_URL}api/execution/checklists`,
+        `${BASE_URL}api/sujit/pre-execution-checklists`,
         { withCredentials: true }
       );
 

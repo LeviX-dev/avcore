@@ -1,3 +1,5 @@
+// StartExecutionModal.tsx - FIXED VERSION (no hook order violations)
+
 import React, { useState, FormEvent, useEffect } from "react";
 import axios from "axios";
 import { BASE_URL } from "../../../public/config";
@@ -7,6 +9,7 @@ import { FiEye } from "react-icons/fi";
 
 interface Lead {
   master_id: number;
+  execution_id?: number;
   [key: string]: any;
 }
 
@@ -29,7 +32,7 @@ interface StartExecutionModalProps {
   users: User[];
   selectedLeads?: Lead[];
   onStartExecution: (data: any) => void;
-  executionId?: number;   // ✅ SAFE ADD (no breaking change)
+  executionId?: number;
 }
 
 /* ================= COMPONENT ================= */
@@ -42,25 +45,28 @@ const StartExecutionModal: React.FC<StartExecutionModalProps> = ({
   users,
   selectedLeads = [],
   onStartExecution,
-  executionId,   // ✅ SAFE USE
+  executionId: propExecutionId,
 }) => {
-
+  // ========== ALL useState hooks MUST be at the top ==========
   const [selectedSchedule, setSelectedSchedule] = useState<string>("");
   const [startDate, setStartDate] = useState<string>("");
   const [endDate, setEndDate] = useState<string>("");
   const [remark, setRemark] = useState<string>("");
-
   const [selectedUsers, setSelectedUsers] = useState<string[]>([]);
   const [selectedUserIds, setSelectedUserIds] = useState<number[]>([]);
   const [scheduleDetails, setScheduleDetails] = useState<any[]>([]);
   const [status, setStatus] = useState<string>("startExecution");
-
   const [showScheduleModal, setShowScheduleModal] = useState<boolean>(false);
   const [selectedScheduleForModal, setSelectedScheduleForModal] = useState<Schedule | null>(null);
+  const [originalStatus, setOriginalStatus] = useState<string>("");
+  const [originalRemark, setOriginalRemark] = useState<string>("");
+  const [originalStartDate, setOriginalStartDate] = useState<string>("");
+  const [originalEndDate, setOriginalEndDate] = useState<string>("");
+  const [existingExecutionId, setExistingExecutionId] = useState<number | null>(null);
 
+  // ========== ALL useEffect hooks must be at the top ==========
   
-  /* ================= FETCH SCHEDULE DETAILS ================= */
-
+  /* Fetch schedule details when selectedSchedule changes */
   useEffect(() => {
     if (!selectedSchedule) {
       setScheduleDetails([]);
@@ -85,43 +91,76 @@ const StartExecutionModal: React.FC<StartExecutionModalProps> = ({
     fetchDetails();
   }, [selectedSchedule]);
 
-  /* ================= PREFILL EXECUTION ================= */
-
+  /* Prefill execution data when modal opens */
   useEffect(() => {
-  if (!show || selectedLeads.length === 0) return;
+    if (!show || selectedLeads.length === 0) return;
 
-  const leadId = selectedLeads[0]?.master_id;
-  if (!leadId) return;
-
-  const fetchPrefill = async () => {
-    try {
-      const res = await axios.get(
-        `${BASE_URL}api/execution/prefill/${leadId}`,
-        { withCredentials: true }
-      );
-
-      if (res.data.success && res.data.exists) {
-        const d = res.data.data;
-
-        setSelectedSchedule(String(d.schedule_id || ""));
-        setStartDate(d.start_date || "");  // Already in YYYY-MM-DD format
-        setEndDate(d.end_date || "");      // Already in YYYY-MM-DD format
-        setRemark(d.remark || "");
-        setSelectedUsers(d.assigned_users || []);
-        setSelectedUserIds(d.assigned_user_ids || []);
-        setStatus(d.status || "startExecution"); // ✅ Now properly set
-      }
-    } catch (err) {
-      console.error("Prefill execution error:", err);
+    const leadData = selectedLeads[0];
+    const leadId = leadData?.master_id;
+    
+    // Check if lead already has an execution_id from the prefill data
+    if (leadData?.execution_id) {
+      console.log("Lead has existing execution_id:", leadData.execution_id);
+      setExistingExecutionId(leadData.execution_id);
     }
-  };
 
-  fetchPrefill();
-}, [show, selectedLeads]);
+    if (!leadId) return;
 
+    const fetchPrefill = async () => {
+      try {
+        const res = await axios.get(
+          `${BASE_URL}api/execution/prefill/${leadId}`,
+          { withCredentials: true }
+        );
 
-  /* ================= GROUP TYPE + PROCESS ================= */
+        if (res.data.success && res.data.exists) {
+          const d = res.data.data;
 
+          setSelectedSchedule(String(d.schedule_id || ""));
+          setStartDate(d.start_date || "");
+          setEndDate(d.end_date || "");
+          setRemark(d.remark || "");
+          setSelectedUsers(d.assigned_users || []);
+          setSelectedUserIds(d.assigned_user_ids || []);
+          setStatus(d.status || "startExecution");
+          
+          // Store original values for comparison
+          setOriginalStatus(d.status || "startExecution");
+          setOriginalRemark(d.remark || "");
+          setOriginalStartDate(d.start_date || "");
+          setOriginalEndDate(d.end_date || "");
+          
+          // Store the execution ID if available from prefill response
+          if (d.execution_id) {
+            setExistingExecutionId(d.execution_id);
+          }
+        } else {
+          // Reset for new execution
+          setExistingExecutionId(null);
+          setSelectedSchedule("");
+          setStartDate("");
+          setEndDate("");
+          setRemark("");
+          setSelectedUsers([]);
+          setSelectedUserIds([]);
+          setStatus("startExecution");
+          setOriginalStatus("");
+          setOriginalRemark("");
+          setOriginalStartDate("");
+          setOriginalEndDate("");
+        }
+      } catch (err) {
+        console.error("Prefill execution error:", err);
+      }
+    };
+
+    fetchPrefill();
+  }, [show, selectedLeads]);
+
+  /* ========== CONDITIONAL RETURN (after all hooks) ========== */
+  if (!show) return null;
+
+  /* ========== DERIVED VALUES ========== */
   const groupedDetails = scheduleDetails.reduce((acc: any, curr: any) => {
     if (!acc[curr.type_name]) {
       acc[curr.type_name] = [];
@@ -130,344 +169,425 @@ const StartExecutionModal: React.FC<StartExecutionModalProps> = ({
     return acc;
   }, {});
 
-  /* ================= HANDLE EYE ICON CLICK ================= */
-const handleEyeIconClick = () => {
-  if (!selectedSchedule) {
-    alert("Please select a schedule first");
-    return;
-  }
+  const isUpdateMode = !!existingExecutionId || !!propExecutionId;
 
-  const schedule = schedules.find(
-    (s) => s.schedule_id == Number(selectedSchedule)
-  );
+  /* ========== HANDLERS ========== */
+  const handleEyeIconClick = () => {
+    if (!selectedSchedule) {
+      alert("Please select a schedule first");
+      return;
+    }
 
-  if (schedule) {
-    setSelectedScheduleForModal(schedule);
-    setShowScheduleModal(true);  // ✅ This sets modal to true
-  }
-};
-  if (!show) return null;
+    const schedule = schedules.find(
+      (s) => s.schedule_id == Number(selectedSchedule)
+    );
 
-  /* ================= SUBMIT ================= */
+    if (schedule) {
+      setSelectedScheduleForModal(schedule);
+      setShowScheduleModal(true);
+    }
+  };
 
   const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
 
-    if (!selectedSchedule || !startDate || !endDate || selectedUsers.length === 0) {
-      alert("Please fill all required fields");
-      return;
-    }
+    // If we have an existing execution ID, use UPDATE endpoint
+    if (existingExecutionId) {
+      console.log("Updating existing execution:", existingExecutionId);
+      
+      // Check if status or remark changed
+      const statusChanged = status !== originalStatus;
+      const remarkChanged = remark !== originalRemark;
+      const startDateChanged = startDate !== originalStartDate;
+      const endDateChanged = endDate !== originalEndDate;
+      const usersChanged = JSON.stringify(selectedUserIds) !== JSON.stringify(
+        selectedLeads[0]?.assigned_user_ids || []
+      );
+      
+      const hasChanges = statusChanged || remarkChanged || startDateChanged || endDateChanged || usersChanged;
+      
+      if (!hasChanges) {
+        alert("No changes to update");
+        onClose();
+        return;
+      }
 
-    const selectedScheduleObj = schedules.find(
-      (s) => s.schedule_id == Number(selectedSchedule)
-    );
+      try {
+        const updateData: any = {};
+        if (statusChanged) updateData.status = status;
+        if (remarkChanged) updateData.remark = remark;
+        if (startDateChanged) updateData.start_date = startDate;
+        if (endDateChanged) updateData.end_date = endDate;
+        if (usersChanged) {
+          updateData.assigned_users = selectedUsers;
+          updateData.assigned_user_ids = selectedUserIds;
+        }
 
-    const executionData = {
-      schedule_id: selectedSchedule,
-      schedule_name: selectedScheduleObj?.schedule_name || "",
-      start_date: startDate,
-      end_date: endDate,
-      remark,
-      status,
-      assigned_users: selectedUsers,
-      assigned_user_ids: selectedUserIds,
-      lead_ids: selectedLeads.map((lead) => lead.master_id),
-    };
-
-    try {
-      let response;
-
-      if (executionId) {
-        // ✅ UPDATE - Remove schedule_id from update data since it shouldn't change
-        const { schedule_id, schedule_name, ...updateData } = executionData;
-        response = await axios.put(
-          `${BASE_URL}api/execution/update/${executionId}`,
-          updateData,  // Send only updatable fields
+        const response = await axios.put(
+          `${BASE_URL}api/execution/update/${existingExecutionId}`,
+          updateData,
           { withCredentials: true }
         );
-      } else {
-        // ✅ CREATE
-        response = await axios.post(
+
+        if (response.data.success) {
+          alert("Execution updated successfully");
+          onStartExecution(response.data);
+          onClose();
+        }
+      } catch (error) {
+        console.error("Update execution error:", error);
+        alert("Failed to update execution");
+      }
+    } 
+    // Check if we have an execution ID from props (alternative)
+    else if (propExecutionId) {
+      // UPDATE MODE - Only send status and remark
+      const statusChanged = status !== originalStatus;
+      const remarkChanged = remark !== originalRemark;
+      
+      if (!statusChanged && !remarkChanged) {
+        alert("No changes to update");
+        onClose();
+        return;
+      }
+
+      try {
+        const updateData: any = {};
+        if (statusChanged) updateData.status = status;
+        if (remarkChanged) updateData.remark = remark;
+
+        const response = await axios.put(
+          `${BASE_URL}api/execution/update/${propExecutionId}`,
+          updateData,
+          { withCredentials: true }
+        );
+
+        if (response.data.success) {
+          alert("Execution status updated successfully");
+          onStartExecution(response.data);
+          onClose();
+        }
+      } catch (error) {
+        console.error("Update status error:", error);
+        alert("Failed to update execution status");
+      }
+    } 
+    else {
+      // ✅ CREATE MODE - Create new execution
+      if (!selectedSchedule || !startDate || !endDate || selectedUsers.length === 0) {
+        alert("Please fill all required fields");
+        return;
+      }
+
+      const selectedScheduleObj = schedules.find(
+        (s) => s.schedule_id == Number(selectedSchedule)
+      );
+
+      const executionData = {
+        schedule_id: selectedSchedule,
+        schedule_name: selectedScheduleObj?.schedule_name || "",
+        start_date: startDate,
+        end_date: endDate,
+        remark,
+        status,
+        assigned_users: selectedUsers,
+        assigned_user_ids: selectedUserIds,
+        lead_ids: selectedLeads.map((lead) => lead.master_id),
+      };
+
+      try {
+        const response = await axios.post(
           `${BASE_URL}api/execution/start`,
           executionData,
           { withCredentials: true }
         );
-      }
 
-      if (response.data.success) {
-        alert(executionId ? "Execution updated" : "Execution started");
-        onStartExecution(response.data);
-        onClose();
+        if (response.data.success) {
+          alert("Execution started successfully");
+          onStartExecution(response.data);
+          onClose();
+        }
+      } catch (error) {
+        console.error("Create execution error:", error);
+        alert("Failed to start execution");
       }
-    } catch (error) {
-      console.error("Execution save error:", error);
-      alert("Failed to save execution");
     }
   };
 
-  /* ================= UI ================= */
-
+  /* ========== RENDER ========== */
   return (
-<>
-  <div className="fixed inset-0 z-50 bg-black/70 flex items-start justify-center pt-20 p-4">
-    <div className="bg-white rounded-xl shadow-2xl w-full max-w-3xl max-h-[90vh] overflow-y-auto border border-gray-200">
+    <>
+      <div className="fixed inset-0 z-50 bg-black/70 flex items-start justify-center pt-20 p-4">
+        <div className="bg-white rounded-xl shadow-2xl w-full max-w-3xl max-h-[90vh] overflow-y-auto border border-gray-200">
+          <div className="p-5 border-b bg-gray-50 rounded-t-xl">
+            <h3 className="text-xl font-semibold text-gray-800">
+              {isUpdateMode ? "Update Execution" : "Start Execution"}
+            </h3>
+            {isUpdateMode && (
+              <p className="text-sm text-gray-500 mt-1">
+                Update execution details below
+              </p>
+            )}
+          </div>
 
-      <div className="p-5 border-b bg-gray-50 rounded-t-xl">
-        <h3 className="text-xl font-semibold text-gray-800">
-          {executionId ? "Update Execution" : "Start Execution"}
-        </h3>
-       
-      </div>
-
-      <form onSubmit={handleSubmit} className="p-6 space-y-6">
-        {/* Schedule - Read Only in Update Mode */}
-        <div>
-          <label className="block text-sm font-medium mb-2">
-            Select Schedule *
-          </label>
-
-          <div className="flex gap-2">
-            {executionId ? (
-              // Read-only display for update mode
-              <div className="flex-1 p-3 border rounded-lg bg-gray-100 text-gray-700 flex items-center">
-                {schedules.find(s => s.schedule_id === Number(selectedSchedule))?.schedule_name || 'Schedule not found'}
+          <form onSubmit={handleSubmit} className="p-6 space-y-6">
+            {/* Schedule - Read Only in Update Mode */}
+            <div>
+              <label className="block text-sm font-medium mb-2">
+                Schedule {!isUpdateMode && "*"}
+              </label>
+              <div className="flex gap-2">
+                {isUpdateMode ? (
+                  <div className="flex-1 p-3 border rounded-lg bg-gray-100 text-gray-700 flex items-center">
+                    {schedules.find(s => s.schedule_id === Number(selectedSchedule))?.schedule_name || 'Schedule not found'}
+                  </div>
+                ) : (
+                  <select
+                    value={selectedSchedule}
+                    onChange={(e) => setSelectedSchedule(e.target.value)}
+                    className="flex-1 p-3 border rounded-lg focus:ring-2 focus:ring-indigo-500"
+                    required
+                  >
+                    <option value="">-- Choose Schedule --</option>
+                    {schedules.map((schedule) => (
+                      <option key={schedule.schedule_id} value={schedule.schedule_id}>
+                        {schedule.schedule_name}
+                      </option>
+                    ))}
+                  </select>
+                )}
+                <button
+                  type="button"
+                  onClick={handleEyeIconClick}
+                  className="px-4 py-3 bg-gray-100 border rounded-lg hover:bg-gray-200"
+                  disabled={!selectedSchedule}
+                >
+                  <FiEye className="w-5 h-5 text-gray-600" />
+                </button>
               </div>
-            ) : (
-              // Editable select for create mode
+            </div>
+
+            {/* Status - Always editable */}
+            <div>
+              <label className="block text-sm font-medium mb-2">
+                Execution Status *
+              </label>
               <select
-                value={selectedSchedule}
-                onChange={(e) => setSelectedSchedule(e.target.value)}
-                className="flex-1 p-3 border rounded-lg focus:ring-2 focus:ring-indigo-500"
+                value={status}
+                onChange={(e) => setStatus(e.target.value)}
+                className="w-full p-3 border rounded-lg focus:ring-2 focus:ring-indigo-500"
                 required
               >
-                <option value="">-- Choose Schedule --</option>
-                {schedules.map((schedule) => (
-                  <option key={schedule.schedule_id} value={schedule.schedule_id}>
-                    {schedule.schedule_name}
-                  </option>
-                ))}
+                <option value="startExecution">Select Status</option>
+                <option value="pending">Pending</option>
+                <option value="in_progress">In Progress</option>
+                <option value="hold_by_client">Hold by Client</option>
+                <option value="hold_by_avcore">Hold by Avcore</option>
+                <option value="complete">Complete</option>
               </select>
-            )}
-
-            <button
-              type="button"
-              onClick={handleEyeIconClick}
-              className="px-4 py-3 bg-gray-100 border rounded-lg hover:bg-gray-200"
-              disabled={!selectedSchedule} // Disable if no schedule selected
-            >
-              <FiEye className="w-5 h-5 text-gray-600" />
-            </button>
-          </div>
-          {executionId && (
-            <p className="text-xs text-gray-500 mt-1">Schedule cannot be changed after creation</p>
-          )}
-        </div>
-
-        {/* Status */}
-        <div>
-          <label className="block text-sm font-medium mb-2">
-            Execution Status *
-          </label>
-
-          <select
-            value={status}
-            onChange={(e) => setStatus(e.target.value)}
-            className="w-full p-3 border rounded-lg focus:ring-2 focus:ring-indigo-500"
-            required
-          >
-            <option value="startExecution">Select</option>
-            <option value="in_progress">In Progress</option>
-            <option value="hold_by_client">Hold by Client</option>
-            <option value="hold_by_avcore">Hold by Avcore</option>
-            <option value="complete">Complete</option>
-          </select>
-        </div>
-
-        {/* Dates with Labels */}
-        <div className="grid grid-cols-2 gap-6">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Start Date <span className="text-red-500">*</span>
-            </label>
-            <input
-              type="date"
-              value={startDate}
-              onChange={(e) => {
-                setStartDate(e.target.value);
-                // Optional: Clear end date if it's before new start date
-                if (endDate && new Date(endDate) < new Date(e.target.value)) {
-                  setEndDate('');
-                }
-              }}
-              className={`w-full p-3 border rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent ${
-                !startDate ? 'border-gray-300' : 'border-gray-300'
-              }`}
-              required
-            />
-            {!startDate && (
-              <p className="text-xs text-red-500 mt-1">Start date is required</p>
-            )}
-          </div>
-          
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              End Date <span className="text-red-500">*</span>
-            </label>
-            <input
-              type="date"
-              value={endDate}
-              onChange={(e) => setEndDate(e.target.value)}
-              min={startDate} // Ensures end date is not before start date
-              className={`w-full p-3 border rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent ${
-                !endDate ? 'border-gray-300' : 'border-gray-300'
-              }`}
-              required
-            />
-            {!endDate && (
-              <p className="text-xs text-red-500 mt-1">End date is required</p>
-            )}
-            {startDate && endDate && new Date(endDate) < new Date(startDate) && (
-              <p className="text-xs text-red-500 mt-1">End date must be after start date</p>
-            )}
-          </div>
-        </div>
-
-        {/* Remark */}
-        <div>
-          <label className="block text-sm font-medium mb-2">
-            Remark (optional)
-          </label>
-          <textarea
-            value={remark}
-            onChange={(e) => setRemark(e.target.value)}
-            className="w-full p-3 border rounded-lg"
-            rows={3}
-            placeholder="Enter any remarks or notes..."
-          />
-        </div>
-
-        {/* Users */}
-        <div>
-          <label className="block text-sm font-medium mb-2">
-            Assign *
-          </label>
-          <div className="grid grid-cols-3 gap-3">
-            {users.map((user) => (
-              <label key={user.user_id} className="flex items-center gap-2 p-2 border rounded-lg hover:bg-gray-50 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={selectedUserIds.includes(user.user_id)}
-                  onChange={() => {
-                    if (selectedUserIds.includes(user.user_id)) {
-                      setSelectedUserIds(selectedUserIds.filter(id => id !== user.user_id));
-                      setSelectedUsers(selectedUsers.filter(u => u !== user.name));
-                    } else {
-                      setSelectedUserIds([...selectedUserIds, user.user_id]);
-                      setSelectedUsers([...selectedUsers, user.name]);
-                    }
-                  }}
-                  className="rounded text-indigo-600 focus:ring-indigo-500"
-                />
-                <span className="text-sm">{user.name}</span>
-              </label>
-            ))}
-          </div>
-          {selectedUserIds.length === 0 && (
-            <p className="text-xs text-red-500 mt-1">At least one user must be assigned</p>
-          )}
-        </div>
-
-        <div className="flex justify-end gap-3 pt-6 border-t">
-          <button 
-            type="button" 
-            onClick={onClose} 
-            className="px-5 py-2 border rounded-lg hover:bg-gray-50 transition-colors"
-          >
-            Cancel
-          </button>
-
-          <button 
-            type="submit" 
-            disabled={!startDate || !endDate || selectedUserIds.length === 0}
-            className={`px-5 py-2 rounded-lg transition-colors ${
-              !startDate || !endDate || selectedUserIds.length === 0
-                ? 'bg-gray-400 cursor-not-allowed'
-                : 'bg-green-600 hover:bg-green-700 text-white'
-            }`}
-          >
-            {executionId ? "Update Execution" : "Start Execution"}
-          </button>
-        </div>
-      </form>
-    </div>
-  </div>
-
-  {/* Schedule Details Modal */}
-  {showScheduleModal && selectedScheduleForModal && (
-    <div className="fixed inset-0 z-[60] bg-black/40 flex justify-center pt-28 px-3">
-      <div className="bg-white rounded-lg shadow-xl w-full max-w-lg max-h-[55vh] overflow-y-auto">
-
-        {/* Header */}
-        <div className="px-4 py-3 border-b bg-gray-50 flex justify-between items-center rounded-t-lg">
-          <div>
-            <h3 className="text-base font-semibold text-gray-800">
-              Schedule Details
-            </h3>
-            <p className="text-xs text-gray-500">
-              {selectedScheduleForModal.schedule_name}
-            </p>
-          </div>
-          <button
-            onClick={() => setShowScheduleModal(false)}
-            className="text-gray-500 hover:text-gray-700 text-xl leading-none"
-          >
-            ×
-          </button>
-        </div>
-
-        {/* Body */}
-        <div className="p-4">
-          {scheduleDetails.length > 0 ? (
-            <div className="space-y-3">
-              {Object.entries(groupedDetails).map(
-                ([typeName, processes]: any) => (
-                  <div key={typeName} className="border rounded-md p-3">
-                    <p className="text-xs font-semibold text-indigo-600 mb-2">
-                      {typeName}
-                    </p>
-                    <ul className="space-y-1">
-                      {processes.map((process: string, index: number) => (
-                        <li key={index} className="text-xs text-gray-700">
-                          • {process}
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-                )
+              {isUpdateMode && originalStatus && status !== originalStatus && (
+                <p className="text-xs text-blue-500 mt-1">
+                  Status will change from "{originalStatus}" to "{status}"
+                </p>
               )}
             </div>
-          ) : (
-            <div className="text-center py-6 text-gray-400 text-sm">
-              No schedule details
+
+            {/* Dates */}
+            <div className="grid grid-cols-2 gap-6">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Start Date {!isUpdateMode && "*"}
+                </label>
+                {isUpdateMode ? (
+                  <input
+                    type="date"
+                    value={startDate}
+                    onChange={(e) => setStartDate(e.target.value)}
+                    className="w-full p-3 border rounded-lg focus:ring-2 focus:ring-indigo-500"
+                  />
+                ) : (
+                  <input
+                    type="date"
+                    value={startDate}
+                    onChange={(e) => setStartDate(e.target.value)}
+                    min={new Date().toISOString().split('T')[0]}
+                    className="w-full p-3 border rounded-lg focus:ring-2 focus:ring-indigo-500"
+                    required
+                  />
+                )}
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  End Date {!isUpdateMode && "*"}
+                </label>
+                {isUpdateMode ? (
+                  <input
+                    type="date"
+                    value={endDate}
+                    onChange={(e) => setEndDate(e.target.value)}
+                    min={startDate}
+                    className="w-full p-3 border rounded-lg focus:ring-2 focus:ring-indigo-500"
+                  />
+                ) : (
+                  <input
+                    type="date"
+                    value={endDate}
+                    onChange={(e) => setEndDate(e.target.value)}
+                    min={startDate}
+                    className="w-full p-3 border rounded-lg focus:ring-2 focus:ring-indigo-500"
+                    required
+                  />
+                )}
+              </div>
             </div>
-          )}
-        </div>
 
-        {/* Footer */}
-        <div className="px-4 py-3 border-t bg-gray-50 flex justify-end rounded-b-lg">
-          <button
-            onClick={() => setShowScheduleModal(false)}
-            className="px-4 py-1.5 bg-indigo-600 text-white text-sm rounded-md hover:bg-indigo-700"
-          >
-            Close
-          </button>
-        </div>
+            {/* Remark */}
+            <div>
+              <label className="block text-sm font-medium mb-2">
+                Remark (optional)
+              </label>
+              <textarea
+                value={remark}
+                onChange={(e) => setRemark(e.target.value)}
+                className="w-full p-3 border rounded-lg focus:ring-2 focus:ring-indigo-500"
+                rows={3}
+                placeholder="Enter any remarks or notes..."
+              />
+            </div>
 
+            {/* Users */}
+            <div>
+              <label className="block text-sm font-medium mb-2">
+                Assigned Users {!isUpdateMode && "*"}
+              </label>
+              {isUpdateMode ? (
+                <div className="grid grid-cols-3 gap-3 max-h-48 overflow-y-auto p-2 border rounded-lg">
+                  {users.map((user) => (
+                    <label key={user.user_id} className="flex items-center gap-2 p-2 border rounded-lg hover:bg-gray-50 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={selectedUserIds.includes(user.user_id)}
+                        onChange={() => {
+                          if (selectedUserIds.includes(user.user_id)) {
+                            setSelectedUserIds(selectedUserIds.filter(id => id !== user.user_id));
+                            setSelectedUsers(selectedUsers.filter(u => u !== user.name));
+                          } else {
+                            setSelectedUserIds([...selectedUserIds, user.user_id]);
+                            setSelectedUsers([...selectedUsers, user.name]);
+                          }
+                        }}
+                        className="rounded text-indigo-600 focus:ring-indigo-500"
+                      />
+                      <span className="text-sm">{user.name}</span>
+                    </label>
+                  ))}
+                </div>
+              ) : (
+                <div className="grid grid-cols-3 gap-3">
+                  {users.map((user) => (
+                    <label key={user.user_id} className="flex items-center gap-2 p-2 border rounded-lg hover:bg-gray-50 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={selectedUserIds.includes(user.user_id)}
+                        onChange={() => {
+                          if (selectedUserIds.includes(user.user_id)) {
+                            setSelectedUserIds(selectedUserIds.filter(id => id !== user.user_id));
+                            setSelectedUsers(selectedUsers.filter(u => u !== user.name));
+                          } else {
+                            setSelectedUserIds([...selectedUserIds, user.user_id]);
+                            setSelectedUsers([...selectedUsers, user.name]);
+                          }
+                        }}
+                        className="rounded text-indigo-600 focus:ring-indigo-500"
+                      />
+                      <span className="text-sm">{user.name}</span>
+                    </label>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            <div className="flex justify-end gap-3 pt-6 border-t">
+              <button 
+                type="button" 
+                onClick={onClose} 
+                className="px-5 py-2 border rounded-lg hover:bg-gray-50 transition-colors"
+              >
+                Cancel
+              </button>
+
+              <button 
+                type="submit"
+                className={`px-5 py-2 rounded-lg transition-colors bg-green-600 hover:bg-green-700 text-white`}
+              >
+                {isUpdateMode ? "Update Execution" : "Start Execution"}
+              </button>
+            </div>
+          </form>
+        </div>
       </div>
-    </div>
-  )}
-</>
 
+      {/* Schedule Details Modal */}
+      {showScheduleModal && selectedScheduleForModal && (
+        <div className="fixed inset-0 z-[60] bg-black/40 flex justify-center pt-28 px-3">
+          <div className="bg-white rounded-lg shadow-xl w-full max-w-lg max-h-[55vh] overflow-y-auto">
+            <div className="px-4 py-3 border-b bg-gray-50 flex justify-between items-center rounded-t-lg">
+              <div>
+                <h3 className="text-base font-semibold text-gray-800">
+                  Schedule Details
+                </h3>
+                <p className="text-xs text-gray-500">
+                  {selectedScheduleForModal.schedule_name}
+                </p>
+              </div>
+              <button
+                onClick={() => setShowScheduleModal(false)}
+                className="text-gray-500 hover:text-gray-700 text-xl leading-none"
+              >
+                ×
+              </button>
+            </div>
+
+            <div className="p-4">
+              {scheduleDetails.length > 0 ? (
+                <div className="space-y-3">
+                  {Object.entries(groupedDetails).map(
+                    ([typeName, processes]: any) => (
+                      <div key={typeName} className="border rounded-md p-3">
+                        <p className="text-xs font-semibold text-indigo-600 mb-2">
+                          {typeName}
+                        </p>
+                        <ul className="space-y-1">
+                          {processes.map((process: string, index: number) => (
+                            <li key={index} className="text-xs text-gray-700">
+                              • {process}
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    )
+                  )}
+                </div>
+              ) : (
+                <div className="text-center py-6 text-gray-400 text-sm">
+                  No schedule details
+                </div>
+              )}
+            </div>
+
+            <div className="px-4 py-3 border-t bg-gray-50 flex justify-end rounded-b-lg">
+              <button
+                onClick={() => setShowScheduleModal(false)}
+                className="px-4 py-1.5 bg-indigo-600 text-white text-sm rounded-md hover:bg-indigo-700"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </>
   );
 };
 

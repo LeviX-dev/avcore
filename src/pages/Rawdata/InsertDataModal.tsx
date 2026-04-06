@@ -122,7 +122,7 @@ const InsertDataModal: React.FC<InsertDataModalProps> = ({
   useEffect(() => {
     if (showAddPopup && !singleFormData.assign_date) {
       const today = new Date().toISOString().split('T')[0];
-      setSingleFormData(prev => ({
+      setSingleFormData((prev: any) => ({
         ...prev,
         assign_date: today
       }));

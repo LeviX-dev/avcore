@@ -1,8 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
-import { 
-  ChevronDown
-} from 'lucide-react';
+import { ChevronDown } from 'lucide-react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import {
   faCheckCircle,
@@ -22,34 +20,514 @@ import {
   faFile,
   faImage,
   faVideo,
-  faBuilding
+  faBuilding,
+  faEye,
+  faFileText,
+  faSave,
+  faEdit
 } from '@fortawesome/free-solid-svg-icons';
 import { BASE_URL } from '../../../public/config.js';
 
-// ActionButton component - Only play button icon
-const ActionButton = ({ 
-  onPlay,
-  className = ""
-}: { 
-  onPlay: () => void; 
+// ============================================
+// TYPES
+// ============================================
+
+interface QuotationItem {
+  model: string;
+  brand_name: string;
+  qty: number;
+  price: number;
+}
+
+interface QuotationKit {
+  items: QuotationItem[];
+}
+
+interface QuotationRevision {
+  revision: number;
+}
+
+interface QuotationData {
+  qt_number: string;
+  type: string;
+  total_price: number;
+  acoustic_terms: string;
+  items: QuotationKit[];
+  additional_prices: Array<{ add_price_name: string; price: number }>;
+  totals?: {
+    total_with_gst: number;
+  };
+  revisions?: QuotationRevision[];
+}
+
+interface QuotationResponse {
+  quotations: QuotationData[];
+  lead: Lead;
+}
+
+interface Lead {
+  master_id: number;
+  name: string;
+  number?: string;
+  alternate_number?: string;
+  email?: string;
+  address?: string;
+  city?: string;
+  area_name?: string;
+  p_type?: string;
+  budget_range?: string;
+  time_to_complete?: string;
+  room_length?: string;
+  room_width?: string;
+  room_height?: string;
+  execution_schedule_name?: string;
+  execution_process_count?: number;
+  execution_status?: string;
+  execution_remark?: string;
+  execution_start_date?: string;
+  execution_end_date?: string;
+  created_at?: string;
+  assign_date?: string;
+  latest_reassignment_date?: string;
+  quick_remark?: string;
+  detailed_remark?: string;
+  latest_remark?: string;
+  assigned_to?: string;
+  telecaller_name?: string;
+  lead_stage?: string;
+  lead_status?: string;
+  cat_name?: string;
+  reference_name?: string;
+  architect_name?: string;
+  ar_number?: string;
+  ca_number?: string;
+  e_number?: string;
+  sm_number?: string;
+  pop_number?: string;
+  other_number?: string;
+  location_link?: string;
+}
+
+interface ChecklistItem {
+  item_id: number;
+  item_name: string;
+}
+
+interface Checklist {
+  checklist_id: number;
+  checklist_name: string;
+  items: ChecklistItem[];
+}
+
+interface ChecklistResponse {
+  success: boolean;
+  selected_items: number[];
+  data?: Checklist[];
+  error?: string;
+}
+
+interface ApiResponse {
+  success: boolean;
+  data: Lead[];
+  pagination?: {
+    total: number;
+    totalPages: number;
+    currentPage: number;
+    limit: number;
+  };
+}
+
+// ============================================
+// QUOTATION VIEW MODAL
+// ============================================
+
+interface QuotationViewModalProps {
+  show: boolean;
+  onClose: () => void;
+  master_id: number;
+  lead?: Lead;
+}
+
+const QuotationViewModal: React.FC<QuotationViewModalProps> = ({
+  show,
+  onClose,
+  master_id,
+  lead
+}) => {
+  const [data, setData] = useState<QuotationResponse | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [selectedRevision, setSelectedRevision] = useState<number>(1);
+
+  useEffect(() => {
+    if (show && master_id) {
+      fetchQuotation();
+    }
+  }, [show, master_id, selectedRevision]);
+
+  const fetchQuotation = async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const response = await axios.get<QuotationResponse>(
+        `${BASE_URL}api/quotation/${master_id}/${selectedRevision}`
+      );
+      setData(response.data);
+    } catch (err) {
+      console.error('Error fetching quotation:', err);
+      setError('Failed to load quotation data');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  if (!show) return null;
+
+  const quotationData: Partial<QuotationData> = data?.quotations?.[0] || {};
+  const leadInfo: Lead | {} = data?.lead || lead || {};
+
+  // Calculate totals
+  const isGST = quotationData.type === 'with_gst';
+  const subtotal = Number(quotationData.total_price || 0);
+  
+  const additionalPrices = (quotationData.additional_prices || []).filter(
+    (additional: { add_price_name: string; price: number }) => 
+      additional.add_price_name && additional.add_price_name.trim() !== ''
+  );
+  
+  let additionalTotal = 0;
+  additionalPrices.forEach((additional: { add_price_name: string; price: number }) => {
+    additionalTotal += Number(additional.price) || 0;
+  });
+
+  let gstAmount = 0;
+  let projectTotal = subtotal + additionalTotal;
+  
+  if (isGST) {
+    projectTotal = Number(quotationData.totals?.total_with_gst || 0) + additionalTotal;
+  } else {
+    gstAmount = subtotal * 0.18;
+    projectTotal = subtotal + gstAmount + additionalTotal;
+  }
+
+  return (
+    <div className="fixed inset-0 z-[9999] bg-black/60 flex justify-center items-start pt-32 px-3 overflow-y-auto">
+      <div className="bg-white dark:bg-boxdark w-full max-w-3xl rounded-lg shadow-lg border border-gray-200 dark:border-gray-700 text-xs">
+        {/* Header */}
+        <div className="flex justify-between items-center px-4 py-2 border-b dark:border-gray-700">
+          <div>
+            <div className="font-semibold">Quotation</div>
+           
+          </div>
+
+          <div className="flex items-center gap-2">
+            {data?.quotations?.[0]?.revisions && data.quotations[0].revisions.length > 0 && (
+              <select
+                value={selectedRevision}
+                onChange={(e) => setSelectedRevision(Number(e.target.value))}
+                className="border px-2 py-1 rounded text-xs dark:bg-gray-700"
+              >
+                {data.quotations[0].revisions.map((rev: QuotationRevision) => (
+                  <option key={rev.revision} value={rev.revision}>
+                    V{rev.revision}
+                  </option>
+                ))}
+              </select>
+            )}
+            <button onClick={onClose} className="text-lg px-2">×</button>
+          </div>
+        </div>
+
+        {/* Body */}
+        <div className="p-4 space-y-4">
+          {loading ? (
+            <div className="text-center py-6">Loading...</div>
+          ) : error ? (
+            <div className="text-center text-red-500 py-6">{error}</div>
+          ) : !quotationData.qt_number ? (
+            <div className="text-center py-6 text-gray-500">
+              No quotation found
+            </div>
+          ) : (
+            <>
+              {/* QT Number */}
+              <div className="flex justify-between items-center border p-2 rounded">
+                <div>
+                  <div className="text-xs text-gray-500">QT No</div>
+                  <div className="font-semibold">{quotationData.qt_number}</div>
+                </div>
+                <div className="text-xs font-medium">
+                  {isGST ? "GST Included" : "GST Extra"}
+                </div>
+              </div>
+
+              {/* Items */}
+              <table className="w-full text-xs border">
+                <thead className="bg-gray-100 dark:bg-gray-800">
+                  <tr>
+                    <th className="px-2 py-1 text-left">Model</th>
+                    <th className="px-2 py-1 text-right">Qty</th>
+                    <th className="px-2 py-1 text-right">Rate</th>
+                    <th className="px-2 py-1 text-right">Amt</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {quotationData.items?.flatMap((kit: QuotationKit) =>
+                    kit.items?.map((item: QuotationItem, idx: number) => (
+                      <tr key={idx} className="border-t">
+                        <td className="px-2 py-1">
+                          <div className="font-medium">{item.model}</div>
+                          <div className="text-[10px] text-gray-500">{item.brand_name}</div>
+                        </td>
+                        <td className="px-2 py-1 text-right">{item.qty}</td>
+                        <td className="px-2 py-1 text-right">
+                          ₹{Number(item.price / (parseInt(String(item.qty)) || 1)).toLocaleString('en-IN')}
+                        </td>
+                        <td className="px-2 py-1 text-right font-medium">
+                          ₹{Number(item.price).toLocaleString('en-IN')}
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+
+              {/* Summary */}
+              <div className="border rounded p-2 space-y-1 text-xs">
+                <div className="flex justify-between">
+                  <span>Subtotal</span>
+                  <span>₹{subtotal.toLocaleString('en-IN')}</span>
+                </div>
+
+                {additionalPrices.map((add: { add_price_name: string; price: number }, i: number) => (
+                  <div key={i} className="flex justify-between">
+                    <span>{add.add_price_name}</span>
+                    <span>₹{Number(add.price).toLocaleString('en-IN')}</span>
+                  </div>
+                ))}
+
+                {!isGST && gstAmount > 0 && (
+                  <div className="flex justify-between">
+                    <span>GST 18%</span>
+                    <span>₹{gstAmount.toLocaleString('en-IN')}</span>
+                  </div>
+                )}
+
+                <div className="flex justify-between font-semibold border-t pt-1 mt-1">
+                  <span>Total</span>
+                  <span>₹{projectTotal.toLocaleString('en-IN')}</span>
+                </div>
+              </div>
+
+              {/* Terms */}
+              {quotationData.acoustic_terms && (
+                <div className="border rounded p-2 text-xs">
+                  <div className="font-medium mb-1">Terms</div>
+                  <div className="text-gray-600 dark:text-gray-300">
+                    {quotationData.acoustic_terms}
+                  </div>
+                </div>
+              )}
+            </>
+          )}
+        </div>
+
+        {/* Footer */}
+        <div className="flex justify-end border-t px-4 py-2">
+          <button
+            onClick={onClose}
+            className="px-4 py-1.5 bg-indigo-600 text-white rounded text-sm"
+          >
+            Close
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// ============================================
+// CHECKLIST VIEW MODAL
+// ============================================
+
+interface ChecklistViewModalProps {
+  lead: Lead | null;
+  items: Checklist[];
+  selectedItems: number[];
+  onClose: () => void;
+}
+
+const ChecklistViewModal: React.FC<ChecklistViewModalProps> = ({ 
+  lead, 
+  items, 
+  selectedItems, 
+  onClose 
+}) => {
+  if (!lead) return null;
+
+  // Filter to show only selected items
+  const getSelectedItemsWithDetails = (): Array<ChecklistItem & { checklist_name: string }> => {
+    const result: Array<ChecklistItem & { checklist_name: string }> = [];
+    
+    items.forEach(checklist => {
+      checklist.items.forEach(item => {
+        if (selectedItems.includes(item.item_id)) {
+          result.push({
+            ...item,
+            checklist_name: checklist.checklist_name
+          });
+        }
+      });
+    });
+    
+    return result;
+  };
+
+  const selectedItemsWithDetails = getSelectedItemsWithDetails();
+
+  return (
+    <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-[9999] p-4">
+      <div className="bg-white dark:bg-boxdark rounded-xl shadow-xl w-full max-w-2xl max-h-[90vh] overflow-hidden">
+        
+        {/* Header */}
+        <div className="flex justify-between items-center px-4 py-3 border-b dark:border-gray-700 bg-gradient-to-r from-blue-50 to-indigo-50">
+          <div>
+            <h2 className="text-lg font-semibold dark:text-white flex items-center gap-2">
+              <FontAwesomeIcon icon={faEye} className="text-blue-500" />
+              Selected Checklist Items
+            </h2>
+            <p className="text-sm text-gray-500">
+              {lead.name} • #{lead.master_id}
+            </p>
+          </div>
+          <button 
+            onClick={onClose} 
+            className="text-xl px-2 hover:bg-gray-200 rounded-lg p-1"
+          >
+            ×
+          </button>
+        </div>
+
+        {/* Body */}
+        <div className="p-4 overflow-y-auto max-h-[60vh]">
+          {selectedItemsWithDetails.length === 0 ? (
+            <div className="text-center py-12 text-gray-500">
+              <FontAwesomeIcon icon={faEye} className="h-12 w-12 mx-auto mb-4 opacity-30" />
+              <p className="text-lg">No items selected</p>
+              <p className="text-sm">This lead has no checklist items</p>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              {/* Group by checklist */}
+              {items.map(checklist => {
+                const checklistSelectedItems = checklist.items.filter(
+                  item => selectedItems.includes(item.item_id)
+                );
+                
+                if (checklistSelectedItems.length === 0) return null;
+                
+                return (
+                  <div key={checklist.checklist_id} className="border rounded-lg p-4">
+                    <h3 className="font-semibold text-indigo-600 mb-3 flex items-center gap-2">
+                      <span className="w-2 h-2 bg-indigo-600 rounded-full"></span>
+                      {checklist.checklist_name}
+                      <span className="text-xs bg-indigo-100 text-indigo-700 px-2 py-1 rounded-full ml-2">
+                        {checklistSelectedItems.length} selected
+                      </span>
+                    </h3>
+                    
+                    <div className="space-y-2">
+                      {checklistSelectedItems.map(item => (
+                        <div 
+                          key={item.item_id} 
+                          className="flex items-center gap-2 p-2 bg-green-50 dark:bg-green-900/20 rounded-lg border border-green-200"
+                        >
+                          <FontAwesomeIcon icon={faCheckCircle} className="h-4 w-4 text-green-500" />
+                          <span className="text-sm">{item.item_name}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                );
+              })}
+              
+              {/* Summary */}
+              <div className="mt-4 p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
+                <div className="flex justify-between items-center">
+                  <span className="font-medium">Total Selected Items:</span>
+                  <span className="text-lg font-bold text-blue-600">
+                    {selectedItemsWithDetails.length}
+                  </span>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Footer */}
+        <div className="flex justify-end px-4 py-3 border-t">
+          <button
+            onClick={onClose}
+            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+          >
+            Close
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// ============================================
+// ACTION BUTTON
+// ============================================
+
+interface ActionButtonProps {
+  onViewQuotation: () => void;
+  onViewChecklist: () => void;
+  viewCount?: number;
   className?: string;
+}
+
+const ActionButton: React.FC<ActionButtonProps> = ({ 
+  onViewQuotation,
+  onViewChecklist,
+  viewCount = 0,
+  className = ""
 }) => {
   return (
     <div className={`flex items-center gap-1 ${className}`}>
-      {/* PLAY BUTTON */}
+      {/* VIEW QUOTATION BUTTON */}
       <button
-        onClick={onPlay}
-        className="p-1.5 bg-green-500 hover:bg-green-600 text-white rounded-lg transition-all duration-200 shadow-sm hover:shadow-md"
-        title="Show ID"
+        onClick={onViewQuotation}
+        className="p-1.5 bg-purple-500 hover:bg-purple-600 text-white rounded-lg transition-all duration-200 shadow-sm hover:shadow-md"
+        title="View Quotation"
       >
-        <FontAwesomeIcon icon={faPlay} className="h-3.5 w-3.5" />
+        <FontAwesomeIcon icon={faFileText} className="h-3.5 w-3.5" />
+      </button>
+
+      {/* VIEW CHECKLIST BUTTON */}
+      <button
+        onClick={onViewChecklist}
+        className="p-1.5 bg-blue-500 hover:bg-blue-600 text-white rounded-lg transition-all duration-200 shadow-sm hover:shadow-md relative"
+        title="View Selected Checklist Items"
+      >
+        <FontAwesomeIcon icon={faEye} className="h-3.5 w-3.5" />
+        {viewCount > 0 && (
+          <span className="absolute -top-1 -right-1 bg-red-500 text-white text-[8px] font-bold rounded-full h-3.5 w-3.5 flex items-center justify-center">
+            {viewCount}
+          </span>
+        )}
       </button>
     </div>
   );
 };
 
-// Pagination Component
-const Pagination: React.FC<{
+// ============================================
+// PAGINATION COMPONENT
+// ============================================
+
+interface PaginationProps {
   currentPage: number;
   totalPages: number;
   onPageChange: (page: number) => void;
@@ -57,7 +535,9 @@ const Pagination: React.FC<{
   itemsPerPage: number;
   showingStart: number;
   showingEnd: number;
-}> = ({
+}
+
+const Pagination: React.FC<PaginationProps> = ({
   currentPage,
   totalPages,
   onPageChange,
@@ -66,10 +546,10 @@ const Pagination: React.FC<{
   showingStart,
   showingEnd,
 }) => {
-  const getPageNumbers = () => {
+  const getPageNumbers = (): (number | string)[] => {
     const delta = 2;
-    const range = [];
-    const rangeWithDots = [];
+    const range: number[] = [];
+    const rangeWithDots: (number | string)[] = [];
 
     for (
       let i = Math.max(2, currentPage - delta);
@@ -202,8 +682,16 @@ const Pagination: React.FC<{
   );
 };
 
-// ID Display Modal Component
-const IdDisplayModal = ({ lead, onClose }: { lead: any; onClose: () => void }) => {
+// ============================================
+// ID DISPLAY MODAL
+// ============================================
+
+interface IdDisplayModalProps {
+  lead: Lead | null;
+  onClose: () => void;
+}
+
+const IdDisplayModal: React.FC<IdDisplayModalProps> = ({ lead, onClose }) => {
   if (!lead) return null;
 
   return (
@@ -258,11 +746,19 @@ const IdDisplayModal = ({ lead, onClose }: { lead: any; onClose: () => void }) =
   );
 };
 
-// CLIENT DETAILS MODAL - Copied from your reference code
-const ClientDetailsModal = ({ lead, onClose }) => {
+// ============================================
+// CLIENT DETAILS MODAL
+// ============================================
+
+interface ClientDetailsModalProps {
+  lead: Lead | null;
+  onClose: () => void;
+}
+
+const ClientDetailsModal: React.FC<ClientDetailsModalProps> = ({ lead, onClose }) => {
   if (!lead) return null;
 
-  const formatDate = (dateString) => {
+  const formatDate = (dateString?: string): string => {
     if (!dateString) return '—';
     try {
       return new Date(dateString).toLocaleDateString('en-GB', {
@@ -275,15 +771,16 @@ const ClientDetailsModal = ({ lead, onClose }) => {
     }
   };
 
-  const formatValue = (value) => {
+  const formatValue = (value?: string | number): string => {
     if (!value || value === '' || value === 'Not Available' || value === 'N/A') {
       return 'N/A';
     }
-    return value;
+    return String(value);
   };
 
-  const hasField = (fieldName) => {
-    return lead[fieldName] && lead[fieldName] !== '' && lead[fieldName] !== 'Not Available';
+  const hasField = (fieldName: keyof Lead): boolean => {
+    const value = lead[fieldName];
+    return !!value && value !== '' && value !== 'Not Available';
   };
 
   return (
@@ -303,7 +800,6 @@ const ClientDetailsModal = ({ lead, onClose }) => {
                   <h2 className="text-xl font-bold text-black dark:text-white truncate">
                     {formatValue(lead.name)}
                   </h2>
-               
                 </div>
               </div>
             </div>
@@ -658,10 +1154,13 @@ const ClientDetailsModal = ({ lead, onClose }) => {
   );
 };
 
-// Main ExecutionCompleted Component
-const ExecutionCompleted = () => {
-  const [leads, setLeads] = useState([]);
-  const [filteredLeads, setFilteredLeads] = useState([]);
+// ============================================
+// MAIN EXECUTION COMPLETED COMPONENT
+// ============================================
+
+const ExecutionCompleted: React.FC = () => {
+  const [leads, setLeads] = useState<Lead[]>([]);
+  const [filteredLeads, setFilteredLeads] = useState<Lead[]>([]);
   const [loading, setLoading] = useState(true);
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(10);
@@ -671,11 +1170,25 @@ const ExecutionCompleted = () => {
   
   // Modal states
   const [showIdModal, setShowIdModal] = useState(false);
-  const [selectedIdLead, setSelectedIdLead] = useState(null);
+  const [selectedIdLead, setSelectedIdLead] = useState<Lead | null>(null);
   
   // Client details modal state
   const [showClientDetailsModal, setShowClientDetailsModal] = useState(false);
-  const [selectedClientDetails, setSelectedClientDetails] = useState(null);
+  const [selectedClientDetails, setSelectedClientDetails] = useState<Lead | null>(null);
+  
+  // Quotation modal state
+  const [showQuotationModal, setShowQuotationModal] = useState(false);
+  const [selectedQuotationLead, setSelectedQuotationLead] = useState<Lead | null>(null);
+  
+  // Checklist modal states
+  const [showChecklistViewModal, setShowChecklistViewModal] = useState(false);
+  const [selectedChecklistLead, setSelectedChecklistLead] = useState<Lead | null>(null);
+  const [checklistItems, setChecklistItems] = useState<Checklist[]>([]);
+  const [selectedItems, setSelectedItems] = useState<number[]>([]);
+  const [loadingChecklist, setLoadingChecklist] = useState(false);
+  
+  // Item counts for checklist badge
+  const [itemCounts, setItemCounts] = useState<Record<number, number>>({});
   
   // Filter states
   const [showExecutionStartCalendar, setShowExecutionStartCalendar] = useState(false);
@@ -686,9 +1199,9 @@ const ExecutionCompleted = () => {
   const [selectedExecutionStartToDate, setSelectedExecutionStartToDate] = useState('');
   const [selectedExecutionEndFromDate, setSelectedExecutionEndFromDate] = useState('');
   const [selectedExecutionEndToDate, setSelectedExecutionEndToDate] = useState('');
-  const [selectedCities, setSelectedCities] = useState([]);
+  const [selectedCities, setSelectedCities] = useState<string[]>([]);
   
-  const [availableCities, setAvailableCities] = useState([]);
+  const [availableCities, setAvailableCities] = useState<string[]>([]);
   const [customRecordCount, setCustomRecordCount] = useState<number | ''>('');
   
   // Refs
@@ -696,11 +1209,30 @@ const ExecutionCompleted = () => {
   const executionEndRef = useRef<HTMLDivElement>(null);
   const cityFilterRef = useRef<HTMLDivElement>(null);
 
+  // Fetch item counts for all leads
+  const fetchItemCounts = async (leadsData: Lead[]) => {
+    try {
+      const counts: Record<number, number> = {};
+      for (const lead of leadsData) {
+        const response = await axios.get<ChecklistResponse>(
+          `${BASE_URL}api/execution/get-checklist/${lead.master_id}`,
+          { withCredentials: true }
+        );
+        if (response.data.success) {
+          counts[lead.master_id] = response.data.selected_items.length;
+        }
+      }
+      setItemCounts(counts);
+    } catch (error) {
+      console.error("Error fetching item counts:", error);
+    }
+  };
+
   // Fetch completed execution leads
   const fetchCompletedExecutionLeads = async () => {
     try {
       setLoading(true);
-      const response = await axios.get(
+      const response = await axios.get<ApiResponse>(
         `${BASE_URL}api/complete/closed-leads`,
         {
           params: {
@@ -721,10 +1253,15 @@ const ExecutionCompleted = () => {
         // Extract unique cities
         const cities = leadsData
           .map(lead => lead.city?.trim())
-          .filter(city => city && city !== '' && city !== 'Not Available' && city !== 'N/A')
+          .filter((city): city is string => 
+            !!city && city !== '' && city !== 'Not Available' && city !== 'N/A'
+          )
           .filter((city, index, self) => self.indexOf(city) === index)
-          .sort() as string[];
+          .sort();
         setAvailableCities(cities);
+        
+        // Fetch item counts for these leads
+        fetchItemCounts(leadsData);
       }
     } catch (error) {
       console.error('Error fetching completed execution leads:', error);
@@ -738,7 +1275,7 @@ const ExecutionCompleted = () => {
   };
 
   // Format date function
-  const formatDate = (dateString) => {
+  const formatDate = (dateString?: string): string => {
     if (!dateString) return '—';
     try {
       return new Date(dateString).toLocaleDateString('en-GB', {
@@ -752,15 +1289,57 @@ const ExecutionCompleted = () => {
   };
 
   // Handle play button click - show ID modal
-  const handlePlayClick = (lead) => {
+  const handlePlayClick = (lead: Lead) => {
     setSelectedIdLead(lead);
     setShowIdModal(true);
   };
 
   // Handle client name click - show details modal
-  const handleClientNameClick = (lead) => {
+  const handleClientNameClick = (lead: Lead) => {
     setSelectedClientDetails(lead);
     setShowClientDetailsModal(true);
+  };
+
+  // Handle View Quotation
+  const handleViewQuotation = (lead: Lead) => {
+    setSelectedQuotationLead(lead);
+    setShowQuotationModal(true);
+  };
+
+  // Handle View Checklist (shows only selected items)
+  const handleViewChecklist = async (lead: Lead) => {
+    try {
+      setLoadingChecklist(true);
+      setSelectedChecklistLead(lead);
+      
+      const response = await axios.get<ChecklistResponse>(
+        `${BASE_URL}api/execution/get-checklist/${lead.master_id}`,
+        { withCredentials: true }
+      );
+      
+      if (response.data.success) {
+        setSelectedItems(response.data.selected_items || []);
+        
+        // Fetch all checklists to show item names
+        const checklistRes = await axios.get<{ success: boolean; data: Checklist[] }>(
+          `${BASE_URL}api/sujit/execution-checklists`,
+          { withCredentials: true }
+        );
+        
+        if (checklistRes.data.success) {
+          setChecklistItems(checklistRes.data.data);
+        }
+        
+        setShowChecklistViewModal(true);
+      } else {
+        alert("Failed to load checklist: " + (response.data.error || "Unknown error"));
+      }
+    } catch (error) {
+      console.error("Error fetching checklist:", error);
+      alert("Failed to load checklist: " + ((error as any).response?.data?.error || (error as Error).message));
+    } finally {
+      setLoadingChecklist(false);
+    }
   };
 
   // Apply filters
@@ -940,7 +1519,7 @@ const ExecutionCompleted = () => {
     setItemsPerPage(10);
   };
 
-  const handlePageChange = (page) => {
+  const handlePageChange = (page: number) => {
     if (page >= 1 && page <= totalPages && page !== currentPage) {
       setCurrentPage(page);
     }
@@ -1016,7 +1595,7 @@ const ExecutionCompleted = () => {
 
               {/* Refresh Button */}
               <button
-                onClick={fetchCompletedExecutionLeads}
+                onClick={() => fetchCompletedExecutionLeads()}
                 className="px-4 py-2 bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 text-white rounded-lg font-medium transition-all shadow-md hover:shadow-lg flex items-center gap-2 whitespace-nowrap"
               >
                 <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1379,7 +1958,12 @@ const ExecutionCompleted = () => {
                     </div>
                   </th>
                   
-                
+                  {/* Action Column */}
+                  <th className="py-3 px-4">
+                    <div className="text-xs font-extrabold uppercase tracking-wider text-gray-700 dark:text-gray-300">
+                      Action
+                    </div>
+                  </th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-200 dark:divide-gray-800">
@@ -1395,7 +1979,6 @@ const ExecutionCompleted = () => {
                 ) : (
                   filteredLeads.map((lead) => (
                     <tr key={lead.master_id} className="hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors">
-                     
                       {/* Execution Start Date */}
                       <td className="py-4 px-4">
                         <div className="font-semibold text-sm bg-gradient-to-r from-blue-50 to-blue-100 dark:from-blue-900/20 dark:to-blue-800/10 text-blue-800 dark:text-blue-300 px-3 py-1.5 rounded-lg border border-blue-100 dark:border-blue-800/30 shadow-sm">
@@ -1419,7 +2002,6 @@ const ExecutionCompleted = () => {
                           <div className="text-sm font-bold text-gray-900 dark:text-gray-100 group-hover:text-green-600 dark:group-hover:text-green-400 transition-colors duration-200">
                             {lead.name || 'N/A'}
                           </div>
-                        
                         </div>
                       </td>
 
@@ -1465,7 +2047,16 @@ const ExecutionCompleted = () => {
                         </div>
                       </td>
 
-                   
+                      {/* Action Buttons */}
+                      <td className="py-4 px-4">
+                        <div className="flex justify-center">
+                          <ActionButton
+                            onViewQuotation={() => handleViewQuotation(lead)}
+                            onViewChecklist={() => handleViewChecklist(lead)}
+                            viewCount={itemCounts[lead.master_id] || 0}
+                          />
+                        </div>
+                      </td>
                     </tr>
                   ))
                 )}
@@ -1508,6 +2099,42 @@ const ExecutionCompleted = () => {
             setSelectedClientDetails(null);
           }}
         />
+      )}
+
+      {/* Quotation View Modal */}
+      {showQuotationModal && selectedQuotationLead && (
+        <QuotationViewModal
+          show={showQuotationModal}
+          onClose={() => {
+            setShowQuotationModal(false);
+            setSelectedQuotationLead(null);
+          }}
+          master_id={selectedQuotationLead.master_id}
+          lead={selectedQuotationLead}
+        />
+      )}
+
+      {/* Checklist View Modal */}
+      {showChecklistViewModal && selectedChecklistLead && (
+        <ChecklistViewModal
+          lead={selectedChecklistLead}
+          items={checklistItems}
+          selectedItems={selectedItems}
+          onClose={() => {
+            setShowChecklistViewModal(false);
+            setSelectedChecklistLead(null);
+          }}
+        />
+      )}
+
+      {/* Loading Indicator for Checklist */}
+      {loadingChecklist && (
+        <div className="fixed inset-0 bg-black/20 flex items-center justify-center z-[9998]">
+          <div className="bg-white dark:bg-boxdark p-4 rounded-lg shadow-lg flex items-center gap-3">
+            <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-green-500"></div>
+            <span className="text-sm dark:text-white">Loading checklist...</span>
+          </div>
+        </div>
       )}
     </div>
   );

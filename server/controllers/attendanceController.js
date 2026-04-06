@@ -190,7 +190,7 @@ export const getTodayStatus1 = async (req, res) => {
 };
 
 
-export const getTodayStatus = async (req, res) => {
+export const getTodayStatus2 = async (req, res) => {
   try {
     const userId = req.session.user.id;
 
@@ -211,6 +211,94 @@ export const getTodayStatus = async (req, res) => {
     console.error(err);
     res.status(500).json({ message: "Error fetching status" });
   }
+}; 
+
+
+
+export const getTodayStatus3 = async (req, res) => {
+  try {
+    const userId = req.session.user.user_id || req.session.user.id;
+
+    const [rows] = await db.query(`
+      SELECT * FROM attendance
+      WHERE user_id = ?
+      AND attendance_date = CURDATE()
+      LIMIT 1
+    `, [userId]);
+
+    if (rows.length > 0) {
+      return res.json({ checkedIn: true });
+    } else {
+      return res.json({ checkedIn: false });
+    }
+
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: "Error fetching status" });
+  }
+};
+
+
+export const getTodayStatus4 = async (req, res) => {
+  try {
+    // ✅ ADD THIS CHECK (MUST)
+    if (!req.session?.user) {
+      return res.status(401).json({ message: "Unauthorized" });
+    }
+
+    const userId = req.session.user.user_id || req.session.user.id;
+
+    if (!userId) {
+      return res.status(400).json({ message: "User ID missing" });
+    }
+
+    const [rows] = await db.query(`
+      SELECT * FROM attendance
+      WHERE user_id = ?
+      AND attendance_date = CURDATE()
+      LIMIT 1
+    `, [userId]);
+
+    if (rows.length > 0) {
+      return res.json({ checkedIn: true });
+    } else {
+      return res.json({ checkedIn: false });
+    }
+
+  } catch (err) {
+    console.error("STATUS ERROR:", err);
+    res.status(500).json({ message: "Error fetching status" });
+  }
+};
+
+export const getTodayStatus = async (req, res) => {
+  try {
+    // ✅ ADD THIS (IMPORTANT)
+    if (!req.session?.user) {
+      return res.status(401).json({ message: 'Unauthorized' });
+    }
+
+    const userId = req.session.user.user_id || req.session.user.id;
+
+    if (!userId) {
+      return res.status(400).json({ message: 'User id missing' });
+    }
+
+    const [rows] = await db.query(`
+      SELECT * FROM attendance
+      WHERE user_id = ?
+      AND attendance_date = CURDATE()
+      LIMIT 1
+    `, [userId]);
+
+    return res.json({
+      checkedIn: rows.length > 0
+    });
+
+  } catch (err) {
+    console.error("❌ getTodayStatus ERROR:", err);
+    res.status(500).json({ message: "Error fetching status" });
+  }
 };
 
 
@@ -221,6 +309,11 @@ const TELECALLER_ROLES = [
   'tech_sale_sound_engineer',
   'junior_autocad_designer',
   'senior_autocad_designer',
+    'av_engineer',
+  'acoustic_engineer',
+  'acoustic_designer',
+  'hr_executive',
+  
 ];
 
 const ADMIN_ROLES = ['admin', 'sub_admin'];

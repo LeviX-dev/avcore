@@ -289,6 +289,36 @@ const EmployeeDetailedReport = () => {
           <div className="p-12 text-center text-gray-500">Loading...</div>
         ) : (
           <>
+            {/* Pagination on Top */}
+            {filteredData.length > 0 && totalPages > 1 && (
+              <div className="px-3 py-3 border-b border-gray-200 bg-gray-50">
+                <div className="flex items-center justify-between text-sm">
+                  <span className="text-gray-600">
+                    Showing {((currentPage - 1) * PAGE_SIZE) + 1} to {Math.min(currentPage * PAGE_SIZE, filteredData.length)} of {filteredData.length}
+                  </span>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                      disabled={currentPage === 1}
+                      className="p-1 rounded border border-gray-200 bg-white hover:bg-gray-100 disabled:opacity-40 disabled:hover:bg-white"
+                    >
+                      <FiChevronLeft size={16} />
+                    </button>
+                    <span className="px-3 py-1 rounded border border-gray-200 bg-white">
+                      Page {currentPage} of {totalPages}
+                    </span>
+                    <button
+                      onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                      disabled={currentPage === totalPages}
+                      className="p-1 rounded border border-gray-200 bg-white hover:bg-gray-100 disabled:opacity-40 disabled:hover:bg-white"
+                    >
+                      <FiChevronRight size={16} />
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
+            
             <table className="w-full text-sm">
               <thead>
                 <tr className="bg-gray-50 border-b border-gray-200">
@@ -380,8 +410,8 @@ const EmployeeDetailedReport = () => {
                             </div>
                           );
                         })()}
-                      </td>
-                    </tr>
+                       </td>
+                     </tr>
                   ))
                 ) : (
                   <tr>
@@ -393,7 +423,7 @@ const EmployeeDetailedReport = () => {
               </tbody>
             </table>
 
-            {/* Pagination */}
+            {/* Pagination on Bottom */}
             {filteredData.length > 0 && totalPages > 1 && (
               <div className="px-3 py-3 border-t border-gray-200 bg-gray-50">
                 <div className="flex items-center justify-between text-sm">

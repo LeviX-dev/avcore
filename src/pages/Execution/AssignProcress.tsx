@@ -445,6 +445,9 @@ const LogsModal = ({
   const [editingDocument, setEditingDocument] = useState<DocumentLog | null>(null);
   const [managerStatus, setManagerStatus] = useState<string>('');
   const [managerRemark, setManagerRemark] = useState('');
+  const [startDate, setStartDate] = useState('');
+const [startTime, setStartTime] = useState('');
+const [endTime, setEndTime] = useState('');
   
   // State for process status update modal
   const [showStatusUpdateModal, setShowStatusUpdateModal] = useState(false);
@@ -813,6 +816,7 @@ const LogsModal = ({
 };
 
 // Upload Modal
+// Upload Modal - Fixed Version
 const UploadModal = ({ 
   process, 
   onClose,
@@ -829,6 +833,18 @@ const UploadModal = ({
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [imageViewer, setImageViewer] = useState<UploadedImage | null>(null);
   const [loading, setLoading] = useState(false);
+  
+// ✅ FIX: Properly initialize these state variables
+const [startDate, setStartDate] = useState<string>(
+  new Date().toISOString().split('T')[0]
+);
+const [startTime, setStartTime] = useState<string>('');
+const [endTime, setEndTime] = useState<string>('');
+
+  const getTodayDate = () => {
+  const today = new Date();
+  return today.toISOString().split('T')[0]; // YYYY-MM-DD
+};
 
   useEffect(() => {
     if (process?.execution_id && process?.process_id) {
@@ -880,12 +896,33 @@ const UploadModal = ({
       return;
     }
 
+    if (!selectedFiles.length) {
+      alert("Please select files");
+      return;
+    }
+
+    // ✅ Validation for start/end times
+    if (startTime && endTime && startTime > endTime) {
+      alert("End time must be greater than start time");
+      return;
+    }
+
     try {
       setUploading(true);
+
       const formData = new FormData();
+
+      // Files
       selectedFiles.forEach(f => formData.append("files", f));
+
+      // Existing fields
       formData.append("remark", newRemark || "");
       formData.append("lead_id", String(process.lead_id));
+
+      // ✅ NEW FIELDS - only append if they have values
+      if (startDate) formData.append("start_date", startDate);
+      if (startTime) formData.append("start_time", startTime);
+      if (endTime) formData.append("end_time", endTime);
 
       await axios.post(
         `${BASE_URL}api/daily-execution/upload/${process.execution_id}/${process.process_id}`,
@@ -893,11 +930,17 @@ const UploadModal = ({
         { withCredentials: true }
       );
 
+      // ✅ Reset all form fields
       await fetchImages();
       setSelectedFiles([]);
       setImagePreview(null);
       setNewRemark("");
+setStartDate(getTodayDate()); // ✅ reset to today's date
+      setStartTime("");
+      setEndTime("");
+
       onUploadComplete();
+
     } catch (err) {
       console.error(err);
       alert("Failed to upload");
@@ -905,7 +948,7 @@ const UploadModal = ({
       setUploading(false);
     }
   };
-
+  
   const handleDeleteImage = async (imageId: number) => {
     if (!confirm("Are you sure you want to delete this image?")) return;
     try {
@@ -921,7 +964,7 @@ const UploadModal = ({
 
   if (!process) return null;
 
-  return (
+ return (
     <>
       <div className="fixed inset-0 bg-black/60 flex items-start justify-center z-50 pt-24">
         <div className="bg-white dark:bg-boxdark w-full max-w-2xl rounded-lg shadow-lg">
@@ -944,7 +987,7 @@ const UploadModal = ({
           </div>
 
           {/* Body */}
-          <div className="px-3 py-2 space-y-3 max-h-[70vh] overflow-y-auto">
+          <div className="px-3 py-2 space-y-3 max-h-[55vh] overflow-y-auto">
             {/* Status */}
             <div className="flex items-center gap-1">
               <span className="text-xs font-medium text-gray-600 dark:text-gray-400">Status:</span>
@@ -1004,13 +1047,13 @@ const UploadModal = ({
               </div>
             </div>
 
-            {/* Selected Files Preview */}
+            {/* Selected Files Preview with Scrollbar */}
             {selectedFiles.length > 0 && (
               <div>
                 <p className="text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
                   Selected ({selectedFiles.length})
                 </p>
-                <div className="grid grid-cols-4 gap-1">
+                <div className="grid grid-cols-4 gap-1 max-h-40 overflow-y-auto p-1 border border-gray-200 dark:border-gray-700 rounded">
                   {selectedFiles.map((file, index) => (
                     <div key={index} className="relative group">
                       {file.type.startsWith('image/') ? (
@@ -1036,13 +1079,13 @@ const UploadModal = ({
               </div>
             )}
 
-            {/* Uploaded Images */}
+            {/* Uploaded Images with Scrollbar */}
             {uploadedImages.length > 0 && (
               <div>
                 <p className="text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
                   Uploaded ({uploadedImages.length})
                 </p>
-                <div className="grid grid-cols-4 gap-1">
+                <div className="grid grid-cols-4 gap-1 max-h-40 overflow-y-auto p-1 border border-gray-200 dark:border-gray-700 rounded">
                   {uploadedImages.map(img => (
                     <div key={img.id} className="relative group">
                       <img
@@ -1051,7 +1094,12 @@ const UploadModal = ({
                         className="h-16 w-full object-cover rounded cursor-pointer border"
                         onClick={() => setImageViewer(img)}
                       />
-                     
+                      <button
+                        onClick={() => handleDeleteImage(img.id)}
+                        className="absolute top-0 right-0 bg-red-500 text-white p-0.5 rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
+                      >
+                        <FaTrash className="h-2.5 w-2.5" />
+                      </button>
                     </div>
                   ))}
                 </div>
@@ -1059,7 +1107,37 @@ const UploadModal = ({
             )}
           </div>
 
-          {/* Footer */}
+       {/* Date/Time Inputs */}
+<div className="grid grid-cols-1 md:grid-cols-3 gap-2 p-3 border-t border-gray-200 dark:border-gray-700">
+  {/* Start Date */}
+  <input
+    type="date"
+    value={startDate}
+    onChange={(e) => setStartDate(e.target.value)}
+    className="w-full p-2 text-xs border border-gray-300 dark:border-gray-700 rounded focus:ring-1 focus:ring-indigo-500 dark:bg-gray-800 dark:text-white"
+    placeholder="Start Date"
+  />
+
+  {/* Start Time */}
+  <input
+    type="time"
+    value={startTime}
+    onChange={(e) => setStartTime(e.target.value)}
+    className="w-full p-2 text-xs border border-gray-300 dark:border-gray-700 rounded focus:ring-1 focus:ring-indigo-500 dark:bg-gray-800 dark:text-white"
+    placeholder="Start Time"
+  />
+
+  {/* End Time */}
+  <input
+    type="time"
+    value={endTime}
+    onChange={(e) => setEndTime(e.target.value)}
+    className="w-full p-2 text-xs border border-gray-300 dark:border-gray-700 rounded focus:ring-1 focus:ring-indigo-500 dark:bg-gray-800 dark:text-white"
+    placeholder="End Time"
+  />
+</div>
+
+          {/* Footer - Save button hidden when more than one image is uploaded */}
           <div className="flex justify-end gap-2 border-t px-3 py-2">
             <button
               onClick={onClose}
@@ -1067,23 +1145,25 @@ const UploadModal = ({
             >
               Cancel
             </button>
-            <button
-              onClick={handleUpload}
-              disabled={uploading || (selectedFiles.length === 0 && !newRemark)}
-              className="px-3 py-1 text-xs bg-green-600 text-white rounded hover:bg-green-700 disabled:bg-gray-400 disabled:cursor-not-allowed flex items-center gap-1"
-            >
-              {uploading ? (
-                <>
-                  <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-white"></div>
-                  <span>Saving...</span>
-                </>
-              ) : (
-                <>
-                  <FaUpload className="h-3 w-3" />
-                  <span>Save</span>
-                </>
-              )}
-            </button>
+            {(!uploadedImages || uploadedImages.length <= 1) && (
+              <button
+                onClick={handleUpload}
+                disabled={uploading || (selectedFiles.length === 0 && !newRemark)}
+                className="px-3 py-1 text-xs bg-green-600 text-white rounded hover:bg-green-700 disabled:bg-gray-400 disabled:cursor-not-allowed flex items-center gap-1"
+              >
+                {uploading ? (
+                  <>
+                    <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-white"></div>
+                    <span>Saving...</span>
+                  </>
+                ) : (
+                  <>
+                    <FaUpload className="h-3 w-3" />
+                    <span>Save</span>
+                  </>
+                )}
+              </button>
+            )}
           </div>
         </div>
       </div>

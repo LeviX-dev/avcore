@@ -69,7 +69,11 @@ import {
   faMinus,
   faFileText,
   faImage,
-  faSave
+  faSave,
+  faEllipsisH,
+  faBars,
+  faEllipsisV,
+  faList
 } from '@fortawesome/free-solid-svg-icons';
 import { BASE_URL } from '../../../public/config.js';
 import StartExecutionModal from "./StartExecutionModal";
@@ -123,41 +127,43 @@ interface LogsData {
 }
 
 
+// Update ActionButton component definition
 const ActionButton = ({ 
   onView, 
   onEdit,
+  onEditExecution,  // NEW
   onSettings,
   onLogs,
   onViewQuotation,
-  viewCount = 0,  // Add this prop
+  viewCount = 0,
   title = "Actions",
   className = ""
-}: { 
-  onView: () => void; 
-  onEdit: () => void;
-  onSettings: () => void;
-  onLogs: () => void; 
-  onViewQuotation: () => void;
-  viewCount?: number;  // Add this
-  title?: string; 
-  className?: string;
 }) => {
   return (
     <div className={`flex items-center gap-1 ${className}`}>
       
+      {/* EDIT EXECUTION BUTTON - NEW */}
+      <button
+        onClick={onEditExecution}
+        className="p-1.5 bg-yellow-500 hover:bg-yellow-600 text-white rounded-lg transition-all duration-200 shadow-sm hover:shadow-md"
+        title="Edit Execution"
+      >
+        <FontAwesomeIcon icon={faEdit} className="h-3.5 w-3.5" />
+      </button>
+      
       {/* VIEW QUOTATION BUTTON */}
       <button
         onClick={onViewQuotation}
-        className="p-1.5 bg-purple-500 hover:bg-purple-600 text-white rounded-lg transition-all duration-200 shadow-sm hover:shadow-md relative"
+        className="p-1.5 bg-purple-500 hover:bg-purple-600 text-white rounded-lg"
         title="View Quotation"
       >
         <FontAwesomeIcon icon={faFileText} className="h-3.5 w-3.5" />
       </button>
 
-      {/* VIEW CHECKLIST BUTTON - Shows selected items with count */}
+      {/* VIEW CHECKLIST BUTTON */}
       <button
         onClick={onView}
-        className="p-1.5 bg-blue-500 hover:bg-blue-600 text-white rounded-lg transition-all duration-200 shadow-sm hover:shadow-md relative"
+        className="p-1.5 bg-blue-500 hover:bg-blue-600 text-white rounded-lg"
         title="View Selected Checklist Items"
       >
         <FontAwesomeIcon icon={faEye} className="h-3.5 w-3.5" />
@@ -171,16 +177,16 @@ const ActionButton = ({
       {/* EDIT CHECKLIST BUTTON */}
       <button
         onClick={onEdit}
-        className="p-1.5 bg-green-500 hover:bg-green-600 text-white rounded-lg transition-all duration-200 shadow-sm hover:shadow-md"
+        className="p-1.5 bg-green-500 hover:bg-green-600 text-white rounded-lg"
         title="Edit Checklist Items"
       >
-        <FontAwesomeIcon icon={faEdit} className="h-3.5 w-3.5" />
+        <FontAwesomeIcon icon={faList} className="h-3.5 w-3.5" />
       </button>
 
       {/* SETTINGS */}
       <button
         onClick={onSettings}
-        className="p-1.5 bg-gray-500 hover:bg-gray-600 text-white rounded-lg transition-all duration-200 shadow-sm hover:shadow-md"
+        className="p-1.5 bg-gray-500 hover:bg-gray-600 text-white rounded-lg"
         title="Process Settings"
       >
         <FontAwesomeIcon icon={faCog} className="h-3.5 w-3.5" />
@@ -189,7 +195,7 @@ const ActionButton = ({
       {/* LOGS BUTTON */}
       <button
         onClick={onLogs}
-        className="p-1.5 bg-indigo-500 hover:bg-indigo-600 text-white rounded-lg transition-all duration-200 shadow-sm hover:shadow-md"
+        className="p-1.5 bg-indigo-500 hover:bg-indigo-600 text-white rounded-lg"
         title="Execution Logs"
       >
         <FontAwesomeIcon icon={faHistory} className="h-3.5 w-3.5" />
@@ -2034,6 +2040,18 @@ useEffect(() => {
   }
 }, [leads]);
 
+// In ExecutionPending.tsx, add this function with your other handlers
+
+const handleEditExecution = (lead) => {
+  console.log("Editing execution for lead:", lead.master_id);
+  console.log("Execution ID:", lead.execution_id);
+  console.log("Execution data:", lead);
+  
+  // Open the StartExecutionModal with this lead
+  setSelectedExecutionLead(lead);
+  setShowExecutionModal(true);
+};
+
 
 
 // Add these states
@@ -2095,11 +2113,17 @@ const handleEditChecklist = async (lead) => {
     setSelectedChecklistLead(lead);
     
     // Fetch all checklists
+    // const checklistRes = await axios.get(
+    //   `${BASE_URL}api/execution/checklists`,
+    //   { withCredentials: true }
+    // );
+    
     const checklistRes = await axios.get(
-      `${BASE_URL}api/execution/checklists`,
+      `${BASE_URL}api/sujit/execution-checklists`,
       { withCredentials: true }
     );
-    
+
+
     if (checklistRes.data.success) {
       setChecklistItems(checklistRes.data.data);
     }
@@ -2862,7 +2886,7 @@ const closeLogsModal = () => {
     try {
       setLoading(true);
       const response = await axios.get(
-        `${BASE_URL}api/get/closed-leads`,
+        `${BASE_URL}api/sujit/get/closed-leads`,
         {
           params: {
             page: currentPage,
@@ -3081,6 +3105,8 @@ const fetchSchedules = async () => {
 
 
 const handleStartExecution = (lead) => {
+  console.log("Starting execution for lead:", lead.master_id);
+  console.log("Lead has execution_id?", lead.execution_id);
   setSelectedExecutionLead(lead);
   setShowExecutionModal(true);
 };
@@ -3746,14 +3772,16 @@ const handleSettingsClick = (lead) => {
     <ActionButton
       onView={() => handleViewChecklist(lead)}
       onEdit={() => handleEditChecklist(lead)}
+      onEditExecution={() => handleEditExecution(lead)}  // NEW
       onSettings={() => handleSettingsClick(lead)}
       onLogs={() => handleLogsClick(lead)}
       onViewQuotation={() => handleViewQuotation(lead)}
-      viewCount={itemCounts[lead.master_id] || 0}  // ✅ per-lead count
+      viewCount={itemCounts[lead.master_id] || 0}
       className="text-xs"
     />
   </div>
 </td>
+
 
               
               
@@ -3796,20 +3824,21 @@ const handleSettingsClick = (lead) => {
 )}
 
 {showExecutionModal && (
-  <StartExecutionModal
-    show={showExecutionModal}
-    onClose={() => {
-      setShowExecutionModal(false);
-      setSelectedExecutionLead(null);
-    }}
-    lead={selectedExecutionLead}
-    schedules={schedules}
-    users={users}
-    selectedLeads={selectedExecutionLead ? [selectedExecutionLead] : []}
-    onStartExecution={handleExecutionSubmit}
 
-    executionId={selectedExecutionLead?.execution_id}   // ✅ ADD
-  />
+<StartExecutionModal
+  show={showExecutionModal}
+  onClose={() => {
+    setShowExecutionModal(false);
+    setSelectedExecutionLead(null);
+  }}
+  lead={selectedExecutionLead}
+  schedules={schedules}
+  users={users}
+  selectedLeads={selectedExecutionLead ? [selectedExecutionLead] : []}
+  onStartExecution={handleExecutionSubmit}
+  // Remove executionId prop if you don't have it - the prefill will work based on lead
+/>
+
 )}
 
 

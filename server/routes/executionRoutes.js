@@ -5,7 +5,7 @@ import { getClosedLeadsDataExe  ,getProcessesByLead, saveProcess , getProcessLog
 const router = express.Router();
 
 // Get closed leads data only
-router.get('/get/closed-leads', getClosedLeadsDataExe); 
+router.get('/sujit/get/closed-leads', getClosedLeadsDataExe); 
 
 // Get all processes for a lead
 router.get("/execution/processes/:leadId", getProcessesByLead);

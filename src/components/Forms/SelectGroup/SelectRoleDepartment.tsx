@@ -40,21 +40,27 @@ const SelectRoleDepartment: React.FC<SelectRoleDepartmentProps> = ({
   <option value="sub_admin">Business Head (Sub Admin)</option>
 
   <option value="digital_marketing">Digital Marketing</option>
-  <option value="tele_caller">tele_caller</option>
+  <option value="tele_caller">Tele Caller</option>
   <option value="field_marketing_executive">Field Marketing Executive</option>
   <option value="junior_autocad_designer">Junior AutoCAD Designer</option>
   <option value="senior_autocad_designer">Senior AutoCAD Designer</option>
   <option value="tech_sale_sound_engineer">Tech-sale Sound Engineer</option>
   <option value="technical_head">Technical Head</option>
   <option value="project_manager">Project Manager</option>
-</select>
 
+  {/* ✅ Newly Added Roles */}
+  <option value="av_engineer">AV Engineer</option>
+  <option value="acoustic_engineer">Acoustic Engineer</option>
+  <option value="acoustic_designer">Acoustic Designer</option>
+  <option value="hr_executive">HR Executive</option>  {/* ✅ Added */}
+</select>
 
     <span className="absolute top-1/2 right-4 z-30 -translate-y-1/2">
       {/* SVG Icon */}
     </span>
   </div>
 </div>
+
 
 
 

@@ -43,7 +43,7 @@ export const addExecutionType = async (req, res) => {
 /**
  ✅ Get Execution Types WITH Process Count
 */
-export const getExecutionTypes = async (req, res) => {
+export const getExecutionTypes1 = async (req, res) => {
   try {
 
     const [rows] = await db.query(`
@@ -58,6 +58,34 @@ export const getExecutionTypes = async (req, res) => {
         ON ptm.type_id = et.type_id
       GROUP BY et.type_id
       ORDER BY et.created_at DESC
+    `);
+
+    res.json(rows);
+
+  } catch (error) {
+    console.error("Get Execution Types Error:", error);
+    res.status(500).json({ error: "Server error" });
+  }
+};
+
+
+export const getExecutionTypes = async (req, res) => {
+  try {
+
+    const [rows] = await db.query(`
+      SELECT 
+        et.*,
+        u.name AS created_by_name,
+        COUNT(ptm.process_id) AS process_count
+      FROM execution_type et
+      LEFT JOIN users u 
+        ON u.user_id = et.created_by
+      LEFT JOIN process_type_mapping ptm 
+        ON ptm.type_id = et.type_id
+      GROUP BY et.type_id
+      ORDER BY 
+        (et.type_id = 1) DESC,
+        et.created_at DESC
     `);
 
     res.json(rows);
@@ -196,7 +224,7 @@ export const addProcess = async (req, res) => {
 /**
  ✅ Get Processes By Type
 */
-export const getProcessesByType = async (req, res) => {
+export const getProcessesByType1 = async (req, res) => {
   try {
 
     const { typeId } = req.params;
@@ -222,6 +250,34 @@ export const getProcessesByType = async (req, res) => {
   }
 };
 
+
+export const getProcessesByType = async (req, res) => {
+  try {
+
+    const { typeId } = req.params;
+
+    const [rows] = await db.query(`
+      SELECT 
+        pe.*,
+        u.name AS created_by_name
+      FROM process_execution pe
+      JOIN process_type_mapping ptm 
+        ON ptm.process_id = pe.process_id
+      LEFT JOIN users u 
+        ON u.user_id = pe.created_by
+      WHERE ptm.type_id = ?
+      ORDER BY 
+        (pe.process_id = 28) DESC,
+        pe.created_at DESC
+    `, [typeId]);
+
+    res.json(rows);
+
+  } catch (error) {
+    console.error("Get Processes By Type Error:", error);
+    res.status(500).json({ error: "Server error" });
+  }
+};
 
 /**
  ✅ Update Process Details
@@ -370,7 +426,7 @@ export const addChecklist = async (req,res)=>{
  }
 }
 
-export const getChecklists = async (req,res)=>{
+export const getChecklists1 = async (req,res)=>{
  try{
    const [rows] = await db.query(`
       SELECT
@@ -393,6 +449,34 @@ export const getChecklists = async (req,res)=>{
    res.status(500).json({error:"Server error"})
  }
 }
+
+
+export const getChecklists = async (req,res)=>{
+ try{
+   const [rows] = await db.query(`
+      SELECT
+         c.*,
+         u.name AS created_by_name,
+         COUNT(ci.item_id) AS item_count
+      FROM execution_checklist c
+      LEFT JOIN users u
+        ON u.user_id = c.created_by
+      LEFT JOIN checklist_items ci
+        ON ci.checklist_id = c.checklist_id
+      GROUP BY c.checklist_id
+      ORDER BY 
+        (c.checklist_id = 28) DESC,
+        c.created_at DESC
+   `)
+
+   res.json(rows)
+
+ }catch(error){
+   console.error("Get Checklist Error:",error)
+   res.status(500).json({error:"Server error"})
+ }
+}
+
 
 export const updateChecklist = async (req,res)=>{
  try{
@@ -450,7 +534,7 @@ export const addChecklistItem = async (req,res)=>{
  }
 }
 
-export const getChecklistItemsByChecklist = async (req,res)=>{
+export const getChecklistItemsByChecklist1 = async (req,res)=>{
  try{
    const {checklistId} = req.params
 
@@ -472,6 +556,34 @@ export const getChecklistItemsByChecklist = async (req,res)=>{
    res.status(500).json({error:"Server error"})
  }
 }
+
+
+export const getChecklistItemsByChecklist = async (req,res)=>{
+ try{
+   const {checklistId} = req.params
+
+   const [rows] = await db.query(`
+      SELECT
+         ci.*,
+         u.name AS created_by_name
+      FROM checklist_items ci
+      LEFT JOIN users u
+        ON u.user_id = ci.created_by
+      WHERE ci.checklist_id = ?
+      ORDER BY 
+        (ci.item_id = 1) DESC,
+        ci.created_at DESC
+   `,[checklistId])
+
+   res.json(rows)
+
+ }catch(error){
+   console.error("Get Checklist Items Error:",error)
+   res.status(500).json({error:"Server error"})
+ }
+}
+
+
 
 export const updateChecklistItem = async (req,res)=>{
  try{
@@ -554,3 +666,103 @@ export const deleteChecklistItem = async (req,res)=>{
  }
 }
 
+
+
+export const getPreExecutionChecklistsWithItems = async (req, res) => {
+  try {
+
+    const [rows] = await db.query(`
+      SELECT 
+        ec.checklist_id,
+        ec.checklist_name,
+        ci.item_id,
+        ci.item_name
+      FROM execution_checklist ec
+      LEFT JOIN checklist_items ci 
+        ON ci.checklist_id = ec.checklist_id
+      WHERE ec.checklist_type = 'pre_execution'
+        AND ec.status = 'active'
+      ORDER BY 
+        (ec.checklist_id = 1) DESC,   -- your main checklist first
+        ec.checklist_id,
+        ci.item_id
+    `);
+
+    const checklistsMap = {};
+
+    rows.forEach(row => {
+      if (!checklistsMap[row.checklist_id]) {
+        checklistsMap[row.checklist_id] = {
+          checklist_id: row.checklist_id,
+          checklist_name: row.checklist_name,
+          items: []
+        };
+      }
+
+      if (row.item_id) {
+        checklistsMap[row.checklist_id].items.push({
+          item_id: row.item_id,
+          item_name: row.item_name
+        });
+      }
+    });
+
+    res.json({
+      success: true,
+      data: Object.values(checklistsMap)
+    });
+
+  } catch (error) {
+    console.error("Get Pre Execution Checklist Error:", error);
+    res.status(500).json({ error: "Server error" });
+  }
+};
+
+export const getExecutionChecklistsWithItems = async (req, res) => {
+  try {
+
+    const [rows] = await db.query(`
+      SELECT 
+        ec.checklist_id,
+        ec.checklist_name,
+        ci.item_id,
+        ci.item_name
+      FROM execution_checklist ec
+      LEFT JOIN checklist_items ci 
+        ON ci.checklist_id = ec.checklist_id
+      WHERE ec.checklist_type = 'execution'
+        AND ec.status = 'active'
+      ORDER BY 
+        ec.checklist_id,
+        ci.item_id
+    `);
+
+    const checklistsMap = {};
+
+    rows.forEach(row => {
+      if (!checklistsMap[row.checklist_id]) {
+        checklistsMap[row.checklist_id] = {
+          checklist_id: row.checklist_id,
+          checklist_name: row.checklist_name,
+          items: []
+        };
+      }
+
+      if (row.item_id) {
+        checklistsMap[row.checklist_id].items.push({
+          item_id: row.item_id,
+          item_name: row.item_name
+        });
+      }
+    });
+
+    res.json({
+      success: true,
+      data: Object.values(checklistsMap)
+    });
+
+  } catch (error) {
+    console.error("Get Execution Checklist Error:", error);
+    res.status(500).json({ error: "Server error" });
+  }
+};

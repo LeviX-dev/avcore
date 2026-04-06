@@ -476,6 +476,8 @@ const TodaysTodoPage: React.FC = () => {
   const [references, setReferences] = useState<Reference[]>([]);
   const [area, setArea] = useState<Area[]>([]);
   
+  const [topPaginationKey, setTopPaginationKey] = useState(0);
+
   // Document upload/view states
   const [docsClient, setDocsClient] = useState<Lead | null>(null);
   const [docsData, setDocsData] = useState<DocumentData>({ 
@@ -2940,6 +2942,23 @@ const renderDocsModal = () => {
   </div>
 )}
 
+{/* ✅ TOP PAGINATION - Added here below header and filters */}
+      {!loading && totalLeads > 0 && (
+        <div className="mb-4" key={topPaginationKey}>
+          <Pagination
+            currentPage={currentPage}
+            totalPages={Math.ceil(totalLeads / itemsPerPage)}
+            onPageChange={(page) => {
+              handlePageChange(page);
+              setTopPaginationKey(prev => prev + 1);
+            }}
+            totalItems={totalLeads}
+            itemsPerPage={itemsPerPage}
+            showingStart={totalLeads === 0 ? 0 : ((currentPage - 1) * itemsPerPage) + 1}
+            showingEnd={Math.min(currentPage * itemsPerPage, totalLeads)}
+          />
+        </div>
+      )}
       {/* Loading State */}
       {loading ? (
         <div className="flex justify-center items-center h-64">
@@ -3761,20 +3780,7 @@ const renderDocsModal = () => {
 </div>
 
 
-          {/* Pagination */}
-
-{totalLeads > 0 && (
-  <Pagination
-    currentPage={currentPage}
-    totalPages={Math.ceil(totalLeads / itemsPerPage)}
-    onPageChange={handlePageChange}
-    totalItems={totalLeads}
-    itemsPerPage={itemsPerPage}
-    showingStart={totalLeads === 0 ? 0 : ((currentPage - 1) * itemsPerPage) + 1}
-    showingEnd={Math.min(currentPage * itemsPerPage, totalLeads)}
-  />
-)}
-
+        
         </>
       )}
 

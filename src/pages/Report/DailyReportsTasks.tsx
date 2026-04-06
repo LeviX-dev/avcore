@@ -366,6 +366,30 @@ const DailyReportsTasks = () => {
             <div className="text-center p-8 text-gray-500">No records found</div>
           ) : (
             <>
+              {/* Pagination on Top */}
+              {filteredLeadsData.length > 0 && (
+                <div className="px-3 py-2 border-b bg-gray-50 dark:bg-gray-700/50">
+                  <div className="flex justify-between items-center text-xs">
+                    <span className="text-gray-600 dark:text-gray-400">
+                      Showing {(currentPage-1)*itemsPerPage+1} to {Math.min(currentPage*itemsPerPage, filteredLeadsData.length)} of {filteredLeadsData.length}
+                    </span>
+                    <div className="flex gap-1">
+                      <button
+                        disabled={currentPage === 1}
+                        onClick={() => setCurrentPage(p => p - 1)}
+                        className="px-2 py-1 border rounded hover:bg-gray-100 dark:hover:bg-gray-600 disabled:opacity-40 dark:border-gray-600"
+                      >←</button>
+                      <span className="px-2 py-1 bg-blue-600 text-white rounded">{currentPage}</span>
+                      <button
+                        disabled={currentPage === totalPages}
+                        onClick={() => setCurrentPage(p => p + 1)}
+                        className="px-2 py-1 border rounded hover:bg-gray-100 dark:hover:bg-gray-600 disabled:opacity-40 dark:border-gray-600"
+                      >→</button>
+                    </div>
+                  </div>
+                </div>
+              )}
+              
               <div className="overflow-x-auto">
                 <table className="w-full text-xs">
                   <thead className="bg-gray-50 dark:bg-gray-700">
@@ -384,17 +408,17 @@ const DailyReportsTasks = () => {
                         <td className="p-2">
                           <div className="font-medium">{item.lead_name || '-'}</div>
                           <div className="text-gray-500">{item.lead_phone || '-'}</div>
-                        </td>
+                         </td>
                         <td className="p-2">{item.city || '-'}</td>
                         <td className="p-2">
                           {item.assign_date ? new Date(item.assign_date).toLocaleDateString() : '-'}
-                        </td>
+                         </td>
                         <td className="p-2">{item.employee_name}</td>
                         <td className="p-2">
                           <span className="px-2 py-1 bg-green-100 text-green-800 rounded-full text-[10px]">
                             {item.current_stage || 'N/A'}
                           </span>
-                        </td>
+                         </td>
                         <td className="p-2">
                           <button
                             onClick={() => openHistory(item.master_id)}
@@ -403,31 +427,31 @@ const DailyReportsTasks = () => {
                             <FontAwesomeIcon icon={faHistory} className="h-2 w-2" />
                          
                           </button>
-                        </td>
-                      </tr>
+                         </td>
+                       </tr>
                     ))}
                   </tbody>
                 </table>
               </div>
 
-              {/* Pagination - Like first example */}
+              {/* Pagination on Bottom */}
               {filteredLeadsData.length > 0 && (
-                <div className="px-3 py-2 border-t">
+                <div className="px-3 py-2 border-t dark:border-gray-700">
                   <div className="flex justify-between items-center text-xs">
-                    <span>
+                    <span className="text-gray-600 dark:text-gray-400">
                       Showing {(currentPage-1)*itemsPerPage+1} to {Math.min(currentPage*itemsPerPage, filteredLeadsData.length)} of {filteredLeadsData.length}
                     </span>
                     <div className="flex gap-1">
                       <button
                         disabled={currentPage === 1}
                         onClick={() => setCurrentPage(p => p - 1)}
-                        className="px-2 py-1 border rounded hover:bg-gray-100 disabled:opacity-40"
+                        className="px-2 py-1 border rounded hover:bg-gray-100 dark:hover:bg-gray-600 disabled:opacity-40 dark:border-gray-600"
                       >←</button>
                       <span className="px-2 py-1 bg-blue-600 text-white rounded">{currentPage}</span>
                       <button
                         disabled={currentPage === totalPages}
                         onClick={() => setCurrentPage(p => p + 1)}
-                        className="px-2 py-1 border rounded hover:bg-gray-100 disabled:opacity-40"
+                        className="px-2 py-1 border rounded hover:bg-gray-100 dark:hover:bg-gray-600 disabled:opacity-40 dark:border-gray-600"
                       >→</button>
                     </div>
                   </div>

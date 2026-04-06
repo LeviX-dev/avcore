@@ -8,6 +8,11 @@ const TELECALLER_ROLES = [
   'junior_autocad_designer',
   'senior_autocad_designer',
   'technical_head',
+    'av_engineer',
+  'acoustic_engineer',
+  'acoustic_designer',
+   'hr_executive',
+  
 ];
 
 const isTelecallerLike = (role) => TELECALLER_ROLES.includes(role);
@@ -152,10 +157,11 @@ export const getClosedLeadsDataExe = async (req, res) => {
 
       LEFT JOIN users u ON lr.assignedTo = u.name
 
-      LEFT JOIN execution_start es
-        ON FIND_IN_SET(rd.master_id, es.lead_ids)
+LEFT JOIN execution_start es
+  ON FIND_IN_SET(rd.master_id, es.lead_ids)
+  AND es.status = 'complete'
 
-      WHERE (rd.lead_stage = 'Closed Deal' OR lr.leadStage = 'Closed Deal')
+WHERE rd.lead_stage = 'Execution' 
 
       AND EXISTS (
         SELECT 1 

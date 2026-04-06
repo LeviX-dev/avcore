@@ -23,6 +23,11 @@ const ALLOWED_ROLES = [
   'senior_autocad_designer',
   'tech_sale_sound_engineer',
   'technical_head',
+    'av_engineer',
+  'acoustic_engineer',
+  'acoustic_designer',
+  'hr_executive',
+  
 ];
 
 
@@ -479,5 +484,277 @@ export const resetPassword = async (req, res) => {
   } catch (error) {
     console.error(error);
     res.status(500).json({ error: "Failed to reset password" });
+  }
+};
+
+
+//assets
+
+
+export const getAssetsGroupedByStatus = async (req, res) => {
+  try {
+    const query = `SELECT * FROM assets ORDER BY status`;
+    const [rows] = await db.execute(query);
+
+    const groupedData = {};
+
+    rows.forEach(asset => {
+      if (!groupedData[asset.status]) {
+        groupedData[asset.status] = [];
+      }
+      groupedData[asset.status].push(asset);
+    });
+
+    res.status(200).json({
+      success: true,
+      data: groupedData
+    });
+
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({
+      success: false,
+      message: "Internal Server Error"
+    });
+  }
+};
+
+
+export const assignAsset = async (req, res) => {
+  try {
+    const { user_id, asset_id, remark } = req.body;
+
+    if (!user_id || !asset_id) {
+      return res.status(400).json({
+        success: false,
+        message: "User ID and Asset ID are required"
+      });
+    }
+
+    // ✅ Check if user already has asset
+    const [existing] = await db.execute(
+      `SELECT * FROM asset_assignments 
+       WHERE user_id = ? AND status = 'assigned'`,
+      [user_id]
+    );
+
+    if (existing.length > 0) {
+      return res.status(400).json({
+        success: false,
+        message: "User already has an assigned asset"
+      });
+    }
+
+    // ✅ Check if asset is available
+    const [assetCheck] = await db.execute(
+      `SELECT * FROM assets WHERE asset_id = ? AND status = 'available'`,
+      [asset_id]
+    );
+
+    if (assetCheck.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: "Asset is not available"
+      });
+    }
+
+    // ✅ Insert assignment
+    await db.execute(
+      `INSERT INTO asset_assignments 
+        (user_id, asset_id, assigned_date, returned_date, remark, status)
+       VALUES (?, ?, CURDATE(), NULL, ?, 'assigned')`,
+      [user_id, asset_id, remark || null]
+    );
+
+    // ✅ Update asset
+    await db.execute(
+      `UPDATE assets SET status = 'assigned' WHERE asset_id = ?`,
+      [asset_id]
+    );
+
+    // ✅ Update user flag (IMPORTANT)
+    await db.execute(
+      `UPDATE users SET has_asset = 1 WHERE user_id = ?`,
+      [user_id]
+    );
+
+    return res.status(200).json({
+      success: true,
+      message: "Asset assigned successfully"
+    });
+
+  } catch (error) {
+    console.error(error);
+    return res.status(500).json({
+      success: false,
+      message: "Internal Server Error"
+    });
+  }
+};
+
+
+export const getUserAssignedAsset = async (req, res) => {
+  try {
+    const { user_id } = req.params;
+
+    const [rows] = await db.execute(
+      `SELECT aa.*, a.asset_name, a.serial_no
+       FROM asset_assignments aa
+       JOIN assets a ON aa.asset_id = a.asset_id
+       WHERE aa.user_id = ? AND aa.status = 'assigned'`,
+      [user_id]
+    );
+
+    if (rows.length === 0) {
+      return res.status(404).json({
+        success: false,
+        message: "No assigned asset found"
+      });
+    }
+
+    res.json({
+      success: true,
+      data: rows[0]
+    });
+
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ success: false });
+  }
+};
+
+
+export const returnAsset = async (req, res) => {
+  const connection = await db.getConnection();
+
+  try {
+    await connection.beginTransaction();
+
+    const { user_id, remark, return_date } = req.body;
+
+    if (!user_id || !return_date) {
+      return res.status(400).json({
+        success: false,
+        message: "User ID and return date required"
+      });
+    }
+
+    // ✅ Get current assignment
+    const [assigned] = await connection.execute(
+      `SELECT * FROM asset_assignments 
+       WHERE user_id = ? AND status = 'assigned'`,
+      [user_id]
+    );
+
+    if (assigned.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: "No active asset found"
+      });
+    }
+
+    const current = assigned[0];
+
+    // ✅ Insert NEW return entry (history)
+    await connection.execute(
+      `INSERT INTO asset_assignments 
+      (user_id, asset_id, returned_date, remark, status)
+      VALUES (?, ?, ?, ?, 'returned')`,
+      [
+        current.user_id,
+        current.asset_id,
+     
+        return_date,
+        remark || null
+      ]
+    );
+
+    // ✅ Update old entry
+    await connection.execute(
+      `UPDATE asset_assignments 
+       SET status = 'returned' 
+       WHERE assignment_id = ?`,
+      [current.assignment_id]
+    );
+
+    // ✅ Update asset
+    await connection.execute(
+      `UPDATE assets SET status = 'available' WHERE asset_id = ?`,
+      [current.asset_id]
+    );
+
+    // ✅ Update user
+    await connection.execute(
+      `UPDATE users SET has_asset = 0 WHERE user_id = ?`,
+      [user_id]
+    );
+
+    await connection.commit();
+
+    res.json({
+      success: true,
+      message: "Asset returned successfully"
+    });
+
+  } catch (error) {
+    await connection.rollback();
+    console.error(error);
+
+    res.status(500).json({
+      success: false,
+      message: "Internal Server Error"
+    });
+  } finally {
+    connection.release();
+  }
+};
+
+
+export const getUserAssetHistory = async (req, res) => {
+  try {
+    const { user_id } = req.params;
+
+    if (!user_id) {
+      return res.status(400).json({
+        success: false,
+        message: "User ID is required"
+      });
+    }
+
+    const [rows] = await db.execute(
+      `SELECT 
+          aa.assignment_id,
+          aa.user_id,
+          aa.asset_id,
+          aa.assigned_date,
+          aa.returned_date,
+          aa.remark,
+          aa.status,
+          aa.created_at,
+
+          a.asset_name,
+          a.asset_type,
+          a.serial_no
+
+       FROM asset_assignments aa
+       JOIN assets a ON aa.asset_id = a.asset_id
+       WHERE aa.user_id = ?
+       ORDER BY aa.created_at DESC`,
+      [user_id]
+    );
+
+    return res.status(200).json({
+      success: true,
+      count: rows.length,
+      data: rows
+    });
+
+  } catch (error) {
+    console.error("Error fetching user asset history:", error);
+
+    return res.status(500).json({
+      success: false,
+      message: "Internal Server Error"
+    });
   }
 };

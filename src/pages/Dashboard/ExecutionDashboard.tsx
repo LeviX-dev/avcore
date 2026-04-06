@@ -34,7 +34,16 @@ const ExecutionDashboard = () => {
 
   const ADMIN_AND_SUB_ADMIN_ROLES = ['admin', 'sub_admin'];
   const isAdminOrSubAdmin = ADMIN_AND_SUB_ADMIN_ROLES.includes(role);
-  const isProjectManager = role === 'project_manager';
+  // const isProjectManager = role === 'project_manager';
+
+  const DASHBOARD_ROLES = [
+  'project_manager',
+  'av_engineer',
+  'acoustic_engineer',
+  'acoustic_designer'
+];
+
+const isProjectManager = DASHBOARD_ROLES.includes(role);
 
   // Format display value
   const formatDisplayValue = (value: any): string => {

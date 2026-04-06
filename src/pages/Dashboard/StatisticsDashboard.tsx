@@ -8,7 +8,7 @@ import {
   Users, 
   MapPin
 } from 'lucide-react';
-import { BASE_URL } from '../../../public/config.js';
+import { BASE_URL } from '../../../public/config';
 
 // Display configuration
 const DISPLAY_CONFIG = {

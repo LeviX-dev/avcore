@@ -1421,6 +1421,11 @@ const TELECALLER_ROLES = [
   'junior_autocad_designer',
   'senior_autocad_designer',
   'technical_head',
+    'av_engineer',
+  'acoustic_engineer',
+  'acoustic_designer',
+   'hr_executive',
+  
 ];
 
 const ADMIN_ROLES = ['admin', 'sub_admin'];

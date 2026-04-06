@@ -480,6 +480,9 @@ const UpcomingAssignmentsPage: React.FC = () => {
   const [references, setReferences] = useState<Reference[]>([]);
   const [area, setArea] = useState<Area[]>([]);
   
+  const [topPaginationKey, setTopPaginationKey] = useState(0);
+
+
   // Document upload/view states
   const [docsClient, setDocsClient] = useState<UpcomingLead | null>(null);
   const [docsData, setDocsData] = useState<DocumentData>({ 
@@ -2691,6 +2694,26 @@ const renderDetailsModal = () => {
         </div>
       )}
 
+ {/* ✅ TOP PAGINATION - Added here below header and filters */}
+      {!loading && totalLeads > 0 && (
+        <div className="mb-4" key={topPaginationKey}>
+          <Pagination
+            currentPage={currentPage}
+            totalPages={Math.ceil(totalLeads / itemsPerPage)}
+            onPageChange={(page) => {
+              handlePageChange(page);
+              setTopPaginationKey(prev => prev + 1);
+              // Scroll to top smoothly when pagination is clicked
+              window.scrollTo({ top: 0, behavior: 'smooth' });
+            }}
+            totalItems={totalLeads}
+            itemsPerPage={itemsPerPage}
+            showingStart={((currentPage - 1) * itemsPerPage) + 1}
+            showingEnd={Math.min(currentPage * itemsPerPage, totalLeads)}
+          />
+        </div>
+      )}
+
       {/* Loading State */}
       {loading ? (
         <div className="flex justify-center items-center h-64">
@@ -3433,18 +3456,8 @@ const renderDetailsModal = () => {
             </div>
           </div>
 
-          {/* Pagination */}
-          {totalLeads > 0 && (
-            <Pagination
-              currentPage={currentPage}
-              totalPages={Math.ceil(totalLeads / itemsPerPage)}
-              onPageChange={handlePageChange}
-              totalItems={totalLeads}
-              itemsPerPage={itemsPerPage}
-              showingStart={((currentPage - 1) * itemsPerPage) + 1}
-              showingEnd={Math.min(currentPage * itemsPerPage, totalLeads)}
-            />
-          )}
+         
+
         </>
       )}
 

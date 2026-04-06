@@ -416,6 +416,30 @@ const MetaReports: React.FC = () => {
 
         {/* Table */}
         <div className="bg-white dark:bg-gray-800 rounded shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden">
+          {/* Pagination on Top */}
+          {data.length > 0 && (
+            <div className="px-3 py-2 border-b bg-gray-50 dark:bg-gray-700/50">
+              <div className="flex justify-between items-center text-xs">
+                <span className="text-gray-600 dark:text-gray-400">
+                  Showing {(page-1)*PAGE_SIZE+1} to {Math.min(page*PAGE_SIZE, totalRecords)} of {totalRecords}
+                </span>
+                <div className="flex gap-1">
+                  <button
+                    disabled={page === 1}
+                    onClick={() => setPage(p => p - 1)}
+                    className="px-2 py-1 border rounded hover:bg-gray-100 dark:hover:bg-gray-600 disabled:opacity-40 dark:border-gray-600"
+                  >←</button>
+                  <span className="px-2 py-1 dark:text-gray-300">{page}</span>
+                  <button
+                    disabled={page === totalPages}
+                    onClick={() => setPage(p => p + 1)}
+                    className="px-2 py-1 border rounded hover:bg-gray-100 dark:hover:bg-gray-600 disabled:opacity-40 dark:border-gray-600"
+                  >→</button>
+                </div>
+              </div>
+            </div>
+          )}
+          
           <div className="overflow-x-auto">
             <table className="w-full text-xs">
               <thead className="bg-gray-50 dark:bg-gray-700">
@@ -427,7 +451,6 @@ const MetaReports: React.FC = () => {
                   <th className="p-2 text-left font-semibold">City</th>
                   <th className="p-2 text-left font-semibold">Entry Date</th>
                 </tr>
-                
               </thead>
               <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
                 {loading ? (
@@ -449,24 +472,24 @@ const MetaReports: React.FC = () => {
             </table>
           </div>
 
-          {/* Pagination */}
+          {/* Pagination on Bottom */}
           {data.length > 0 && (
-            <div className="px-3 py-2 border-t">
+            <div className="px-3 py-2 border-t dark:border-gray-700">
               <div className="flex justify-between items-center text-xs">
-                <span>
+                <span className="text-gray-600 dark:text-gray-400">
                   Showing {(page-1)*PAGE_SIZE+1} to {Math.min(page*PAGE_SIZE, totalRecords)} of {totalRecords}
                 </span>
                 <div className="flex gap-1">
                   <button
                     disabled={page === 1}
                     onClick={() => setPage(p => p - 1)}
-                    className="px-2 py-1 border rounded hover:bg-gray-100 disabled:opacity-40"
+                    className="px-2 py-1 border rounded hover:bg-gray-100 dark:hover:bg-gray-600 disabled:opacity-40 dark:border-gray-600"
                   >←</button>
-                  <span className="px-2 py-1">{page}</span>
+                  <span className="px-2 py-1 dark:text-gray-300">{page}</span>
                   <button
                     disabled={page === totalPages}
                     onClick={() => setPage(p => p + 1)}
-                    className="px-2 py-1 border rounded hover:bg-gray-100 disabled:opacity-40"
+                    className="px-2 py-1 border rounded hover:bg-gray-100 dark:hover:bg-gray-600 disabled:opacity-40 dark:border-gray-600"
                   >→</button>
                 </div>
               </div>

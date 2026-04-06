@@ -91,6 +91,10 @@ import ChecklistSettings from "./pages/Execution/ChecklistSettings";
 
 import ExecutionChecklist from './pages/Execution/ExecutionChecklist';
 
+import UserAssets from './pages/User/UserAssets';
+
+
+
 function App() {
   const [loading, setLoading] = useState<boolean>(true);
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(false);
@@ -917,6 +921,19 @@ path="/schedule/settings/:id"
     </ProtectedRoute>
   }
 />
+
+ <Route
+              path="/userassets"
+              element={
+                <ProtectedRoute menuKey="userassets">
+                  <DefaultLayout userRole={userRole}>
+                    <PageTitle title="User Assets" />
+                    <UserAssets />
+                  </DefaultLayout>
+                </ProtectedRoute>
+              }
+            />
+
 
 
           </>

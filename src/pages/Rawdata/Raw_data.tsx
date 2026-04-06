@@ -465,6 +465,8 @@ const RawData = () => {
   >([]);
   const [errorDetails, setErrorDetails] = useState<any[]>([]);
 
+  const [topPaginationKey, setTopPaginationKey] = useState(0);
+
   const [showDuplicateModal, setShowDuplicateModal] = useState(false);
   const [duplicateEntries, setDuplicateEntries] = useState<any[]>([]);
   const [openRemark, setOpenRemark] = useState(null);
@@ -478,6 +480,9 @@ const RawData = () => {
     reference: '',
     area_id: '',
   });
+
+    // const [refreshTrigger, setRefreshTrigger] = useState(0);
+
 
   const [itemsPerPage, setItemsPerPage] = useState(10);
 
@@ -2512,7 +2517,7 @@ const RawData = () => {
     });
 
     setFilteredClients(results);
-    setCurrentPage(1);
+    // setCurrentPage(1);
   }, [searchTerm, rawData]);
 
   // Update Date Handlers
@@ -2585,7 +2590,7 @@ const RawData = () => {
 
     // Reset to show all data
     setFilteredClients(rawData);
-    setCurrentPage(1);
+    // setCurrentPage(1);
 
     setSelectedStages([]);
     setSearchTerm('');
@@ -2690,15 +2695,25 @@ const RawData = () => {
     );
   };
 
+  const [refreshTrigger, setRefreshTrigger] = useState(0);
+  const [currentPageBeforeEdit, setCurrentPageBeforeEdit] = useState(1);
+
   const handleEditClick = (client: Client) => {
+    setCurrentPageBeforeEdit(currentPage);
     setEditingClient(client);
     setShowEditPopup(true);
   };
 
+  // const closeEditPopup = () => {
+  //   setEditingClient(null);
+  //   setShowEditPopup(false);
+  // }; 
   const closeEditPopup = () => {
     setEditingClient(null);
     setShowEditPopup(false);
+    refreshDataWithPagePreservation();
   };
+
 
   interface AssignData {
     assignedTo: string[];
@@ -2775,7 +2790,6 @@ const RawData = () => {
 
       console.log('📥 Import response:', response.data);
 
-      // Show summary in alert
       const summary = response.data.summary;
       const successMsg =
         summary.success > 0
@@ -2786,28 +2800,22 @@ const RawData = () => {
         alert(`${successMsg}Please check below for any issues.`);
       }
 
-      // 🔥 HANDLE ERRORS
       if (response.data.errors && response.data.errors.length > 0) {
         setImportErrors(response.data.errors);
-        // Don't close import popup yet
       } else {
         setShowImportPopup(false);
       }
 
-      // 🔥 HANDLE DUPLICATES
       if (response.data.duplicates && response.data.duplicates.length > 0) {
         setDuplicateEntries(response.data.duplicates);
         setShowDuplicateModal(true);
       }
 
-      // Refresh data if any success
       if (summary.success > 0) {
-        fetchRawData();
+        refreshDataWithPagePreservation();
       }
     } catch (err) {
       console.log('Import Error:', err);
-      console.log('Error response:', err.response?.data);
-
       let errorMessage = 'Import failed. ';
 
       if (err.response?.status === 409) {
@@ -2821,6 +2829,7 @@ const RawData = () => {
       alert(errorMessage);
     }
   };
+
 
   const handleDuplicateModalClose = () => {
     // setShowDuplicateModal(false);
@@ -2861,7 +2870,7 @@ const RawData = () => {
         setFile(null);
         setFormData({ cat_id: '', reference: '', area_id: '' });
         setShowImportPopup(false);
-        fetchRawData();
+        refreshDataWithPagePreservation();
       }
     } catch (err: any) {
       const errorMessage =
@@ -2869,6 +2878,9 @@ const RawData = () => {
       setError(errorMessage);
     }
   };
+
+
+
 
   // Function to cancel and close everything
   const handleCancelImport = () => {
@@ -2885,15 +2897,12 @@ const RawData = () => {
     setShowDuplicateModal(false);
     setDuplicateEntries([]);
     setShowImportPopup(false);
-
-    // Optionally clear the form
     setFile(null);
     setFormData({ cat_id: '', reference: '', area_id: '' });
-
-    alert(
-      'Please review the duplicate entries and try again with corrected data.',
-    );
+    alert('Please review the duplicate entries and try again with corrected data.');
   };
+
+
 
   //fetch master data
 
@@ -2966,7 +2975,7 @@ const RawData = () => {
   );
 
   const fetchRawData = async () => {
-    setIsLoading(true); // Set loading to true before fetching
+    setIsLoading(true);
     try {
       const response = await fetch(`${BASE_URL}api/master-data`);
       if (!response.ok) throw new Error('Network response was not ok');
@@ -3062,15 +3071,15 @@ const RawData = () => {
         const cityName = parseValue(item.city);
 
         if (areaName && areaName !== '' && areaName !== 'Not Available') {
-          displayCity = areaName; // Use area_name if available
+          displayCity = areaName;
         } else if (
           cityName &&
           cityName !== '' &&
           cityName !== 'Not Available'
         ) {
-          displayCity = cityName; // Fallback to city if area_name not available
+          displayCity = cityName;
         } else {
-          displayCity = ''; // Empty if neither available
+          displayCity = '';
         }
 
         return {
@@ -3081,8 +3090,6 @@ const RawData = () => {
           alternate_number: parseValue(item.alternate_number),
           email: parseValue(item.email),
           address: parseValue(item.address),
-
-          // Master data
           area: parseValue(item.area_name),
           area_id: parseIdValue(item.area_id),
           cat_name: parseValue(item.cat_name),
@@ -3090,15 +3097,11 @@ const RawData = () => {
           reference_name: parseValue(item.reference_name),
           reference_id: parseIdValue(item.reference_id),
           status: parseValue(item.status),
-
-          // Other inputs
           category_other: item.category_other || '',
           reference_other: item.reference_other || '',
-
-          // Location and room details
-          city: displayCity, // 🔥 THIS IS THE KEY CHANGE - Use the prioritized display city
-          original_city: parseValue(item.city), // Keep original if needed elsewhere
-          original_area: parseValue(item.area_name), // Keep original if needed elsewhere
+          city: displayCity,
+          original_city: parseValue(item.city),
+          original_area: parseValue(item.area_name),
           location_link: parseValue(item.location_link),
           room_length: parseValue(item.room_length),
           room_width: parseValue(item.room_width),
@@ -3110,8 +3113,6 @@ const RawData = () => {
           time_to_complete: parseValue(item.time_to_complete),
           site_visit_date: parseValue(item.site_visit_date),
           demo_date: parseValue(item.demo_date),
-
-          // Contact numbers
           ar_number: parseValue(item.ar_number),
           architect_name: parseValue(item.architect_name),
           ca_number: parseValue(item.ca_number),
@@ -3119,15 +3120,10 @@ const RawData = () => {
           sm_number: parseValue(item.sm_number),
           pop_number: parseValue(item.pop_number),
           other_number: parseValue(item.other_number),
-
-          // Lead information
           latest_leadStage: parseValue(item.latest_leadStage),
           lead_stage: parseValue(item.lead_stage),
-
           quick_remark: parseValue(item.quick_remark),
           detailed_remark: parseValue(item.detailed_remark),
-
-          // Assignment fields
           assign_date: parseValue(item.assign_date),
           followup_date: parseValue(item.followup_date),
           assignment_remark: parseValue(item.assignment_remark),
@@ -3135,7 +3131,6 @@ const RawData = () => {
           assigned_to_user_id: parseIdValue(item.assigned_to_user_id),
           stage: cleanStage,
           assign_type: parseValue(item.assign_type),
-
           reassignment_remarks: Array.isArray(item.reassignment_remarks)
             ? item.reassignment_remarks.map((remark: any) => {
                 if (typeof remark === 'string') {
@@ -3156,34 +3151,42 @@ const RawData = () => {
               })
             : [],
           previous_stage: previousStage,
-
-          // Calculated percentage for battery display
           status_percentage: status_percentage,
-
-          // Flag to indicate if this is a Drop stage
           is_drop_stage: cleanStage === 'Drop',
-
           assign_id: parseIdValue(item.assign_id),
-
           document_location_link: parseValue(item.document_location_link),
         };
       });
 
-      console.log('Processed data with other inputs:', {
-        totalClients: formattedData.length,
-        sampleClient: formattedData[0],
-        hasCategoryOther: formattedData[0]?.category_other,
-        hasReferenceOther: formattedData[0]?.reference_other,
-      });
-
       setRawData(formattedData);
       setFilteredClients(formattedData);
-      setCurrentPage(1);
+      // 🔥 REMOVED: setCurrentPage(1); - DO NOT RESET PAGE HERE
+      
     } catch (error) {
       console.error('Error fetching Master Data:', error);
     } finally {
-      setIsLoading(false); // Set loading to false after fetching (whether success or error)
+      setIsLoading(false);
     }
+  };
+
+  // ============ ADD PAGE RESTORATION EFFECT ============
+  useEffect(() => {
+    if (!isLoading && refreshTrigger > 0) {
+      const savedPage = sessionStorage.getItem('rawData_savedPage');
+      if (savedPage) {
+        const pageToRestore = parseInt(savedPage);
+        const totalPages = Math.ceil(filteredClients.length / itemsPerPage);
+        if (pageToRestore <= totalPages && pageToRestore >= 1) {
+          setCurrentPage(pageToRestore);
+        }
+        sessionStorage.removeItem('rawData_savedPage');
+      }
+    }
+  }, [isLoading, filteredClients.length, refreshTrigger]);
+
+  const refreshDataWithPagePreservation = () => {
+    sessionStorage.setItem('rawData_savedPage', currentPage.toString());
+    setRefreshTrigger(prev => prev + 1);
   };
 
   // Call this in useEffect
@@ -3230,7 +3233,6 @@ const RawData = () => {
   const [selectedMasterId, setSelectedMasterId] = useState(null);
 
   // Updated handleAssignSubmit
-
   const handleAssignSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
@@ -3253,17 +3255,11 @@ const RawData = () => {
           credentials: 'include',
           body: JSON.stringify({
             master_id,
-
-            // SAME STRUCTURE AS updateRawData
-            assignedTo: assignData.assignedTo, // ARRAY
+            assignedTo: assignData.assignedTo,
             leadStage: assignData.leadStage,
             remark: assignData.remark,
-
-            // IMPORTANT: both dates
             reassignment_date: assignData.reassignmentDate,
             followup_date: assignData.reassignmentDate,
-
-            // optional (backend resolves if null)
             assign_id: client?.assign_id || null,
           }),
         });
@@ -3282,7 +3278,6 @@ const RawData = () => {
 
       alert(`✅ Assignment Done\nInserted: ${inserted}\nSkipped: ${skipped}`);
 
-      // Reset
       setAssignData({
         assignedTo: [],
         leadStage: '',
@@ -3293,7 +3288,7 @@ const RawData = () => {
       setSelectedMasterIds([]);
       setSelectedClients([]);
       setShowAssignPopup(false);
-      fetchRawData();
+      refreshDataWithPagePreservation();
     } catch (err) {
       console.error(err);
       alert('❌ Assignment failed');
@@ -3303,11 +3298,10 @@ const RawData = () => {
   const handleSingleDelete = async (master_id) => {
     if (window.confirm('Are you sure you want to delete this entry?')) {
       try {
-        // Try the most common endpoint
         const res = await axios.post(
           `${BASE_URL}api/master-data/delete-multiple`,
           {
-            ids: [master_id], // Send as array
+            ids: [master_id],
           },
           {
             withCredentials: true,
@@ -3317,53 +3311,22 @@ const RawData = () => {
           },
         );
 
-        console.log('Delete response:', res.data);
-
         alert(res.data.message || 'Entry deleted successfully');
-
-        // Remove from selected arrays
         setSelectedClients((prev) => prev.filter((id) => id !== master_id));
         setSelectedMasterIds((prev) => prev.filter((id) => id !== master_id));
-
-        // Refresh the data
-        fetchRawData();
+        refreshDataWithPagePreservation();
       } catch (error) {
-        console.error('Delete error details:', {
-          error,
-          response: error.response,
-          status: error.response?.status,
-          data: error.response?.data,
-        });
-
-        // Try alternative endpoint if first fails
-        if (error.response?.status === 404) {
-          try {
-            // Alternative: try without array wrapper
-            const res = await axios.post(
-              `${BASE_URL}api/master-data/delete`,
-              { master_id: master_id }, // Send as single field
-              { withCredentials: true },
-            );
-
-            alert(res.data.message || 'Entry deleted successfully');
-            fetchRawData();
-          } catch (secondError) {
-            alert(
-              secondError.response?.data?.message ||
-                'Cannot delete entry. Please check API endpoint.',
-            );
-          }
-        } else {
-          alert(
-            error.response?.data?.message ||
-              'Failed to delete entry. Please try again.',
-          );
-        }
+        console.error('Delete error details:', error);
+        alert(
+          error.response?.data?.message ||
+            'Failed to delete entry. Please try again.',
+        );
       }
     }
   };
 
-  const handleBulkDelete = async () => {
+
+ const handleBulkDelete = async () => {
     if (selectedMasterIds.length === 0) {
       alert('Please select entries to delete');
       return;
@@ -3387,8 +3350,6 @@ const RawData = () => {
           },
         );
 
-        console.log('Bulk delete response:', res.data);
-
         if (res.data.success) {
           alert(
             res.data.message ||
@@ -3400,19 +3361,18 @@ const RawData = () => {
 
         setSelectedClients([]);
         setSelectedMasterIds([]);
-        fetchRawData();
+        refreshDataWithPagePreservation();
       } catch (error) {
         console.error('Bulk delete error:', error);
-        console.error('Error response:', error.response);
-
         alert(
           error.response?.data?.message ||
-            error.response?.data?.error ||
             'Failed to delete selected entries. Please try again.',
         );
       }
     }
   };
+
+
 
   const handleSingleFormChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>,
@@ -4009,18 +3969,19 @@ const RawData = () => {
     selectedFollowupToDate,
   ]);
 
-  const handleCustomRecordInput = (e: React.ChangeEvent<HTMLInputElement>) => {
+  
+    const handleCustomRecordInput = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value;
     if (value === '') {
       setCustomRecordCount('');
       return;
     }
-
     const numValue = parseInt(value);
     if (!isNaN(numValue) && numValue > 0) {
       setCustomRecordCount(numValue);
     }
   };
+
 
   // Add this function to clear the custom record count
   const clearCustomRecordCount = () => {
@@ -4417,17 +4378,17 @@ const RawData = () => {
         </div>
       )}
 
-      {/* Update Data Modal Component */}
-      <UpdateRawData
-        showEditPopup={showEditPopup}
-        editingClient={editingClient}
-        setEditingClient={setEditingClient}
-        closeEditPopup={closeEditPopup}
-        fetchRawData={fetchRawData}
-        categories={categories}
-        references={references}
-        area={area}
-      />
+  <UpdateRawData
+    showEditPopup={showEditPopup}
+    editingClient={editingClient}
+    setEditingClient={setEditingClient}
+    closeEditPopup={closeEditPopup}
+    fetchRawData={refreshDataWithPagePreservation}
+    categories={categories}
+    references={references}
+    area={area}
+  />
+
 
       {/* Update the duplicate modal in your RawData component */}
 
@@ -4566,7 +4527,25 @@ const RawData = () => {
       )}
 
       {/* Main Data Table */}
-      <div className="h-[calc(100vh-180px)] overflow-y-auto mt-2">
+      <div className="h-[calc(100vh-180px)] overflow-y-auto mt-2"> 
+                {/* ✅ TOP PAGINATION - Added here below header */}
+        {!isLoading && totalItems > 0 && (
+          <div className="mb-4" key={topPaginationKey}>
+            <Pagination
+              currentPage={currentPage}
+              totalPages={totalPages}
+              onPageChange={(page) => {
+                handlePageChange(page);
+                setTopPaginationKey(prev => prev + 1);
+              }}
+              totalItems={totalItems}
+              itemsPerPage={itemsPerPage}
+              showingStart={showingStart}
+              showingEnd={showingEnd}
+            />
+          </div>
+        )}
+        
         {isLoading ? (
           <Loader />
         ) : (
@@ -5341,18 +5320,7 @@ const RawData = () => {
               </table>
             </div>
 
-            {/* Pagination (remains unchanged) */}
-            {totalItems > 0 && (
-              <Pagination
-                currentPage={currentPage}
-                totalPages={totalPages}
-                onPageChange={handlePageChange}
-                totalItems={totalItems}
-                itemsPerPage={itemsPerPage}
-                showingStart={showingStart}
-                showingEnd={showingEnd}
-              />
-            )}
+           
           </div>
         )}
       </div>
@@ -5564,18 +5532,18 @@ const RawData = () => {
       )}
 
       {/* Add Single Data Popup */}
-      <InsertDataModal
-        showAddPopup={showAddPopup}
-        setShowAddPopup={setShowAddPopup}
-        singleFormData={singleFormData}
-        setSingleFormData={setSingleFormData}
-        categories={categories}
-        references={references}
-        fetchRawData={fetchRawData}
-        setError={setError}
-        setDuplicateEntries={setDuplicateEntries}
-        setShowDuplicateModal={setShowDuplicateModal}
-      />
+ <InsertDataModal
+    showAddPopup={showAddPopup}
+    setShowAddPopup={setShowAddPopup}
+    singleFormData={singleFormData}
+    setSingleFormData={setSingleFormData}
+    categories={categories}
+    references={references}
+    fetchRawData={refreshDataWithPagePreservation}
+    setError={setError}
+    setDuplicateEntries={setDuplicateEntries}
+    setShowDuplicateModal={setShowDuplicateModal}
+  />
 
       {showDetailsModal && renderDetailsModal()}
 

@@ -70,7 +70,7 @@ export const getDailyExecutionProcesses = async (req, res) => {
   }
 };
 
-export const uploadExecutionDocuments = async (req, res) => {
+export const uploadExecutionDocuments1 = async (req, res) => {
   try {
     const { execution_id, process_id } = req.params;
     const { lead_id, remark } = req.body;
@@ -157,6 +157,103 @@ export const uploadExecutionDocuments = async (req, res) => {
         [values]
       );
       console.log("7. Insert result:", result);
+    }
+
+    res.json({
+      success: true,
+      uploaded
+    });
+
+  } catch (err) {
+    console.error("EXECUTION UPLOAD ERROR:", err);
+    res.status(500).json({
+      success: false,
+      message: "Upload failed"
+    });
+  }
+};
+
+export const uploadExecutionDocuments = async (req, res) => {
+  try {
+    const { execution_id, process_id } = req.params;
+    const { lead_id, remark, start_date, start_time, end_time } = req.body;
+    const user = req.session.user;
+
+    console.log("========== UPLOAD DEBUG ==========");
+    console.log("User:", user);
+    console.log("Body:", req.body);
+    console.log("==================================");
+
+    if (!execution_id || !process_id || !lead_id) {
+      return res.status(400).json({
+        success: false,
+        message: "execution_id, process_id, lead_id required"
+      });
+    }
+
+    if (!req.files || !req.files.files) {
+      return res.status(400).json({
+        success: false,
+        message: "No files uploaded"
+      });
+    }
+
+    const filesArray = Array.isArray(req.files.files)
+      ? req.files.files
+      : [req.files.files];
+
+    const values = [];
+    const uploaded = [];
+
+    for (const file of filesArray) {
+      const original = file.name;
+
+      const fileType = file.mimetype.startsWith("image/")
+        ? "image"
+        : file.mimetype.startsWith("video/")
+        ? "video"
+        : "document";
+
+      const safeName = `${execution_id}_${process_id}_${Date.now()}_${original.replace(/\s+/g, "_")}`;
+
+      const uploadDir = path.join("uploads", "execution", fileType);
+      if (!fs.existsSync(uploadDir)) fs.mkdirSync(uploadDir, { recursive: true });
+
+      const savePath = path.join(uploadDir, safeName);
+      await file.mv(savePath);
+
+      const dbPath = `execution/${fileType}/${safeName}`;
+
+      values.push([
+        execution_id,
+        lead_id,
+        process_id,
+        dbPath,
+        fileType,
+        remark || null,
+        'pending',
+        null,
+        user?.id || null,
+        start_date || null,
+        start_time || null,
+        end_time || null
+      ]);
+
+      uploaded.push({
+        execution_id,
+        lead_id,
+        process_id,
+        file_path: dbPath
+      });
+    }
+
+    if (values.length) {
+      await db.query(
+        `INSERT INTO execution_documents
+        (execution_id, lead_id, process_id, file_path, file_type, remark, manager_status, manager_remark, uploaded_by, start_date, start_time, end_time)
+        VALUES ?`,
+        [values]
+      );
     }
 
     res.json({
@@ -479,7 +576,7 @@ export const getManagerDocumentDashboard = async (req, res) => {
     }
 
     // Check if user is admin or manager
-    const allowedRoles = ['admin', 'sub_admin', 'technical_head', 'manager'];
+    const allowedRoles = ['admin', 'sub_admin', 'technical_head', 'manager' , 'av_engineer' , 'acoustic_engineer' , 'acoustic_designer'];
     if (!allowedRoles.includes(user.role)) {
       return res.status(403).json({
         success: false,
@@ -829,7 +926,7 @@ export const getManagerProcesses2 = async (req, res) => {
 };
 
 
-export const getManagerProcesses = async (req, res) => {
+export const getManagerProcesses3 = async (req, res) => {
   try {
     const user = req.session.user;
     if (!user) {
@@ -924,6 +1021,110 @@ export const getManagerProcesses = async (req, res) => {
         name: user.username,
         role: user.role
       }
+    });
+
+  } catch (error) {
+    console.error("ManagerProcesses error:", error);
+    res.status(500).json({
+      success: false,
+      message: "Server error",
+    });
+  }
+};
+
+export const getManagerProcesses = async (req, res) => {
+  try {
+    const user = req.session.user;
+
+    if (!user) {
+      return res.status(401).json({
+        success: false,
+        message: "Unauthorized",
+      });
+    }
+
+    let query = `
+      SELECT 
+        ed.lead_id,
+        ed.process_id,
+
+        es.schedule_id,
+        es.schedule_name,
+
+        rd.name AS client_name,
+        rd.city,
+
+        pe.process_name,
+        pe.description,
+
+        ed.id AS document_id,
+        ed.file_path,
+        ed.file_type,
+        ed.remark,
+
+        ed.manager_status,
+        ed.manager_remark,
+
+        ed.uploaded_by AS updated_by,
+        u.name AS updated_by_name,
+        u.role AS updated_by_role,
+
+        ed.created_at AS document_created_at,
+
+        -- ✅ NEW FIELDS
+        ed.start_date,
+        ed.start_time,
+        ed.end_time
+
+      FROM execution_documents ed
+
+      LEFT JOIN execution_start es
+        ON es.execution_id = ed.execution_id
+
+      LEFT JOIN process_execution pe
+        ON pe.process_id = ed.process_id
+
+      LEFT JOIN raw_data rd
+        ON rd.master_id = ed.lead_id
+
+      LEFT JOIN users u
+        ON u.user_id = ed.uploaded_by
+    `;
+
+    let queryParams = [];
+
+    // Role-based filter
+    if (user.role !== 'admin') {
+      query += ` WHERE ed.uploaded_by = ?`;
+      queryParams.push(user.id);
+    }
+
+    query += ` ORDER BY ed.created_at DESC`;
+
+    const [rows] = await db.query(query, queryParams);
+
+    // Pagination
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 50;
+    const start = (page - 1) * limit;
+    const end = start + limit;
+
+    const paginatedData = rows.slice(start, end);
+
+    res.json({
+      success: true,
+      data: paginatedData,
+      pagination: {
+        total: rows.length,
+        page,
+        limit,
+        totalPages: Math.ceil(rows.length / limit),
+      },
+      user: {
+        id: user.id,
+        name: user.username,
+        role: user.role,
+      },
     });
 
   } catch (error) {

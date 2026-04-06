@@ -10,8 +10,14 @@ export const addUser = async (user) => {
 };
 
 // Function to fetch users from the database
-export const getUsers = async () => {
+export const getUsers1 = async () => {
   const query = 'SELECT user_id, name, contact_no, email, address, role, status FROM users ORDER BY user_id DESC';
+  const [rows] = await db.query(query);
+  return rows;
+};
+
+export const getUsers = async () => {
+  const query = 'SELECT user_id, name, contact_no, email, address, role, status, has_asset  FROM users ORDER BY user_id DESC';
   const [rows] = await db.query(query);
   return rows;
 };

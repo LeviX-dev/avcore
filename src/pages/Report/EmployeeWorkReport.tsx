@@ -72,13 +72,13 @@ const TableRow = memo(({ row, index, onCityClick, onRemarkClick, onClientClick }
     <tr className="hover:bg-gray-50 dark:hover:bg-gray-800/50">
       <td className="p-2 text-gray-600 dark:text-gray-400 whitespace-nowrap text-center">
         {index + 1}
-      </td>
+       </td>
       <td className="p-2 text-gray-600 dark:text-gray-400 whitespace-nowrap">
         {formatDate(row.created_at)}
-      </td>
+       </td>
       <td className="p-2 font-medium whitespace-nowrap">
         {formatField(row.assigned_to)}
-      </td>
+       </td>
       
       <td className="p-2 max-w-[160px]">
   {row.client_name ? (
@@ -103,12 +103,12 @@ const TableRow = memo(({ row, index, onCityClick, onRemarkClick, onClientClick }
             {formatCity(row.city)}
           </button>
         ) : '-'}
-      </td>
+       </td>
       <td className="p-2 whitespace-nowrap">
         <span className="px-1.5 py-0.5 bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-300 rounded text-[10px] inline-block">
           {formatField(row.reassigned_stage || row.current_stage)}
         </span>
-      </td>
+       </td>
       <td className="p-2 whitespace-nowrap">{formatField(row.category)}</td>
       <td className="p-2 whitespace-nowrap">{formatField(row.reference_name)}</td>
       <td className="p-2 whitespace-nowrap">{formatField(row.assigned_by)}</td>
@@ -121,8 +121,8 @@ const TableRow = memo(({ row, index, onCityClick, onRemarkClick, onClientClick }
             {row.remark.length > 30 ? `${row.remark.substring(0, 30)}...` : row.remark}
           </button>
         ) : '-'}
-      </td>
-    </tr>
+       </td>
+     </tr>
   );
 });
 
@@ -465,6 +465,30 @@ const EmployeeWorkReport: React.FC = () => {
 
         {/* Table */}
         <div className="bg-white dark:bg-gray-800 rounded shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden">
+          {/* Pagination on Top */}
+          {data.length > 0 && (
+            <div className="px-3 py-2 border-b bg-gray-50 dark:bg-gray-700/50">
+              <div className="flex justify-between items-center text-xs">
+                <span className="text-gray-600 dark:text-gray-400">
+                  Showing {(page-1)*PAGE_SIZE+1} to {Math.min(page*PAGE_SIZE, totalRecords)} of {totalRecords}
+                </span>
+                <div className="flex gap-1">
+                  <button
+                    disabled={page === 1}
+                    onClick={() => setPage(p => p - 1)}
+                    className="px-2 py-1 border rounded hover:bg-gray-100 dark:hover:bg-gray-600 disabled:opacity-40 dark:border-gray-600"
+                  >←</button>
+                  <span className="px-2 py-1 dark:text-gray-300">{page}</span>
+                  <button
+                    disabled={page === totalPages}
+                    onClick={() => setPage(p => p + 1)}
+                    className="px-2 py-1 border rounded hover:bg-gray-100 dark:hover:bg-gray-600 disabled:opacity-40 dark:border-gray-600"
+                  >→</button>
+                </div>
+              </div>
+            </div>
+          )}
+          
           <div className="overflow-x-auto">
             <table className="w-full text-xs">
               <thead className="bg-gray-50 dark:bg-gray-700">
@@ -503,24 +527,24 @@ const EmployeeWorkReport: React.FC = () => {
             </table>
           </div>
 
-          {/* Pagination */}
+          {/* Pagination on Bottom */}
           {data.length > 0 && (
-            <div className="px-3 py-2 border-t">
+            <div className="px-3 py-2 border-t dark:border-gray-700">
               <div className="flex justify-between items-center text-xs">
-                <span>
+                <span className="text-gray-600 dark:text-gray-400">
                   Showing {(page-1)*PAGE_SIZE+1} to {Math.min(page*PAGE_SIZE, totalRecords)} of {totalRecords}
                 </span>
                 <div className="flex gap-1">
                   <button
                     disabled={page === 1}
                     onClick={() => setPage(p => p - 1)}
-                    className="px-2 py-1 border rounded hover:bg-gray-100 disabled:opacity-40"
+                    className="px-2 py-1 border rounded hover:bg-gray-100 dark:hover:bg-gray-600 disabled:opacity-40 dark:border-gray-600"
                   >←</button>
-                  <span className="px-2 py-1">{page}</span>
+                  <span className="px-2 py-1 dark:text-gray-300">{page}</span>
                   <button
                     disabled={page === totalPages}
                     onClick={() => setPage(p => p + 1)}
-                    className="px-2 py-1 border rounded hover:bg-gray-100 disabled:opacity-40"
+                    className="px-2 py-1 border rounded hover:bg-gray-100 dark:hover:bg-gray-600 disabled:opacity-40 dark:border-gray-600"
                   >→</button>
                 </div>
               </div>

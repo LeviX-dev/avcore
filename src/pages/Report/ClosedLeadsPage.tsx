@@ -492,6 +492,9 @@ const ClosedLeadsPage: React.FC = () => {
   const [references, setReferences] = useState<Reference[]>([]);
   const [area, setArea] = useState<Area[]>([]);
   
+  const [topPaginationKey, setTopPaginationKey] = useState(0);
+
+
   // Document upload/view states
   const [docsClient, setDocsClient] = useState<Lead | null>(null);
   const [docsData, setDocsData] = useState<DocumentData>({ 
@@ -3283,6 +3286,25 @@ const fetchDocumentsForModal = async () => {
         </div>
       )}
 
+  {/* ✅ TOP PAGINATION - Added here below header and filters */}
+      {!loading && totalItems > 0 && (
+        <div className="mb-4" key={topPaginationKey}>
+          <Pagination
+            currentPage={currentPage}
+            totalPages={totalPages}
+            onPageChange={(page) => {
+              handlePageChange(page);
+              setTopPaginationKey(prev => prev + 1);
+            }}
+            totalItems={totalItems}
+            itemsPerPage={itemsPerPage}
+            showingStart={showingStart}
+            showingEnd={showingEnd}
+          />
+        </div>
+      )}
+
+      
       {/* Loading State */}
       {loading ? (
         <div className="flex justify-center items-center h-64">
@@ -4058,18 +4080,7 @@ const fetchDocumentsForModal = async () => {
             </div>
           </div>
 
-          {/* Pagination */}
-          {totalItems > 0 && (
-            <Pagination
-              currentPage={currentPage}
-              totalPages={totalPages}
-              onPageChange={handlePageChange}
-              totalItems={totalItems}
-              itemsPerPage={itemsPerPage}
-              showingStart={showingStart}
-              showingEnd={showingEnd}
-            />
-          )}
+        
         </>
       )}
 

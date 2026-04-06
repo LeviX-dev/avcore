@@ -8,6 +8,10 @@ const TELECALLER_ROLES = [
   'junior_autocad_designer',
   'senior_autocad_designer',
   'technical_head',
+    'av_engineer',
+  'acoustic_engineer',
+  'acoustic_designer',
+   'hr_executive',
 ];
 
 const isTelecallerLike = (role) => TELECALLER_ROLES.includes(role);
