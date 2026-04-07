@@ -5245,7 +5245,7 @@ export const getDropLeadsFullData = async (req, res) => {
         SELECT r1.*, ROW_NUMBER() OVER (PARTITION BY master_id ORDER BY id DESC) rn
         FROM reassignment r1
       ) lr ON rd.master_id = lr.master_id AND lr.rn = 1
-      WHERE (rd.lead_stage IN ('Drop', 'loss') OR lr.leadStage IN ('Drop', 'loss'))
+      WHERE (rd.lead_stage IN ('Drop', 'lost') OR lr.leadStage IN ('Drop', 'lost'))
     `;
 
     let countParams = [];
@@ -5386,7 +5386,7 @@ export const getDropLeadsFullData = async (req, res) => {
       LEFT JOIN product p ON p.product_id = pm.product_id
       LEFT JOIN documents d ON d.master_id = rd.master_id
 
-      WHERE (rd.lead_stage IN ('Drop', 'loss') OR lr.leadStage IN ('Drop', 'loss'))
+      WHERE (rd.lead_stage IN ('Drop', 'lost') OR lr.leadStage IN ('Drop', 'lost'))
     `;
 
     let params = [];
@@ -8918,14 +8918,14 @@ export const getEmployeeDetailedReport = async (req, res) => {
             la.leadStage,
             CASE 
                 WHEN la.leadStage = 'Drop' THEN 'Drop'
-                WHEN la.leadStage = 'loss' THEN 'Loss'
+                WHEN la.leadStage = 'lost' THEN 'Lost'
                 ELSE NULL
             END AS drop_loss_type,
             la.reassignment_date AS drop_loss_date,
             la.remark AS drop_loss_remark
         FROM latest_assignment la
         WHERE la.rn = 1 
-          AND (la.leadStage = 'Drop' OR la.leadStage = 'loss')
+          AND (la.leadStage = 'Drop' OR la.leadStage = 'lost')
     )
 
     SELECT
@@ -9010,7 +9010,7 @@ export const getEmployeeDetailedReport = async (req, res) => {
       if (row.drop_loss_type === 'Drop') {
         employee.drop_count += 1;
         employee.total_dropped_lost += 1;
-      } else if (row.drop_loss_type === 'Loss') {
+      } else if (row.drop_loss_type === 'Lost') {
         employee.loss_count += 1;
         employee.total_dropped_lost += 1;
       }

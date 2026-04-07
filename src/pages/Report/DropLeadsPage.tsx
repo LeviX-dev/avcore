@@ -426,7 +426,7 @@ const ProgressStatus: React.FC<{
     if (stageLower.includes('quote followup')) return 'bg-[#A52A2A]';
     if (stageLower.includes('projection')) return 'bg-[#90EE90]';
     if (stageLower.includes('drop')) return 'bg-[#FF0000]';
-    if (stageLower.includes('loss')) return 'bg-[#8B0000]'; // 🔥 ADD THIS LINE for Loss stage
+    if (stageLower.includes('lost')) return 'bg-[#8B0000]'; // 🔥 ADD THIS LINE for Loss stage
     if (stageLower.includes('closed')) return 'bg-[#006400]';
 
     return 'bg-[#A9A9A9]';
@@ -435,7 +435,7 @@ const ProgressStatus: React.FC<{
   // 🔥 ADD THIS FUNCTION to get the display stage text
   const getDisplayStage = (stage: string) => {
     const stageLower = stage.toLowerCase().trim();
-    if (stageLower === 'loss') return 'Loss';
+    if (stageLower === 'lost') return 'Lost';
     return stage;
   };
 
@@ -446,16 +446,16 @@ const ProgressStatus: React.FC<{
       return previous_stage || cleanStage;
     }
     // For Loss leads, show "Loss" instead of "loss"
-    if (cleanStage.toLowerCase() === 'loss') {
-      return 'Loss';
+    if (cleanStage.toLowerCase() === 'lost') {
+      return 'Lost';
     }
     return cleanStage || 'N/A';
   };
 
   // Determine if we should show DROPPED or LOSS badge
   const getBadgeText = () => {
-    if (cleanStage.toLowerCase() === 'loss') {
-      return 'LOSS'; // Show LOSS badge for loss leads
+    if (cleanStage.toLowerCase() === 'lost') {
+      return 'LOST'; // Show LOSS badge for loss leads
     }
     if (is_drop_stage) {
       return 'DROPPED';
@@ -484,7 +484,7 @@ const ProgressStatus: React.FC<{
         </div>
         {getBadgeText() && (
           <div className={`text-[8px] font-medium mt-0.5 ${
-            getBadgeText() === 'LOSS' ? 'text-purple-600' : 'text-red-500'
+            getBadgeText() === 'LOST' ? 'text-purple-600' : 'text-red-500'
           }`}>
             {getBadgeText()}
           </div>
@@ -538,7 +538,7 @@ const [modalDocsFetched, setModalDocsFetched] = useState(false);
   const [leadStage, setLeadStage] = useState('');
   const [selectedUsers, setSelectedUsers] = useState<string[]>([]);
   const [users, setUsers] = useState<any[]>([]);
-const [leadStages, setLeadStages] = useState<string[]>(['Drop', 'loss']);
+const [leadStages, setLeadStages] = useState<string[]>(['Drop', 'lost']);
 
   // Filter states
   const [showEntryDateCalendar, setShowEntryDateCalendar] = useState(false);
@@ -736,7 +736,7 @@ const fetchDropLeads = async () => {
         
         // Determine if this is a Drop or Loss stage
         const isDropStage = cleanStage === 'Drop';
-        const isLossStage = cleanStage === 'loss';
+        const isLossStage = cleanStage === 'lost';
         
         // For Drop stages, find previous stage
         let previousStage = '';
@@ -748,7 +748,7 @@ const fetchDropLeads = async () => {
         if (isDropStage && reassignmentRemarks.length > 0) {
           const nonDropRemarks = reassignmentRemarks.filter(
             (remark: any) =>
-              remark.leadStage && remark.leadStage.trim() !== 'Drop' && remark.leadStage.trim() !== 'loss',
+              remark.leadStage && remark.leadStage.trim() !== 'Drop' && remark.leadStage.trim() !== 'lost',
           );
 
           if (nonDropRemarks.length > 0) {
@@ -1206,13 +1206,13 @@ const fetchLeadStages = async () => {
     const response = await axios.get(`${BASE_URL}api/leadstage`);
     // Filter to only include Drop and loss
     const filteredStages = response.data.filter(
-      (stage: string) => stage === 'Drop' || stage === 'loss'
+      (stage: string) => stage === 'Drop' || stage === 'lost'
     );
     setLeadStages(filteredStages);
   } catch (error) {
     console.error('Error fetching lead stages:', error);
     // Fallback to manual list
-    setLeadStages(['Drop', 'loss']);
+    setLeadStages(['Drop', 'lost']);
   }
 };
 
@@ -3419,7 +3419,7 @@ const clearCustomRecordCount = () => {
     key={stage}
     className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-300"
   >
-    Stage: {stage === 'loss' ? 'Loss' : stage}
+    Stage: {stage === 'lost' ? 'Lost' : stage}
     <button
       onClick={() => handleStageSelect(stage)}
       className="ml-1 text-purple-600 hover:text-purple-800 dark:text-purple-400"
@@ -4044,7 +4044,7 @@ const clearCustomRecordCount = () => {
     </div>
 
 {/* Stage Filter Dropdown - Update the label */}
-{['Drop', 'loss'].map((stage) => (
+{['Drop', 'lost'].map((stage) => (
   <div key={stage} className="flex items-center mb-2">
     <input
       type="checkbox"
@@ -4061,7 +4061,7 @@ const clearCustomRecordCount = () => {
       htmlFor={`stage-${stage}`}
       className="text-sm font-medium dark:text-white cursor-pointer truncate hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
     >
-      {stage === 'loss' ? 'Loss' : stage}
+      {stage === 'lost' ? 'Lost' : stage}
     </label>
   </div>
 ))}
@@ -4079,7 +4079,7 @@ const clearCustomRecordCount = () => {
               key={stage}
               className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-300"
             >
-              Stage: {stage === 'loss' ? 'Loss' : stage}
+              Stage: {stage === 'lost' ? 'Lost' : stage}
               <button
                 onClick={() => {
                   handleStageSelect(stage);
@@ -4250,7 +4250,7 @@ const clearCustomRecordCount = () => {
 {/* Stage Column */}
 <td className="py-4 px-4">
   <div className="text-xs font-semibold bg-gradient-to-r from-orange-50 to-orange-100 dark:from-orange-900/30 dark:to-orange-800/20 text-orange-800 dark:text-orange-300 px-3 py-1.5 rounded-lg border border-orange-200 dark:border-orange-700/30 shadow-sm text-center">
-    {lead.lead_stage === 'loss' ? 'Loss' : (lead.lead_stage || 'N/A')}
+    {lead.lead_stage === 'lost' ? 'Lost' : (lead.lead_stage || 'N/A')}
   </div>
 </td>
                       {/* Remark */}

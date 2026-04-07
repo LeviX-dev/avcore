@@ -218,7 +218,7 @@ const EmployeeDetailedReport = () => {
       case 'converted': return 'Converted';
       case 'not_converted': return 'Not Converted';
       case 'drop': return 'Dropped';
-      case 'loss': return 'Lost';
+      case 'lost': return 'Lost';
       default: return 'All';
     }
   };
@@ -328,7 +328,7 @@ const EmployeeDetailedReport = () => {
                   <th className="p-3 text-center font-medium text-gray-600">Converted</th>
                   <th className="p-3 text-center font-medium text-gray-600">Pending</th>
                   <th className="p-3 text-center font-medium text-gray-600">Drop</th>
-                  <th className="p-3 text-center font-medium text-gray-600">Loss</th>
+                  <th className="p-3 text-center font-medium text-gray-600">Lost</th>
                   <th className="p-3 text-center font-medium text-gray-600">Conversion Ratio</th>
                 </tr>
               </thead>

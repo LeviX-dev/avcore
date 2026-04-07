@@ -371,7 +371,7 @@ export const getDashboardLeadCounts = async (req, res) => {
     const [dropRows] = await db.execute(`
   SELECT COUNT(*) AS drop_count
   FROM raw_data
-  WHERE lead_stage IN ('Drop', 'loss')
+  WHERE lead_stage IN ('Drop', 'lost')
 `);
 
     // ===== CLOSED COUNT (NOW INCLUDES Closed Deal, Execution, Pre Execution) =====
