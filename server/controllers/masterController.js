@@ -29,7 +29,7 @@ export const createCategory = async (req, res) => {
 
 
 // show category list controller
-export const categoryList = async (req, res) => {
+export const categoryList1 = async (req, res) => {
   try {
     const category = await getCategories();
     // console.log('Users fetched from DB:', category); 
@@ -37,6 +37,46 @@ export const categoryList = async (req, res) => {
   } catch (error) {
     console.error('Error fetching categories:', error); 
     res.status(500).json({ error: 'Failed to fetch categories' });
+  }
+};
+
+// show category list controller (excludes Customised Quotation categories)
+export const categoryList = async (req, res) => {
+  try {
+    const category = await getCategories();
+    
+    // Filter out categories that contain both "Customised" and "Quotation"
+    const filteredCategories = category.filter(category => {
+      const catName = category.cat_name || '';
+      // Exclude if it contains both "Customised" AND "Quotation"
+      return !(catName.includes('Customised') && catName.includes('Quotation'));
+    });
+    
+    res.status(200).json(filteredCategories);
+  } catch (error) {
+    console.error('Error fetching categories:', error); 
+    res.status(500).json({ error: 'Failed to fetch categories' });
+  }
+};
+
+// Add this controller function after your existing categoryList controller
+
+// Get only Customised Quotation categories
+export const customisedCategoryList = async (req, res) => {
+  try {
+    const categories = await getCategories();
+    
+    // Filter categories that contain both "Customised" and "Quotation" in their name
+    const customisedCategories = categories.filter(category => {
+      const catName = category.cat_name || '';
+      return catName.includes('Customised') && catName.includes('Quotation');
+    });
+    
+    console.log('Customised categories fetched:', customisedCategories); 
+    res.status(200).json(customisedCategories);
+  } catch (error) {
+    console.error('Error fetching customised categories:', error); 
+    res.status(500).json({ error: 'Failed to fetch customised categories' });
   }
 };
 

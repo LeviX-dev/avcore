@@ -5,7 +5,8 @@ import { FaDownload, FaArrowLeft } from 'react-icons/fa';
 import { BASE_URL } from '../../../public/config';
 import pdfMake from 'pdfmake/build/pdfmake';
 import pdfFonts from 'pdfmake/build/vfs_fonts';
-import logo from '../../../src/images/logo/MMS_logo.png';
+import logo from '../../../src/images/logo/AVCoreLogo.png';
+
 
 pdfMake.addVirtualFileSystem(pdfFonts);
 
@@ -359,7 +360,7 @@ const ViewQuotation = () => {
               [
                 {
                   text: [
-                    { text: 'QUOTATION FOR: ', bold: true },
+                    { text: 'Name: ', bold: true },
                     { text: lead.name || '' },
                   ],
                   margin: [5, 4, 5, 4],
@@ -734,39 +735,45 @@ const ViewQuotation = () => {
         </button>
       </div>
 
-      {/* HEADER SECTION */}
-      <div className="relative flex justify-between items-start mb-10">
-        {/* COMPANY INFO */}
-        <div className="flex-1 text-center">
-          <h1 className="text-4xl font-bold text-[#7d20a0] underline decoration-[#7d20a0] decoration-4 underline-offset-4 mb-2">
-            AV CORE
-          </h1>
+     {/* HEADER SECTION */}
+<div className="flex justify-between items-start mb-10">
+  {/* LEFT SIDE - COMPANY INFO */}
+  <div className="flex flex-col text-left leading-tight">
+    <h1 className="text-5xl font-bold text-[#7d20a0] underline decoration-[#7d20a0] decoration-4 underline-offset-4 mb-2">
+      AV CORE
+    </h1>
 
-          <p className="font-bold text-[13px] text-black uppercase mb-2 tracking-wide">
-            ALL ABOUT AUDIO VIDEO
-          </p>
+    <p className="font-bold text-[15px] text-black uppercase mb-1">
+      ALL ABOUT AUDIO VIDEO
+    </p>
 
-          <div className="text-[12px] text-black font-bold uppercase leading-tight mb-1">
-            <p>
-              OFFICE NO 1 & 2, 1ST FLOOR GAYATRI BUILDING, BESIDE JUPITER
-              HOSPITAL, BANER 411045, PUNE.
-            </p>
-          </div>
+    <p className="text-[15px] font-bold text-black uppercase">
+      1ST FLOOR GAYATRI BUILDING, BESIDE JUPITER HOSPITAL,
+      BANER 411045, PUNE.
+    </p>
 
-          <p className="text-[12px] text-black font-bold uppercase">
-            CO.NO: 8329728210 / 8766786026
-          </p>
-        </div>
+<p className="text-[16px] font-bold text-black">
+  Email: <span className="text-blue-600">avcoreindia@gmail.com</span>
+</p>
 
-        {/* LOGO */}
-        <div className="absolute right-0 top-2 bg-black">
-          <img
-            src={logo}
-            className="w-28 h-auto border-2 border-black"
-            alt="Logo"
-          />
-        </div>
-      </div>
+<p className="text-[16px] font-bold text-black">
+  Website: <span className="text-blue-600">www.avcore.in</span>
+</p>
+
+    <p className="text-[14px] font-bold text-black uppercase">
+      CO.NO: 8329728210 / 8766786026
+    </p>
+  </div>
+
+  {/* RIGHT SIDE - LOGO */}
+  <div className="bg-black p-1">
+    <img
+      src={logo}
+      className="w-26 h-auto border border-black"
+      alt="Logo"
+    />
+  </div>
+</div>
 
       {/* FIXED: render single quotation */}
       {quotation && (
@@ -780,7 +787,7 @@ const ViewQuotation = () => {
               <div className="space-y-1 leading-tight">
                 <p>
                   <span className="font-extrabold text-black ">
-                    QUOTATION FOR:
+                    NAME:
                   </span>{' '}
                   <span className="text-black font-extrabold">{lead.name}</span>
                 </p>

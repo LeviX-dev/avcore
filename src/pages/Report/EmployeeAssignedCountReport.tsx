@@ -50,6 +50,9 @@ const EmployeeDetailedReport = () => {
   const [currentPage, setCurrentPage] = useState(1);
   const [error, setError] = useState<string | null>(null);
   
+  const [fromDate, setFromDate] = useState("");
+const [toDate, setToDate] = useState("");
+
   const [leadData, setLeadData] = useState<LeadData[]>([]);
   const [leadPage, setLeadPage] = useState(1);
   const [totalLeads, setTotalLeads] = useState(0);
@@ -108,10 +111,15 @@ const EmployeeDetailedReport = () => {
       setLoading(true);
       setError(null);
       
-      const response = await axios.get(
-        `${BASE_URL}api/reports/employee-detailed`,
-        { withCredentials: true }
-      );
+      let url = `${BASE_URL}api/reports/employee-detailed`;
+
+if (fromDate && toDate) {
+  url += `?fromDate=${fromDate}&toDate=${toDate}`;
+}
+
+const response = await axios.get(url, {
+  withCredentials: true,
+});
 
       if (response.data.success) {
         // Ensure each employee has valid lead_details and drop/loss counts
@@ -136,9 +144,10 @@ const EmployeeDetailedReport = () => {
     }
   };
 
-  useEffect(() => {
-    fetchEmployeeDetailedReport();
-  }, []);
+useEffect(() => {
+  fetchEmployeeDetailedReport();
+}, [fromDate, toDate]); 
+
 
   useEffect(() => {
     let result = [...reportData];
@@ -253,7 +262,39 @@ const EmployeeDetailedReport = () => {
       )}
 
       {/* Filters */}
-      <div className="mb-6 flex flex-wrap gap-3">
+        <div className="mb-6 flex flex-wrap gap-3 items-center">
+
+  {/* From Date */}
+  <input
+    type="date"
+    value={fromDate}
+    onChange={(e) => setFromDate(e.target.value)}
+    className="px-3 py-1.5 text-sm border border-gray-200 rounded-md"
+  />
+
+  {/* To Date */}
+  <input
+    type="date"
+    value={toDate}
+    onChange={(e) => setToDate(e.target.value)}
+    className="px-3 py-1.5 text-sm border border-gray-200 rounded-md"
+  />
+
+  {/* Clear Button */}
+  {(fromDate || toDate) && (
+    <button
+      onClick={() => {
+        setFromDate("");
+        setToDate("");
+      }}
+      className="px-3 py-1.5 text-sm bg-gray-100 border border-gray-200 rounded-md hover:bg-gray-200"
+    >
+      Clear
+    </button>
+  )}
+
+
+
         <select
           value={selectedEmployee}
           onChange={(e) => setSelectedEmployee(e.target.value)}

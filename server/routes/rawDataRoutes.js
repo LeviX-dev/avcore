@@ -19,6 +19,10 @@ getSimpleLeadReport , getLeadHistory , getEmployeeLeadsWithHistory ,getAssignedM
  
 getEmployeeWorkReport , getEmployeeWorkReportFilters , 
 getEmployeeLeadList ,getEmployeeDetailedReport  ,getQuotationClosedLeads ,
+  toggleFavorite, 
+    getFavorites, 
+    checkFavorite,
+    getFavoritesBatch ,
 
 
 } from '../controllers/rawDataController.js';
@@ -53,6 +57,13 @@ router.get('/leadstage', getLeadStage);
 router.get('/quickremark', getQuickRemark);
 
 router.get('/getcompleterawdata', getCompleteRawData);
+
+// for fev 
+router.post('/favorites/toggle/:master_id', toggleFavorite);
+router.get('/favorites', getFavorites);
+router.get('/favorites/check/:master_id', checkFavorite);
+router.post('/favorites/batch', getFavoritesBatch);
+
 
 router.get('/getinactiveleaddetails', getInactiveLeadDetails); 
 

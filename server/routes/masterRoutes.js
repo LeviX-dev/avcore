@@ -9,7 +9,7 @@ import { categoryList, createCategory,updateCategoryController,
 createKit , getKits , getProductsByCategory , getKitById , updateKit , toggleKitStatus , 
  getProductsAndKitsByCategory ,  createQuotation ,  getQuotationByMasterId , 
 getQuotationRevisionsByMasterId , updateQuotationWithRevision , getQuotationForEdit  , 
-getLatestQuotation , 
+getLatestQuotation , customisedCategoryList , 
 
 
 } from '../controllers/masterController.js';
@@ -24,6 +24,7 @@ router.post('/category', createCategory);
 router.get('/category', categoryList);
 router.delete('/category/:cat_id', removeCategory);
 router.put("/category/:cat_id", updateCategoryController);
+router.get('/customised-categories', customisedCategoryList);
 
 
 // --------------------------- Product ---------------------------

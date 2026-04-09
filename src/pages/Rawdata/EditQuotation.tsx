@@ -4,7 +4,6 @@ import axios from 'axios';
 import { FaArrowLeft } from 'react-icons/fa';
 import Breadcrumb from '../../components/Breadcrumbs/Breadcrumb';
 import { BASE_URL } from '../../../public/config';
-import AddKitModal from '../Master/AddKit';
 
 const EditQuotation = () => {
   const { qt_id } = useParams();
@@ -83,7 +82,6 @@ const EditQuotation = () => {
         return;
       }
 
-      // ✅ GST comes from revision
       setGstBaseAmount(Number(revToEdit.gst_app_amt || 0));
 
       const prefilled: any[] = [];
@@ -114,7 +112,6 @@ const EditQuotation = () => {
 
       setQueuedCategories(prefilled);
 
-      // Prefill additional prices
       setAdditionalPrices(
         revToEdit.additional_prices?.length
           ? revToEdit.additional_prices.map((a: any) => ({
@@ -130,11 +127,17 @@ const EditQuotation = () => {
 
   const fetchCategories = async () => {
     try {
-      const res = await axios.get(`${BASE_URL}api/categories`);
+      const res = await axios.get(`${BASE_URL}api/customised-categories`);
       setCategories(res.data || []);
     } catch (error) {
       console.error('Failed to fetch categories', error);
     }
+  };
+
+  // Helper function to get category name
+  const getCategoryName = (catId: string) => {
+    const category = categories.find((c) => c.cat_id == catId);
+    return category?.cat_name || '';
   };
 
   /* ================= HANDLERS ================= */
@@ -183,7 +186,7 @@ const EditQuotation = () => {
     e.preventDefault();
 
     const isAcoustic = queuedCategories.some(
-      (q) => q.cat_name?.toLowerCase() === 'acoustic',
+      (q) => q.cat_name?.toLowerCase() === 'customised acoustic quotation',
     );
 
     const finalAcousticTerms = isAcoustic
@@ -197,11 +200,8 @@ const EditQuotation = () => {
       type: quoteType,
       categories: queuedCategories,
       additional_prices: additionalPrices,
-
-      // ✅ IMPORTANT (NEW)
       gst_app_amt: quoteType === 'with_gst' ? gstBaseAmount : 0,
       gst_percent: 18,
-
       acoustic_terms: finalAcousticTerms,
     };
 
@@ -213,6 +213,7 @@ const EditQuotation = () => {
       console.error('Update failed', error);
     }
   };
+
   /* ================= TOTAL ================= */
   const totalQuotationPrice =
     queuedCategories.reduce((sum, c) => sum + c.category_total, 0) +
@@ -269,8 +270,7 @@ const EditQuotation = () => {
 
     const newKit = {
       cat_id: selectedCategory,
-      cat_name:
-        categories.find((c) => c.cat_id == selectedCategory)?.cat_name || '',
+      cat_name: getCategoryName(selectedCategory),
       kit_id: selectedKitData.kit_id,
       kit_name: selectedKitData.kit_name,
       kit_qty: Number(kitQty ?? 1),
@@ -429,7 +429,7 @@ const EditQuotation = () => {
               </select>
             </div>
 
-            {/* GST Applicable Amount (Prefilled + Editable) */}
+            {/* GST Applicable Amount */}
             <div>
               <label className="font-medium block mb-1">
                 GST Applicable Amount
@@ -440,7 +440,7 @@ const EditQuotation = () => {
                 onChange={(e) => setGstBaseAmount(Number(e.target.value))}
                 className="border px-3 py-2 rounded w-full"
                 placeholder="Enter GST applicable amount"
-                disabled={quoteType !== 'with_gst'} // optional logic
+                disabled={quoteType !== 'with_gst'}
               />
             </div>
 
@@ -485,66 +485,58 @@ const EditQuotation = () => {
                 </select>
               </div>
 
-              {/* ACOUSTIC SPECIAL TERMS - APPEARS WHEN ACOUSTIC IS SELECTED */}
-              {selectedCategory &&
-                categories
-                  .find((c) => c.cat_id == selectedCategory)
-                  ?.cat_name?.toUpperCase() === 'ACOUSTIC' && (
-                  <div className="border rounded bg-yellow-50 p-4 space-y-3 mb-4">
-                    <h4 className="font-semibold text-gray-700">
-                      Acoustic Special Terms
-                    </h4>
+              {/* ACOUSTIC SPECIAL TERMS - ONLY FOR "Customised Acoustic Quotation" */}
+              {selectedCategory && getCategoryName(selectedCategory) === 'Customised Acoustic Quotation' && (
+                <div className="border rounded bg-gray-50 p-4 space-y-3 mb-4">
+                  <h2 className="font-semibold text-blue-600">
+                    Acoustic Special Terms
+                  </h2>
 
-                    <div>
-                      <label className="text-sm font-medium">
-                        All Framing Will Be Done By
-                      </label>
-                      <select
-                        className="border px-3 py-2 rounded w-full mt-1"
-                        value={framingBy}
-                        onChange={(e) => setFramingBy(e.target.value)}
-                      >
-                        <option value="">Select</option>
-                        <option value="AV CORE">BY AV CORE</option>
-                        <option value="THE CLIENT">BY THE CLIENT</option>
-                      </select>
-                    </div>
-
-                    <div>
-                      <label className="text-sm font-medium">
-                        Fabric & Floor Carpet Provided By
-                      </label>
-                      <select
-                        className="border px-3 py-2 rounded w-full mt-1"
-                        value={fabricBy}
-                        onChange={(e) => setFabricBy(e.target.value)}
-                      >
-                        <option value="">Select</option>
-                        <option value="AV CORE">BY AV CORE</option>
-                        <option value="THE CLIENT">BY THE CLIENT</option>
-                      </select>
-                    </div>
-
-                    <div>
-                      <label className="text-sm font-medium">
-                        Ceiling Related Work Provided By
-                      </label>
-                      <select
-                        className="border px-3 py-2 rounded w-full mt-1"
-                        value={ceilingBy}
-                        onChange={(e) => setCeilingBy(e.target.value)}
-                      >
-                        <option value="">Select</option>
-                        <option value="AV CORE">BY AV CORE</option>
-                        <option value="THE CLIENT">BY THE CLIENT</option>
-                      </select>
-                    </div>
-
-                    <div className="text-sm text-gray-600 pt-2">
-                      • FABRIC STITCHING CHARGES WILL BE EXTRA AS PER THE DESIGN
-                    </div>
+                  <div>
+                    <label className="text-base font-semibold text-gray-500">
+                      All Framing Will Be Done By
+                    </label>
+                    <select
+                      className="border px-3 py-2 rounded w-full mt-1"
+                      value={framingBy}
+                      onChange={(e) => setFramingBy(e.target.value)}
+                    >
+                      <option value="AV CORE">BY AV CORE</option>
+                      <option value="THE CLIENT">BY THE CLIENT</option>
+                    </select>
                   </div>
-                )}
+
+                  <div>
+                    <label className="text-base font-semibold text-gray-500">
+                      Fabric & Floor Carpet Provided By
+                    </label>
+                    <select
+                      className="border px-3 py-2 rounded w-full mt-1"
+                      value={fabricBy}
+                      onChange={(e) => setFabricBy(e.target.value)}
+                    >
+                      <option value="AV CORE">BY AV CORE</option>
+                      <option value="THE CLIENT">BY THE CLIENT</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="text-base font-semibold text-gray-500">
+                      Ceiling Related Work Provided By
+                    </label>
+                    <select
+                      className="border px-3 py-2 rounded w-full mt-1"
+                      value={ceilingBy}
+                      onChange={(e) => setCeilingBy(e.target.value)}
+                    >
+                      <option value="AV CORE">BY AV CORE</option>
+                      <option value="THE CLIENT">BY THE CLIENT</option>
+                    </select>
+                  </div>
+
+              
+                </div>
+              )}
 
               {/* Kit Selection */}
               {selectedCategory && (
@@ -797,67 +789,58 @@ const EditQuotation = () => {
                   </select>
                 </div>
 
-                {/* ACOUSTIC SPECIAL TERMS - APPEARS WHEN ACOUSTIC IS SELECTED */}
-                {spCategory &&
-                  categories
-                    .find((c) => c.cat_id == spCategory)
-                    ?.cat_name?.toUpperCase() === 'ACOUSTIC' && (
-                    <div className="border rounded bg-yellow-50 p-4 space-y-3 mb-4">
-                      <h4 className="font-semibold text-gray-700">
-                        Acoustic Special Terms
-                      </h4>
+                {/* ACOUSTIC SPECIAL TERMS - ONLY FOR "Customised Acoustic Quotation" */}
+                {spCategory && getCategoryName(spCategory) === 'Customised Acoustic Quotation' && (
+                  <div className="border rounded bg-gray-50 p-4 space-y-3 mb-4">
+                    <h2 className="font-semibold text-blue-600">
+                      Acoustic Special Terms
+                    </h2>
 
-                      <div>
-                        <label className="text-sm font-medium">
-                          All Framing Will Be Done By
-                        </label>
-                        <select
-                          className="border px-3 py-2 rounded w-full mt-1"
-                          value={framingBy}
-                          onChange={(e) => setFramingBy(e.target.value)}
-                        >
-                          <option value="">Select</option>
-                          <option value="AV CORE">BY AV CORE</option>
-                          <option value="THE CLIENT">BY THE CLIENT</option>
-                        </select>
-                      </div>
-
-                      <div>
-                        <label className="text-sm font-medium">
-                          Fabric & Floor Carpet Provided By
-                        </label>
-                        <select
-                          className="border px-3 py-2 rounded w-full mt-1"
-                          value={fabricBy}
-                          onChange={(e) => setFabricBy(e.target.value)}
-                        >
-                          <option value="">Select</option>
-                          <option value="AV CORE">BY AV CORE</option>
-                          <option value="THE CLIENT">BY THE CLIENT</option>
-                        </select>
-                      </div>
-
-                      <div>
-                        <label className="text-sm font-medium">
-                          Ceiling Related Work Provided By
-                        </label>
-                        <select
-                          className="border px-3 py-2 rounded w-full mt-1"
-                          value={ceilingBy}
-                          onChange={(e) => setCeilingBy(e.target.value)}
-                        >
-                          <option value="">Select</option>
-                          <option value="AV CORE">BY AV CORE</option>
-                          <option value="THE CLIENT">BY THE CLIENT</option>
-                        </select>
-                      </div>
-
-                      <div className="text-sm text-gray-600 pt-2">
-                        • FABRIC STITCHING CHARGES WILL BE EXTRA AS PER THE
-                        DESIGN
-                      </div>
+                    <div>
+                      <label className="text-base font-semibold text-gray-500">
+                        All Framing Will Be Done By
+                      </label>
+                      <select
+                        className="border px-3 py-2 rounded w-full mt-1"
+                        value={framingBy}
+                        onChange={(e) => setFramingBy(e.target.value)}
+                      >
+                        <option value="AV CORE">BY AV CORE</option>
+                        <option value="THE CLIENT">BY THE CLIENT</option>
+                      </select>
                     </div>
-                  )}
+
+                    <div>
+                      <label className="text-base font-semibold text-gray-500">
+                        Fabric & Floor Carpet Provided By
+                      </label>
+                      <select
+                        className="border px-3 py-2 rounded w-full mt-1"
+                        value={fabricBy}
+                        onChange={(e) => setFabricBy(e.target.value)}
+                      >
+                        <option value="AV CORE">BY AV CORE</option>
+                        <option value="THE CLIENT">BY THE CLIENT</option>
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className="text-base font-semibold text-gray-500">
+                        Ceiling Related Work Provided By
+                      </label>
+                      <select
+                        className="border px-3 py-2 rounded w-full mt-1"
+                        value={ceilingBy}
+                        onChange={(e) => setCeilingBy(e.target.value)}
+                      >
+                        <option value="AV CORE">BY AV CORE</option>
+                        <option value="THE CLIENT">BY THE CLIENT</option>
+                      </select>
+                    </div>
+
+                   
+                  </div>
+                )}
 
                 {/* Product Type */}
                 <div className="mb-3">

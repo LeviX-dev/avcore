@@ -139,6 +139,11 @@ const EmployeeWorkReport: React.FC = () => {
     assigned_to: [],
     reassigned_stages: []
   });
+  const [summary, setSummary] = useState<any>({
+  userWise: [],
+  roleWise: []
+});
+
   const [modal, setModal] = useState<{ isOpen: boolean; title: string; content: string }>({
     isOpen: false,
     title: '',
@@ -205,16 +210,21 @@ const EmployeeWorkReport: React.FC = () => {
     if (appliedFilters.assigned_to) params.append('assigned_to', appliedFilters.assigned_to);
     if (appliedFilters.reassigned_stage) params.append('reassigned_stage', appliedFilters.reassigned_stage);
 
-    const res = await axios.get(`${BASE_URL}api/employee-work-report?${params.toString()}`, { 
-      withCredentials: true 
-    });
-    
-    if (isExport) return res.data.data || [];
-    
-    requestAnimationFrame(() => {
-      setData(res.data.data || []);
-      setTotalRecords(res.data.total || 0);
-    });
+const res = await axios.get(`${BASE_URL}api/employee-work-report?${params.toString()}`, { 
+  withCredentials: true 
+});
+
+if (isExport) return res.data.data || [];
+
+requestAnimationFrame(() => {
+  setData(res.data.data || []);
+  setTotalRecords(res.data.total || 0);
+
+  // ✅ NEW (safe)
+  if (res.data.summary) {
+    setSummary(res.data.summary);
+  }
+});
   } catch (err) {
     console.error('Error fetching employee work:', err);
     return [];
@@ -582,6 +592,7 @@ const EmployeeWorkReport: React.FC = () => {
           </div>
         )}
       </div>
+      
     </div>
   );
 };

@@ -58,6 +58,7 @@ interface Client {
   quick_remark?: string;
   detailed_remark?: string;
   followup_date?: string;
+    followup_time?: string;  // ✅ ADD THIS - Time field
   assign_date?: string; // Entry Date (read-only)
   assigned_to: string[];
   reassignment_date?: string;
@@ -245,6 +246,7 @@ const UpdateRawData: React.FC<UpdateDataModalProps> = ({
         quick_remark: editingClient.quick_remark,
         detailed_remark: editingClient.detailed_remark,
         followup_date: editingClient.followup_date,
+          followup_time: editingClient.followup_time,  // ✅ ADD THIS LINE
         assign_id: editingClient.assign_id,
         category_other: editingClient.category_other,
         reference_other: editingClient.reference_other,
@@ -891,7 +893,7 @@ const UpdateRawData: React.FC<UpdateDataModalProps> = ({
 
               <div>
                 <label className="block mb-1 text-base font-semibold text-green-700 dark:text-green-600">
-                  Project Type
+                  Video Type
                 </label>
                 <select
                   name="p_type"
@@ -993,7 +995,7 @@ const UpdateRawData: React.FC<UpdateDataModalProps> = ({
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
               {/* Site Visit Date */}
               <div>
-                <label className="block mb-1 text-sm dark:text-white">
+                <label className="block mb-1 text-base font-semibold text-green-700 dark:text-green-600">
                   Site Visit Date
                 </label>
                 <input
@@ -1353,6 +1355,22 @@ const UpdateRawData: React.FC<UpdateDataModalProps> = ({
                   className="w-full p-2 border rounded text-sm dark:border-form-strokedark dark:bg-form-input dark:text-white"
                 />
               </div>
+
+{/* ⏰ Follow-up Time - ADD THIS RIGHT AFTER */}
+<div className="md:col-span-1 mt-4">
+  <label className="block mb-1 text-base font-semibold text-orange-600 dark:text-orange-400">
+    Follow-up Time
+  </label>
+  <input
+    type="time"
+    name="followup_time"
+    value={editingClient.followup_time || ''}
+    onChange={handleInputChange}
+    className="w-full p-2 border rounded text-sm dark:border-form-strokedark dark:bg-form-input dark:text-white"
+  />
+  
+</div>
+
 
               <div className="md:col-span-1 mt-4 ">
                 <label className="block mb-1 text-base font-semibold text-green-700 dark:text-green-600">

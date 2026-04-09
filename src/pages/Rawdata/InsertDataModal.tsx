@@ -848,7 +848,7 @@ const handleSelectAllFiltered = () => {
 
               <div>
                 <label className="block mb-1 text-base font-semibold text-green-700 dark:text-green-600">
-                  Project Type
+                  Video Type
                 </label>
                 <select
                   name="p_type"
@@ -951,7 +951,7 @@ const handleSelectAllFiltered = () => {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
               {/* Site Visit Date */}
               <div>
-                <label className="block mb-1 text-sm dark:text-white">
+                <label className="block mb-1 text-base font-semibold text-green-700 dark:text-green-600">
                   Site Visit Date
                 </label>
                 <input

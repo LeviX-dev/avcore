@@ -13,6 +13,7 @@ const TELECALLER_ROLES = [
   'acoustic_engineer',
   'acoustic_designer',
   'hr_executive',
+    'project_manager',
 ];
 
 const ADMIN_ROLES = ['admin', 'sub_admin'];

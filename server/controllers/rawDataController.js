@@ -1425,7 +1425,7 @@ const TELECALLER_ROLES = [
   'acoustic_engineer',
   'acoustic_designer',
    'hr_executive',
-  
+     'project_manager',
 ];
 
 const ADMIN_ROLES = ['admin', 'sub_admin'];
@@ -2108,6 +2108,158 @@ export const getCompleteRawData = async (req, res) => {
   }
 };
 
+//fev 
+
+
+// Toggle favorite (add/remove)
+export const toggleFavorite = async (req, res) => {
+    try {
+        if (!req.session.user) {
+            return res.status(401).json({ success: false, message: "Unauthorized: No session" });
+        }
+
+        const { master_id } = req.params;
+        const user_id = req.session.user.id;
+
+        if (!master_id) {
+            return res.status(400).json({ success: false, message: "master_id is required" });
+        }
+
+        // Check if favorite exists
+        const [existing] = await db.query(
+            "SELECT id FROM favorite_leads WHERE master_id = ? AND user_id = ?",
+            [master_id, user_id]
+        );
+
+        if (existing.length > 0) {
+            // Remove favorite
+            await db.query(
+                "DELETE FROM favorite_leads WHERE master_id = ? AND user_id = ?",
+                [master_id, user_id]
+            );
+            return res.status(200).json({ 
+                success: true, 
+                is_favorite: false,
+                message: "Removed from favorites" 
+            });
+        } else {
+            // Add favorite
+            await db.query(
+                "INSERT INTO favorite_leads (master_id, user_id) VALUES (?, ?)",
+                [master_id, user_id]
+            );
+            return res.status(200).json({ 
+                success: true, 
+                is_favorite: true,
+                message: "Added to favorites" 
+            });
+        }
+
+    } catch (error) {
+        console.error("❌ Error in toggleFavorite:", error);
+        res.status(500).json({ success: false, message: "Failed to toggle favorite" });
+    }
+};
+
+// Get all favorite leads for current user
+export const getFavorites = async (req, res) => {
+    try {
+        if (!req.session.user) {
+            return res.status(401).json({ success: false, message: "Unauthorized: No session" });
+        }
+
+        const user_id = req.session.user.id;
+
+        const [favorites] = await db.query(
+            `SELECT fl.master_id, fl.created_at, 
+                    rd.name, rd.number, rd.city, rd.lead_stage, rd.followup_date,
+                    lr.assignedTo as assigned_to
+             FROM favorite_leads fl
+             LEFT JOIN raw_data rd ON fl.master_id = rd.master_id
+             LEFT JOIN (SELECT r1.* FROM reassignment r1 
+                        INNER JOIN (SELECT master_id, MAX(id) as max_id 
+                                    FROM reassignment GROUP BY master_id) r2 
+                        ON r1.master_id = r2.master_id AND r1.id = r2.max_id) lr 
+             ON rd.master_id = lr.master_id
+             WHERE fl.user_id = ?
+             ORDER BY fl.created_at DESC`,
+            [user_id]
+        );
+
+        return res.status(200).json({ 
+            success: true, 
+            favorites: favorites 
+        });
+
+    } catch (error) {
+        console.error("❌ Error in getFavorites:", error);
+        res.status(500).json({ success: false, message: "Failed to fetch favorites" });
+    }
+};
+
+// Check if specific lead is favorite
+export const checkFavorite = async (req, res) => {
+    try {
+        if (!req.session.user) {
+            return res.status(401).json({ success: false, message: "Unauthorized: No session" });
+        }
+
+        const { master_id } = req.params;
+        const user_id = req.session.user.id;
+
+        const [result] = await db.query(
+            "SELECT id FROM favorite_leads WHERE master_id = ? AND user_id = ?",
+            [master_id, user_id]
+        );
+
+        return res.status(200).json({ 
+            success: true, 
+            is_favorite: result.length > 0 
+        });
+
+    } catch (error) {
+        console.error("❌ Error in checkFavorite:", error);
+        res.status(500).json({ success: false, message: "Failed to check favorite status" });
+    }
+};
+
+// Get favorite statuses for multiple leads (for batch checking)
+export const getFavoritesBatch = async (req, res) => {
+    try {
+        if (!req.session.user) {
+            return res.status(401).json({ success: false, message: "Unauthorized: No session" });
+        }
+
+        const { master_ids } = req.body;
+        
+        if (!master_ids || !Array.isArray(master_ids) || master_ids.length === 0) {
+            return res.status(400).json({ success: false, message: "master_ids array is required" });
+        }
+
+        const user_id = req.session.user.id;
+        
+        const placeholders = master_ids.map(() => '?').join(',');
+        const [favorites] = await db.query(
+            `SELECT master_id FROM favorite_leads 
+             WHERE user_id = ? AND master_id IN (${placeholders})`,
+            [user_id, ...master_ids]
+        );
+
+        const favoriteMap = {};
+        favorites.forEach(fav => {
+            favoriteMap[fav.master_id] = true;
+        });
+
+        return res.status(200).json({ 
+            success: true, 
+            favorites: favoriteMap 
+        });
+
+    } catch (error) {
+        console.error("❌ Error in getFavoritesBatch:", error);
+        res.status(500).json({ success: false, message: "Failed to fetch favorites batch" });
+    }
+};
 
 
 
@@ -2743,7 +2895,7 @@ assignedUserName = userRow[0].name;
   }
 };
 
-export const updateRawData = async (req, res) => {
+export const updateRawData1 = async (req, res) => {
   try {
     const { master_id } = req.params;
 
@@ -3131,6 +3283,393 @@ if (detailed_remark && detailed_remark.trim() !== '') {
 };
 
 
+export const updateRawData = async (req, res) => {
+  try {
+    const { master_id } = req.params;
+
+    if (!master_id) {
+      return res.status(400).json({ message: "master_id is required" });
+    }
+
+    const created_by_user = req.session?.user?.id || null;
+
+    console.log("📥 Incoming Payload:", req.body);
+
+    const {
+      // Your existing fields...
+      name, number, email, address, area_id, cat_id, reference_id, city,
+      location_link, room_length, room_width, room_height, p_type, budget_range,
+      current_stage, time_to_complete, site_visit_date, demo_date,
+      ar_number, architect_name, ca_number, e_number, sm_number, pop_number, other_number,
+      lead_stage, quick_remark, detailed_remark, status, lead_status,
+      followup_date, followup_time,  // ✅ ADD THIS - Time field
+      assign_date,
+      alternate_number,
+      
+      // reassignment params
+      assignedTo, leadStage, remark, assign_id, reassignment_date,
+      
+      // NEW: Other inputs
+      category_other,
+      reference_other,
+      
+      // NEW: Update mode flag
+      update_mode = 'updateWithReassignment'
+    } = req.body;
+
+    // ------------------------------------------------
+    // STEP 1: Update raw_data (PATCH behavior)
+    // ------------------------------------------------
+    const allowed = {
+      name, 
+      number,
+      alternate_number,
+      email, 
+      address, 
+      area_id, 
+      cat_id, 
+      reference_id, 
+      city,
+      location_link, 
+      room_length: room_length ? parseFloat(room_length) : null,
+      room_width: room_width ? parseFloat(room_width) : null,
+      room_height: room_height ? parseFloat(room_height) : null,
+      p_type, 
+      budget_range,
+      current_stage, 
+      time_to_complete, 
+      site_visit_date, 
+      demo_date,
+      ar_number,
+      architect_name,
+      ca_number, 
+      e_number, 
+      sm_number, 
+      pop_number, 
+      other_number,
+      lead_stage, 
+      quick_remark,
+      status, 
+      lead_status,
+      followup_date,
+      followup_time,  // ✅ ADD THIS - Time field
+      detailed_remark,
+    };
+
+    const updateFields = [];
+    const values = [];
+
+    Object.entries(allowed).forEach(([k, v]) => {
+      if (v !== undefined && v !== "") {
+        updateFields.push(`${k} = ?`);
+        values.push(v);
+      }
+    });
+
+    if (updateFields.length) {
+      values.push(master_id);
+      await db.execute(
+        `UPDATE raw_data SET ${updateFields.join(", ")} WHERE master_id = ?`,
+        values
+      );
+    }
+
+    // ------------------------------------------------
+    // STEP 2: Handle Other Inputs - FIXED (no updated_at column)
+    // ------------------------------------------------
+    // For Category Other
+    if (category_other !== undefined) {
+      if (category_other && category_other.trim() !== '') {
+        // Check if entry exists
+        const [existingCat] = await db.execute(
+          `SELECT id FROM raw_data_other_inputs 
+           WHERE master_id = ? AND cat_id = ?`,
+          [master_id, cat_id]
+        );
+        
+        if (existingCat.length > 0) {
+          // Update existing (use created_at if no updated_at column)
+          await db.execute(
+            `UPDATE raw_data_other_inputs 
+             SET input_text = ?, created_at = NOW()
+             WHERE master_id = ? AND cat_id = ?`,
+            [category_other, master_id, cat_id]
+          );
+        } else {
+          // Insert new
+          await db.execute(
+            `INSERT INTO raw_data_other_inputs 
+             (master_id, cat_id, input_text, created_at) 
+             VALUES (?, ?, ?, NOW())`,
+            [master_id, cat_id, category_other]
+          );
+        }
+      } else {
+        // Delete if empty
+        await db.execute(
+          `DELETE FROM raw_data_other_inputs 
+           WHERE master_id = ? AND cat_id = ?`,
+          [master_id, cat_id]
+        );
+      }
+    }
+
+    // For Reference Other
+    if (reference_other !== undefined) {
+      if (reference_other && reference_other.trim() !== '') {
+        // Check if entry exists
+        const [existingRef] = await db.execute(
+          `SELECT id FROM raw_data_other_inputs 
+           WHERE master_id = ? AND reference_id = ?`,
+          [master_id, reference_id]
+        );
+        
+        if (existingRef.length > 0) {
+          // Update existing (use created_at if no updated_at column)
+          await db.execute(
+            `UPDATE raw_data_other_inputs 
+             SET input_text = ?, created_at = NOW()
+             WHERE master_id = ? AND reference_id = ?`,
+            [reference_other, master_id, reference_id]
+          );
+        } else {
+          // Insert new
+          await db.execute(
+            `INSERT INTO raw_data_other_inputs 
+             (master_id, reference_id, input_text, created_at) 
+             VALUES (?, ?, ?, NOW())`,
+            [master_id, reference_id, reference_other]
+          );
+        }
+      } else {
+        // Delete if empty
+        await db.execute(
+          `DELETE FROM raw_data_other_inputs 
+           WHERE master_id = ? AND reference_id = ?`,
+          [master_id, reference_id]
+        );
+      }
+    }
+
+    // ------------------------------------------------
+    // STEP 3: Assignment logic
+    // ------------------------------------------------
+    let finalAssignId = assign_id;
+
+    if (!finalAssignId) {
+      const [row] = await db.execute(
+        "SELECT assign_id FROM raw_data WHERE master_id = ?",
+        [master_id]
+      );
+      finalAssignId = row.length ? row[0].assign_id : null;
+    }
+
+    if (!finalAssignId) {
+      const [newAssign] = await db.execute(
+        "INSERT INTO assignments (assign_date) VALUES (NOW())"
+      );
+      finalAssignId = newAssign.insertId;
+
+      await db.execute(
+        "UPDATE raw_data SET assign_id = ? WHERE master_id = ?",
+        [finalAssignId, master_id]
+      );
+    }
+
+    // ------------------------------------------------
+    // STEP 4: IMPROVED Reassignment logic
+    // ------------------------------------------------
+    const inserted = [];
+    const skipped = [];
+    let users = [];
+
+    // Get previous assignments for comparison
+    const [previousAssignments] = await db.execute(
+      `SELECT assignedTo, leadStage, remark 
+       FROM reassignment 
+       WHERE master_id = ? AND assign_id = ?
+       ORDER BY created_at DESC
+       LIMIT 1`,
+      [master_id, finalAssignId]
+    );
+
+    const previousAssignment = previousAssignments.length > 0 ? previousAssignments[0] : null;
+    const previousUsers = previousAssignment?.assignedTo ? previousAssignment.assignedTo.toString().split(",").map(u => u.trim()) : [];
+
+    // Determine if we should create new reassignment
+    let shouldCreateReassignment = false;
+    let reassignmentReason = '';
+
+    // Only check reassignment if update_mode includes it
+    if (update_mode === 'updateWithReassignment') {
+      // Check if assignedTo has changed
+      if (assignedTo) {
+        const newUsers = Array.isArray(assignedTo) 
+          ? assignedTo.map(u => u.toString().trim())
+          : assignedTo.toString().split(",").map(u => u.trim());
+        
+        // Check if the list of users has actually changed
+        const sortedPrevious = [...previousUsers].sort().join(",");
+        const sortedNew = [...newUsers].sort().join(",");
+        
+        if (sortedPrevious !== sortedNew || (assignedTo && assignedTo.length)) {
+          shouldCreateReassignment = true;
+          reassignmentReason = 'assignedTo_changed';
+          users = newUsers;
+        } else {
+          // Use previous users if no change
+          users = previousUsers;
+        }
+      } else {
+        users = previousUsers;
+      }
+
+      // Check if we have a NEW detailed remark (not just copying from quick_remark or previous)
+      const hasNewDetailedRemark = detailed_remark && 
+        detailed_remark.trim() !== '' && 
+        previousAssignment?.remark !== detailed_remark.trim();
+
+      // Check if lead stage changed
+      const hasLeadStageChanged = (leadStage || lead_stage) && 
+        previousAssignment?.leadStage !== (leadStage || lead_stage);
+
+      if (hasNewDetailedRemark && !shouldCreateReassignment) {
+        shouldCreateReassignment = true;
+        reassignmentReason = 'new_remark';
+        users = previousUsers; // Keep same users if only remark changed
+      }
+
+      if (hasLeadStageChanged && !shouldCreateReassignment) {
+        shouldCreateReassignment = true;
+        reassignmentReason = 'leadStage_changed';
+        users = previousUsers; // Keep same users if only stage changed
+      }
+    }
+
+    // Create reassignment only if there are actual changes and mode allows it
+    if (shouldCreateReassignment && update_mode === 'updateWithReassignment') {
+      const reassDate = reassignment_date
+        ? new Date(reassignment_date)
+        : followup_date
+          ? new Date(followup_date)
+          : new Date();
+
+      // Determine the remark to use
+      let finalRemark = '';
+      if (detailed_remark && detailed_remark.trim() !== '') {
+        finalRemark = detailed_remark;
+      } else if (quick_remark && quick_remark.trim() !== '') {
+        // If detailed_remark is empty but quick_remark is selected, use quick_remark
+        finalRemark = quick_remark;
+      } else if (reassignmentReason === 'leadStage_changed') {
+        finalRemark = `Lead stage changed to ${leadStage || lead_stage}`;
+      }
+
+      // Determine the lead stage to use
+      let finalLeadStage = leadStage || lead_stage || previousAssignment?.leadStage || null;
+
+      for (const user of users) {
+        if (!user || user.trim() === '') continue;
+
+        let finalName = user;
+
+        // If user is an ID, get the name
+        if (!isNaN(user) && reassignmentReason === 'assignedTo_changed') {
+          const [u] = await db.execute(
+            "SELECT name FROM users WHERE user_id = ?",
+            [user]
+          );
+          finalName = u.length ? u[0].name : user.toString();
+        }
+
+        // Check for duplicate reassignment (same day, same user, same stage)
+        const [existingReassignment] = await db.execute(
+          `SELECT id FROM reassignment 
+           WHERE master_id = ? AND assign_id = ? AND assignedTo = ? 
+           AND leadStage = ? 
+           AND DATE(reassignment_date) = DATE(?)
+           ORDER BY created_at DESC
+           LIMIT 1`,
+          [
+            master_id,
+            finalAssignId,
+            finalName,
+            finalLeadStage,
+            reassDate
+          ]
+        );
+
+        if (existingReassignment.length > 0) {
+          // Skip duplicate - only if remark is also the same
+          const [checkRemark] = await db.execute(
+            `SELECT remark FROM reassignment WHERE id = ?`,
+            [existingReassignment[0].id]
+          );
+          
+          if (checkRemark.length > 0 && checkRemark[0].remark === finalRemark) {
+            skipped.push({
+              userId: user,
+              userName: finalName,
+              leadStage: finalLeadStage,
+              reason: 'duplicate'
+            });
+            continue;
+          }
+        }
+
+        // Create new reassignment
+        const [insertRes] = await db.execute(
+          `INSERT INTO reassignment
+           (assign_id, master_id, created_by_user, assignedTo, leadStage, remark, reassignment_date, created_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?, NOW())`,
+          [
+            finalAssignId,
+            master_id,
+            created_by_user,
+            finalName,
+            finalLeadStage,
+            finalRemark,
+            reassDate
+          ]
+        );
+
+        inserted.push({
+          id: insertRes.insertId,
+          userId: user,
+          userName: finalName,
+          leadStage: finalLeadStage,
+          remark: finalRemark
+        });
+      }
+    }
+
+    // ------------------------------------------------
+    // RESPONSE
+    // ------------------------------------------------
+    res.status(200).json({
+      success: true,
+      message: update_mode === 'updateWithReassignment' 
+        ? "Raw data updated with reassignment" 
+        : "Raw data updated without reassignment",
+      assign_id: finalAssignId,
+      inserted_count: inserted.length,
+      skipped_count: skipped.length,
+      inserted,
+      skipped,
+      reassignment_created: shouldCreateReassignment,
+      reassignment_reason: reassignmentReason,
+      update_mode
+    });
+
+  } catch (err) {
+    console.error("❌ updateRawData error:", err);
+    res.status(500).json({
+      success: false,
+      message: "Server error",
+      error: err.message
+    });
+  }
+};
 
 // ✅ MIME → EXTENSION MAP (FIXES jpeg issue)
 const mimeExtensionMap = {
@@ -8869,7 +9408,7 @@ export const getEmployeeDetailedReport1 = async (req, res) => {
   }
 };
 
-export const getEmployeeDetailedReport = async (req, res) => {
+export const getEmployeeDetailedReport2 = async (req, res) => {
   try {
     if (!req.session?.user) {
       return res.status(401).json({ message: "Unauthorized" });
@@ -9070,6 +9609,221 @@ export const getEmployeeDetailedReport = async (req, res) => {
     });
   }
 };
+
+
+export const getEmployeeDetailedReport = async (req, res) => {
+  try {
+    if (!req.session?.user) {
+      return res.status(401).json({ message: "Unauthorized" });
+    }
+
+    const { role } = req.session.user;
+
+    if (!isAdminLike(role) && !isManagementLike(role)) {
+      return res.status(403).json({ message: "Access denied" });
+    }
+
+    // ✅ GET DATE FILTER FROM FRONTEND
+    const { fromDate, toDate } = req.query;
+
+    let dateFilter = "";
+
+    // ✅ APPLY ONLY IF BOTH DATES EXIST
+    if (fromDate && toDate) {
+      dateFilter = `AND DATE(r.created_at) BETWEEN '${fromDate}' AND '${toDate}'`;
+    }
+
+    const query = `
+    WITH latest_assignment AS (
+        SELECT 
+            r.*,
+            ROW_NUMBER() OVER (
+                PARTITION BY r.master_id, r.assignedTo
+                ORDER BY r.created_at DESC
+            ) AS rn
+        FROM reassignment r
+        WHERE 1=1 ${dateFilter}
+    ),
+
+    lead_conversion_status AS (
+        SELECT 
+            la.master_id,
+            la.assignedTo,
+            la.leadStage,
+            CASE
+                WHEN u.role = 'tele_caller' AND la.leadStage = 'Pre Site Visit' THEN 1
+                WHEN u.role = 'field_marketing_executive' AND la.leadStage = 'Quotation Pending' THEN 1
+                WHEN u.role = 'junior_autocad_designer' AND la.leadStage = 'Quotation Follow-up' THEN 1
+                WHEN u.role = 'tech_sale_sound_engineer' AND la.leadStage IN ('Demo','Pre Site Visit','Projection List') THEN 1
+                WHEN u.role = 'technical_head' AND la.leadStage = 'Projection List' THEN 1
+                ELSE 0
+            END AS is_converted
+        FROM latest_assignment la
+        INNER JOIN users u ON u.name = la.assignedTo
+        WHERE la.rn = 1
+    ),
+
+    drop_loss_status AS (
+        SELECT 
+            la.master_id,
+            la.assignedTo,
+            la.leadStage,
+            CASE 
+                WHEN la.leadStage = 'Drop' THEN 'Drop'
+                WHEN la.leadStage = 'lost' THEN 'Lost'
+                ELSE NULL
+            END AS drop_loss_type,
+            la.reassignment_date AS drop_loss_date,
+            la.remark AS drop_loss_remark
+        FROM latest_assignment la
+        WHERE la.rn = 1 
+          AND (la.leadStage = 'Drop' OR la.leadStage = 'lost')
+    )
+
+    SELECT
+        u.name AS employee_name,
+        u.role,
+        rd.master_id,
+        rd.name AS lead_name,
+        rd.number,
+        rd.email,
+        rd.city,
+        a.assign_date,
+        la.leadStage AS stage,
+        la.remark,
+        la.reassignment_date,
+        IFNULL(lcs.is_converted,0) AS is_converted,
+        dl.drop_loss_type,
+        dl.drop_loss_date,
+        dl.drop_loss_remark,
+        CASE 
+            WHEN dl.drop_loss_type IS NOT NULL THEN 1 
+            ELSE 0 
+        END AS is_dropped_or_lost
+    FROM latest_assignment la
+
+    INNER JOIN users u 
+        ON u.name = la.assignedTo
+
+    INNER JOIN raw_data rd
+        ON rd.master_id = la.master_id
+
+    LEFT JOIN assignments a
+        ON a.assign_id = la.assign_id
+
+    LEFT JOIN lead_conversion_status lcs
+        ON la.master_id = lcs.master_id 
+        AND la.assignedTo = lcs.assignedTo
+
+    LEFT JOIN drop_loss_status dl
+        ON la.master_id = dl.master_id 
+        AND la.assignedTo = dl.assignedTo
+
+    WHERE la.rn = 1
+
+    ORDER BY u.name, la.reassignment_date DESC
+    `;
+
+    const [rows] = await db.query(query);
+
+    // 🔹 Group data by employee
+    const employeeMap = {};
+
+    rows.forEach(row => {
+      if (!employeeMap[row.employee_name]) {
+        employeeMap[row.employee_name] = {
+          employee_name: row.employee_name,
+          role: row.role,
+          total_assigned: 0,
+          converted_count: 0,
+          not_converted_count: 0,
+          drop_count: 0,
+          loss_count: 0,
+          total_dropped_lost: 0,
+          lead_details: []
+        };
+      }
+
+      const employee = employeeMap[row.employee_name];
+
+      employee.total_assigned += 1;
+
+      if (row.is_converted === 1) {
+        employee.converted_count += 1;
+      } else {
+        employee.not_converted_count += 1;
+      }
+
+      if (row.drop_loss_type === 'Drop') {
+        employee.drop_count += 1;
+        employee.total_dropped_lost += 1;
+      } else if (row.drop_loss_type === 'Lost') {
+        employee.loss_count += 1;
+        employee.total_dropped_lost += 1;
+      }
+
+      employee.lead_details.push({
+        master_id: row.master_id,
+        lead_name: row.lead_name,
+        number: row.number,
+        email: row.email,
+        city: row.city,
+        assign_date: row.assign_date,
+        stage: row.stage,
+        remark: row.remark,
+        reassignment_date: row.reassignment_date,
+        is_converted: row.is_converted,
+        conversion_status: row.is_converted ? "Converted" : "Not Converted",
+        is_dropped_or_lost: row.is_dropped_or_lost,
+        drop_loss_type: row.drop_loss_type,
+        drop_loss_date: row.drop_loss_date,
+        drop_loss_remark: row.drop_loss_remark,
+        drop_loss_status: row.drop_loss_type 
+          ? (row.drop_loss_type === 'Drop' ? 'Dropped' : 'Lost') 
+          : 'Active'
+      });
+    });
+
+    const result = Object.values(employeeMap);
+
+    // 🔹 Summary
+    const totalAssigned = result.reduce((sum, emp) => sum + emp.total_assigned, 0);
+    const totalConverted = result.reduce((sum, emp) => sum + emp.converted_count, 0);
+    const totalDroppedLost = result.reduce((sum, emp) => sum + emp.total_dropped_lost, 0);
+
+    const summary = {
+      total_employees: result.length,
+      total_leads_assigned: totalAssigned,
+      total_converted: totalConverted,
+      total_not_converted: result.reduce((sum, emp) => sum + emp.not_converted_count, 0),
+      total_dropped: result.reduce((sum, emp) => sum + emp.drop_count, 0),
+      total_lost: result.reduce((sum, emp) => sum + emp.loss_count, 0),
+      total_dropped_lost: totalDroppedLost,
+      conversion_rate: totalAssigned > 0 
+        ? ((totalConverted / totalAssigned) * 100).toFixed(2)
+        : "0.00",
+      drop_loss_rate: totalAssigned > 0 
+        ? ((totalDroppedLost / totalAssigned) * 100).toFixed(2)
+        : "0.00"
+    };
+
+    res.status(200).json({
+      success: true,
+      totalEmployees: result.length,
+      summary,
+      data: result
+    });
+
+  } catch (error) {
+    console.error("❌ Employee detailed report error:", error);
+
+    res.status(500).json({
+      message: "Failed to fetch employee report",
+      error: error.message
+    });
+  }
+};
+
 
 
 export const getEmployeeLeadList = async (req, res) => {
@@ -10354,7 +11108,7 @@ AND rd.lead_stage NOT IN ('Drop','Closed Deal','Execution','Pre Execution')
 };
 
 
-export const getAssignedMissTodaysLeadsFullData = async (req, res) => {
+export const getAssignedMissTodaysLeadsFullData3 = async (req, res) => {
   try {
     if (!req.session.user) {
       return res.status(401).json({ message: "Unauthorized: No session" });
@@ -10780,6 +11534,1365 @@ AND rd.lead_stage NOT IN ('Drop','Closed Deal','Execution','Pre Execution')
 };
 
 
+export const getAssignedMissTodaysLeadsFullData4 = async (req, res) => {
+  try {
+    if (!req.session.user) {
+      return res.status(401).json({ message: "Unauthorized: No session" });
+    }
+
+    const { id: userId, role } = req.session.user;
+    const today = new Date().toISOString().slice(0, 10);
+    
+    // Get pagination and filter parameters from query
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 5;
+    const offset = (page - 1) * limit;
+    
+    // Get filter parameters
+    const search = req.query.search || '';
+    const entryFromDate = req.query.entryFromDate;
+    const entryToDate = req.query.entryToDate;
+    const followupFromDate = req.query.followupFromDate;
+    const followupToDate = req.query.followupToDate;
+    const stages = req.query.stages ? req.query.stages.split(',') : [];
+    const users = req.query.users ? req.query.users.split(',') : [];
+    const cities = req.query.cities ? req.query.cities.split(',') : [];
+
+    /* ================= CURRENT USER ================= */
+    const [userResult] = await db.query(
+      "SELECT name FROM users WHERE user_id = ?",
+      [userId]
+    );
+    const currentUserName = userResult[0]?.name || '';
+
+    /* ================= GET LATEST REASSIGNMENT IDS ================= */
+    const [latestReassignments] = await db.query(`
+      SELECT master_id, MAX(id) as latest_id
+      FROM reassignment
+      GROUP BY master_id
+    `);
+    
+    const latestReassignmentIds = latestReassignments.map(r => r.latest_id);
+
+    /* ================= GET TOTAL COUNT FOR PAGINATION ================= */
+    let countQuery = `
+      SELECT COUNT(DISTINCT rd.master_id) AS total_count
+      FROM raw_data rd
+      LEFT JOIN reassignment re ON rd.master_id = re.master_id
+      LEFT JOIN (
+        SELECT r1.*, ROW_NUMBER() OVER (PARTITION BY master_id ORDER BY id DESC) rn
+        FROM reassignment r1
+      ) lr ON rd.master_id = lr.master_id AND lr.rn = 1
+      WHERE (rd.followup_date < ? OR rd.followup_date = CURDATE() OR DATE(re.reassignment_date) = CURDATE())
+AND rd.lead_stage NOT IN ('Drop', 'Closed Deal', 'Execution', 'Pre Execution')
+      AND re.id IN (?)
+    `;
+
+    let countParams = [today, latestReassignmentIds];
+
+    // Add search filter to count
+    if (search) {
+      countQuery += ` AND (
+        rd.name LIKE ? OR 
+        rd.number LIKE ? OR 
+        rd.email LIKE ? OR 
+        rd.address LIKE ? OR 
+        rd.city LIKE ? OR 
+        rd.lead_stage LIKE ? OR 
+        lr.assignedTo LIKE ?
+      )`;
+      const searchPattern = `%${search}%`;
+      countParams.push(searchPattern, searchPattern, searchPattern, searchPattern, searchPattern, searchPattern, searchPattern);
+    }
+
+    // Add date filters to count
+    if (entryFromDate) {
+      countQuery += ` AND DATE(rd.assign_date) >= ?`;
+      countParams.push(entryFromDate);
+    }
+    if (entryToDate) {
+      countQuery += ` AND DATE(rd.assign_date) <= ?`;
+      countParams.push(entryToDate);
+    }
+    if (followupFromDate) {
+      countQuery += ` AND DATE(rd.followup_date) >= ?`;
+      countParams.push(followupFromDate);
+    }
+    if (followupToDate) {
+      countQuery += ` AND DATE(rd.followup_date) <= ?`;
+      countParams.push(followupToDate);
+    }
+
+    // Add stage filter
+    if (stages.length > 0) {
+      countQuery += ` AND rd.lead_stage IN (?)`;
+      countParams.push(stages);
+    }
+
+    // Add user filter
+    if (users.length > 0) {
+      countQuery += ` AND lr.assignedTo IN (?)`;
+      countParams.push(users);
+    }
+
+    // Add city filter
+    if (cities.length > 0) {
+      countQuery += ` AND rd.city IN (?)`;
+      countParams.push(cities);
+    }
+
+    // Role filter for count
+    if (isTelecallerLike(role)) {
+      countQuery += ` AND lr.assignedTo = ?`;
+      countParams.push(currentUserName);
+    } else if (isAdminLike(role) || isManagementLike(role)) {
+      // Admin/Management see all
+    } else {
+      countQuery += ` AND lr.assignedTo = ?`;
+      countParams.push(currentUserName);
+    }
+
+    const [countResult] = await db.query(countQuery, countParams);
+    const totalCount = countResult[0]?.total_count || 0;
+
+    /* ================= GET COMBINED LEADS DATA WITH PAGINATION ================= */
+    let leadsQuery = `
+      SELECT 
+        rd.master_id,
+        IFNULL(rd.name, 'Not Available') AS name,
+        IFNULL(rd.number, 'Not Available') AS number,
+        IFNULL(rd.alternate_number, 'Not Available') AS alternate_number,
+        IFNULL(rd.email, 'Not Available') AS email,
+        IFNULL(rd.address, 'Not Available') AS address,
+        IFNULL(rd.city, 'Not Available') AS city,
+        IFNULL(rd.status, 'Not Available') AS status,
+        IFNULL(rd.lead_status, 'Not Available') AS lead_status,
+        IFNULL(rd.lead_stage, 'Not Available') AS lead_stage,
+        IFNULL(rd.current_stage, 'Not Available') AS current_stage,
+        IFNULL(rd.created_by_user, 'Not Available') AS created_by_user,
+        IFNULL(rd.assign_id, 'Not Available') AS assign_id,
+        IFNULL(rd.followup_date, 'Not Available') AS followup_date,
+        IFNULL(rd.cat_id, 'Not Available') AS cat_id,
+        IFNULL(rd.reference_id, 'Not Available') AS reference_id,
+        IFNULL(rd.area_id, 'Not Available') AS area_id,
+        IFNULL(rd.room_length, 'Not Available') AS room_length,
+        IFNULL(rd.room_width, 'Not Available') AS room_width,
+        IFNULL(rd.room_height, 'Not Available') AS room_height,
+        IFNULL(rd.location_link, 'Not Available') AS location_link,
+        IFNULL(rd.p_type, 'Not Available') AS p_type,
+        IFNULL(rd.budget_range, 'Not Available') AS budget_range,
+        IFNULL(rd.time_to_complete, 'Not Available') AS time_to_complete,
+        IFNULL(rd.site_visit_date, 'Not Available') AS site_visit_date,
+        IFNULL(rd.demo_date, 'Not Available') AS demo_date,
+        IFNULL(rd.lead_activity, 0) AS lead_activity,
+        IFNULL(rd.ar_number, 'Not Available') AS ar_number,
+        IFNULL(rd.architect_name, 'Not Available') AS architect_name,
+        IFNULL(rd.ca_number, 'Not Available') AS ca_number,
+        IFNULL(rd.e_number, 'Not Available') AS e_number,
+        IFNULL(rd.sm_number, 'Not Available') AS sm_number,
+        IFNULL(rd.pop_number, 'Not Available') AS pop_number,
+        IFNULL(rd.other_number, 'Not Available') AS other_number,
+        IFNULL(rd.quick_remark, 'Not Available') AS quick_remark,
+        IFNULL(rd.detailed_remark, 'Not Available') AS detailed_remark,
+        IFNULL(a.area_name, 'Not Available') AS area_name,
+        IFNULL(c.cat_name, 'Not Available') AS cat_name,
+        IFNULL(ref.reference_name, 'Not Available') AS reference_name,
+        IFNULL(DATE(asg.assign_date), 'Not Available') AS assign_date,
+        lr.id AS reassignment_id,
+        lr.reassignment_date,
+        lr.assignedTo AS reassigned_to,
+        lr.remark AS reassignment_remark,
+        lr.leadStage AS reassignment_lead_stage,
+        IFNULL(u.name, 'Not Available') AS telecaller_name,
+        u.user_id AS assigned_to_user_id,
+        MAX(d.location_link) AS document_location_link,
+        CASE 
+          WHEN rd.followup_date < ? THEN 'missed'
+          ELSE 'todays'
+        END AS data_type
+
+      FROM raw_data rd
+
+      LEFT JOIN area a ON rd.area_id = a.area_id
+      LEFT JOIN category c ON rd.cat_id = c.cat_id
+      LEFT JOIN reference ref ON rd.reference_id = ref.reference_id
+      LEFT JOIN assignments asg ON rd.assign_id = asg.assign_id
+      LEFT JOIN (
+        SELECT r1.*, ROW_NUMBER() OVER (PARTITION BY master_id ORDER BY id DESC) rn
+        FROM reassignment r1
+      ) lr ON rd.master_id = lr.master_id AND lr.rn = 1
+      LEFT JOIN users u ON lr.assignedTo = u.name
+      LEFT JOIN documents d ON d.master_id = rd.master_id
+      LEFT JOIN reassignment re ON rd.master_id = re.master_id
+
+      WHERE (rd.followup_date < ? OR rd.followup_date = CURDATE() OR DATE(re.reassignment_date) = CURDATE())
+AND rd.lead_stage NOT IN ('Drop','Closed Deal','Execution','Pre Execution')
+      AND re.id IN (?)
+    `;
+
+    let leadsParams = [today, today, latestReassignmentIds];
+
+    // Add filters to leads query
+    if (search) {
+      leadsQuery += ` AND (
+        rd.name LIKE ? OR 
+        rd.number LIKE ? OR 
+        rd.email LIKE ? OR 
+        rd.address LIKE ? OR 
+        rd.city LIKE ? OR 
+        rd.lead_stage LIKE ? OR 
+        lr.assignedTo LIKE ?
+      )`;
+      const searchPattern = `%${search}%`;
+      leadsParams.push(searchPattern, searchPattern, searchPattern, searchPattern, searchPattern, searchPattern, searchPattern);
+    }
+
+    if (entryFromDate) {
+      leadsQuery += ` AND DATE(rd.assign_date) >= ?`;
+      leadsParams.push(entryFromDate);
+    }
+    if (entryToDate) {
+      leadsQuery += ` AND DATE(rd.assign_date) <= ?`;
+      leadsParams.push(entryToDate);
+    }
+    if (followupFromDate) {
+      leadsQuery += ` AND DATE(rd.followup_date) >= ?`;
+      leadsParams.push(followupFromDate);
+    }
+    if (followupToDate) {
+      leadsQuery += ` AND DATE(rd.followup_date) <= ?`;
+      leadsParams.push(followupToDate);
+    }
+
+    if (stages.length > 0) {
+      leadsQuery += ` AND rd.lead_stage IN (?)`;
+      leadsParams.push(stages);
+    }
+
+    if (users.length > 0) {
+      leadsQuery += ` AND lr.assignedTo IN (?)`;
+      leadsParams.push(users);
+    }
+
+    if (cities.length > 0) {
+      leadsQuery += ` AND rd.city IN (?)`;
+      leadsParams.push(cities);
+    }
+
+    if (isTelecallerLike(role)) {
+      leadsQuery += ` AND lr.assignedTo = ?`;
+      leadsParams.push(currentUserName);
+    } else if (!isAdminLike(role) && !isManagementLike(role)) {
+      leadsQuery += ` AND lr.assignedTo = ?`;
+      leadsParams.push(currentUserName);
+    }
+
+    leadsQuery += ` ORDER BY rd.followup_date ASC, rd.followup_time IS NULL, rd.followup_time ASC LIMIT ? OFFSET ?`;
+    leadsParams.push(limit, offset);
+
+    const [leadsRows] = await db.query(leadsQuery, leadsParams);
+
+    /* ================= GET COUNTS FOR TODAY/MISSED SEPARATELY ================= */
+    let todayCountQuery = `
+      SELECT COUNT(DISTINCT rd.master_id) AS count
+      FROM raw_data rd
+      LEFT JOIN reassignment re ON rd.master_id = re.master_id
+      LEFT JOIN (
+        SELECT r1.*, ROW_NUMBER() OVER (PARTITION BY master_id ORDER BY id DESC) rn
+        FROM reassignment r1
+      ) lr ON rd.master_id = lr.master_id AND lr.rn = 1
+      WHERE (rd.followup_date = CURDATE() OR DATE(re.reassignment_date) = CURDATE())
+AND rd.lead_stage NOT IN ('Drop','Closed Deal','Execution','Pre Execution') 
+     AND re.id IN (?)
+    `;
+    
+    let missedCountQuery = `
+      SELECT COUNT(DISTINCT rd.master_id) AS count
+      FROM raw_data rd
+      LEFT JOIN reassignment re ON rd.master_id = re.master_id
+      LEFT JOIN (
+        SELECT r1.*, ROW_NUMBER() OVER (PARTITION BY master_id ORDER BY id DESC) rn
+        FROM reassignment r1
+      ) lr ON rd.master_id = lr.master_id AND lr.rn = 1
+      WHERE rd.followup_date < ?
+AND rd.lead_stage NOT IN ('Drop','Closed Deal','Execution','Pre Execution')
+      AND re.id IN (?)
+    `;
+
+    // Add role filters to count queries
+    if (isTelecallerLike(role)) {
+      todayCountQuery += ` AND lr.assignedTo = ?`;
+      missedCountQuery += ` AND lr.assignedTo = ?`;
+    } else if (!isAdminLike(role) && !isManagementLike(role)) {
+      todayCountQuery += ` AND lr.assignedTo = ?`;
+      missedCountQuery += ` AND lr.assignedTo = ?`;
+    }
+
+    let todayCountParams = [latestReassignmentIds];
+    let missedCountParams = [today, latestReassignmentIds];
+
+    if (isTelecallerLike(role) || (!isAdminLike(role) && !isManagementLike(role))) {
+      todayCountParams.push(currentUserName);
+      missedCountParams.push(currentUserName);
+    }
+
+    const [todayCountResult] = await db.query(todayCountQuery, todayCountParams);
+    const [missedCountResult] = await db.query(missedCountQuery, missedCountParams);
+    
+    const todayTotal = todayCountResult[0]?.count || 0;
+    const missedTotal = missedCountResult[0]?.count || 0;
+
+    /* ================= GET OTHER DATA (same as before) ================= */
+    const masterIds = leadsRows.map(r => r.master_id);
+
+    // Get other inputs
+    let otherInputsRows = [];
+    if (masterIds.length) {
+      const [otherInputs] = await db.query(
+        `SELECT master_id, cat_id, reference_id, input_text
+         FROM raw_data_other_inputs
+         WHERE master_id IN (?)
+         ORDER BY created_at DESC`,
+        [masterIds]
+      );
+      otherInputsRows = otherInputs;
+    }
+
+    // Get reassignment history
+    let reassignmentRows = [];
+    if (masterIds.length) {
+      const [reassignments] = await db.query(
+        `SELECT rm.*, u.name, u.role
+         FROM reassignment rm
+         LEFT JOIN users u ON u.user_id = rm.created_by_user
+         WHERE rm.master_id IN (?)
+         ORDER BY rm.reassignment_date DESC, rm.created_at DESC`,
+        [masterIds]
+      );
+      reassignmentRows = reassignments;
+    }
+
+    // Format the leads
+    const formattedLeads = leadsRows.map(row => {
+      const rowCatId = parseInt(row.cat_id);
+      const rowRefId = parseInt(row.reference_id);
+
+      const categoryOther =
+        otherInputsRows.find(
+          oi => oi.master_id === row.master_id && oi.cat_id === rowCatId
+        )?.input_text || '';
+
+      const referenceOther =
+        otherInputsRows.find(
+          oi => oi.master_id === row.master_id && oi.reference_id === rowRefId
+        )?.input_text || '';
+
+      const reassignments = reassignmentRows
+        .filter(r => r.master_id === row.master_id)
+        .map(r => ({
+          remark: r.remark || '',
+          assignedTo: r.assignedTo || '',
+          leadStage: r.leadStage || '',
+          created_by_user: r.created_by_user || '',
+          created_at: r.created_at
+            ? new Date(r.created_at).toLocaleString('en-GB')
+            : '',
+          reassignment_date: r.reassignment_date
+            ? new Date(r.reassignment_date).toLocaleString('en-GB')
+            : '',
+          name: r.name || '',
+          role: r.role || ''
+        }));
+
+      return {
+        ...row,
+        category_other: categoryOther,
+        reference_other: referenceOther,
+        reassignment_remarks: reassignments,
+        latest_assignedTo: reassignments[0]?.assignedTo || '',
+        latest_leadStage: reassignments[0]?.leadStage || '',
+        assign_date: row.assign_date
+      };
+    });
+
+    // Separate missed and today's leads
+    const missedLeads = formattedLeads.filter(lead => lead.data_type === 'missed');
+    const todaysLeads = formattedLeads.filter(lead => lead.data_type === 'todays');
+
+    const totalPages = Math.ceil(totalCount / limit);
+
+    return res.status(200).json({
+      success: true,
+      todayCount: todayTotal,
+      missedCount: missedTotal,
+      totalCount: totalCount,
+      
+      // Paginated combined results
+      leads: {
+        total: totalCount,
+        currentPage: page,
+        totalPages: totalPages,
+        limit: limit,
+        data: formattedLeads,
+        showing: {
+          from: offset + 1,
+          to: Math.min(offset + limit, totalCount),
+          total: totalCount
+        }
+      },
+      
+      // Separate counts (for UI badges)
+      today: {
+        total: todayTotal,
+        leads: todaysLeads
+      },
+      
+      missed: {
+        total: missedTotal,
+        leads: missedLeads
+      }
+    });
+
+  } catch (error) {
+    console.error("❌ Error in getAssignedMissTodaysLeadsFullData:", error);
+    res.status(500).json({ message: "Failed to fetch dashboard data" });
+  }
+};
+
+export const getAssignedMissTodaysLeadsFullData5 = async (req, res) => {
+  try {
+    if (!req.session.user) {
+      return res.status(401).json({ message: "Unauthorized: No session" });
+    }
+
+    const { id: userId, role } = req.session.user;
+    const today = new Date().toISOString().slice(0, 10);
+    
+    // Get pagination and filter parameters from query
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 5;
+    const offset = (page - 1) * limit;
+    
+    // Get filter parameters
+    const search = req.query.search || '';
+    const entryFromDate = req.query.entryFromDate;
+    const entryToDate = req.query.entryToDate;
+    const followupFromDate = req.query.followupFromDate;
+    const followupToDate = req.query.followupToDate;
+    const stages = req.query.stages ? req.query.stages.split(',') : [];
+    const users = req.query.users ? req.query.users.split(',') : [];
+    const cities = req.query.cities ? req.query.cities.split(',') : [];
+
+    /* ================= CURRENT USER ================= */
+    const [userResult] = await db.query(
+      "SELECT name FROM users WHERE user_id = ?",
+      [userId]
+    );
+    const currentUserName = userResult[0]?.name || '';
+
+    /* ================= GET LATEST REASSIGNMENT IDS ================= */
+    const [latestReassignments] = await db.query(`
+      SELECT master_id, MAX(id) as latest_id
+      FROM reassignment
+      GROUP BY master_id
+    `);
+    
+    const latestReassignmentIds = latestReassignments.map(r => r.latest_id);
+
+    /* ================= GET TOTAL COUNT FOR PAGINATION ================= */
+    let countQuery = `
+      SELECT COUNT(DISTINCT rd.master_id) AS total_count
+      FROM raw_data rd
+      LEFT JOIN reassignment re ON rd.master_id = re.master_id
+      LEFT JOIN (
+        SELECT r1.*, ROW_NUMBER() OVER (PARTITION BY master_id ORDER BY id DESC) rn
+        FROM reassignment r1
+      ) lr ON rd.master_id = lr.master_id AND lr.rn = 1
+      WHERE (rd.followup_date < ? OR rd.followup_date = CURDATE() OR DATE(re.reassignment_date) = CURDATE())
+AND rd.lead_stage NOT IN ('Drop', 'Closed Deal', 'Execution', 'Pre Execution')
+      AND re.id IN (?)
+    `;
+
+    let countParams = [today, latestReassignmentIds];
+
+    // Add search filter to count
+    if (search) {
+      countQuery += ` AND (
+        rd.name LIKE ? OR 
+        rd.number LIKE ? OR 
+        rd.email LIKE ? OR 
+        rd.address LIKE ? OR 
+        rd.city LIKE ? OR 
+        rd.lead_stage LIKE ? OR 
+        lr.assignedTo LIKE ?
+      )`;
+      const searchPattern = `%${search}%`;
+      countParams.push(searchPattern, searchPattern, searchPattern, searchPattern, searchPattern, searchPattern, searchPattern);
+    }
+
+    // Add date filters to count
+    if (entryFromDate) {
+      countQuery += ` AND DATE(rd.assign_date) >= ?`;
+      countParams.push(entryFromDate);
+    }
+    if (entryToDate) {
+      countQuery += ` AND DATE(rd.assign_date) <= ?`;
+      countParams.push(entryToDate);
+    }
+    if (followupFromDate) {
+      countQuery += ` AND DATE(rd.followup_date) >= ?`;
+      countParams.push(followupFromDate);
+    }
+    if (followupToDate) {
+      countQuery += ` AND DATE(rd.followup_date) <= ?`;
+      countParams.push(followupToDate);
+    }
+
+    // Add stage filter
+    if (stages.length > 0) {
+      countQuery += ` AND rd.lead_stage IN (?)`;
+      countParams.push(stages);
+    }
+
+    // Add user filter
+    if (users.length > 0) {
+      countQuery += ` AND lr.assignedTo IN (?)`;
+      countParams.push(users);
+    }
+
+    // Add city filter
+    if (cities.length > 0) {
+      countQuery += ` AND rd.city IN (?)`;
+      countParams.push(cities);
+    }
+
+    // Role filter for count
+    if (isTelecallerLike(role)) {
+      countQuery += ` AND lr.assignedTo = ?`;
+      countParams.push(currentUserName);
+    } else if (isAdminLike(role) || isManagementLike(role)) {
+      // Admin/Management see all
+    } else {
+      countQuery += ` AND lr.assignedTo = ?`;
+      countParams.push(currentUserName);
+    }
+
+    const [countResult] = await db.query(countQuery, countParams);
+    const totalCount = countResult[0]?.total_count || 0;
+
+    /* ================= GET COMBINED LEADS DATA WITH PAGINATION ================= */
+    let leadsQuery = `
+      SELECT 
+        rd.master_id,
+        IFNULL(rd.name, 'Not Available') AS name,
+        IFNULL(rd.number, 'Not Available') AS number,
+        IFNULL(rd.alternate_number, 'Not Available') AS alternate_number,
+        IFNULL(rd.email, 'Not Available') AS email,
+        IFNULL(rd.address, 'Not Available') AS address,
+        IFNULL(rd.city, 'Not Available') AS city,
+        IFNULL(rd.status, 'Not Available') AS status,
+        IFNULL(rd.lead_status, 'Not Available') AS lead_status,
+        IFNULL(rd.lead_stage, 'Not Available') AS lead_stage,
+        IFNULL(rd.current_stage, 'Not Available') AS current_stage,
+        IFNULL(rd.created_by_user, 'Not Available') AS created_by_user,
+        IFNULL(rd.assign_id, 'Not Available') AS assign_id,
+        IFNULL(rd.followup_date, 'Not Available') AS followup_date,
+        IFNULL(rd.followup_time, 'Not Available') AS followup_time,  /* ✅ ADD THIS LINE */
+        IFNULL(rd.cat_id, 'Not Available') AS cat_id,
+        IFNULL(rd.reference_id, 'Not Available') AS reference_id,
+        IFNULL(rd.area_id, 'Not Available') AS area_id,
+        IFNULL(rd.room_length, 'Not Available') AS room_length,
+        IFNULL(rd.room_width, 'Not Available') AS room_width,
+        IFNULL(rd.room_height, 'Not Available') AS room_height,
+        IFNULL(rd.location_link, 'Not Available') AS location_link,
+        IFNULL(rd.p_type, 'Not Available') AS p_type,
+        IFNULL(rd.budget_range, 'Not Available') AS budget_range,
+        IFNULL(rd.time_to_complete, 'Not Available') AS time_to_complete,
+        IFNULL(rd.site_visit_date, 'Not Available') AS site_visit_date,
+        IFNULL(rd.demo_date, 'Not Available') AS demo_date,
+        IFNULL(rd.lead_activity, 0) AS lead_activity,
+        IFNULL(rd.ar_number, 'Not Available') AS ar_number,
+        IFNULL(rd.architect_name, 'Not Available') AS architect_name,
+        IFNULL(rd.ca_number, 'Not Available') AS ca_number,
+        IFNULL(rd.e_number, 'Not Available') AS e_number,
+        IFNULL(rd.sm_number, 'Not Available') AS sm_number,
+        IFNULL(rd.pop_number, 'Not Available') AS pop_number,
+        IFNULL(rd.other_number, 'Not Available') AS other_number,
+        IFNULL(rd.quick_remark, 'Not Available') AS quick_remark,
+        IFNULL(rd.detailed_remark, 'Not Available') AS detailed_remark,
+        IFNULL(a.area_name, 'Not Available') AS area_name,
+        IFNULL(c.cat_name, 'Not Available') AS cat_name,
+        IFNULL(ref.reference_name, 'Not Available') AS reference_name,
+        IFNULL(DATE(asg.assign_date), 'Not Available') AS assign_date,
+        lr.id AS reassignment_id,
+        lr.reassignment_date,
+        lr.assignedTo AS reassigned_to,
+        lr.remark AS reassignment_remark,
+        lr.leadStage AS reassignment_lead_stage,
+        IFNULL(u.name, 'Not Available') AS telecaller_name,
+        u.user_id AS assigned_to_user_id,
+        MAX(d.location_link) AS document_location_link,
+        CASE 
+          WHEN rd.followup_date < ? THEN 'missed'
+          ELSE 'todays'
+        END AS data_type
+
+      FROM raw_data rd
+
+      LEFT JOIN area a ON rd.area_id = a.area_id
+      LEFT JOIN category c ON rd.cat_id = c.cat_id
+      LEFT JOIN reference ref ON rd.reference_id = ref.reference_id
+      LEFT JOIN assignments asg ON rd.assign_id = asg.assign_id
+      LEFT JOIN (
+        SELECT r1.*, ROW_NUMBER() OVER (PARTITION BY master_id ORDER BY id DESC) rn
+        FROM reassignment r1
+      ) lr ON rd.master_id = lr.master_id AND lr.rn = 1
+      LEFT JOIN users u ON lr.assignedTo = u.name
+      LEFT JOIN documents d ON d.master_id = rd.master_id
+      LEFT JOIN reassignment re ON rd.master_id = re.master_id
+
+      WHERE (rd.followup_date < ? OR rd.followup_date = CURDATE() OR DATE(re.reassignment_date) = CURDATE())
+AND rd.lead_stage NOT IN ('Drop','Closed Deal','Execution','Pre Execution')
+      AND re.id IN (?)
+    `;
+
+    let leadsParams = [today, today, latestReassignmentIds];
+
+    // Add filters to leads query
+    if (search) {
+      leadsQuery += ` AND (
+        rd.name LIKE ? OR 
+        rd.number LIKE ? OR 
+        rd.email LIKE ? OR 
+        rd.address LIKE ? OR 
+        rd.city LIKE ? OR 
+        rd.lead_stage LIKE ? OR 
+        lr.assignedTo LIKE ?
+      )`;
+      const searchPattern = `%${search}%`;
+      leadsParams.push(searchPattern, searchPattern, searchPattern, searchPattern, searchPattern, searchPattern, searchPattern);
+    }
+
+    if (entryFromDate) {
+      leadsQuery += ` AND DATE(rd.assign_date) >= ?`;
+      leadsParams.push(entryFromDate);
+    }
+    if (entryToDate) {
+      leadsQuery += ` AND DATE(rd.assign_date) <= ?`;
+      leadsParams.push(entryToDate);
+    }
+    if (followupFromDate) {
+      leadsQuery += ` AND DATE(rd.followup_date) >= ?`;
+      leadsParams.push(followupFromDate);
+    }
+    if (followupToDate) {
+      leadsQuery += ` AND DATE(rd.followup_date) <= ?`;
+      leadsParams.push(followupToDate);
+    }
+
+    if (stages.length > 0) {
+      leadsQuery += ` AND rd.lead_stage IN (?)`;
+      leadsParams.push(stages);
+    }
+
+    if (users.length > 0) {
+      leadsQuery += ` AND lr.assignedTo IN (?)`;
+      leadsParams.push(users);
+    }
+
+    if (cities.length > 0) {
+      leadsQuery += ` AND rd.city IN (?)`;
+      leadsParams.push(cities);
+    }
+
+    if (isTelecallerLike(role)) {
+      leadsQuery += ` AND lr.assignedTo = ?`;
+      leadsParams.push(currentUserName);
+    } else if (!isAdminLike(role) && !isManagementLike(role)) {
+      leadsQuery += ` AND lr.assignedTo = ?`;
+      leadsParams.push(currentUserName);
+    }
+
+    leadsQuery += ` GROUP BY rd.master_id ORDER BY rd.followup_date ASC LIMIT ? OFFSET ?`;
+    leadsParams.push(limit, offset);
+
+    const [leadsRows] = await db.query(leadsQuery, leadsParams);
+
+    /* ================= GET COUNTS FOR TODAY/MISSED SEPARATELY ================= */
+    let todayCountQuery = `
+      SELECT COUNT(DISTINCT rd.master_id) AS count
+      FROM raw_data rd
+      LEFT JOIN reassignment re ON rd.master_id = re.master_id
+      LEFT JOIN (
+        SELECT r1.*, ROW_NUMBER() OVER (PARTITION BY master_id ORDER BY id DESC) rn
+        FROM reassignment r1
+      ) lr ON rd.master_id = lr.master_id AND lr.rn = 1
+      WHERE (rd.followup_date = CURDATE() OR DATE(re.reassignment_date) = CURDATE())
+AND rd.lead_stage NOT IN ('Drop','Closed Deal','Execution','Pre Execution') 
+     AND re.id IN (?)
+    `;
+    
+    let missedCountQuery = `
+      SELECT COUNT(DISTINCT rd.master_id) AS count
+      FROM raw_data rd
+      LEFT JOIN reassignment re ON rd.master_id = re.master_id
+      LEFT JOIN (
+        SELECT r1.*, ROW_NUMBER() OVER (PARTITION BY master_id ORDER BY id DESC) rn
+        FROM reassignment r1
+      ) lr ON rd.master_id = lr.master_id AND lr.rn = 1
+      WHERE rd.followup_date < ?
+AND rd.lead_stage NOT IN ('Drop','Closed Deal','Execution','Pre Execution')
+      AND re.id IN (?)
+    `;
+
+    // Add role filters to count queries
+    if (isTelecallerLike(role)) {
+      todayCountQuery += ` AND lr.assignedTo = ?`;
+      missedCountQuery += ` AND lr.assignedTo = ?`;
+    } else if (!isAdminLike(role) && !isManagementLike(role)) {
+      todayCountQuery += ` AND lr.assignedTo = ?`;
+      missedCountQuery += ` AND lr.assignedTo = ?`;
+    }
+
+    let todayCountParams = [latestReassignmentIds];
+    let missedCountParams = [today, latestReassignmentIds];
+
+    if (isTelecallerLike(role) || (!isAdminLike(role) && !isManagementLike(role))) {
+      todayCountParams.push(currentUserName);
+      missedCountParams.push(currentUserName);
+    }
+
+    const [todayCountResult] = await db.query(todayCountQuery, todayCountParams);
+    const [missedCountResult] = await db.query(missedCountQuery, missedCountParams);
+    
+    const todayTotal = todayCountResult[0]?.count || 0;
+    const missedTotal = missedCountResult[0]?.count || 0;
+
+    /* ================= GET OTHER DATA (same as before) ================= */
+    const masterIds = leadsRows.map(r => r.master_id);
+
+    // Get other inputs
+    let otherInputsRows = [];
+    if (masterIds.length) {
+      const [otherInputs] = await db.query(
+        `SELECT master_id, cat_id, reference_id, input_text
+         FROM raw_data_other_inputs
+         WHERE master_id IN (?)
+         ORDER BY created_at DESC`,
+        [masterIds]
+      );
+      otherInputsRows = otherInputs;
+    }
+
+    // Get reassignment history
+    let reassignmentRows = [];
+    if (masterIds.length) {
+      const [reassignments] = await db.query(
+        `SELECT rm.*, u.name, u.role
+         FROM reassignment rm
+         LEFT JOIN users u ON u.user_id = rm.created_by_user
+         WHERE rm.master_id IN (?)
+         ORDER BY rm.reassignment_date DESC, rm.created_at DESC`,
+        [masterIds]
+      );
+      reassignmentRows = reassignments;
+    }
+
+    // Format the leads
+    const formattedLeads = leadsRows.map(row => {
+      const rowCatId = parseInt(row.cat_id);
+      const rowRefId = parseInt(row.reference_id);
+
+      const categoryOther =
+        otherInputsRows.find(
+          oi => oi.master_id === row.master_id && oi.cat_id === rowCatId
+        )?.input_text || '';
+
+      const referenceOther =
+        otherInputsRows.find(
+          oi => oi.master_id === row.master_id && oi.reference_id === rowRefId
+        )?.input_text || '';
+
+      const reassignments = reassignmentRows
+        .filter(r => r.master_id === row.master_id)
+        .map(r => ({
+          remark: r.remark || '',
+          assignedTo: r.assignedTo || '',
+          leadStage: r.leadStage || '',
+          created_by_user: r.created_by_user || '',
+          created_at: r.created_at
+            ? new Date(r.created_at).toLocaleString('en-GB')
+            : '',
+          reassignment_date: r.reassignment_date
+            ? new Date(r.reassignment_date).toLocaleString('en-GB')
+            : '',
+          name: r.name || '',
+          role: r.role || ''
+        }));
+
+      return {
+        ...row,
+        category_other: categoryOther,
+        reference_other: referenceOther,
+        reassignment_remarks: reassignments,
+        latest_assignedTo: reassignments[0]?.assignedTo || '',
+        latest_leadStage: reassignments[0]?.leadStage || '',
+        assign_date: row.assign_date
+      };
+    });
+
+    // Separate missed and today's leads
+    const missedLeads = formattedLeads.filter(lead => lead.data_type === 'missed');
+    const todaysLeads = formattedLeads.filter(lead => lead.data_type === 'todays');
+
+    const totalPages = Math.ceil(totalCount / limit);
+
+    return res.status(200).json({
+      success: true,
+      todayCount: todayTotal,
+      missedCount: missedTotal,
+      totalCount: totalCount,
+      
+      // Paginated combined results
+      leads: {
+        total: totalCount,
+        currentPage: page,
+        totalPages: totalPages,
+        limit: limit,
+        data: formattedLeads,
+        showing: {
+          from: offset + 1,
+          to: Math.min(offset + limit, totalCount),
+          total: totalCount
+        }
+      },
+      
+      // Separate counts (for UI badges)
+      today: {
+        total: todayTotal,
+        leads: todaysLeads
+      },
+      
+      missed: {
+        total: missedTotal,
+        leads: missedLeads
+      }
+    });
+
+  } catch (error) {
+    console.error("❌ Error in getAssignedMissTodaysLeadsFullData:", error);
+    res.status(500).json({ message: "Failed to fetch dashboard data" });
+  }
+};
+
+
+export const getAssignedMissTodaysLeadsFullData = async (req, res) => {
+  try {
+    if (!req.session.user) {
+      return res.status(401).json({ message: "Unauthorized: No session" });
+    }
+
+    const { id: userId, role } = req.session.user;
+    const today = new Date().toISOString().slice(0, 10);
+    
+    // Get pagination and filter parameters from query
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 5;
+    const offset = (page - 1) * limit;
+    
+    // Get filter parameters
+    const search = req.query.search || '';
+    const entryFromDate = req.query.entryFromDate;
+    const entryToDate = req.query.entryToDate;
+    const followupFromDate = req.query.followupFromDate;
+    const followupToDate = req.query.followupToDate;
+    const stages = req.query.stages ? req.query.stages.split(',') : [];
+    const users = req.query.users ? req.query.users.split(',') : [];
+    const cities = req.query.cities ? req.query.cities.split(',') : [];
+    
+    // ✅ NEW: Time-based filter parameters
+    const timeSlot = req.query.timeSlot; // 'morning', 'afternoon', 'evening', 'overdue'
+    const followupTime = req.query.followupTime; // specific time like '17:00'
+    const sortByTime = req.query.sortByTime === 'true'; // sort by time instead of date
+
+    /* ================= CURRENT USER ================= */
+    const [userResult] = await db.query(
+      "SELECT name FROM users WHERE user_id = ?",
+      [userId]
+    );
+    const currentUserName = userResult[0]?.name || '';
+
+    /* ================= GET LATEST REASSIGNMENT IDS ================= */
+    const [latestReassignments] = await db.query(`
+      SELECT master_id, MAX(id) as latest_id
+      FROM reassignment
+      GROUP BY master_id
+    `);
+    
+    const latestReassignmentIds = latestReassignments.map(r => r.latest_id);
+
+    /* ================= GET TOTAL COUNT FOR PAGINATION ================= */
+    let countQuery = `
+      SELECT COUNT(DISTINCT rd.master_id) AS total_count
+      FROM raw_data rd
+      LEFT JOIN reassignment re ON rd.master_id = re.master_id
+      LEFT JOIN (
+        SELECT r1.*, ROW_NUMBER() OVER (PARTITION BY master_id ORDER BY id DESC) rn
+        FROM reassignment r1
+      ) lr ON rd.master_id = lr.master_id AND lr.rn = 1
+      WHERE (rd.followup_date < ? OR rd.followup_date = CURDATE() OR DATE(re.reassignment_date) = CURDATE())
+      AND rd.lead_stage NOT IN ('Drop', 'Closed Deal', 'Execution', 'Pre Execution')
+      AND re.id IN (?)
+    `;
+
+    let countParams = [today, latestReassignmentIds];
+
+    // Add search filter to count
+    if (search) {
+      countQuery += ` AND (
+        rd.name LIKE ? OR 
+        rd.number LIKE ? OR 
+        rd.email LIKE ? OR 
+        rd.address LIKE ? OR 
+        rd.city LIKE ? OR 
+        rd.lead_stage LIKE ? OR 
+        lr.assignedTo LIKE ?
+      )`;
+      const searchPattern = `%${search}%`;
+      countParams.push(searchPattern, searchPattern, searchPattern, searchPattern, searchPattern, searchPattern, searchPattern);
+    }
+
+    // Add date filters to count
+    if (entryFromDate) {
+      countQuery += ` AND DATE(rd.assign_date) >= ?`;
+      countParams.push(entryFromDate);
+    }
+    if (entryToDate) {
+      countQuery += ` AND DATE(rd.assign_date) <= ?`;
+      countParams.push(entryToDate);
+    }
+    if (followupFromDate) {
+      countQuery += ` AND DATE(rd.followup_date) >= ?`;
+      countParams.push(followupFromDate);
+    }
+    if (followupToDate) {
+      countQuery += ` AND DATE(rd.followup_date) <= ?`;
+      countParams.push(followupToDate);
+    }
+
+    // ✅ NEW: Add time slot filter to count
+    if (timeSlot === 'morning') {
+      countQuery += ` AND TIME(rd.followup_time) IS NOT NULL AND TIME(rd.followup_time) < '12:00:00'`;
+    } else if (timeSlot === 'afternoon') {
+      countQuery += ` AND TIME(rd.followup_time) IS NOT NULL AND TIME(rd.followup_time) BETWEEN '12:00:00' AND '17:00:00'`;
+    } else if (timeSlot === 'evening') {
+      countQuery += ` AND TIME(rd.followup_time) IS NOT NULL AND TIME(rd.followup_time) >= '17:00:00'`;
+    } else if (timeSlot === 'overdue') {
+      countQuery += ` AND rd.followup_date = CURDATE() AND TIME(rd.followup_time) IS NOT NULL AND TIME(rd.followup_time) < CURTIME()`;
+    }
+    
+    // ✅ NEW: Add specific time filter to count
+    if (followupTime) {
+      countQuery += ` AND TIME(rd.followup_time) = ?`;
+      countParams.push(followupTime);
+    }
+
+    // Add stage filter
+    if (stages.length > 0) {
+      countQuery += ` AND rd.lead_stage IN (?)`;
+      countParams.push(stages);
+    }
+
+    // Add user filter
+    if (users.length > 0) {
+      countQuery += ` AND lr.assignedTo IN (?)`;
+      countParams.push(users);
+    }
+
+    // Add city filter
+    if (cities.length > 0) {
+      countQuery += ` AND rd.city IN (?)`;
+      countParams.push(cities);
+    }
+
+    // Role filter for count
+    if (isTelecallerLike(role)) {
+      countQuery += ` AND lr.assignedTo = ?`;
+      countParams.push(currentUserName);
+    } else if (isAdminLike(role) || isManagementLike(role)) {
+      // Admin/Management see all
+    } else {
+      countQuery += ` AND lr.assignedTo = ?`;
+      countParams.push(currentUserName);
+    }
+
+    const [countResult] = await db.query(countQuery, countParams);
+    const totalCount = countResult[0]?.total_count || 0;
+
+    /* ================= GET COMBINED LEADS DATA WITH PAGINATION ================= */
+    let leadsQuery = `
+      SELECT 
+        rd.master_id,
+        IFNULL(rd.name, 'Not Available') AS name,
+        IFNULL(rd.number, 'Not Available') AS number,
+        IFNULL(rd.alternate_number, 'Not Available') AS alternate_number,
+        IFNULL(rd.email, 'Not Available') AS email,
+        IFNULL(rd.address, 'Not Available') AS address,
+        IFNULL(rd.city, 'Not Available') AS city,
+        IFNULL(rd.status, 'Not Available') AS status,
+        IFNULL(rd.lead_status, 'Not Available') AS lead_status,
+        IFNULL(rd.lead_stage, 'Not Available') AS lead_stage,
+        IFNULL(rd.current_stage, 'Not Available') AS current_stage,
+        IFNULL(rd.created_by_user, 'Not Available') AS created_by_user,
+        IFNULL(rd.assign_id, 'Not Available') AS assign_id,
+        IFNULL(rd.followup_date, 'Not Available') AS followup_date,
+        IFNULL(rd.followup_time, 'Not Available') AS followup_time,
+        IFNULL(rd.cat_id, 'Not Available') AS cat_id,
+        IFNULL(rd.reference_id, 'Not Available') AS reference_id,
+        IFNULL(rd.area_id, 'Not Available') AS area_id,
+        IFNULL(rd.room_length, 'Not Available') AS room_length,
+        IFNULL(rd.room_width, 'Not Available') AS room_width,
+        IFNULL(rd.room_height, 'Not Available') AS room_height,
+        IFNULL(rd.location_link, 'Not Available') AS location_link,
+        IFNULL(rd.p_type, 'Not Available') AS p_type,
+        IFNULL(rd.budget_range, 'Not Available') AS budget_range,
+        IFNULL(rd.time_to_complete, 'Not Available') AS time_to_complete,
+        IFNULL(rd.site_visit_date, 'Not Available') AS site_visit_date,
+        IFNULL(rd.demo_date, 'Not Available') AS demo_date,
+        IFNULL(rd.lead_activity, 0) AS lead_activity,
+        IFNULL(rd.ar_number, 'Not Available') AS ar_number,
+        IFNULL(rd.architect_name, 'Not Available') AS architect_name,
+        IFNULL(rd.ca_number, 'Not Available') AS ca_number,
+        IFNULL(rd.e_number, 'Not Available') AS e_number,
+        IFNULL(rd.sm_number, 'Not Available') AS sm_number,
+        IFNULL(rd.pop_number, 'Not Available') AS pop_number,
+        IFNULL(rd.other_number, 'Not Available') AS other_number,
+        IFNULL(rd.quick_remark, 'Not Available') AS quick_remark,
+        IFNULL(rd.detailed_remark, 'Not Available') AS detailed_remark,
+        IFNULL(a.area_name, 'Not Available') AS area_name,
+        IFNULL(c.cat_name, 'Not Available') AS cat_name,
+        IFNULL(ref.reference_name, 'Not Available') AS reference_name,
+        IFNULL(DATE(asg.assign_date), 'Not Available') AS assign_date,
+        lr.id AS reassignment_id,
+        lr.reassignment_date,
+        lr.assignedTo AS reassigned_to,
+        lr.remark AS reassignment_remark,
+        lr.leadStage AS reassignment_lead_stage,
+        IFNULL(u.name, 'Not Available') AS telecaller_name,
+        u.user_id AS assigned_to_user_id,
+        MAX(d.location_link) AS document_location_link,
+        CASE 
+          WHEN rd.followup_date < ? THEN 'missed'
+          ELSE 'todays'
+        END AS data_type,
+        /* ✅ NEW: Add time status for frontend */
+        CASE 
+          WHEN rd.followup_date = CURDATE() AND TIME(rd.followup_time) < CURTIME() THEN 'overdue'
+          WHEN rd.followup_date = CURDATE() AND TIME(rd.followup_time) BETWEEN CURTIME() AND ADDTIME(CURTIME(), '01:00:00') THEN 'urgent'
+          WHEN rd.followup_date = CURDATE() THEN 'today'
+          ELSE 'future'
+        END AS time_status
+
+      FROM raw_data rd
+
+      LEFT JOIN area a ON rd.area_id = a.area_id
+      LEFT JOIN category c ON rd.cat_id = c.cat_id
+      LEFT JOIN reference ref ON rd.reference_id = ref.reference_id
+      LEFT JOIN assignments asg ON rd.assign_id = asg.assign_id
+      LEFT JOIN (
+        SELECT r1.*, ROW_NUMBER() OVER (PARTITION BY master_id ORDER BY id DESC) rn
+        FROM reassignment r1
+      ) lr ON rd.master_id = lr.master_id AND lr.rn = 1
+      LEFT JOIN users u ON lr.assignedTo = u.name
+      LEFT JOIN documents d ON d.master_id = rd.master_id
+      LEFT JOIN reassignment re ON rd.master_id = re.master_id
+
+      WHERE (rd.followup_date < ? OR rd.followup_date = CURDATE() OR DATE(re.reassignment_date) = CURDATE())
+      AND rd.lead_stage NOT IN ('Drop','Closed Deal','Execution','Pre Execution')
+      AND re.id IN (?)
+    `;
+
+    let leadsParams = [today, today, latestReassignmentIds];
+
+    // Add filters to leads query
+    if (search) {
+      leadsQuery += ` AND (
+        rd.name LIKE ? OR 
+        rd.number LIKE ? OR 
+        rd.email LIKE ? OR 
+        rd.address LIKE ? OR 
+        rd.city LIKE ? OR 
+        rd.lead_stage LIKE ? OR 
+        lr.assignedTo LIKE ?
+      )`;
+      const searchPattern = `%${search}%`;
+      leadsParams.push(searchPattern, searchPattern, searchPattern, searchPattern, searchPattern, searchPattern, searchPattern);
+    }
+
+    if (entryFromDate) {
+      leadsQuery += ` AND DATE(rd.assign_date) >= ?`;
+      leadsParams.push(entryFromDate);
+    }
+    if (entryToDate) {
+      leadsQuery += ` AND DATE(rd.assign_date) <= ?`;
+      leadsParams.push(entryToDate);
+    }
+    if (followupFromDate) {
+      leadsQuery += ` AND DATE(rd.followup_date) >= ?`;
+      leadsParams.push(followupFromDate);
+    }
+    if (followupToDate) {
+      leadsQuery += ` AND DATE(rd.followup_date) <= ?`;
+      leadsParams.push(followupToDate);
+    }
+
+    // ✅ NEW: Add time slot filter to leads query
+    if (timeSlot === 'morning') {
+      leadsQuery += ` AND TIME(rd.followup_time) IS NOT NULL AND TIME(rd.followup_time) < '12:00:00'`;
+    } else if (timeSlot === 'afternoon') {
+      leadsQuery += ` AND TIME(rd.followup_time) IS NOT NULL AND TIME(rd.followup_time) BETWEEN '12:00:00' AND '17:00:00'`;
+    } else if (timeSlot === 'evening') {
+      leadsQuery += ` AND TIME(rd.followup_time) IS NOT NULL AND TIME(rd.followup_time) >= '17:00:00'`;
+    } else if (timeSlot === 'overdue') {
+      leadsQuery += ` AND rd.followup_date = CURDATE() AND TIME(rd.followup_time) IS NOT NULL AND TIME(rd.followup_time) < CURTIME()`;
+    }
+    
+    // ✅ NEW: Add specific time filter to leads query
+    if (followupTime) {
+      leadsQuery += ` AND TIME(rd.followup_time) = ?`;
+      leadsParams.push(followupTime);
+    }
+
+    if (stages.length > 0) {
+      leadsQuery += ` AND rd.lead_stage IN (?)`;
+      leadsParams.push(stages);
+    }
+
+    if (users.length > 0) {
+      leadsQuery += ` AND lr.assignedTo IN (?)`;
+      leadsParams.push(users);
+    }
+
+    if (cities.length > 0) {
+      leadsQuery += ` AND rd.city IN (?)`;
+      leadsParams.push(cities);
+    }
+
+    if (isTelecallerLike(role)) {
+      leadsQuery += ` AND lr.assignedTo = ?`;
+      leadsParams.push(currentUserName);
+    } else if (!isAdminLike(role) && !isManagementLike(role)) {
+      leadsQuery += ` AND lr.assignedTo = ?`;
+      leadsParams.push(currentUserName);
+    }
+
+    // ✅ MODIFIED: ORDER BY - support sorting by time if requested
+    leadsQuery += ` GROUP BY rd.master_id `;
+    
+    if (sortByTime) {
+      // Sort by time first (morning to evening), then by date
+      leadsQuery += ` ORDER BY TIME(rd.followup_time) ASC, rd.followup_date ASC`;
+    } else {
+      // Default: sort by date (existing behavior)
+      leadsQuery += ` ORDER BY rd.followup_date ASC`;
+    }
+    
+    leadsQuery += ` LIMIT ? OFFSET ?`;
+    leadsParams.push(limit, offset);
+
+    const [leadsRows] = await db.query(leadsQuery, leadsParams);
+
+    /* ================= GET COUNTS FOR TODAY/MISSED SEPARATELY ================= */
+    let todayCountQuery = `
+      SELECT COUNT(DISTINCT rd.master_id) AS count
+      FROM raw_data rd
+      LEFT JOIN reassignment re ON rd.master_id = re.master_id
+      LEFT JOIN (
+        SELECT r1.*, ROW_NUMBER() OVER (PARTITION BY master_id ORDER BY id DESC) rn
+        FROM reassignment r1
+      ) lr ON rd.master_id = lr.master_id AND lr.rn = 1
+      WHERE (rd.followup_date = CURDATE() OR DATE(re.reassignment_date) = CURDATE())
+      AND rd.lead_stage NOT IN ('Drop','Closed Deal','Execution','Pre Execution') 
+      AND re.id IN (?)
+    `;
+    
+    let missedCountQuery = `
+      SELECT COUNT(DISTINCT rd.master_id) AS count
+      FROM raw_data rd
+      LEFT JOIN reassignment re ON rd.master_id = re.master_id
+      LEFT JOIN (
+        SELECT r1.*, ROW_NUMBER() OVER (PARTITION BY master_id ORDER BY id DESC) rn
+        FROM reassignment r1
+      ) lr ON rd.master_id = lr.master_id AND lr.rn = 1
+      WHERE rd.followup_date < ?
+      AND rd.lead_stage NOT IN ('Drop','Closed Deal','Execution','Pre Execution')
+      AND re.id IN (?)
+    `;
+
+    // Add role filters to count queries
+    if (isTelecallerLike(role)) {
+      todayCountQuery += ` AND lr.assignedTo = ?`;
+      missedCountQuery += ` AND lr.assignedTo = ?`;
+    } else if (!isAdminLike(role) && !isManagementLike(role)) {
+      todayCountQuery += ` AND lr.assignedTo = ?`;
+      missedCountQuery += ` AND lr.assignedTo = ?`;
+    }
+
+    let todayCountParams = [latestReassignmentIds];
+    let missedCountParams = [today, latestReassignmentIds];
+
+    if (isTelecallerLike(role) || (!isAdminLike(role) && !isManagementLike(role))) {
+      todayCountParams.push(currentUserName);
+      missedCountParams.push(currentUserName);
+    }
+
+    const [todayCountResult] = await db.query(todayCountQuery, todayCountParams);
+    const [missedCountResult] = await db.query(missedCountQuery, missedCountParams);
+    
+    const todayTotal = todayCountResult[0]?.count || 0;
+    const missedTotal = missedCountResult[0]?.count || 0;
+
+    /* ================= GET OTHER DATA (same as before) ================= */
+    const masterIds = leadsRows.map(r => r.master_id);
+
+    // Get other inputs
+    let otherInputsRows = [];
+    if (masterIds.length) {
+      const [otherInputs] = await db.query(
+        `SELECT master_id, cat_id, reference_id, input_text
+         FROM raw_data_other_inputs
+         WHERE master_id IN (?)
+         ORDER BY created_at DESC`,
+        [masterIds]
+      );
+      otherInputsRows = otherInputs;
+    }
+
+    // Get reassignment history
+    let reassignmentRows = [];
+    if (masterIds.length) {
+      const [reassignments] = await db.query(
+        `SELECT rm.*, u.name, u.role
+         FROM reassignment rm
+         LEFT JOIN users u ON u.user_id = rm.created_by_user
+         WHERE rm.master_id IN (?)
+         ORDER BY rm.reassignment_date DESC, rm.created_at DESC`,
+        [masterIds]
+      );
+      reassignmentRows = reassignments;
+    }
+
+    // Format the leads
+    const formattedLeads = leadsRows.map(row => {
+      const rowCatId = parseInt(row.cat_id);
+      const rowRefId = parseInt(row.reference_id);
+
+      const categoryOther =
+        otherInputsRows.find(
+          oi => oi.master_id === row.master_id && oi.cat_id === rowCatId
+        )?.input_text || '';
+
+      const referenceOther =
+        otherInputsRows.find(
+          oi => oi.master_id === row.master_id && oi.reference_id === rowRefId
+        )?.input_text || '';
+
+      const reassignments = reassignmentRows
+        .filter(r => r.master_id === row.master_id)
+        .map(r => ({
+          remark: r.remark || '',
+          assignedTo: r.assignedTo || '',
+          leadStage: r.leadStage || '',
+          created_by_user: r.created_by_user || '',
+          created_at: r.created_at
+            ? new Date(r.created_at).toLocaleString('en-GB')
+            : '',
+          reassignment_date: r.reassignment_date
+            ? new Date(r.reassignment_date).toLocaleString('en-GB')
+            : '',
+          name: r.name || '',
+          role: r.role || ''
+        }));
+
+      return {
+        ...row,
+        category_other: categoryOther,
+        reference_other: referenceOther,
+        reassignment_remarks: reassignments,
+        latest_assignedTo: reassignments[0]?.assignedTo || '',
+        latest_leadStage: reassignments[0]?.leadStage || '',
+        assign_date: row.assign_date
+      };
+    });
+
+    // Separate missed and today's leads
+    const missedLeads = formattedLeads.filter(lead => lead.data_type === 'missed');
+    const todaysLeads = formattedLeads.filter(lead => lead.data_type === 'todays');
+
+    const totalPages = Math.ceil(totalCount / limit);
+
+    // ✅ NEW: Calculate time-based statistics for dashboard
+    const timeStats = {
+      morning: formattedLeads.filter(lead => {
+        const time = lead.followup_time;
+        return time && time !== 'Not Available' && time < '12:00:00';
+      }).length,
+      afternoon: formattedLeads.filter(lead => {
+        const time = lead.followup_time;
+        return time && time !== 'Not Available' && time >= '12:00:00' && time < '17:00:00';
+      }).length,
+      evening: formattedLeads.filter(lead => {
+        const time = lead.followup_time;
+        return time && time !== 'Not Available' && time >= '17:00:00';
+      }).length,
+      overdue: formattedLeads.filter(lead => {
+        return lead.time_status === 'overdue';
+      }).length,
+      urgent: formattedLeads.filter(lead => {
+        return lead.time_status === 'urgent';
+      }).length
+    };
+
+    return res.status(200).json({
+      success: true,
+      todayCount: todayTotal,
+      missedCount: missedTotal,
+      totalCount: totalCount,
+      
+      // ✅ NEW: Time statistics
+      timeStats: timeStats,
+      
+      // Paginated combined results
+      leads: {
+        total: totalCount,
+        currentPage: page,
+        totalPages: totalPages,
+        limit: limit,
+        data: formattedLeads,
+        showing: {
+          from: offset + 1,
+          to: Math.min(offset + limit, totalCount),
+          total: totalCount
+        }
+      },
+      
+      // Separate counts (for UI badges)
+      today: {
+        total: todayTotal,
+        leads: todaysLeads
+      },
+      
+      missed: {
+        total: missedTotal,
+        leads: missedLeads
+      }
+    });
+
+  } catch (error) {
+    console.error("❌ Error in getAssignedMissTodaysLeadsFullData:", error);
+    res.status(500).json({ message: "Failed to fetch dashboard data" });
+  }
+};
 
 export const getQuotationClosedLeads = async (req, res) => {
   const connection = await db.getConnection();
@@ -10965,7 +13078,7 @@ export const getEmployeeWorkReport1 = async (req, res) => {
 };
 
 
-export const getEmployeeWorkReport = async (req, res) => {
+export const getEmployeeWorkReport2 = async (req, res) => {
   try {
     const { fromDate, toDate, search, city, assigned_to, reassigned_stage } = req.query;
     
@@ -11061,6 +13174,190 @@ export const getEmployeeWorkReport = async (req, res) => {
       success: true,
       total: total,
       data: rows
+    });
+
+  } catch (error) {
+    console.error("EmployeeWorkReport error:", error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to fetch employee work report"
+    });
+  }
+};
+
+
+export const getEmployeeWorkReport = async (req, res) => {
+  try {
+    /* ================= AUTH ================= */
+    if (!req.session.user) {
+      return res.status(401).json({ message: "Unauthorized: No session" });
+    }
+
+    const { id: userId, role } = req.session.user;
+
+    /* ================= CURRENT USER ================= */
+    const [userResult] = await db.query(
+      "SELECT name FROM users WHERE user_id = ?",
+      [userId]
+    );
+    const currentUserName = userResult[0]?.name || '';
+
+    /* ================= QUERY PARAMS ================= */
+    const { fromDate, toDate, search, city, assigned_to, reassigned_stage } = req.query;
+
+    /* ================= MAIN QUERY ================= */
+    let query = `
+      SELECT
+        rd.master_id,
+        rd.name AS client_name,
+        rd.number,
+        rd.city,
+        rd.lead_stage AS current_stage,
+
+        c.cat_name AS category,
+        ref.reference_name AS reference_name,
+
+        u_from.name AS assigned_by,
+        rs.assignedTo AS assigned_to,
+
+        rs.leadStage AS reassigned_stage,
+        rs.remark,
+        rs.created_at
+
+      FROM reassignment rs
+      JOIN raw_data rd ON rd.master_id = rs.master_id
+      LEFT JOIN category c ON c.cat_id = rd.cat_id
+      LEFT JOIN reference ref ON ref.reference_id = rd.reference_id
+      LEFT JOIN users u_from ON u_from.user_id = rs.created_by_user
+
+      WHERE 1=1
+    `;
+
+    const queryParams = [];
+
+    /* ================= ROLE FILTER ================= */
+    if (isTelecallerLike(role)) {
+      query += ` AND rs.assignedTo = ?`;
+      queryParams.push(currentUserName);
+    } 
+    else if (isAdminLike(role)) {
+      // Admin → no restriction
+    } 
+    else if (!isManagementLike(role)) {
+      query += ` AND rs.assignedTo = ?`;
+      queryParams.push(currentUserName);
+    }
+
+    /* ================= DATE FILTER ================= */
+    if (!fromDate && !toDate) {
+      query += ` AND rs.created_at >= NOW() - INTERVAL 30 DAY`;
+    }
+
+    if (fromDate) {
+      query += ` AND DATE(rs.created_at) >= ?`;
+      queryParams.push(fromDate);
+    }
+
+    if (toDate) {
+      query += ` AND DATE(rs.created_at) <= ?`;
+      queryParams.push(toDate);
+    }
+
+    /* ================= OTHER FILTERS ================= */
+    if (city) {
+      query += ` AND rd.city = ?`;
+      queryParams.push(city);
+    }
+
+    if (assigned_to) {
+      query += ` AND rs.assignedTo = ?`;
+      queryParams.push(assigned_to);
+    }
+
+    if (reassigned_stage) {
+      query += ` AND rs.leadStage = ?`;
+      queryParams.push(reassigned_stage);
+    }
+
+    if (search) {
+      query += ` AND (
+        rd.name LIKE ? OR 
+        rd.number LIKE ? OR 
+        rd.city LIKE ? OR 
+        rs.assignedTo LIKE ?
+      )`;
+      const s = `%${search}%`;
+      queryParams.push(s, s, s, s);
+    }
+
+    query += ` ORDER BY rs.created_at DESC`;
+
+    /* ================= PAGINATION ================= */
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 50;
+    const offset = (page - 1) * limit;
+
+    const countQuery = query
+      .replace(/SELECT[\s\S]*?FROM/, 'SELECT COUNT(*) as total FROM')
+      .replace(/ORDER BY[\s\S]*$/, '');
+
+    const [countResult] = await db.query(countQuery, queryParams);
+    const total = countResult[0]?.total || 0;
+
+    query += ` LIMIT ? OFFSET ?`;
+    queryParams.push(limit, offset);
+
+    const [rows] = await db.query(query, queryParams);
+
+    /* ================= SUMMARY (ADMIN ONLY) ================= */
+    let summary = {};
+
+    if (isAdminLike(role)) {
+      let summaryParams = [];
+
+      let summaryWhere = ` WHERE 1=1 `;
+
+      if (fromDate) {
+        summaryWhere += ` AND DATE(rs.created_at) >= ?`;
+        summaryParams.push(fromDate);
+      }
+
+      if (toDate) {
+        summaryWhere += ` AND DATE(rs.created_at) <= ?`;
+        summaryParams.push(toDate);
+      }
+
+      /* ===== USER WISE ===== */
+      const [userWise] = await db.query(`
+        SELECT rs.assignedTo, COUNT(*) as total
+        FROM reassignment rs
+        ${summaryWhere}
+        GROUP BY rs.assignedTo
+        ORDER BY total DESC
+      `, summaryParams);
+
+      /* ===== ROLE WISE ===== */
+      const [roleWise] = await db.query(`
+        SELECT u.role, COUNT(*) as total
+        FROM reassignment rs
+        JOIN users u ON u.name = rs.assignedTo
+        ${summaryWhere}
+        GROUP BY u.role
+        ORDER BY total DESC
+      `, summaryParams);
+
+      summary = {
+        userWise,
+        roleWise
+      };
+    }
+
+    /* ================= RESPONSE ================= */
+    res.json({
+      success: true,
+      total,
+      data: rows,
+      summary   // 👈 new (safe)
     });
 
   } catch (error) {

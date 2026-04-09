@@ -40,7 +40,7 @@ const AddProductTypeForm: React.FC<AddProductTypeFormProps> = ({ onClose, onSucc
 
   const fetchCategories = async () => {
     try {
-      const res = await axios.get(`${BASE_URL}api/category`);
+      const res = await axios.get(`${BASE_URL}api/customised-categories`);
       setCategories(res.data);
     } catch (err) {
       console.error("Failed to fetch categories");

@@ -38,7 +38,7 @@ const AddKitForm = ({ onClose, onKitAdded }) => {
   }, []);
 
   const fetchCategories = async () => {
-    const res = await axios.get(`${BASE_URL}api/category`);
+    const res = await axios.get(`${BASE_URL}api/customised-categories`);
     setCategories(res.data);
   };
 

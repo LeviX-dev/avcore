@@ -46,7 +46,7 @@ const AddQuotation = () => {
 
   /* ---------------- FETCH CATEGORIES ---------------- */
   useEffect(() => {
-    axios.get(`${BASE_URL}api/category`).then((res) => {
+    axios.get(`${BASE_URL}api/customised-categories`).then((res) => {
       setCategories(res.data || []);
     });
   }, []);
@@ -194,14 +194,6 @@ const AddQuotation = () => {
 
   /* ---------------- SUBMIT ---------------- */
 
-  const acousticTerms =
-    framingBy && fabricBy && ceilingBy
-      ? `ALL FRAMING WILL BE DONE BY ${framingBy}.
-• FABRIC & FLOOR CARPET WILL BE PROVIDED BY ${fabricBy}
-• ALL CEILING-RELATED WORK WILL BE PROVIDED BY ${ceilingBy}.
-• FABRIC STITCHING CHARGES WILL BE EXTRA AS PER THE DESIGN`
-      : null;
-
   const handleSubmit = async (e) => {
     e.preventDefault();
 
@@ -212,7 +204,7 @@ const AddQuotation = () => {
 
     // Check if ACOUSTIC category exists
     const isAcoustic = queuedCategories.some(
-      (q) => q.cat_name?.toLowerCase() === 'acoustic',
+      (q) => q.cat_name?.toLowerCase() === 'customised acoustic quotation',
     );
 
     // Validate acoustic dropdowns
@@ -230,28 +222,6 @@ const AddQuotation = () => {
 • FABRIC STITCHING CHARGES WILL BE EXTRA AS PER THE DESIGN`
         : null;
 
-    const payload1 = {
-      type: quoteType,
-      master_id,
-
-      // ✅ NEW FIELD
-      acoustic_terms: acousticTerms,
-
-      items: queuedCategories.map((item) => ({
-        cat_id: item.cat_id,
-        kit_id: item.kit_id || null,
-        kit_qty: item.kit_id ? Number(item.kit_qty || 1) : 1,
-        products: item.products.map((p) => ({
-          model_id: p.model_id,
-          model_qty: Number(p.model_qty || 1),
-          model_price: Number(p.model_price || 0),
-        })),
-      })),
-
-      additional_prices: additionalPrices.filter(
-        (a) => a.add_price_name && a.price,
-      ),
-    };
     const payload = {
       type: quoteType,
       master_id,
@@ -388,6 +358,12 @@ const AddQuotation = () => {
     setSpPrice(0);
   };
 
+  // Get selected category name for display
+  const getSelectedCategoryName = () => {
+    const category = categories.find((c) => c.cat_id == selectedCategory);
+    return category?.cat_name || '';
+  };
+
   return (
     <div>
       <Breadcrumb pageName="Create Quotation" />
@@ -451,66 +427,61 @@ const AddQuotation = () => {
             </div>
           </div>
 
-          {/* ACOUSTIC SPECIAL TERMS - MOVED HERE TO BE DIRECTLY BELOW CATEGORY */}
-          {selectedCategory &&
-            categories
-              .find((c) => c.cat_id == selectedCategory)
-              ?.cat_name?.toUpperCase() === 'ACOUSTIC' && (
-              <div className="border rounded bg-gray-50 p-4 space-y-3 mb-4">
-                <h2 className="font-semibold text-blue-600">
-                  Acoustic Special Terms
-                </h2>
+          {/* ACOUSTIC SPECIAL TERMS - ONLY SHOW FOR "Customised Acoustic Quotation" */}
+          {selectedCategory && getSelectedCategoryName() === 'Customised Acoustic Quotation' && (
+            <div className="border rounded bg-gray-50 p-4 space-y-3 mb-4">
+              <h2 className="font-semibold text-blue-600">
+                Acoustic Special Terms
+              </h2>
 
-                <div>
-                  <label className="text-base font-semibold text-gray-500">
-                    All Framing Will Be Done By
-                  </label>
-                  <select
-                    className="border px-3 py-2 rounded w-full mt-1"
-                    value={framingBy}
-                    onChange={(e) => setFramingBy(e.target.value)}
-                  >
-                    <option value="">Select</option>
-                    <option value="AV CORE">BY AV CORE</option>
-                    <option value="THE CLIENT">BY THE CLIENT</option>
-                  </select>
-                </div>
-
-                <div>
-                  <label className="text-base font-semibold text-gray-500">
-                    Fabric & Floor Carpet Provided By
-                  </label>
-                  <select
-                    className="border px-3 py-2 rounded w-full mt-1"
-                    value={fabricBy}
-                    onChange={(e) => setFabricBy(e.target.value)}
-                  >
-                    <option value="">Select</option>
-                    <option value="AV CORE">BY AV CORE</option>
-                    <option value="THE CLIENT">BY THE CLIENT</option>
-                  </select>
-                </div>
-
-                <div>
-                  <label className="text-base font-semibold text-gray-500">
-                    Ceiling Related Work Provided By
-                  </label>
-                  <select
-                    className="border px-3 py-2 rounded w-full mt-1"
-                    value={ceilingBy}
-                    onChange={(e) => setCeilingBy(e.target.value)}
-                  >
-                    <option value="">Select</option>
-                    <option value="AV CORE">BY AV CORE</option>
-                    <option value="THE CLIENT">BY THE CLIENT</option>
-                  </select>
-                </div>
-
-                <div className="text-base font-semibold text-gray-500">
-                  • FABRIC STITCHING CHARGES WILL BE EXTRA AS PER THE DESIGN
-                </div>
+              <div>
+                <label className="text-base font-semibold text-gray-500">
+                  All Framing Will Be Done By
+                </label>
+                <select
+                  className="border px-3 py-2 rounded w-full mt-1"
+                  value={framingBy}
+                  onChange={(e) => setFramingBy(e.target.value)}
+                >
+                  <option value="">Select</option>
+                  <option value="AV CORE">BY AV CORE</option>
+                  <option value="THE CLIENT">BY THE CLIENT</option>
+                </select>
               </div>
-            )}
+
+              <div>
+                <label className="text-base font-semibold text-gray-500">
+                  Fabric & Floor Carpet Provided By
+                </label>
+                <select
+                  className="border px-3 py-2 rounded w-full mt-1"
+                  value={fabricBy}
+                  onChange={(e) => setFabricBy(e.target.value)}
+                >
+                  <option value="">Select</option>
+                  <option value="AV CORE">BY AV CORE</option>
+                  <option value="THE CLIENT">BY THE CLIENT</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="text-base font-semibold text-gray-500">
+                  Ceiling Related Work Provided By
+                </label>
+                <select
+                  className="border px-3 py-2 rounded w-full mt-1"
+                  value={ceilingBy}
+                  onChange={(e) => setCeilingBy(e.target.value)}
+                >
+                  <option value="">Select</option>
+                  <option value="AV CORE">BY AV CORE</option>
+                  <option value="THE CLIENT">BY THE CLIENT</option>
+                </select>
+              </div>
+
+           
+            </div>
+          )}
 
           {/* QUOTE TYPE + KIT QTY - MOVED AFTER ACOUSTIC SECTION */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
@@ -837,130 +808,187 @@ const AddQuotation = () => {
           </div>
         </form>
 
-        {openSingleProductPopup && (
-          <div className="fixed inset-0 bg-black bg-opacity-30 flex items-center justify-center z-50">
-            <div className="bg-white p-6 rounded shadow-lg w-[600px] max-w-full">
-              <h3 className="font-semibold text-lg mb-4">Add Single Product</h3>
+            {openSingleProductPopup && (
+  <div className="fixed inset-0 bg-black bg-opacity-30 flex items-center justify-center z-50">
+    <div className="bg-white p-6 rounded shadow-lg w-[600px] max-w-full max-h-[90vh] overflow-y-auto">
+      <h3 className="font-semibold text-lg mb-4">Add Single Product</h3>
 
-              {/* Category */}
-              <select
-                className="border px-3 py-2 rounded w-full mb-3"
-                value={spCategory}
-                onChange={(e) => {
-                  setSpCategory(e.target.value);
-                  fetchProductsByCategory(e.target.value);
-                  setSpType('');
-                  setSpBrand('');
-                  setSpModel('');
-                  setSpPrice(0);
-                }}
-              >
-                <option value="">Select Category</option>
-                {categories.map((c) => (
-                  <option key={c.cat_id} value={c.cat_id}>
-                    {c.cat_name}
-                  </option>
-                ))}
-              </select>
+      {/* Category */}
+      <select
+        className="border px-3 py-2 rounded w-full mb-3"
+        value={spCategory}
+        onChange={(e) => {
+          setSpCategory(e.target.value);
+          fetchProductsByCategory(e.target.value);
+          setSpType('');
+          setSpBrand('');
+          setSpModel('');
+          setSpPrice(0);
+        }}
+      >
+        <option value="">Select Category</option>
+        {categories.map((c) => (
+          <option key={c.cat_id} value={c.cat_id}>
+            {c.cat_name}
+          </option>
+        ))}
+      </select>
 
-              {/* Product Type */}
-              <select
-                className="border px-3 py-2 rounded w-full mb-3"
-                value={spType}
-                disabled={!productTypes.length}
-                onChange={(e) => handleProductTypeChange(e.target.value)}
-              >
-                <option value="">Select Product Type</option>
-                {productTypes.map((pt) => (
-                  <option key={pt.product_type_id} value={pt.product_type_id}>
-                    {pt.product_type_name}
-                  </option>
-                ))}
-              </select>
+      {/* ACOUSTIC SPECIAL TERMS - ONLY FOR "Customised Acoustic Quotation" */}
+      {spCategory && categories.find((c) => c.cat_id == spCategory)?.cat_name === 'Customised Acoustic Quotation' && (
+        <div className="border rounded bg-gray-50 p-4 space-y-3 mb-4">
+          <h2 className="font-semibold text-blue-600">
+            Acoustic Special Terms
+          </h2>
 
-              {/* Brand */}
-              <select
-                className="border px-3 py-2 rounded w-full mb-3"
-                value={spBrand}
-                disabled={!selectedPT?.brands?.length}
-                onChange={(e) => handleBrandChange(e.target.value)}
-              >
-                <option value="">Select Brand</option>
-                {selectedPT?.brands?.map((b) => (
-                  <option key={b.brand_id} value={b.brand_id}>
-                    {b.brand_name}
-                  </option>
-                ))}
-              </select>
-
-              {/* Model */}
-              <select
-                className="border px-3 py-2 rounded w-full mb-3"
-                value={spModel}
-                disabled={!selectedBrand?.models?.length}
-                onChange={(e) => handleModelChange(e.target.value)}
-              >
-                <option value="">Select Model</option>
-                {(selectedBrand?.models || []).map((m) => (
-                  <option key={m.model_id} value={m.model_id}>
-                    {m.model_no}
-                  </option>
-                ))}
-              </select>
-
-              {/* Qty & Price */}
-              {selectedSingleModel && (
-                <div className="grid grid-cols-2 gap-4 mb-3">
-                  <div className="flex flex-col">
-                    <label className="font-medium text-sm">Quantity</label>
-                    <input
-                      type="number"
-                      min={1}
-                      className="border px-3 py-2 rounded w-full"
-                      value={spQty}
-                      onChange={(e) => setSpQty(Number(e.target.value))}
-                    />
-                  </div>
-
-                  <div className="flex flex-col">
-                    <label className="font-medium text-sm">Unit Price</label>
-                    <input
-                      type="number"
-                      min={0}
-                      step="0.01"
-                      className="border px-3 py-2 rounded w-full"
-                      value={spPrice}
-                      onChange={(e) => setSpPrice(Number(e.target.value))}
-                    />
-                  </div>
-                </div>
-              )}
-
-              {/* Description */}
-              {selectedSingleModel?.description && (
-                <div className="mb-3 text-sm text-gray-600 whitespace-pre-line">
-                  {selectedSingleModel.description}
-                </div>
-              )}
-
-              {/* Buttons */}
-              <div className="flex justify-end gap-2">
-                <button
-                  onClick={() => setOpenSingleProductPopup(false)}
-                  className="bg-gray-400 text-white px-3 py-1 rounded"
-                >
-                  Cancel
-                </button>
-                <button
-                  onClick={handleAddSingleProduct}
-                  className="bg-blue-600 text-white px-3 py-1 rounded"
-                >
-                  Add Product
-                </button>
-              </div>
-            </div>
+          <div>
+            <label className="text-base font-semibold text-gray-500">
+              All Framing Will Be Done By
+            </label>
+            <select
+              className="border px-3 py-2 rounded w-full mt-1"
+              value={framingBy}
+              onChange={(e) => setFramingBy(e.target.value)}
+            >
+              <option value="">Select</option>
+              <option value="AV CORE">BY AV CORE</option>
+              <option value="THE CLIENT">BY THE CLIENT</option>
+            </select>
           </div>
-        )}
+
+          <div>
+            <label className="text-base font-semibold text-gray-500">
+              Fabric & Floor Carpet Provided By
+            </label>
+            <select
+              className="border px-3 py-2 rounded w-full mt-1"
+              value={fabricBy}
+              onChange={(e) => setFabricBy(e.target.value)}
+            >
+              <option value="">Select</option>
+              <option value="AV CORE">BY AV CORE</option>
+              <option value="THE CLIENT">BY THE CLIENT</option>
+            </select>
+          </div>
+
+          <div>
+            <label className="text-base font-semibold text-gray-500">
+              Ceiling Related Work Provided By
+            </label>
+            <select
+              className="border px-3 py-2 rounded w-full mt-1"
+              value={ceilingBy}
+              onChange={(e) => setCeilingBy(e.target.value)}
+            >
+              <option value="">Select</option>
+              <option value="AV CORE">BY AV CORE</option>
+              <option value="THE CLIENT">BY THE CLIENT</option>
+            </select>
+          </div>
+
+          
+        </div>
+      )}
+
+      {/* Product Type */}
+      <select
+        className="border px-3 py-2 rounded w-full mb-3"
+        value={spType}
+        disabled={!productTypes.length}
+        onChange={(e) => handleProductTypeChange(e.target.value)}
+      >
+        <option value="">Select Product Type</option>
+        {productTypes.map((pt) => (
+          <option key={pt.product_type_id} value={pt.product_type_id}>
+            {pt.product_type_name}
+          </option>
+        ))}
+      </select>
+
+      {/* Brand */}
+      <select
+        className="border px-3 py-2 rounded w-full mb-3"
+        value={spBrand}
+        disabled={!selectedPT?.brands?.length}
+        onChange={(e) => handleBrandChange(e.target.value)}
+      >
+        <option value="">Select Brand</option>
+        {selectedPT?.brands?.map((b) => (
+          <option key={b.brand_id} value={b.brand_id}>
+            {b.brand_name}
+          </option>
+        ))}
+      </select>
+
+      {/* Model */}
+      <select
+        className="border px-3 py-2 rounded w-full mb-3"
+        value={spModel}
+        disabled={!selectedBrand?.models?.length}
+        onChange={(e) => handleModelChange(e.target.value)}
+      >
+        <option value="">Select Model</option>
+        {(selectedBrand?.models || []).map((m) => (
+          <option key={m.model_id} value={m.model_id}>
+            {m.model_no}
+          </option>
+        ))}
+      </select>
+
+      {/* Qty & Price */}
+      {selectedSingleModel && (
+        <div className="grid grid-cols-2 gap-4 mb-3">
+          <div className="flex flex-col">
+            <label className="font-medium text-sm">Quantity</label>
+            <input
+              type="number"
+              min={1}
+              className="border px-3 py-2 rounded w-full"
+              value={spQty}
+              onChange={(e) => setSpQty(Number(e.target.value))}
+            />
+          </div>
+
+          <div className="flex flex-col">
+            <label className="font-medium text-sm">Unit Price</label>
+            <input
+              type="number"
+              min={0}
+              step="0.01"
+              className="border px-3 py-2 rounded w-full"
+              value={spPrice}
+              onChange={(e) => setSpPrice(Number(e.target.value))}
+            />
+          </div>
+        </div>
+      )}
+
+      {/* Description */}
+      {selectedSingleModel?.description && (
+        <div className="mb-3 text-sm text-gray-600 whitespace-pre-line">
+          {selectedSingleModel.description}
+        </div>
+      )}
+
+      {/* Buttons */}
+      <div className="flex justify-end gap-2">
+        <button
+          onClick={() => setOpenSingleProductPopup(false)}
+          className="bg-gray-400 text-white px-3 py-1 rounded"
+        >
+          Cancel
+        </button>
+        <button
+          onClick={handleAddSingleProduct}
+          className="bg-blue-600 text-white px-3 py-1 rounded"
+        >
+          Add Product
+        </button>
+      </div>
+    </div>
+  </div>
+)}
+
       </div>
     </div>
   );
