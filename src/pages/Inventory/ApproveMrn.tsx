@@ -1,4 +1,3 @@
-// ApproveMrn.tsx
 import React, { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
@@ -38,68 +37,41 @@ interface Area {
   area_name: string;
 }
 
-interface Client {
-  assign_id: any;
-  id: number;
-  master_id: number;
-  name: string;
-  number: string;
-  alternate_number?: string;
-  email: string;
-  address: string;
-  area: string;
-  area_id: string;
+interface MRNItem {
+  mpm_id: number;
+  prod_id: number;
+  model_id: number;
+  brand_id: number;
+  requested_qty: number;
+  verified_qty: number;
+  approval_qty: number;
+  pending_qty: number;
   status: string;
-  cat_name: string;
-  cat_id: number;
-  reference_name: string;
-  reference_id: number;
-  reference?: string | number;
-  city?: string;
-  location_link?: string;
-  room_length: string;
-  room_width: string;
-  room_height: string;
-  p_type?: string;
-  budget_range?: string;
-  current_stage?: string;
-  time_to_complete?: string;
-  site_visit_date?: string;
-  demo_date?: string;
-  ar_number?: string;
-  architect_name?: string;
-  ca_number?: string;
-  e_number?: string;
-  sm_number?: string;
-  pop_number?: string;
-  other_number?: string;
-  lead_stage?: string;
-  quick_remark?: string;
-  detailed_remark?: string;
-  followup_date?: string;
-  assign_date?: string;
-  assigned_to: string[];
-  reassignment_date?: string;
-  category_other?: string;
-  reference_other?: string;
-  reassignment_remarks?: ReassignmentRemark[];
 }
 
-interface ReassignmentRemark {
-  assignedTo?: string;
-  leadStage?: string;
-  reassignment_date?: string;
-  remark?: string;
-  created_by_user?: number;
-  created_at?: string;
-  name?: string;
-  role?: string;
+interface Execution {
+  execution_id: number;
+  schedule_name: string;
+}
+
+interface MRNData {
+  mrn_id: number;
+  mrn_number: string;
+  master_id: number;
+  qt_id: number;
+  expected_date: string | null;
+  created_at: string;
+  mrn_status: string;
+  client_name: string;
+  city: string;
+  execution: Execution;
+  items: MRNItem[];
 }
 
 const ApproveMrn = () => {
   // State management
-  const [data, setData] = useState<any[]>([]);
-  const [filteredData, setFilteredData] = useState<any[]>([]);
+  const [data, setData] = useState<MRNData[]>([]);
+  const [filteredData, setFilteredData] = useState<MRNData[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -139,130 +111,74 @@ const ApproveMrn = () => {
   const [references, setReferences] = useState<Reference[]>([]);
   const [area, setArea] = useState<Area[]>([]);
 
-  // Static MRN data for approval modal
-  const staticMRNData = {
-    master_id: 4806,
-    mrn_number: 'MRN-0001',
-    lead: {
-      name: 'Yogesh Jaju',
-      number: '9545527123',
-      city: 'Pune',
-    },
-    quotations: [
-      {
-        qt_id: 101,
-        qt_number: 'QT-0002',
-        total_price: 285230,
-        kits: [
-          {
-            kit_name: 'XTZ E-IW8 SPEAKER LCR (Made in Sweden)',
-            items: [
-              {
-                model: '3-Way In-Wall Speaker',
-                brand_name: 'XTZ',
-                description:
-                  'Aluminum-magnesium tweeter, 5-inch fiberglass mid & woofer',
-                prod_qty: 3,
-                prod_price: 69200,
-                total: 207600,
-              },
-            ],
-          },
-          {
-            kit_name: 'XTZ Cinema S2 Atmos Surround Speaker',
-            items: [
-              {
-                model: 'Atmos Surround Speaker',
-                brand_name: 'XTZ',
-                description:
-                  '16mm soft dome tweeter, 5.25-inch woofer, 75W continuous',
-                prod_qty: 1,
-                prod_price: 61730,
-                total: 61730,
-              },
-            ],
-          },
-          {
-            kit_name: 'Dolby Atmos Ceiling Speaker',
-            items: [
-              {
-                model: 'Ceiling Speaker',
-                brand_name: 'Dolby',
-                description: '0.75 inch tweeter, 6.5 inch coaxial woofer',
-                prod_qty: 1,
-                prod_price: 15900,
-                total: 15900,
-              },
-            ],
-          },
-        ],
-      },
-    ],
-  };
-
-  // Filter out approved/rejected MRNs from display (show only verified ones)
-  const getDisplayLeads = (allLeads: any[]) => {
+  // Filter out approved/rejected MRNs from display (show only waiting for approval)
+  const getDisplayLeads = (allLeads: MRNData[]) => {
     return allLeads.filter(
-      (lead) => lead.mrn_verified === true || lead.status === 'verified',
+      (lead) => lead.mrn_status === 'Verified' || lead.mrn_status === 'Approval Pending',
     );
   };
 
-  // Fetch outward leads
-  const fetchOutwardLeads = async () => {
+  // Fetch verified MRNs
+  const fetchVerifiedMRNs = async () => {
     try {
       setLoading(true);
       setError(null);
 
-      const response = await axios.get(`${BASE_URL}api/sujit/execution/getleads`);
+      const response = await axios.get(`${BASE_URL}api/verified/leads`);
+      
+      console.log('API Response:', response.data);
 
-      const leads: any[] = Array.isArray(response.data)
-        ? response.data
-        : Array.isArray(response.data?.data)
-        ? response.data.data
-        : [];
+      // Handle response structure
+      let leads: MRNData[] = [];
+      
+      if (response.data?.data && Array.isArray(response.data.data)) {
+        // Response format: { message: "...", data: [...] }
+        leads = response.data.data;
+      } else if (Array.isArray(response.data)) {
+        // Response format: direct array
+        leads = response.data;
+      } else {
+        console.error('Unexpected response format:', response.data);
+        setError('Invalid data format received from server');
+        setLoading(false);
+        return;
+      }
 
-      // Add MRN data for demo
-      const leadsWithMRN = leads.map((lead, index) => ({
+      // Transform data to match the expected format
+      const transformedLeads = leads.map((lead) => ({
         ...lead,
-        mrn_number:
-          lead.mrn_number || `MRN${String(index + 1).padStart(6, '0')}`,
-        mrn_verified: index % 3 === 0 ? true : false, // Set some as verified for demo
-        mrn_approved: index % 5 === 0 ? true : false,
-        mrn_rejected: index % 7 === 0 ? true : false,
-        status:
-          index % 3 === 0
-            ? 'verified'
-            : index % 5 === 0
-            ? 'approved'
-            : index % 7 === 0
-            ? 'rejected'
-            : 'pending',
+        // Ensure execution object exists
+        execution: lead.execution || { execution_id: 0, schedule_name: 'N/A' },
+        // Calculate pending items count
+        pending_items: lead.items?.filter(item => item.pending_qty > 0).length || 0,
+        total_items: lead.items?.length || 0,
       }));
 
-      setData(leadsWithMRN);
+      setData(transformedLeads);
 
       // Only show verified leads in filtered data (ready for approval)
-      const verifiedLeads = getDisplayLeads(leadsWithMRN);
+      const verifiedLeads = getDisplayLeads(transformedLeads);
       setFilteredData(verifiedLeads);
 
       // Extract unique values for filters
       const cities: string[] = Array.from(
-        new Set(verifiedLeads.map((item: any) => item.city).filter(Boolean)),
+        new Set(verifiedLeads.map((item) => item.city).filter(Boolean)),
       );
 
       const schedules: string[] = Array.from(
         new Set(
-          verifiedLeads.map((item: any) => item.schedule_name).filter(Boolean),
+          verifiedLeads.map((item) => item.execution?.schedule_name).filter(Boolean),
         ),
       );
 
       setAvailableCities(cities);
       setAvailableSchedules(schedules);
+      
     } catch (err: any) {
-      console.error('Error fetching outward leads:', err);
+      console.error('Error fetching verified MRNs:', err);
       setError(
         err?.response?.data?.message ||
-          'Failed to fetch outward leads. Please try again.',
+          'Failed to fetch verified MRNs. Please try again.',
       );
     } finally {
       setLoading(false);
@@ -279,7 +195,6 @@ const ApproveMrn = () => {
     }
   };
 
-
   const fetchArea = async () => {
     try {
       const response = await axios.get(`${BASE_URL}api/area`);
@@ -290,7 +205,7 @@ const ApproveMrn = () => {
   };
 
   useEffect(() => {
-    fetchOutwardLeads();
+    fetchVerifiedMRNs();
     fetchCategories();
     fetchArea();
   }, []);
@@ -303,10 +218,9 @@ const ApproveMrn = () => {
     if (searchTerm) {
       filtered = filtered.filter(
         (item) =>
-          item.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          item.number?.includes(searchTerm) ||
-          item.city?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          item.mrn_number?.toLowerCase().includes(searchTerm.toLowerCase()),
+          item.client_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+          item.mrn_number?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+          item.city?.toLowerCase().includes(searchTerm.toLowerCase()),
       );
     }
 
@@ -316,21 +230,20 @@ const ApproveMrn = () => {
 
     if (selectedSchedules.length > 0) {
       filtered = filtered.filter((item) =>
-        selectedSchedules.includes(item.schedule_name),
+        selectedSchedules.includes(item.execution?.schedule_name),
       );
     }
 
     if (selectedStartFromDate) {
       filtered = filtered.filter(
         (item) =>
-          new Date(item.execution_start_date) >=
-          new Date(selectedStartFromDate),
+          new Date(item.created_at) >= new Date(selectedStartFromDate),
       );
     }
     if (selectedStartToDate) {
       filtered = filtered.filter(
         (item) =>
-          new Date(item.execution_start_date) <= new Date(selectedStartToDate),
+          new Date(item.created_at) <= new Date(selectedStartToDate),
       );
     }
 
@@ -345,129 +258,89 @@ const ApproveMrn = () => {
     selectedStartToDate,
   ]);
 
-  // Handle edit click
-  const handleEditClick = (lead: any) => {
-    // Check if lead has quotations data
-    if (lead.quotations && lead.quotations.length > 0) {
-      // Use existing quotations data
-      setEditingMRNData({
-        master_id: lead.master_id,
-        mrn_number: lead.mrn_number,
-        lead: {
-          name: lead.name || '',
-          number: lead.number || '',
-          city: lead.city || '',
-        },
-        quotations: lead.quotations,
-        verification_notes: lead.verification_notes || '',
-      });
-    } else {
-      // Create sample quotations data if none exists
-      // This is just for demo - in production, you'd fetch actual quotations
-      setEditingMRNData({
-        master_id: lead.master_id,
-        mrn_number: lead.mrn_number,
-        lead: {
-          name: lead.name || '',
-          number: lead.number || '',
-          city: lead.city || '',
-        },
-        quotations: [
-          {
-            qt_id: 101,
-            qt_number: 'QT-00' + (lead.master_id || '1'),
-            kits: [
-              {
-                kit_name: 'Sample Kit',
-                items: [
-                  {
-                    id: 1,
-                    model: 'Sample Product',
-                    brand_name: 'Sample Brand',
-                    prod_price: 1000,
-                    prod_qty: 1,
-                    description: 'Sample description',
-                  },
-                ],
-              },
-            ],
-          },
-        ],
-        verification_notes: lead.verification_notes || '',
-      });
-    }
-
-    setShowEditModal(true);
-  };
 
   // Handle approve click
   const handleApproveClick = (lead: any) => {
+    setApprovingMRN(lead.mrn_number);
+    
     // Prepare data for approval modal
     const approveData = {
-      ...staticMRNData,
       master_id: lead.master_id,
+      mrn_id: lead.mrn_id,
       mrn_number: lead.mrn_number,
       lead: {
-        name: lead.name,
-        number: lead.number,
+        name: lead.client_name,
         city: lead.city,
       },
+      items: lead.items || [],
+      created_at: lead.created_at,
     };
+    
     setSelectedApproveData(approveData);
     setShowApproveModal(true);
+    setApprovingMRN(null);
   };
 
   // Handle save approval
-const handleSaveApproval = (approvedMRN) => {
-  setData((prevData) => {
-    const updatedData = prevData.map((item) =>
-      item.master_id === approvedMRN.master_id
-        ? {
-            ...item,
-            mrn_approved: approvedMRN.action === "approved",
-            mrn_rejected: approvedMRN.action === "rejected",
-            status:
-              approvedMRN.action === "approved" ? "approved" : "rejected",
-            approval_date: new Date().toISOString(),
-            approved_by: approvedMRN.approved_by || "Current User",
-            approval_notes:
-              approvedMRN.approval_notes || approvedMRN.rejection_notes,
-          }
-        : item
-    );
+  const handleSaveApproval = async (approvedMRN: any) => {
+    try {
+      // Call API to approve/reject MRN
+      const endpoint = approvedMRN.action === "approved" 
+        ? `${BASE_URL}api/approve-mrn/${approvedMRN.mrn_id}`
+        : `${BASE_URL}api/reject-mrn/${approvedMRN.mrn_id}`;
+      
+      await axios.post(endpoint, {
+        approval_notes: approvedMRN.approval_notes || approvedMRN.rejection_notes,
+        approved_by: approvedMRN.approved_by || "Current User",
+      });
 
-    // Update filtered data based on latest state
-    const updatedFilteredData = getDisplayLeads(updatedData);
-    setFilteredData(updatedFilteredData);
+      // Update local state
+      setData((prevData) => {
+        const updatedData = prevData.map((item) =>
+          item.mrn_id === approvedMRN.mrn_id
+            ? {
+                ...item,
+                mrn_status: approvedMRN.action === "approved" ? "Approved" : "Rejected",
+                approval_date: new Date().toISOString(),
+                approved_by: approvedMRN.approved_by || "Current User",
+                approval_notes: approvedMRN.approval_notes || approvedMRN.rejection_notes,
+              }
+            : item
+        );
 
-    // Update filter options
-    const cities = Array.from(
-      new Set(updatedFilteredData.map((item) => item.city).filter(Boolean))
-    );
+        // Update filtered data based on latest state
+        const updatedFilteredData = getDisplayLeads(updatedData);
+        setFilteredData(updatedFilteredData);
 
-    const schedules = Array.from(
-      new Set(
-        updatedFilteredData.map((item) => item.schedule_name).filter(Boolean)
-      )
-    );
+        // Update filter options
+        const cities = Array.from(
+          new Set(updatedFilteredData.map((item) => item.city).filter(Boolean))
+        );
+        const schedules = Array.from(
+          new Set(
+            updatedFilteredData.map((item) => item.execution?.schedule_name).filter(Boolean)
+          )
+        );
 
-    setAvailableCities(cities);
-    setAvailableSchedules(schedules);
+        setAvailableCities(cities);
+        setAvailableSchedules(schedules);
 
-    return updatedData;
-  });
+        return updatedData;
+      });
 
-  // Close modal
-  setShowApproveModal(false);
-  setSelectedApproveData(null);
-  setApprovingMRN(null);
-
-  alert(
-    `MRN ${
-      approvedMRN.action === "approved" ? "Approved" : "Rejected"
-    } Successfully!\nMRN No: ${approvedMRN.mrn_number}`
-  );
-};
+      // Close modal
+      setShowApproveModal(false);
+      setSelectedApproveData(null);
+      
+      alert(
+        `MRN ${approvedMRN.action === "approved" ? "Approved" : "Rejected"} Successfully!\nMRN No: ${approvedMRN.mrn_number}`
+      );
+      
+    } catch (err) {
+      console.error('Error updating MRN:', err);
+      alert('Failed to update MRN. Please try again.');
+    }
+  };
 
   // Clear all filters
   const clearFilters = () => {
@@ -502,21 +375,23 @@ const handleSaveApproval = (approvedMRN) => {
       day: '2-digit',
       month: 'short',
       year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
     });
   };
 
   // Get MRN status badge
-  const getMRNStatusBadge = (lead) => {
-    if (lead.mrn_approved === true || lead.status === 'approved') {
+  const getMRNStatusBadge = (lead: any) => {
+    if (lead.mrn_status === 'Approved') {
       return (
         <div className="inline-flex items-center px-3 py-1.5 rounded-lg text-xs font-medium bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300 border border-green-200 dark:border-green-800/30">
           <FontAwesomeIcon icon={faCheckCircle} className="w-3 h-3 mr-1.5" />
-          Waiting for Approval
+          Approved
         </div>
       );
     }
 
-    if (lead.mrn_rejected === true || lead.status === 'rejected') {
+    if (lead.mrn_status === 'Rejected') {
       return (
         <div className="inline-flex items-center px-3 py-1.5 rounded-lg text-xs font-medium bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300 border border-red-200 dark:border-red-800/30">
           <FontAwesomeIcon icon={faTimesCircle} className="w-3 h-3 mr-1.5" />
@@ -525,21 +400,47 @@ const handleSaveApproval = (approvedMRN) => {
       );
     }
 
-    if (lead.mrn_verified === true || lead.status === 'verified') {
+    if (lead.mrn_status === 'Verified') {
       return (
         <div className="inline-flex items-center px-3 py-1.5 rounded-lg text-xs font-medium bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300 border border-blue-200 dark:border-blue-800/30">
+          <FontAwesomeIcon icon={faCheckCircle} className="w-3 h-3 mr-1.5" />
+          Verified - Ready for Approval
+        </div>
+      );
+    }
+
+    if (lead.mrn_status === 'Approval Pending') {
+      return (
+        <div className="inline-flex items-center px-3 py-1.5 rounded-lg text-xs font-medium bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-300 border border-yellow-200 dark:border-yellow-800/30">
           <FontAwesomeIcon icon={faClock} className="w-3 h-3 mr-1.5" />
-          Verified (Pending Approval)
+          Approval Pending
         </div>
       );
     }
 
     return (
-      <div className="inline-flex items-center px-3 py-1.5 rounded-lg text-xs font-medium bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-300 border border-yellow-200 dark:border-yellow-800/30">
+      <div className="inline-flex items-center px-3 py-1.5 rounded-lg text-xs font-medium bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-300 border border-gray-200 dark:border-gray-700">
         <FontAwesomeIcon icon={faClock} className="w-3 h-3 mr-1.5" />
-        Pending Verification
+        {lead.mrn_status || 'Pending'}
       </div>
     );
+  };
+
+  // Get item status summary
+  const getItemStatusSummary = (items: MRNItem[]) => {
+    if (!items || items.length === 0) return null;
+    
+    const pendingApproval = items.filter(item => item.status === 'Approval Pending').length;
+    const verified = items.filter(item => item.verified_qty > 0).length;
+    const total = items.length;
+    
+    if (pendingApproval === total) {
+      return <span className="text-xs text-yellow-600">All items pending approval</span>;
+    } else if (verified === total) {
+      return <span className="text-xs text-green-600">All items verified</span>;
+    } else {
+      return <span className="text-xs text-blue-600">{verified}/{total} items verified</span>;
+    }
   };
 
   // Close all dropdowns
@@ -665,7 +566,7 @@ const handleSaveApproval = (approvedMRN) => {
                   icon={faCalendarCheck}
                   className="w-4 h-4 mr-1"
                 />
-                MRN Approval - {filteredData.length} Verified Records
+                MRN Approval - {filteredData.length} Pending Records
               </span>
             </div>
 
@@ -713,7 +614,7 @@ const handleSaveApproval = (approvedMRN) => {
                   <input
                     type="text"
                     className="w-full pl-10 pr-4 py-2 text-sm border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all"
-                    placeholder="Search MRN, name, phone, city..."
+                    placeholder="Search MRN, name, city..."
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
                   />
@@ -729,26 +630,7 @@ const handleSaveApproval = (approvedMRN) => {
                 Reset Filter
               </button>
 
-              {/* Refresh Button */}
-              <button
-                onClick={fetchOutwardLeads}
-                className="px-4 py-2 bg-gradient-to-r from-purple-500 to-indigo-600 hover:from-purple-600 hover:to-indigo-700 text-white rounded-lg font-medium transition-all shadow-md hover:shadow-lg flex items-center gap-2 whitespace-nowrap"
-              >
-                <svg
-                  className="h-4 w-4"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
-                  />
-                </svg>
-                
-              </button>
+             
             </div>
           </div>
         </div>
@@ -837,6 +719,12 @@ const handleSaveApproval = (approvedMRN) => {
               className="h-12 w-12 mx-auto mb-4"
             />
             <p className="text-lg font-medium">{error}</p>
+            <button
+              onClick={fetchVerifiedMRNs}
+              className="mt-4 px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700"
+            >
+              Try Again
+            </button>
           </div>
         </div>
       ) : (
@@ -852,7 +740,7 @@ const handleSaveApproval = (approvedMRN) => {
                       className="flex items-center justify-between gap-2"
                     >
                       <span className="text-xs font-extrabold uppercase tracking-wider text-gray-700 dark:text-gray-300">
-                        Start Date
+                        Created Date
                       </span>
                       <button
                         onClick={(e) => {
@@ -876,7 +764,7 @@ const handleSaveApproval = (approvedMRN) => {
                       <div className="absolute top-full left-0 mt-1 z-50 bg-white dark:bg-boxdark border border-gray-300 dark:border-gray-700 rounded-lg shadow-lg p-4 min-w-[250px]">
                         <div className="flex justify-between items-center mb-3">
                           <span className="font-semibold text-sm dark:text-white">
-                            Select Start Date Range
+                            Select Created Date Range
                           </span>
                           <button
                             onClick={(e) => {
@@ -1135,6 +1023,8 @@ const handleSaveApproval = (approvedMRN) => {
                     </div>
                   </th>
 
+                
+
                   <th className="py-3 px-4">
                     <div className="text-xs font-extrabold uppercase tracking-wider text-gray-700 dark:text-gray-300">
                       Status
@@ -1151,17 +1041,17 @@ const handleSaveApproval = (approvedMRN) => {
               <tbody className="divide-y divide-gray-200 dark:divide-gray-800">
                 {currentItems.length === 0 ? (
                   <tr>
-                    <td colSpan={7} className="px-6 py-12 text-center">
+                    <td colSpan={8} className="px-6 py-12 text-center">
                       <div className="text-gray-500 dark:text-gray-400">
                         <FontAwesomeIcon
                           icon={faCheckCircle}
                           className="h-12 w-12 mx-auto mb-4 opacity-50"
                         />
                         <p className="text-lg font-medium">
-                          No verified MRN records found
+                          No pending MRN records found
                         </p>
                         <p className="text-sm mt-2">
-                          All verified MRNs have been processed
+                          All MRNs have been processed
                         </p>
                       </div>
                     </td>
@@ -1169,29 +1059,24 @@ const handleSaveApproval = (approvedMRN) => {
                 ) : (
                   currentItems.map((lead) => (
                     <tr
-                      key={lead.master_id}
+                      key={lead.mrn_id}
                       className="hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors"
                     >
-                      {/* Execution Start Date */}
+                      {/* Created Date */}
                       <td className="py-4 px-4">
                         <div className="font-semibold text-sm bg-gradient-to-r from-blue-50 to-blue-100 dark:from-blue-900/20 dark:to-blue-800/10 text-blue-800 dark:text-blue-300 px-3 py-1.5 rounded-lg border border-blue-100 dark:border-blue-800/30 shadow-sm">
-                          {formatDate(lead.execution_start_date)}
+                          {formatDate(lead.created_at)}
                         </div>
                       </td>
 
                       {/* Client Details */}
                       <td className="py-4 px-4">
-                        <div
-                          className="group cursor-pointer"
-                          onClick={() => {
-                            /* Handle view details */
-                          }}
-                        >
+                        <div className="group cursor-pointer">
                           <div className="text-sm font-bold text-gray-900 dark:text-gray-100 group-hover:text-purple-600 dark:group-hover:text-purple-400 transition-colors duration-200">
-                            {lead.name || 'N/A'}
+                            {lead.client_name || 'N/A'}
                           </div>
                           <div className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
-                            {lead.number || '—'}
+                            ID: {lead.master_id || '—'}
                           </div>
                         </div>
                       </td>
@@ -1210,7 +1095,7 @@ const handleSaveApproval = (approvedMRN) => {
                       {/* Schedule Name */}
                       <td className="py-4 px-4">
                         <div className="text-sm font-bold text-indigo-600 dark:text-indigo-400">
-                          {lead.schedule_name || 'N/A'}
+                          {lead.execution?.schedule_name || 'N/A'}
                         </div>
                       </td>
 
@@ -1223,15 +1108,16 @@ const handleSaveApproval = (approvedMRN) => {
                         </div>
                       </td>
 
+                    
+
                       {/* MRN Status */}
                       <td className="py-4 px-4">{getMRNStatusBadge(lead)}</td>
 
                       {/* Actions */}
                       <td className="py-4 px-4">
                         <div className="flex items-center gap-2">
-                          {/* Approve Button - Show only for verified MRNs */}
-                          {(lead.mrn_verified === true ||
-                            lead.status === 'verified') && (
+                          {/* Approve Button - Show only for Verified MRNs */}
+                          {(lead.mrn_status === 'Verified' || lead.mrn_status === 'Approval Pending') && (
                             <button
                               onClick={() => handleApproveClick(lead)}
                               disabled={approvingMRN === lead.mrn_number}
@@ -1257,19 +1143,7 @@ const handleSaveApproval = (approvedMRN) => {
                             </button>
                           )}
 
-                          {/* Edit Button - Show for all except rejected */}
-                          {lead.status !== 'rejected' && (
-                            <button
-                              onClick={() => handleEditClick(lead)}
-                              className="w-8 h-8 bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 text-white rounded-lg transition-colors duration-200"
-                              title="Edit MRN"
-                            >
-                              <FontAwesomeIcon
-                                icon={faEdit}
-                                className="h-3.5 w-3.5"
-                              />
-                            </button>
-                          )}
+                        
                         </div>
                       </td>
                     </tr>
@@ -1301,24 +1175,11 @@ const handleSaveApproval = (approvedMRN) => {
                 setSelectedApproveData(null);
                 setApprovingMRN(null);
               }}
-              onSave={handleSaveApproval}
+              onSave={fetchVerifiedMRNs}
             />
           )}
 
-          {/* Edit MRN Modal */}
-          {showEditModal && editingMRNData && (
-            <EditVerifyModal
-              data={editingMRNData}
-              onClose={() => {
-                setShowEditModal(false);
-                setEditingMRNData(null);
-              }}
-              onSave={(updatedData) => {
-                console.log('Saved data:', updatedData);
-                fetchOutwardLeads();
-              }}
-            />
-          )}
+    
         </>
       )}
     </div>

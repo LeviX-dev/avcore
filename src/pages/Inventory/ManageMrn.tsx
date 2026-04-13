@@ -1,5 +1,5 @@
-// ManageMrn.tsx
 import React, { useState, useEffect, useRef } from 'react';
+import axios from 'axios';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import {
   faSearch,
@@ -22,298 +22,122 @@ import {
 } from '@fortawesome/free-solid-svg-icons';
 import MaterialIssueModal from './MaterialIssueModal.js';
 import MrnHistoryLogs from './MrnHistoryLogs.js';
-// Dummy data for MRN records
-const dummyMRNData = [
-  {
-    master_id: 4806,
-    mrn_number: 'MRN-2024-001',
-    name: 'Yogesh Jaju',
-    number: '9545527123',
-    city: 'Pune',
-    schedule_name: 'Site Installation',
-    execution_start_date: '2024-02-20',
-    mrn_approved: true,
-    status: 'approved',
-    material_issued: false,
-    material_partial: false,
-    quotations: [
-      {
-        qt_id: 101,
-        qt_number: 'QT-0002',
-        total_price: 285230,
-        kits: [
-          {
-            kit_name: 'XTZ E-IW8 SPEAKER LCR',
-            items: [
-              {
-                model: '3-Way In-Wall Speaker',
-                brand_name: 'XTZ',
-                description:
-                  'Aluminum-magnesium tweeter, 5-inch fiberglass mid & woofer',
-                prod_qty: 3,
-                prod_price: 69200,
-                total: 207600,
-              },
-            ],
-          },
-          {
-            kit_name: 'XTZ Cinema S2 Atmos',
-            items: [
-              {
-                model: 'Atmos Surround Speaker',
-                brand_name: 'XTZ',
-                description: '16mm soft dome tweeter, 5.25-inch woofer',
-                prod_qty: 1,
-                prod_price: 61730,
-                total: 61730,
-              },
-            ],
-          },
-        ],
-      },
-    ],
-  },
-  {
-    master_id: 4807,
-    mrn_number: 'MRN-2024-002',
-    name: 'Rajesh Sharma',
-    number: '9876543210',
-    city: 'Mumbai',
-    schedule_name: 'Pre-installation',
-    execution_start_date: '2024-02-21',
-    mrn_approved: true,
-    status: 'approved',
-    material_issued: false,
-    material_partial: false,
-    quotations: [
-      {
-        qt_id: 102,
-        qt_number: 'QT-0003',
-        total_price: 445000,
-        kits: [
-          {
-            kit_name: 'Sonos Home Theater Package',
-            items: [
-              {
-                model: 'Sonos Arc Soundbar',
-                brand_name: 'Sonos',
-                description: 'Premium smart soundbar with Dolby Atmos',
-                prod_qty: 1,
-                prod_price: 89900,
-                total: 89900,
-              },
-              {
-                model: 'Sonos Sub Gen 3',
-                brand_name: 'Sonos',
-                description: 'Wireless subwoofer for deep bass',
-                prod_qty: 1,
-                prod_price: 69900,
-                total: 69900,
-              },
-              {
-                model: 'Sonos One SL',
-                brand_name: 'Sonos',
-                description: 'Bookshelf speakers for surround sound',
-                prod_qty: 2,
-                prod_price: 45000,
-                total: 90000,
-              },
-            ],
-          },
-        ],
-      },
-    ],
-  },
-  {
-    master_id: 4808,
-    mrn_number: 'MRN-2024-003',
-    name: 'Priya Patel',
-    number: '9876501234',
-    city: 'Ahmedabad',
-    schedule_name: 'Final Installation',
-    execution_start_date: '2024-02-22',
-    mrn_approved: true,
-    status: 'approved',
-    material_issued: false,
-    material_partial: false,
-    quotations: [
-      {
-        qt_id: 103,
-        qt_number: 'QT-0004',
-        total_price: 305000,
-        kits: [
-          {
-            kit_name: 'Bose Professional Package',
-            items: [
-              {
-                model: 'Bose Professional DesignMax DM5',
-                brand_name: 'Bose',
-                description: '5.25" surface-mount loudspeaker',
-                prod_qty: 4,
-                prod_price: 45000,
-                total: 180000,
-              },
-              {
-                model: 'Bose PowerSpace P4300+',
-                brand_name: 'Bose',
-                description: '4-channel professional amplifier',
-                prod_qty: 1,
-                prod_price: 125000,
-                total: 125000,
-              },
-            ],
-          },
-        ],
-      },
-    ],
-  },
-  {
-    master_id: 4809,
-    mrn_number: 'MRN-2024-004',
-    name: 'Amit Kumar',
-    number: '9988776655',
-    city: 'Delhi',
-    schedule_name: 'Site Survey',
-    execution_start_date: '2024-02-23',
-    mrn_approved: true,
-    status: 'material_issued',
-    material_issued: true,
-    material_partial: false,
-    issue_date: '2024-02-24',
-    issued_by: 'Current User',
-    quotations: [
-      {
-        qt_id: 104,
-        qt_number: 'QT-0005',
-        total_price: 210000,
-        kits: [
-          {
-            kit_name: 'JBL Commercial Package',
-            items: [
-              {
-                model: 'JBL Control 25-1',
-                brand_name: 'JBL',
-                description: 'Indoor/outdoor loudspeaker',
-                prod_qty: 6,
-                prod_price: 35000,
-                total: 210000,
-              },
-            ],
-          },
-        ],
-      },
-    ],
-  },
-];
+import { BASE_URL } from '../../../public/config.js';
+import { useNavigate } from 'react-router-dom';
+
+interface MRNItem {
+  mpm_id: number;
+  prod_id: number;
+  model_id: number;
+  brand_id: number;
+  brand_name: string;
+  model_no: string;
+  requested_qty: number;
+  verified_qty: number;
+  approval_qty: number;
+  purchase_qty: number;
+  issued_qty: number;
+  remaining_qty: number;
+  item_status: string;
+}
+
+interface MRNData {
+  mrn_id: number;
+  mrn_number: string;
+  mrn_status: string;
+  master_id: number;
+  qt_id: number;
+  created_at: string;
+  client_name: string;
+  city: string;
+  items: MRNItem[];
+}
 
 const ManageMrn = () => {
   // State management
-  const [data, setData] = useState<any[]>([]);
-  const [filteredData, setFilteredData] = useState<any[]>([]);
+  const [data, setData] = useState<MRNData[]>([]);
+  const [filteredData, setFilteredData] = useState<MRNData[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   // Filter states
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCities, setSelectedCities] = useState<string[]>([]);
-  const [selectedSchedules, setSelectedSchedules] = useState<string[]>([]);
   const [selectedStartFromDate, setSelectedStartFromDate] = useState('');
   const [selectedStartToDate, setSelectedStartToDate] = useState('');
 
   // Available filter options
   const [availableCities, setAvailableCities] = useState<string[]>([]);
-  const [availableSchedules, setAvailableSchedules] = useState<string[]>([]);
 
   // UI states
   const [showStartCalendar, setShowStartCalendar] = useState(false);
   const [showCityFilter, setShowCityFilter] = useState(false);
-  const [showScheduleFilter, setShowScheduleFilter] = useState(false);
   const [customRecordCount, setCustomRecordCount] = useState('');
   const [itemsPerPage, setItemsPerPage] = useState(10);
   const [showIssueModal, setShowIssueModal] = useState(false);
-  const [showEditModal, setShowEditModal] = useState(false);
-  const [editingMRNData, setEditingMRNData] = useState<any>(null);
+  const [showHistoryModal, setShowHistoryModal] = useState(false);
   const [issuingMRN, setIssuingMRN] = useState<string | null>(null);
   const [selectedIssueData, setSelectedIssueData] = useState<any>(null);
-  const [showHistoryModal, setShowHistoryModal] = useState(false);
-  const [selectedHistoryLead, setSelectedHistoryLead] = useState(null);
-
+  const [selectedHistoryLead, setSelectedHistoryLead] = useState<any>(null);
+  const navigate = useNavigate();
   // Pagination
   const [currentPage, setCurrentPage] = useState(1);
 
   // Refs for dropdowns
   const startDateRef = useRef<HTMLDivElement>(null);
   const cityFilterRef = useRef<HTMLDivElement>(null);
-  const scheduleFilterRef = useRef<HTMLDivElement>(null);
 
-  // Static MRN data for material issue modal
-  const staticMRNData = {
-    master_id: 4806,
-    mrn_number: 'MRN-2024-001',
-    lead: {
-      name: 'Yogesh Jaju',
-      number: '9545527123',
-      city: 'Pune',
-    },
-    quotations: dummyMRNData[0].quotations,
-  };
+  // Fetch issuable MRNs from API
+  const fetchIssuableMRNs = async () => {
+    try {
+      setLoading(true);
+      setError(null);
 
-  // Load dummy data
-  const loadDummyData = () => {
-    setLoading(true);
+      const response = await axios.get(`${BASE_URL}api/issuable/mrn`, {
+        withCredentials: true,
+      });
 
-    // Simulate API delay
-    setTimeout(() => {
-      setData(dummyMRNData);
+      if (response.data?.success && response.data?.data) {
+        const issuableMRNs = response.data.data;
+        setData(issuableMRNs);
+        setFilteredData(issuableMRNs);
 
-      // Show all approved/issued/partial leads in filtered data
-      const displayLeads = dummyMRNData.filter(
-        (lead) =>
-          lead.mrn_approved === true ||
-          lead.status === 'approved' ||
-          lead.status === 'material_issued' ||
-          lead.status === 'partially_issued',
+        // Extract unique values for filters
+        const cities: string[] = Array.from(
+          new Set(
+            issuableMRNs.map((item: MRNData) => item.city).filter(Boolean),
+          ),
+        );
+
+        setAvailableCities(cities);
+      } else {
+        setError('Failed to fetch issuable MRNs');
+      }
+    } catch (err: any) {
+      console.error('Error fetching issuable MRNs:', err);
+      setError(
+        err.response?.data?.message ||
+          'Failed to fetch issuable MRNs. Please try again.',
       );
-      setFilteredData(displayLeads);
-
-      // Extract unique values for filters
-      const cities: string[] = Array.from(
-        new Set(displayLeads.map((item: any) => item.city).filter(Boolean)),
-      );
-
-      const schedules: string[] = Array.from(
-        new Set(
-          displayLeads.map((item: any) => item.schedule_name).filter(Boolean),
-        ),
-      );
-
-      setAvailableCities(cities);
-      setAvailableSchedules(schedules);
+    } finally {
       setLoading(false);
-    }, 500);
+    }
   };
 
   useEffect(() => {
-    loadDummyData();
+    fetchIssuableMRNs();
   }, []);
 
   // Handle search and filters
   useEffect(() => {
-    let filtered = data.filter(
-      (lead) =>
-        lead.mrn_approved === true ||
-        lead.status === 'approved' ||
-        lead.status === 'material_issued' ||
-        lead.status === 'partially_issued',
-    );
+    let filtered = [...data];
 
     if (searchTerm) {
       filtered = filtered.filter(
         (item) =>
-          item.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          item.number?.includes(searchTerm) ||
-          item.city?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          item.mrn_number?.toLowerCase().includes(searchTerm.toLowerCase()),
+          item.client_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+          item.mrn_number?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+          item.city?.toLowerCase().includes(searchTerm.toLowerCase()),
       );
     }
 
@@ -321,23 +145,14 @@ const ManageMrn = () => {
       filtered = filtered.filter((item) => selectedCities.includes(item.city));
     }
 
-    if (selectedSchedules.length > 0) {
-      filtered = filtered.filter((item) =>
-        selectedSchedules.includes(item.schedule_name),
-      );
-    }
-
     if (selectedStartFromDate) {
       filtered = filtered.filter(
-        (item) =>
-          new Date(item.execution_start_date) >=
-          new Date(selectedStartFromDate),
+        (item) => new Date(item.created_at) >= new Date(selectedStartFromDate),
       );
     }
     if (selectedStartToDate) {
       filtered = filtered.filter(
-        (item) =>
-          new Date(item.execution_start_date) <= new Date(selectedStartToDate),
+        (item) => new Date(item.created_at) <= new Date(selectedStartToDate),
       );
     }
 
@@ -347,99 +162,56 @@ const ManageMrn = () => {
     data,
     searchTerm,
     selectedCities,
-    selectedSchedules,
     selectedStartFromDate,
     selectedStartToDate,
   ]);
 
-  const handleViewClick = (lead) => {
+  const handleViewClick = (lead: MRNData) => {
     setSelectedHistoryLead(lead);
     setShowHistoryModal(true);
   };
 
-  // Handle material issue click
-  const handleIssueClick = (lead: any) => {
+  const handleViewMRN = (mrnNumber) => {
+    navigate(`/mrn/view/${mrnNumber}`);
+  };
+
+  // Handle material issue click - using the data from the API
+  const handleIssueClick = (lead: MRNData) => {
     // Prepare data for material issue modal
     const issueData = {
-      ...staticMRNData,
-      master_id: lead.master_id,
+      mrn_id: lead.mrn_id,
       mrn_number: lead.mrn_number,
-      lead: {
-        name: lead.name,
-        number: lead.number,
-        city: lead.city,
-      },
-      quotations: lead.quotations,
-      isPartial: lead.status === 'partially_issued' || lead.material_partial,
+      mrn_status: lead.mrn_status,
+      created_at: lead.created_at,
+      master_id: lead.master_id,
+      client_name: lead.client_name,
+      city: lead.city,
+      items: lead.items.map((item) => ({
+        ...item,
+        issue_status:
+          item.item_status === 'Ready to Issue'
+            ? 'Not Issued'
+            : item.item_status,
+      })),
     };
     setSelectedIssueData(issueData);
+    setIssuingMRN(lead.mrn_number);
     setShowIssueModal(true);
   };
 
   // Handle save material issue
   const handleSaveIssue = (issuedMRN: any) => {
-    // Update the data state to mark MRN as issued or partially issued
-    setData((prevData) =>
-      prevData.map((item) =>
-        item.master_id === issuedMRN.master_id
-          ? {
-              ...item,
-              material_issued: issuedMRN.action === 'issued',
-              material_partial: issuedMRN.action === 'partial',
-              status:
-                issuedMRN.action === 'issued'
-                  ? 'material_issued'
-                  : 'partially_issued',
-              issue_date: new Date().toISOString().split('T')[0],
-              issued_by: issuedMRN.issued_by || 'Current User',
-              issue_notes: issuedMRN.issue_notes,
-            }
-          : item,
-      ),
-    );
-
-    // Update filtered data
-    const updatedData = data.map((item) =>
-      item.master_id === issuedMRN.master_id
-        ? {
-            ...item,
-            material_issued: issuedMRN.action === 'issued',
-            material_partial: issuedMRN.action === 'partial',
-            status:
-              issuedMRN.action === 'issued'
-                ? 'material_issued'
-                : 'partially_issued',
-          }
-        : item,
-    );
-
-    const updatedFilteredData = updatedData.filter(
-      (lead) =>
-        lead.mrn_approved === true ||
-        lead.status === 'approved' ||
-        lead.status === 'material_issued' ||
-        lead.status === 'partially_issued',
-    );
-    setFilteredData(updatedFilteredData);
-
-    // Close the modal
+    // Refresh the list after issuing
+    fetchIssuableMRNs();
     setShowIssueModal(false);
     setSelectedIssueData(null);
     setIssuingMRN(null);
-
-    // Show success message
-    const actionText =
-      issuedMRN.action === 'issued' ? 'Fully Issued' : 'Partially Issued';
-    alert(
-      `Material ${actionText} Successfully!\nMRN No: ${issuedMRN.mrn_number}`,
-    );
   };
 
   // Clear all filters
   const clearFilters = () => {
     setSearchTerm('');
     setSelectedCities([]);
-    setSelectedSchedules([]);
     setSelectedStartFromDate('');
     setSelectedStartToDate('');
     setCustomRecordCount('');
@@ -472,17 +244,17 @@ const ManageMrn = () => {
   };
 
   // Get MRN status badge
-  const getMRNStatusBadge = (lead) => {
-    if (lead.material_issued === true || lead.status === 'material_issued') {
+  const getMRNStatusBadge = (lead: MRNData) => {
+    if (lead.mrn_status === 'Approved') {
       return (
         <div className="inline-flex items-center px-3 py-1.5 rounded-lg text-xs font-medium bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300 border border-green-200 dark:border-green-800/30">
-          <FontAwesomeIcon icon={faCheckDouble} className="w-3 h-3 mr-1.5" />
-          Issued
+          <FontAwesomeIcon icon={faCheckCircle} className="w-3 h-3 mr-1.5" />
+          Approved
         </div>
       );
     }
 
-    if (lead.material_partial === true || lead.status === 'partially_issued') {
+    if (lead.mrn_status === 'Partially Issued') {
       return (
         <div className="inline-flex items-center px-3 py-1.5 rounded-lg text-xs font-medium bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-300 border border-orange-200 dark:border-orange-800/30">
           <FontAwesomeIcon icon={faBoxOpen} className="w-3 h-3 mr-1.5" />
@@ -491,50 +263,71 @@ const ManageMrn = () => {
       );
     }
 
-    if (lead.mrn_approved === true || lead.status === 'approved') {
-      return (
-        <div className="inline-flex items-center px-3 py-1.5 rounded-lg text-xs font-medium bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300 border border-blue-200 dark:border-blue-800/30">
-          <FontAwesomeIcon icon={faClock} className="w-3 h-3 mr-1.5" />
-          Approved
-        </div>
-      );
-    }
-
     return (
-      <div className="inline-flex items-center px-3 py-1.5 rounded-lg text-xs font-medium bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-300 border border-yellow-200 dark:border-yellow-800/30">
+      <div className="inline-flex items-center px-3 py-1.5 rounded-lg text-xs font-medium bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300 border border-blue-200 dark:border-blue-800/30">
         <FontAwesomeIcon icon={faClock} className="w-3 h-3 mr-1.5" />
-        Pending
+        {lead.mrn_status || 'Pending'}
       </div>
     );
   };
 
-  // Get button text based on status
-  const getButtonText = (lead) => {
-    if (lead.material_issued || lead.status === 'material_issued') {
-      return ' Issued';
+  // Get item status summary for display
+  const getItemStatusSummary = (items: MRNItem[]) => {
+    const readyToIssue = items.filter(
+      (item) => item.item_status === 'Ready to Issue',
+    ).length;
+    const waitingPurchase = items.filter(
+      (item) => item.item_status === 'Waiting Purchase',
+    ).length;
+    const partiallyIssued = items.filter(
+      (item) => item.item_status === 'Partially Issued',
+    ).length;
+    const issued = items.filter((item) => item.item_status === 'Issued').length;
+
+    if (readyToIssue > 0) {
+      return (
+        <span className="inline-flex items-center px-2 py-1 rounded text-xs bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300">
+          {readyToIssue} Ready to Issue
+        </span>
+      );
     }
-    if (lead.material_partial || lead.status === 'partially_issued') {
-      return 'Issue Remaining';
+    if (waitingPurchase > 0) {
+      return (
+        <span className="inline-flex items-center px-2 py-1 rounded text-xs bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-300">
+          {waitingPurchase} Waiting Purchase
+        </span>
+      );
     }
-    return 'Issue Material';
+    if (partiallyIssued > 0) {
+      return (
+        <span className="inline-flex items-center px-2 py-1 rounded text-xs bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-300">
+          {partiallyIssued} Partially Issued
+        </span>
+      );
+    }
+    if (issued > 0) {
+      return (
+        <span className="inline-flex items-center px-2 py-1 rounded text-xs bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300">
+          {issued} Issued
+        </span>
+      );
+    }
+    return (
+      <span className="inline-flex items-center px-2 py-1 rounded text-xs bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400">
+        {items.length} Items
+      </span>
+    );
   };
 
-  // Get button color based on status
-  const getButtonColor = (lead) => {
-    if (lead.material_issued || lead.status === 'material_issued') {
-      return 'bg-gray-400 cursor-not-allowed';
-    }
-    if (lead.material_partial || lead.status === 'partially_issued') {
-      return 'bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700';
-    }
-    return 'bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700';
+  // Check if MRN is issuable (has any items ready to issue)
+  const isIssuable = (lead: MRNData) => {
+    return lead.items.some((item) => item.item_status === 'Ready to Issue');
   };
 
   // Close all dropdowns
   const closeAllDropdowns = () => {
     setShowStartCalendar(false);
     setShowCityFilter(false);
-    setShowScheduleFilter(false);
   };
 
   useEffect(() => {
@@ -550,12 +343,6 @@ const ManageMrn = () => {
         !cityFilterRef.current.contains(event.target as Node)
       ) {
         setShowCityFilter(false);
-      }
-      if (
-        scheduleFilterRef.current &&
-        !scheduleFilterRef.current.contains(event.target as Node)
-      ) {
-        setShowScheduleFilter(false);
       }
     };
 
@@ -641,19 +428,6 @@ const ManageMrn = () => {
   const showingStart = filteredData.length === 0 ? 0 : indexOfFirstItem + 1;
   const showingEnd = Math.min(indexOfLastItem, filteredData.length);
 
-  // Count records by status
-  const readyCount = filteredData.filter(
-    (item) => item.status === 'approved',
-  ).length;
-
-  const partialCount = filteredData.filter(
-    (item) => item.status === 'partially_issued',
-  ).length;
-
-  const issuedCount = filteredData.filter(
-    (item) => item.status === 'material_issued',
-  ).length;
-
   return (
     <div className="p-4 bg-gray-50 dark:bg-gray-900 min-h-screen">
       {/* Sticky Header with Filters */}
@@ -666,27 +440,8 @@ const ManageMrn = () => {
                   icon={faClipboardList}
                   className="w-4 h-4 mr-1"
                 />
-                Manage MRN
+                Manage MRN - Issuable
               </span>
-
-              {/* Status Summary Chips */}
-              {/* <div className="flex gap-2 ml-4">
-                {readyCount > 0 && (
-                  <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300">
-                    Ready: {readyCount}
-                  </span>
-                )}
-                {partialCount > 0 && (
-                  <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-300">
-                    Partial: {partialCount}
-                  </span>
-                )}
-                {issuedCount > 0 && (
-                  <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300">
-                    Issued: {issuedCount}
-                  </span>
-                )}
-              </div> */}
             </div>
 
             <div className="flex flex-col sm:flex-row gap-3 w-full sm:w-auto">
@@ -733,7 +488,7 @@ const ManageMrn = () => {
                   <input
                     type="text"
                     className="w-full pl-10 pr-4 py-2 text-sm border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all"
-                    placeholder="Search MRN, name, phone, city..."
+                    placeholder="Search MRN, name, city..."
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
                   />
@@ -749,25 +504,7 @@ const ManageMrn = () => {
                 Reset Filter
               </button>
 
-              {/* Refresh Button */}
-              <button
-                onClick={loadDummyData}
-                className="px-4 py-2 bg-gradient-to-r from-purple-500 to-indigo-600 hover:from-purple-600 hover:to-indigo-700 text-white rounded-lg font-medium transition-all shadow-md hover:shadow-lg flex items-center gap-2 whitespace-nowrap"
-              >
-                <svg
-                  className="h-4 w-4"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
-                  />
-                </svg>
-              </button>
+           
             </div>
           </div>
         </div>
@@ -776,8 +513,7 @@ const ManageMrn = () => {
       {/* Active Filters Display */}
       {(selectedStartFromDate ||
         selectedStartToDate ||
-        selectedCities.length > 0 ||
-        selectedSchedules.length > 0) && (
+        selectedCities.length > 0) && (
         <div className="flex items-center gap-2 mb-4 p-3 bg-white dark:bg-boxdark rounded-lg shadow-sm border border-gray-200 dark:border-gray-800">
           <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
             Active filters:
@@ -785,7 +521,7 @@ const ManageMrn = () => {
           <div className="flex flex-wrap gap-2">
             {(selectedStartFromDate || selectedStartToDate) && (
               <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs bg-blue-100 text-blue-800 dark:bg-blue-900/50 dark:text-blue-300 border border-blue-200 dark:border-blue-800">
-                Start: {formatDate(selectedStartFromDate) || 'Any'} to{' '}
+                Created: {formatDate(selectedStartFromDate) || 'Any'} to{' '}
                 {formatDate(selectedStartToDate) || 'Any'}
                 <button
                   onClick={() => {
@@ -810,24 +546,6 @@ const ManageMrn = () => {
                     setSelectedCities((prev) => prev.filter((c) => c !== city))
                   }
                   className="ml-1 text-teal-600 hover:text-teal-800 dark:text-teal-400"
-                >
-                  ×
-                </button>
-              </span>
-            ))}
-            {selectedSchedules.map((schedule) => (
-              <span
-                key={schedule}
-                className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs bg-indigo-100 text-indigo-800 dark:bg-indigo-900/50 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800"
-              >
-                {schedule}
-                <button
-                  onClick={() =>
-                    setSelectedSchedules((prev) =>
-                      prev.filter((s) => s !== schedule),
-                    )
-                  }
-                  className="ml-1 text-indigo-600 hover:text-indigo-800 dark:text-indigo-400"
                 >
                   ×
                 </button>
@@ -871,7 +589,7 @@ const ManageMrn = () => {
                       className="flex items-center justify-between gap-2"
                     >
                       <span className="text-xs font-extrabold uppercase tracking-wider text-gray-700 dark:text-gray-300">
-                        Start Date
+                        Created Date
                       </span>
                       <button
                         onClick={(e) => {
@@ -895,7 +613,7 @@ const ManageMrn = () => {
                       <div className="absolute top-full left-0 mt-1 z-50 bg-white dark:bg-boxdark border border-gray-300 dark:border-gray-700 rounded-lg shadow-lg p-4 min-w-[250px]">
                         <div className="flex justify-between items-center mb-3">
                           <span className="font-semibold text-sm dark:text-white">
-                            Select Start Date Range
+                            Select Created Date Range
                           </span>
                           <button
                             onClick={(e) => {
@@ -1054,103 +772,15 @@ const ManageMrn = () => {
                     )}
                   </th>
 
-                  <th className="py-3 px-4 relative">
-                    <div
-                      ref={scheduleFilterRef}
-                      className="flex items-center justify-between gap-2"
-                    >
-                      <span className="text-xs font-extrabold uppercase tracking-wider text-gray-700 dark:text-gray-300">
-                        Schedule
-                      </span>
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          closeAllDropdowns();
-                          setShowScheduleFilter(!showScheduleFilter);
-                        }}
-                        className="text-gray-500 hover:text-purple-600 dark:text-gray-400 dark:hover:text-purple-400 focus:outline-none transition-colors"
-                      >
-                        <FontAwesomeIcon
-                          icon={faFilter}
-                          className={`h-3 w-3 transition-colors duration-200 ${
-                            selectedSchedules.length > 0
-                              ? 'text-purple-600'
-                              : ''
-                          } ${showScheduleFilter ? 'text-purple-600' : ''}`}
-                        />
-                      </button>
+                  <th className="py-3 px-4">
+                    <div className="text-xs font-extrabold uppercase tracking-wider text-gray-700 dark:text-gray-300">
+                      MRN Number
                     </div>
-
-                    {/* Schedule Filter Dropdown */}
-                    {showScheduleFilter && (
-                      <div className="absolute top-full left-0 mt-1 z-50 bg-white dark:bg-boxdark border border-gray-300 dark:border-gray-700 rounded-lg shadow-lg p-4 min-w-[200px] max-h-[300px] overflow-y-auto">
-                        <div className="flex justify-between items-center mb-3">
-                          <span className="font-semibold text-sm dark:text-white">
-                            Filter Schedules
-                          </span>
-                          <div className="flex gap-2">
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                setSelectedSchedules([]);
-                              }}
-                              className="text-xs font-medium text-purple-600 hover:text-purple-800 dark:text-purple-400 transition-colors"
-                            >
-                              Clear All
-                            </button>
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                setShowScheduleFilter(false);
-                              }}
-                              className="text-xs font-medium text-gray-500 hover:text-gray-700 dark:text-gray-400 transition-colors"
-                            >
-                              ×
-                            </button>
-                          </div>
-                        </div>
-
-                        {availableSchedules.length > 0 ? (
-                          availableSchedules.map((schedule) => (
-                            <div
-                              key={schedule}
-                              className="flex items-center mb-2"
-                            >
-                              <input
-                                type="checkbox"
-                                id={`schedule-${schedule}`}
-                                checked={selectedSchedules.includes(schedule)}
-                                onChange={(e) => {
-                                  e.stopPropagation();
-                                  setSelectedSchedules((prev) =>
-                                    prev.includes(schedule)
-                                      ? prev.filter((s) => s !== schedule)
-                                      : [...prev, schedule],
-                                  );
-                                }}
-                                onClick={(e) => e.stopPropagation()}
-                                className="h-3.5 w-3.5 mr-2.5 text-purple-600 rounded border-gray-300 focus:ring-2 focus:ring-purple-500"
-                              />
-                              <label
-                                htmlFor={`schedule-${schedule}`}
-                                className="text-sm font-medium dark:text-white cursor-pointer truncate hover:text-purple-600 dark:hover:text-purple-400 transition-colors"
-                              >
-                                {schedule}
-                              </label>
-                            </div>
-                          ))
-                        ) : (
-                          <div className="text-sm font-medium text-gray-500 dark:text-gray-400 italic py-3 text-center">
-                            No schedules available
-                          </div>
-                        )}
-                      </div>
-                    )}
                   </th>
 
                   <th className="py-3 px-4">
                     <div className="text-xs font-extrabold uppercase tracking-wider text-gray-700 dark:text-gray-300">
-                      MRN Number
+                      Items
                     </div>
                   </th>
 
@@ -1177,10 +807,10 @@ const ManageMrn = () => {
                           className="h-12 w-12 mx-auto mb-4 opacity-50"
                         />
                         <p className="text-lg font-medium">
-                          No material issue records found
+                          No issuable MRN records found
                         </p>
                         <p className="text-sm mt-2">
-                          No approved MRNs available for material issue
+                          All issuable MRNs will appear here
                         </p>
                       </div>
                     </td>
@@ -1188,13 +818,13 @@ const ManageMrn = () => {
                 ) : (
                   currentItems.map((lead) => (
                     <tr
-                      key={lead.master_id}
+                      key={lead.mrn_id}
                       className="hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors"
                     >
-                      {/* Execution Start Date */}
+                      {/* Created Date */}
                       <td className="py-4 px-4">
                         <div className="font-semibold text-sm bg-gradient-to-r from-blue-50 to-blue-100 dark:from-blue-900/20 dark:to-blue-800/10 text-blue-800 dark:text-blue-300 px-3 py-1.5 rounded-lg border border-blue-100 dark:border-blue-800/30 shadow-sm">
-                          {formatDate(lead.execution_start_date)}
+                          {formatDate(lead.created_at)}
                         </div>
                       </td>
 
@@ -1202,10 +832,10 @@ const ManageMrn = () => {
                       <td className="py-4 px-4">
                         <div className="group">
                           <div className="text-sm font-bold text-gray-900 dark:text-gray-100 group-hover:text-purple-600 dark:group-hover:text-purple-400 transition-colors duration-200">
-                            {lead.name || 'N/A'}
+                            {lead.client_name || 'N/A'}
                           </div>
                           <div className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
-                            {lead.number || '—'}
+                            ID: {lead.master_id || '—'}
                           </div>
                         </div>
                       </td>
@@ -1221,40 +851,54 @@ const ManageMrn = () => {
                         </div>
                       </td>
 
-                      {/* Schedule Name */}
-                      <td className="py-4 px-4">
-                        <div className="text-sm font-bold text-indigo-600 dark:text-indigo-400">
-                          {lead.schedule_name || 'N/A'}
-                        </div>
-                      </td>
-
                       {/* MRN Number */}
                       <td className="py-4 px-4">
                         <div className="flex items-center gap-2">
                           <span className="text-sm font-mono font-bold text-gray-900 dark:text-white bg-gray-100 dark:bg-gray-800 px-3 py-1.5 rounded-lg">
                             {lead.mrn_number || '—'}
                           </span>
-                          {/* {lead.issue_date && (
-                            <span className="text-xs text-gray-500">
-                              {lead.status === 'partially_issued' ? 'Partial: ' : 'Issued: '}
-                              {formatDate(lead.issue_date)}
+                        </div>
+                      </td>
+
+                      {/* Items Summary */}
+                      <td className="py-4 px-4">
+                        <div className="flex flex-col gap-1">
+                          <div className="text-sm">
+                            <span className="font-semibold text-gray-900 dark:text-white">
+                              {lead.items?.length || 0}
                             </span>
-                          )} */}
+                            <span className="text-gray-500 dark:text-gray-400 text-xs ml-1">
+                              item(s)
+                            </span>
+                          </div>
+                          <div>{getItemStatusSummary(lead.items)}</div>
                         </div>
                       </td>
 
                       {/* MRN Status */}
                       <td className="py-4 px-4">{getMRNStatusBadge(lead)}</td>
 
+                    
                       {/* Actions */}
                       <td className="py-4 px-4">
                         <div className="flex items-center gap-2">
-                         
+                          {/* Issue Material Button */}
                           <button
                             onClick={() => handleIssueClick(lead)}
-                            disabled={issuingMRN === lead.mrn_number} 
-                            className="px-3 py-1.5 bg-purple-600 text-white text-xs font-medium rounded-lg transition-all duration-200 shadow-sm hover:bg-purple-700 hover:shadow-md flex items-center gap-1 disabled:opacity-50"
-                            title="Issue Material"
+                            disabled={
+                              issuingMRN === lead.mrn_number ||
+                              !isIssuable(lead)
+                            }
+                            className={`px-3 py-1.5 text-white text-xs font-medium rounded-lg transition-all duration-200 shadow-sm flex items-center gap-1 disabled:opacity-50 ${
+                              isIssuable(lead)
+                                ? 'bg-purple-600 hover:bg-purple-700 hover:shadow-md'
+                                : 'bg-gray-400 cursor-not-allowed'
+                            }`}
+                            title={
+                              isIssuable(lead)
+                                ? 'Issue Material'
+                                : 'No items ready to issue'
+                            }
                           >
                             {issuingMRN === lead.mrn_number ? (
                               <>
@@ -1266,19 +910,32 @@ const ManageMrn = () => {
                               </>
                             ) : (
                               <>
-                                {/* <FontAwesomeIcon
+                                <FontAwesomeIcon
                                   icon={faTruck}
                                   className="h-3 w-3"
-                                /> */}
+                                />
                                 Issue Material
                               </>
                             )}
                           </button>
-                          {/* Edit Button */}
+
+                          {/* History Logs Button */}
                           <button
                             onClick={() => handleViewClick(lead)}
-                            className="w-8 h-8 bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white rounded-lg transition-colors duration-200"
-                            title="View MRN History"
+                            className="w-8 h-8 bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white rounded-lg transition-colors duration-200 flex items-center justify-center"
+                            title="View History Logs"
+                          >
+                            <FontAwesomeIcon
+                              icon={faClock}
+                              className="h-3.5 w-3.5"
+                            />
+                          </button>
+
+                          {/* View Details Button - Navigate to MRN Details Page */}
+                          <button
+                            onClick={() => handleViewMRN(lead.mrn_number)}
+                            className="w-8 h-8 bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white rounded-lg transition-colors duration-200 flex items-center justify-center"
+                            title="View MRN Details"
                           >
                             <FontAwesomeIcon
                               icon={faEye}
@@ -1306,30 +963,31 @@ const ManageMrn = () => {
               showingEnd={showingEnd}
             />
           )}
-
-          {/* Material Issue Modal */}
-          {showIssueModal && selectedIssueData && (
-            <MaterialIssueModal
-              data={selectedIssueData}
-              onClose={() => {
-                setShowIssueModal(false);
-                setSelectedIssueData(null);
-                setIssuingMRN(null);
-              }}
-              onSave={handleSaveIssue}
-            />
-          )}
-
-          {showHistoryModal && selectedHistoryLead && (
-            <MrnHistoryLogs
-              lead={selectedHistoryLead}
-              onClose={() => {
-                setShowHistoryModal(false);
-                setSelectedHistoryLead(null);
-              }}
-            />
-          )}
         </>
+      )}
+
+      {/* Material Issue Modal */}
+      {showIssueModal && selectedIssueData && (
+        <MaterialIssueModal
+          data={selectedIssueData}
+          onClose={() => {
+            setShowIssueModal(false);
+            setSelectedIssueData(null);
+            setIssuingMRN(null);
+          }}
+          onSave={handleSaveIssue}
+        />
+      )}
+
+      {/* MRN History Logs Modal */}
+      {showHistoryModal && selectedHistoryLead && (
+        <MrnHistoryLogs
+          lead={selectedHistoryLead}
+          onClose={() => {
+            setShowHistoryModal(false);
+            setSelectedHistoryLead(null);
+          }}
+        />
       )}
     </div>
   );

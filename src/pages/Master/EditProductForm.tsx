@@ -209,14 +209,14 @@ const EditProductForm = ({ productType, onClose, onSuccess }: EditProductFormPro
               {/* Category Dropdown */}
               <div className="flex flex-col gap-2">
                 <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                  Product Category
+                  Product Subject
                 </label>
                 <select
                   value={catId}
                   onChange={(e) => setCatId(Number(e.target.value))}
                   className="w-full border border-gray-300 dark:border-strokedark dark:bg-boxdark dark:text-white rounded-lg py-2 px-2 text-sm"
                 >
-                  <option value="">Select Category</option>
+                  <option value="">Select Subject</option>
                   {categories.map(cat => (
                     <option key={cat.cat_id} value={cat.cat_id}>
                       {cat.cat_name}
@@ -227,7 +227,7 @@ const EditProductForm = ({ productType, onClose, onSuccess }: EditProductFormPro
 
               {/* Quotation Type Dropdown */}
               <div>
-                <label className="text-sm font-medium text-gray-700 dark:text-gray-300">Product Category Type</label>
+                <label className="text-sm font-medium text-gray-700 dark:text-gray-300">Product Subject Type</label>
                 <select
                   value={quotationType}
                   onChange={(e) => handleQuotationChange(e.target.value)}

@@ -27,6 +27,7 @@ const ALLOWED_ROLES = [
   'acoustic_engineer',
   'acoustic_designer',
   'hr_executive',
+  'store'
   
 ];
 

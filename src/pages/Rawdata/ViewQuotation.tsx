@@ -1007,63 +1007,79 @@ const ViewQuotation = () => {
           )}
 
           {/* FOOTER */}
-          <div className="mt-12">
-            <div className="max-w-md border-2 border-black rounded-sm mb-10 overflow-hidden mt-48">
-              <div className="bg-black text-white text-center py-1 font-bold text-sm tracking-wider uppercase">
-                BANK DETAILS
-              </div>
-              <table className="w-full text-[13px] border-collapse">
-                <tbody>
-                  <tr className="border-b border-black">
-                    <td className="p-1.5 px-3 border-r border-black text-black font-bold bg-gray-200 w-1/3">
-                      Account Name:
-                    </td>
-                    <td className="p-1.5 px-3 text-black font-bold bg-gray-200">
-                      AV Core
-                    </td>
-                  </tr>
-                  <tr className="border-b border-black">
-                    <td className="p-1.5 px-3 border-r border-black text-black font-bold bg-white w-1/3">
-                      Account Type:
-                    </td>
-                    <td className="p-1.5 px-3 text-black font-bold">Current</td>
-                  </tr>
-                  <tr className="border-b border-black">
-                    <td className="p-1.5 px-3 border-r border-black text-black font-bold bg-gray-200 w-1/3">
-                      Account Number:
-                    </td>
-                    <td className="p-1.5 px-3 text-black font-bold bg-gray-200">
-                      5412214649
-                    </td>
-                  </tr>
-                  <tr className="border-b border-black">
-                    <td className="p-1.5 px-3 border-r border-black text-black font-bold bg-white w-1/3">
-                      Bank Name:
-                    </td>
-                    <td className="p-1.5 px-3 text-black font-bold">
-                      Kotak Mahindra Bank
-                    </td>
-                  </tr>
-                  <tr className="border-b border-black">
-                    <td className="p-1.5 px-3 border-r border-black text-black font-bold bg-gray-200 w-1/3">
-                      IFSC Code:
-                    </td>
-                    <td className="p-1.5 px-3 text-black font-bold bg-gray-200">
-                      KKBK0001767
-                    </td>
-                  </tr>
-                  <tr>
-                    <td className="p-1.5 px-3 border-r border-black text-black font-bold bg-white w-1/3">
-                      Branch:
-                    </td>
-                    <td className="p-1.5 px-3 text-black font-bold">
-                      Baner Pune
-                    </td>
-                  </tr>
-                </tbody>
-              </table>
-            </div>
+          <div className="mt-36">
 
+            <div className="grid grid-cols-2 gap-4 mb-10">
+  {/* LEFT COLUMN - BANK DETAILS */}
+  <div className="border-2 border-black overflow-hidden">
+    <div className="bg-black text-white text-center py-2 font-bold text-sm tracking-wider uppercase">
+      BANK DETAILS
+    </div>
+    <table className="w-full text-[13px] border-collapse">
+      <tbody>
+        {[
+          { label: "Account Name:", value: "AV Core" },
+          { label: "Account Type:", value: "Current" },
+          { label: "Account Number:", value: "5412214649" },
+          { label: "Bank Name:", value: "Kotak Mahindra Bank" },
+          { label: "IFSC Code:", value: "KKBK0001767" },
+          { label: "Branch:", value: "Baner Pune" }
+        ].map((item, idx) => (
+          <tr key={idx} className="border-b border-black">
+            <td className={`px-3 py-2 border-r border-black font-bold ${idx % 2 === 0 ? 'bg-gray-100' : 'bg-white'} w-2/5`}>
+              {item.label}
+            </td>
+            <td className={`px-3 py-2 font-semibold ${idx % 2 === 0 ? 'bg-gray-100' : 'bg-white'}`}>
+              {item.value}
+            </td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
+  </div>
+
+  {/* RIGHT COLUMN - INSTALLMENTS */}
+  <div className="border-2 border-black overflow-hidden">
+    <div className="bg-black text-white text-center py-2 font-bold text-sm tracking-wider uppercase">
+      PAYMENT INSTALLMENTS
+    </div>
+    <table className="w-full text-[13px] border-collapse">
+      <thead>
+        <tr className="bg-gray-200">
+          <th className="px-3 py-2 border-r border-black border-b-2 border-black font-bold text-center w-3/5">
+            DESCRIPTION
+          </th>
+          <th className="px-3 py-2 border-b-2 border-black font-bold text-center">
+            PERCENT (%)
+          </th>
+        </tr>
+      </thead>
+      <tbody>
+        {quotation.installments && quotation.installments.length > 0 ? (
+          quotation.installments.map((inst, idx) => (
+            <tr 
+              key={idx} 
+              className={`${idx % 2 === 0 ? 'bg-white' : 'bg-gray-100'} border-b border-black`}
+            >
+              <td className="px-3 py-2 border-r border-black text-left">
+                {inst.description || '-'}
+              </td>
+              <td className="px-3 py-2 text-center font-semibold">
+                {inst.percentage}%
+              </td>
+            </tr>
+          ))
+        ) : (
+          <tr>
+            <td colSpan={2} className="px-3 py-8 text-center text-gray-500 border-b border-black">
+              No installments defined
+            </td>
+          </tr>
+        )}
+      </tbody>
+    </table>
+  </div>
+</div>
             {/* TERMS & CONDITIONS HEADER */}
             <h3 className="text-xl font-bold text-blue-600 underline mb-4 decoration-2 underline-offset-4">
               TERMS & CONDITIONS: -

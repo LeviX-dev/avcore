@@ -202,7 +202,7 @@ cat_id: Number(catId || kit.cat_id),
       <div className="bg-white w-full max-w-4xl rounded shadow-lg p-5 sm:p-6">
         {/* Header */}
         <div className="flex justify-between items-center mb-4">
-          <h2 className="text-xl font-semibold">Edit Kit</h2>
+          <h2 className="text-xl font-semibold">Edit Package</h2>
           <button onClick={onClose}>
             <FontAwesomeIcon icon={faTimes} size="lg" />
           </button>
@@ -254,7 +254,7 @@ cat_id: Number(catId || kit.cat_id),
                   fetchProductsByCategory(e.target.value);
                 }}
               >
-                <option value="">Select Category</option>
+                <option value="">Select Subject</option>
                 {categories.map((c) => (
                   <option key={c.cat_id} value={c.cat_id}>
                     {c.cat_name}
@@ -446,7 +446,7 @@ cat_id: Number(catId || kit.cat_id),
           {/* Update Kit Button & Total */}
           <div className="flex justify-between items-center mt-4">
             <span className="text-green-700 font-semibold text-lg">
-              Kit Total: ₹ {kitPrice.toFixed(2)}
+              Package Total: ₹ {kitPrice.toFixed(2)}
             </span>
             <div className="flex gap-2">
               <button

@@ -3,12 +3,28 @@ import axios from 'axios';
 import Breadcrumb from '../../components/Breadcrumbs/Breadcrumb';
 import { BASE_URL } from '../../../public/config';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
-import { FaArrowLeft } from 'react-icons/fa';
+import {
+  FaArrowLeft,
+  FaCalendarAlt,
+  FaMapMarkerAlt,
+  FaPhone,
+  FaUser,
+} from 'react-icons/fa';
+import logo from '../../images/logo/AVCoreLogo.png'; 
 
 const AddQuotation = () => {
   const { master_id } = useParams();
   const navigate = useNavigate();
   const { state } = useLocation();
+
+  const leadName = state?.name || master_id;
+  const leadContact = state?.number || state?.contact || 'N/A';
+  const leadCity = state?.city || state?.address || 'N/A';
+  const leadAddress = state?.address || '';
+
+  const [installments, setInstallments] = useState([
+    { description: 'Full Payment', percentage: 100, amount: 0 },
+  ]);
 
   /* ---------------- STATES ---------------- */
   const [quotationName, setQuotationName] = useState('');
@@ -43,6 +59,107 @@ const AddQuotation = () => {
   const [additionalPrices, setAdditionalPrices] = useState([
     { add_price_name: '', price: '' },
   ]);
+
+ 
+  const updateInstallment = (index, field, value) => {
+  const updated = [...installments];
+  const total = Number(totalWithGST || 0);
+
+  // ALLOW EMPTY INPUT (important)
+  if (value === '') {
+    updated[index][field] = '';
+    setInstallments(updated);
+    return;
+  }
+
+  if (field === 'percentage') {
+    const percent = Number(value);
+    updated[index].percentage = percent;
+    updated[index].amount = (total * percent) / 100;
+  }
+
+  if (field === 'amount') {
+    const amt = Number(value);
+    updated[index].amount = amt;
+    updated[index].percentage = total ? (amt / total) * 100 : 0;
+  }
+
+  if (field === 'description') {
+    updated[index].description = value;
+  }
+
+  // VALIDATION - only alert, don't revert
+  const totalPercent = updated.reduce(
+    (sum, i) => sum + Number(i.percentage || 0),
+    0,
+  );
+
+  if (totalPercent > 100) {
+    alert('Total percentage cannot exceed 100%');
+    // Don't return, allow the value but show warning
+  }
+
+  setInstallments(updated);
+};
+
+const addInstallment = () => {
+  const totalPercent = installments.reduce(
+    (sum, i) => sum + Number(i.percentage || 0),
+    0,
+  );
+
+  if (totalPercent >= 100) {
+    alert('Already reached 100%');
+    return;
+  }
+
+  setInstallments([
+    ...installments,
+    { description: '', percentage: 0, amount: 0 },
+  ]);
+};
+
+const removeInstallment = (index) => {
+  const updated = installments.filter((_, i) => i !== index);
+  setInstallments(updated);
+};
+
+// MODIFIED: Add this new function to validate before submit
+const validateInstallments = () => {
+  const totalPercentage = installments.reduce(
+    (sum, installment) => sum + Number(installment.percentage || 0),
+    0
+  );
+  
+  // Check if total percentage is exactly 100%
+  if (Math.abs(totalPercentage - 100) > 0.01) { // Using small epsilon for floating point comparison
+    alert(`Payment installment total must be 100%. Current total: ${totalPercentage.toFixed(2)}%`);
+    return false;
+  }
+  
+  // Check if any installment has empty description
+  const hasEmptyDescription = installments.some(
+    installment => !installment.description || installment.description.trim() === ''
+  );
+  
+  if (hasEmptyDescription) {
+    alert('Please enter description for all payment installments');
+    return false;
+  }
+  
+  // Check if any installment has zero percentage (unless it's the only one)
+  const hasZeroPercentage = installments.some(
+    installment => Number(installment.percentage || 0) === 0
+  );
+  
+  if (hasZeroPercentage && installments.length > 1) {
+    alert('Each installment must have a percentage greater than 0%');
+    return false;
+  }
+  
+  return true;
+};
+
 
   /* ---------------- FETCH CATEGORIES ---------------- */
   useEffect(() => {
@@ -194,71 +311,90 @@ const AddQuotation = () => {
 
   /* ---------------- SUBMIT ---------------- */
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
+const handleSubmit = async (e) => {
+  e.preventDefault();
 
-    if (!queuedCategories.length) {
-      alert('Please add at least one category to quotation');
-      return;
-    }
+  if (!queuedCategories.length) {
+    alert('Please add at least one category to quotation');
+    return;
+  }
 
-    // Check if ACOUSTIC category exists
-    const isAcoustic = queuedCategories.some(
-      (q) => q.cat_name?.toLowerCase() === 'customised acoustic quotation',
-    );
+  // ADD THIS VALIDATION BEFORE SUBMITTING
+  if (!validateInstallments()) {
+    return; // Stop submission if validation fails
+  }
 
-    // Validate acoustic dropdowns
-    if (isAcoustic && (!framingBy || !fabricBy || !ceilingBy)) {
-      alert('Please select all Acoustic options');
-      return;
-    }
+  // Check if ACOUSTIC category exists
+  const isAcoustic = queuedCategories.some(
+    (q) => q.cat_name?.toLowerCase() === 'customised acoustic quotation',
+  );
 
-    // Build acoustic full text
-    const acousticTerms =
-      framingBy && fabricBy && ceilingBy
-        ? `ALL FRAMING WILL BE DONE BY ${framingBy}.
+  // Validate acoustic dropdowns
+  if (isAcoustic && (!framingBy || !fabricBy || !ceilingBy)) {
+    alert('Please select all Acoustic options');
+    return;
+  }
+
+  // Build acoustic full text
+  const acousticTerms =
+    framingBy && fabricBy && ceilingBy
+      ? `ALL FRAMING WILL BE DONE BY ${framingBy}.
 • FABRIC & FLOOR CARPET WILL BE PROVIDED BY ${fabricBy}
 • ALL CEILING-RELATED WORK WILL BE PROVIDED BY ${ceilingBy}.
 • FABRIC STITCHING CHARGES WILL BE EXTRA AS PER THE DESIGN`
-        : null;
+      : null;
 
-    const payload = {
-      type: quoteType,
-      master_id,
-      acoustic_terms: acousticTerms,
+  const payload = {
+    type: quoteType,
+    master_id,
+    acoustic_terms: acousticTerms,
+    installments: installments,
+    gst_app_amt: quoteType === 'with_gst' ? Number(gstBaseAmount || 0) : 0,
 
-      gst_app_amt: quoteType === 'with_gst' ? Number(gstBaseAmount || 0) : 0,
-
-      items: queuedCategories.map((item) => ({
-        cat_id: item.cat_id,
-        kit_id: item.kit_id || null,
-        kit_qty: item.kit_id ? Number(item.kit_qty || 1) : 1,
-        products: item.products.map((p) => ({
-          model_id: p.model_id,
-          model_qty: Number(p.model_qty || 1),
-          model_price: Number(p.model_price || 0),
-        })),
+    items: queuedCategories.map((item) => ({
+      cat_id: item.cat_id,
+      kit_id: item.kit_id || null,
+      kit_qty: item.kit_id ? Number(item.kit_qty || 1) : 1,
+      products: item.products.map((p) => ({
+        model_id: p.model_id,
+        model_qty: Number(p.model_qty || 1),
+        model_price: Number(p.model_price || 0),
       })),
+    })),
 
-      additional_prices: additionalPrices.filter(
-        (a) => a.add_price_name && a.price,
-      ),
-    };
-
-    console.log('payload', payload);
-
-    try {
-      await axios.post(`${BASE_URL}api/quotation`, payload, {
-        withCredentials: true,
-      });
-
-      alert('Quotation created successfully ✅');
-      navigate('/quatation-pending');
-    } catch (err) {
-      console.error(err);
-      alert('Failed to create quotation ❌');
-    }
+    additional_prices: additionalPrices.filter(
+      (a) => a.add_price_name && a.price,
+    ),
   };
+
+  console.log('payload', payload);
+
+  try {
+    await axios.post(`${BASE_URL}api/quotation`, payload, {
+      withCredentials: true,
+    });
+
+    alert('Quotation created successfully ✅');
+    navigate('/quatation-pending');
+  } catch (err) {
+    console.error(err);
+    alert('Failed to create quotation ❌');
+  }
+};
+
+
+
+  useEffect(() => {
+    if (installments.length === 1 && installments[0].percentage === 100) {
+      setInstallments([
+        {
+          description: 'Full Payment',
+          percentage: 100,
+          amount: Number(totalWithGST || 0),
+        },
+      ]);
+    }
+  }, [totalWithGST]);
 
   const toggleExpand = (index) => {
     setExpandedIndex(expandedIndex === index ? null : index);
@@ -364,6 +500,13 @@ const AddQuotation = () => {
     return category?.cat_name || '';
   };
 
+  const today = new Date();
+  const formattedDate = today.toLocaleDateString('en-GB', {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+  });
+
   return (
     <div>
       <Breadcrumb pageName="Create Quotation" />
@@ -381,27 +524,93 @@ const AddQuotation = () => {
           </button>
         </div>
 
-        {/* LEAD + QUOTATION NO */}
-        <div className="bg-gray-100 border p-4 rounded mb-6 space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3 items-center">
-            <div>
-              <label className="font-medium text-sm">Lead</label>
-              <div className="font-medium">{state?.name || master_id}</div>
-            </div>
+        {/* HEADER SECTION */}
+        <div className="flex justify-between items-start mb-8 border-b pb-4">
+          {/* LEFT SIDE */}
+          <div className="flex flex-col text-left leading-tight">
+            <h1 className="text-4xl font-bold text-[#7d20a0] underline decoration-[#7d20a0] decoration-4 underline-offset-4 mb-2">
+              AV CORE
+            </h1>
+
+            <p className="font-bold text-[13px] text-black uppercase mb-1">
+              ALL ABOUT AUDIO VIDEO
+            </p>
+
+            <p className="text-[12px] font-bold text-black uppercase">
+              1ST FLOOR GAYATRI BUILDING, BESIDE JUPITER HOSPITAL, BANER 411045,
+              PUNE.
+            </p>
+
+            <p className="text-[16px] font-bold text-black">
+              Email:{' '}
+              <span className="text-blue-600">avcoreindia@gmail.com</span>
+            </p>
+
+            <p className="text-[16px] font-bold text-black">
+              Website: <span className="text-blue-600">www.avcore.in</span>
+            </p>
+
+            <p className="text-[12px] font-bold text-black uppercase">
+              CO.NO: 8329728210 / 8766786026
+            </p>
+          </div>
+
+          {/* RIGHT SIDE LOGO */}
+          <div className="bg-black p-1">
+           <img
+  src={logo}
+  className="w-28 h-auto border border-black"
+  alt="Logo"
+/>
           </div>
         </div>
 
-        <form onSubmit={handleSubmit} className="space-y-5">
+
+      {/* CLIENT INFORMATION */}
+<div className="border-2 border-black mt-4 text-[14px]">
+
+  {/* ROW 1 */}
+  <div className="flex justify-between px-4 py-2 border-b border-black">
+    <p>
+      <span className="font-bold text-black">NAME :</span>{' '}
+      <span className="text-gray-800">{leadName}</span>
+    </p>
+
+    <p>
+      <span className="font-bold text-black">CONTACT :</span>{' '}
+      <span className="text-gray-800">{leadContact}</span>
+    </p>
+  </div>
+
+  {/* ROW 2 */}
+  <div className="flex justify-between px-4 py-2">
+    <p>
+      <span className="font-bold text-black">DATE :</span>{' '}
+      <span className="text-gray-800">{formattedDate}</span>
+    </p>
+
+    <p>
+      <span className="font-bold text-black">ADDRESS :</span>{' '}
+      <span className="text-gray-800">
+        {leadAddress ? `${leadAddress}, ${leadCity}` : leadCity}
+      </span>
+    </p>
+  </div>
+
+</div>
+
+
+        <form onSubmit={handleSubmit} className="space-y-5 mt-9">
           {/* CATEGORY & KIT SELECTION */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
             <div>
-              <label className="block mb-1 font-medium">Category</label>
+              <label className="block mb-1 font-medium">Subject</label>
               <select
                 className="w-full border px-4 py-2 rounded"
                 value={selectedCategory}
                 onChange={(e) => setSelectedCategory(e.target.value)}
               >
-                <option value="">Select category</option>
+                <option value="">Select Subject</option>
                 {categories.map((c) => (
                   <option key={c.cat_id} value={c.cat_id}>
                     {c.cat_name}
@@ -428,60 +637,59 @@ const AddQuotation = () => {
           </div>
 
           {/* ACOUSTIC SPECIAL TERMS - ONLY SHOW FOR "Customised Acoustic Quotation" */}
-          {selectedCategory && getSelectedCategoryName() === 'Customised Acoustic Quotation' && (
-            <div className="border rounded bg-gray-50 p-4 space-y-3 mb-4">
-              <h2 className="font-semibold text-blue-600">
-                Acoustic Special Terms
-              </h2>
+          {selectedCategory &&
+            getSelectedCategoryName() === 'Customised Acoustic Quotation' && (
+              <div className="border rounded bg-gray-50 p-4 space-y-3 mb-4">
+                <h2 className="font-semibold text-blue-600">
+                  Acoustic Special Terms
+                </h2>
 
-              <div>
-                <label className="text-base font-semibold text-gray-500">
-                  All Framing Will Be Done By
-                </label>
-                <select
-                  className="border px-3 py-2 rounded w-full mt-1"
-                  value={framingBy}
-                  onChange={(e) => setFramingBy(e.target.value)}
-                >
-                  <option value="">Select</option>
-                  <option value="AV CORE">BY AV CORE</option>
-                  <option value="THE CLIENT">BY THE CLIENT</option>
-                </select>
+                <div>
+                  <label className="text-base font-semibold text-gray-500">
+                    All Framing Will Be Done By
+                  </label>
+                  <select
+                    className="border px-3 py-2 rounded w-full mt-1"
+                    value={framingBy}
+                    onChange={(e) => setFramingBy(e.target.value)}
+                  >
+                    <option value="">Select</option>
+                    <option value="AV CORE">BY AV CORE</option>
+                    <option value="THE CLIENT">BY THE CLIENT</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="text-base font-semibold text-gray-500">
+                    Fabric & Floor Carpet Provided By
+                  </label>
+                  <select
+                    className="border px-3 py-2 rounded w-full mt-1"
+                    value={fabricBy}
+                    onChange={(e) => setFabricBy(e.target.value)}
+                  >
+                    <option value="">Select</option>
+                    <option value="AV CORE">BY AV CORE</option>
+                    <option value="THE CLIENT">BY THE CLIENT</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="text-base font-semibold text-gray-500">
+                    Ceiling Related Work Provided By
+                  </label>
+                  <select
+                    className="border px-3 py-2 rounded w-full mt-1"
+                    value={ceilingBy}
+                    onChange={(e) => setCeilingBy(e.target.value)}
+                  >
+                    <option value="">Select</option>
+                    <option value="AV CORE">BY AV CORE</option>
+                    <option value="THE CLIENT">BY THE CLIENT</option>
+                  </select>
+                </div>
               </div>
-
-              <div>
-                <label className="text-base font-semibold text-gray-500">
-                  Fabric & Floor Carpet Provided By
-                </label>
-                <select
-                  className="border px-3 py-2 rounded w-full mt-1"
-                  value={fabricBy}
-                  onChange={(e) => setFabricBy(e.target.value)}
-                >
-                  <option value="">Select</option>
-                  <option value="AV CORE">BY AV CORE</option>
-                  <option value="THE CLIENT">BY THE CLIENT</option>
-                </select>
-              </div>
-
-              <div>
-                <label className="text-base font-semibold text-gray-500">
-                  Ceiling Related Work Provided By
-                </label>
-                <select
-                  className="border px-3 py-2 rounded w-full mt-1"
-                  value={ceilingBy}
-                  onChange={(e) => setCeilingBy(e.target.value)}
-                >
-                  <option value="">Select</option>
-                  <option value="AV CORE">BY AV CORE</option>
-                  <option value="THE CLIENT">BY THE CLIENT</option>
-                </select>
-              </div>
-
-           
-            </div>
-          )}
+            )}
 
           {/* QUOTE TYPE + KIT QTY - MOVED AFTER ACOUSTIC SECTION */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
@@ -790,6 +998,90 @@ const AddQuotation = () => {
             TOTAL AMOUNT: ₹{Number(totalWithGST || 0).toFixed(2)}
           </div>
 
+          {/* INSTALLMENTS SECTION */}
+          <div className="bg-yellow-50 p-4 rounded mt-4">
+            <h4 className="font-semibold mb-3">Payment Installments</h4>
+
+            {/* HEADER */}
+            <div className="grid grid-cols-[2fr_1fr_1fr_auto] gap-2 mb-2 font-semibold text-gray-700">
+              <div>Description</div>
+              <div>Percent%</div>
+              <div>Amount (₹)</div>
+              <div></div>
+            </div>
+
+            {installments.map((row, idx) => (
+              <div
+                key={idx}
+                className="grid grid-cols-[2fr_1fr_1fr_auto] gap-2 mb-2 items-center"
+              >
+                {/* DESCRIPTION */}
+                <input
+                  className="border px-2 py-1 rounded"
+                  placeholder="Advance / Final"
+                  value={row.description}
+                  onChange={(e) =>
+                    updateInstallment(idx, 'description', e.target.value)
+                  }
+                />
+
+                {/* % */}
+                <input
+                  type="number"
+                  className="border px-2 py-1 rounded"
+                  placeholder="%"
+                  value={row.percentage === 0 ? '' : row.percentage}
+                  onChange={(e) =>
+                    updateInstallment(idx, 'percentage', e.target.value)
+                  }
+                />
+
+                {/* AMOUNT */}
+                <input
+                  type="number"
+                  className="border px-2 py-1 rounded"
+                  placeholder="₹"
+                  value={row.amount === 0 ? '' : row.amount}
+                  onChange={(e) =>
+                    updateInstallment(idx, 'amount', e.target.value)
+                  }
+                />
+
+                {/* ACTIONS */}
+                <div className="flex gap-1">
+                  {idx === installments.length - 1 && (
+                    <button
+                      type="button"
+                      onClick={addInstallment}
+                      className="bg-green-500 text-white px-2 rounded"
+                    >
+                      +
+                    </button>
+                  )}
+
+                  {installments.length > 1 && (
+                    <button
+                      type="button"
+                      onClick={() => removeInstallment(idx)}
+                      className="bg-red-500 text-white px-2 rounded"
+                    >
+                      ✕
+                    </button>
+                  )}
+                </div>
+              </div>
+            ))}
+
+            {/* TOTAL */}
+            <div className="text-right text-sm text-gray-600 mt-2">
+              Total:{' '}
+              {installments
+                .reduce((sum, i) => sum + Number(i.percentage || 0), 0)
+                .toFixed(2)}
+              %
+            </div>
+          </div>
+
           {/* ACTIONS */}
           <div className="flex justify-end gap-3 border-t pt-4">
             <button
@@ -808,187 +1100,186 @@ const AddQuotation = () => {
           </div>
         </form>
 
-            {openSingleProductPopup && (
-  <div className="fixed inset-0 bg-black bg-opacity-30 flex items-center justify-center z-50">
-    <div className="bg-white p-6 rounded shadow-lg w-[600px] max-w-full max-h-[90vh] overflow-y-auto">
-      <h3 className="font-semibold text-lg mb-4">Add Single Product</h3>
+        {openSingleProductPopup && (
+          <div className="fixed inset-0 bg-black bg-opacity-30 flex items-center justify-center z-50">
+            <div className="bg-white p-6 rounded shadow-lg w-[600px] max-w-full max-h-[90vh] overflow-y-auto">
+              <h3 className="font-semibold text-lg mb-4">Add Single Product</h3>
 
-      {/* Category */}
-      <select
-        className="border px-3 py-2 rounded w-full mb-3"
-        value={spCategory}
-        onChange={(e) => {
-          setSpCategory(e.target.value);
-          fetchProductsByCategory(e.target.value);
-          setSpType('');
-          setSpBrand('');
-          setSpModel('');
-          setSpPrice(0);
-        }}
-      >
-        <option value="">Select Category</option>
-        {categories.map((c) => (
-          <option key={c.cat_id} value={c.cat_id}>
-            {c.cat_name}
-          </option>
-        ))}
-      </select>
+              {/* Category */}
+              <select
+                className="border px-3 py-2 rounded w-full mb-3"
+                value={spCategory}
+                onChange={(e) => {
+                  setSpCategory(e.target.value);
+                  fetchProductsByCategory(e.target.value);
+                  setSpType('');
+                  setSpBrand('');
+                  setSpModel('');
+                  setSpPrice(0);
+                }}
+              >
+                <option value="">Select Subject</option>
+                {categories.map((c) => (
+                  <option key={c.cat_id} value={c.cat_id}>
+                    {c.cat_name}
+                  </option>
+                ))}
+              </select>
 
-      {/* ACOUSTIC SPECIAL TERMS - ONLY FOR "Customised Acoustic Quotation" */}
-      {spCategory && categories.find((c) => c.cat_id == spCategory)?.cat_name === 'Customised Acoustic Quotation' && (
-        <div className="border rounded bg-gray-50 p-4 space-y-3 mb-4">
-          <h2 className="font-semibold text-blue-600">
-            Acoustic Special Terms
-          </h2>
+              {/* ACOUSTIC SPECIAL TERMS - ONLY FOR "Customised Acoustic Quotation" */}
+              {spCategory &&
+                categories.find((c) => c.cat_id == spCategory)?.cat_name ===
+                  'Customised Acoustic Quotation' && (
+                  <div className="border rounded bg-gray-50 p-4 space-y-3 mb-4">
+                    <h2 className="font-semibold text-blue-600">
+                      Acoustic Special Terms
+                    </h2>
 
-          <div>
-            <label className="text-base font-semibold text-gray-500">
-              All Framing Will Be Done By
-            </label>
-            <select
-              className="border px-3 py-2 rounded w-full mt-1"
-              value={framingBy}
-              onChange={(e) => setFramingBy(e.target.value)}
-            >
-              <option value="">Select</option>
-              <option value="AV CORE">BY AV CORE</option>
-              <option value="THE CLIENT">BY THE CLIENT</option>
-            </select>
+                    <div>
+                      <label className="text-base font-semibold text-gray-500">
+                        All Framing Will Be Done By
+                      </label>
+                      <select
+                        className="border px-3 py-2 rounded w-full mt-1"
+                        value={framingBy}
+                        onChange={(e) => setFramingBy(e.target.value)}
+                      >
+                        <option value="">Select</option>
+                        <option value="AV CORE">BY AV CORE</option>
+                        <option value="THE CLIENT">BY THE CLIENT</option>
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className="text-base font-semibold text-gray-500">
+                        Fabric & Floor Carpet Provided By
+                      </label>
+                      <select
+                        className="border px-3 py-2 rounded w-full mt-1"
+                        value={fabricBy}
+                        onChange={(e) => setFabricBy(e.target.value)}
+                      >
+                        <option value="">Select</option>
+                        <option value="AV CORE">BY AV CORE</option>
+                        <option value="THE CLIENT">BY THE CLIENT</option>
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className="text-base font-semibold text-gray-500">
+                        Ceiling Related Work Provided By
+                      </label>
+                      <select
+                        className="border px-3 py-2 rounded w-full mt-1"
+                        value={ceilingBy}
+                        onChange={(e) => setCeilingBy(e.target.value)}
+                      >
+                        <option value="">Select</option>
+                        <option value="AV CORE">BY AV CORE</option>
+                        <option value="THE CLIENT">BY THE CLIENT</option>
+                      </select>
+                    </div>
+                  </div>
+                )}
+
+              {/* Product Type */}
+              <select
+                className="border px-3 py-2 rounded w-full mb-3"
+                value={spType}
+                disabled={!productTypes.length}
+                onChange={(e) => handleProductTypeChange(e.target.value)}
+              >
+                <option value="">Select Product Type</option>
+                {productTypes.map((pt) => (
+                  <option key={pt.product_type_id} value={pt.product_type_id}>
+                    {pt.product_type_name}
+                  </option>
+                ))}
+              </select>
+
+              {/* Brand */}
+              <select
+                className="border px-3 py-2 rounded w-full mb-3"
+                value={spBrand}
+                disabled={!selectedPT?.brands?.length}
+                onChange={(e) => handleBrandChange(e.target.value)}
+              >
+                <option value="">Select Brand</option>
+                {selectedPT?.brands?.map((b) => (
+                  <option key={b.brand_id} value={b.brand_id}>
+                    {b.brand_name}
+                  </option>
+                ))}
+              </select>
+
+              {/* Model */}
+              <select
+                className="border px-3 py-2 rounded w-full mb-3"
+                value={spModel}
+                disabled={!selectedBrand?.models?.length}
+                onChange={(e) => handleModelChange(e.target.value)}
+              >
+                <option value="">Select Model</option>
+                {(selectedBrand?.models || []).map((m) => (
+                  <option key={m.model_id} value={m.model_id}>
+                    {m.model_no}
+                  </option>
+                ))}
+              </select>
+
+              {/* Qty & Price */}
+              {selectedSingleModel && (
+                <div className="grid grid-cols-2 gap-4 mb-3">
+                  <div className="flex flex-col">
+                    <label className="font-medium text-sm">Quantity</label>
+                    <input
+                      type="number"
+                      min={1}
+                      className="border px-3 py-2 rounded w-full"
+                      value={spQty}
+                      onChange={(e) => setSpQty(Number(e.target.value))}
+                    />
+                  </div>
+
+                  <div className="flex flex-col">
+                    <label className="font-medium text-sm">Unit Price</label>
+                    <input
+                      type="number"
+                      min={0}
+                      step="0.01"
+                      className="border px-3 py-2 rounded w-full"
+                      value={spPrice}
+                      onChange={(e) => setSpPrice(Number(e.target.value))}
+                    />
+                  </div>
+                </div>
+              )}
+
+              {/* Description */}
+              {selectedSingleModel?.description && (
+                <div className="mb-3 text-sm text-gray-600 whitespace-pre-line">
+                  {selectedSingleModel.description}
+                </div>
+              )}
+
+              {/* Buttons */}
+              <div className="flex justify-end gap-2">
+                <button
+                  onClick={() => setOpenSingleProductPopup(false)}
+                  className="bg-gray-400 text-white px-3 py-1 rounded"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleAddSingleProduct}
+                  className="bg-blue-600 text-white px-3 py-1 rounded"
+                >
+                  Add Product
+                </button>
+              </div>
+            </div>
           </div>
-
-          <div>
-            <label className="text-base font-semibold text-gray-500">
-              Fabric & Floor Carpet Provided By
-            </label>
-            <select
-              className="border px-3 py-2 rounded w-full mt-1"
-              value={fabricBy}
-              onChange={(e) => setFabricBy(e.target.value)}
-            >
-              <option value="">Select</option>
-              <option value="AV CORE">BY AV CORE</option>
-              <option value="THE CLIENT">BY THE CLIENT</option>
-            </select>
-          </div>
-
-          <div>
-            <label className="text-base font-semibold text-gray-500">
-              Ceiling Related Work Provided By
-            </label>
-            <select
-              className="border px-3 py-2 rounded w-full mt-1"
-              value={ceilingBy}
-              onChange={(e) => setCeilingBy(e.target.value)}
-            >
-              <option value="">Select</option>
-              <option value="AV CORE">BY AV CORE</option>
-              <option value="THE CLIENT">BY THE CLIENT</option>
-            </select>
-          </div>
-
-          
-        </div>
-      )}
-
-      {/* Product Type */}
-      <select
-        className="border px-3 py-2 rounded w-full mb-3"
-        value={spType}
-        disabled={!productTypes.length}
-        onChange={(e) => handleProductTypeChange(e.target.value)}
-      >
-        <option value="">Select Product Type</option>
-        {productTypes.map((pt) => (
-          <option key={pt.product_type_id} value={pt.product_type_id}>
-            {pt.product_type_name}
-          </option>
-        ))}
-      </select>
-
-      {/* Brand */}
-      <select
-        className="border px-3 py-2 rounded w-full mb-3"
-        value={spBrand}
-        disabled={!selectedPT?.brands?.length}
-        onChange={(e) => handleBrandChange(e.target.value)}
-      >
-        <option value="">Select Brand</option>
-        {selectedPT?.brands?.map((b) => (
-          <option key={b.brand_id} value={b.brand_id}>
-            {b.brand_name}
-          </option>
-        ))}
-      </select>
-
-      {/* Model */}
-      <select
-        className="border px-3 py-2 rounded w-full mb-3"
-        value={spModel}
-        disabled={!selectedBrand?.models?.length}
-        onChange={(e) => handleModelChange(e.target.value)}
-      >
-        <option value="">Select Model</option>
-        {(selectedBrand?.models || []).map((m) => (
-          <option key={m.model_id} value={m.model_id}>
-            {m.model_no}
-          </option>
-        ))}
-      </select>
-
-      {/* Qty & Price */}
-      {selectedSingleModel && (
-        <div className="grid grid-cols-2 gap-4 mb-3">
-          <div className="flex flex-col">
-            <label className="font-medium text-sm">Quantity</label>
-            <input
-              type="number"
-              min={1}
-              className="border px-3 py-2 rounded w-full"
-              value={spQty}
-              onChange={(e) => setSpQty(Number(e.target.value))}
-            />
-          </div>
-
-          <div className="flex flex-col">
-            <label className="font-medium text-sm">Unit Price</label>
-            <input
-              type="number"
-              min={0}
-              step="0.01"
-              className="border px-3 py-2 rounded w-full"
-              value={spPrice}
-              onChange={(e) => setSpPrice(Number(e.target.value))}
-            />
-          </div>
-        </div>
-      )}
-
-      {/* Description */}
-      {selectedSingleModel?.description && (
-        <div className="mb-3 text-sm text-gray-600 whitespace-pre-line">
-          {selectedSingleModel.description}
-        </div>
-      )}
-
-      {/* Buttons */}
-      <div className="flex justify-end gap-2">
-        <button
-          onClick={() => setOpenSingleProductPopup(false)}
-          className="bg-gray-400 text-white px-3 py-1 rounded"
-        >
-          Cancel
-        </button>
-        <button
-          onClick={handleAddSingleProduct}
-          className="bg-blue-600 text-white px-3 py-1 rounded"
-        >
-          Add Product
-        </button>
-      </div>
-    </div>
-  </div>
-)}
-
+        )}
       </div>
     </div>
   );

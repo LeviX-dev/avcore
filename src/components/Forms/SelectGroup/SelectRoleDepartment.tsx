@@ -47,6 +47,8 @@ const SelectRoleDepartment: React.FC<SelectRoleDepartmentProps> = ({
   <option value="tech_sale_sound_engineer">Tech-sale Sound Engineer</option>
   <option value="technical_head">Technical Head</option>
   <option value="project_manager">Project Manager</option>
+    <option value="store">Store Manager</option>
+
 
   {/* ✅ Newly Added Roles */}
   <option value="av_engineer">AV Engineer</option>

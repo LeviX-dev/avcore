@@ -92,6 +92,11 @@ import ChecklistSettings from "./pages/Execution/ChecklistSettings";
 import ExecutionChecklist from './pages/Execution/ExecutionChecklist';
 
 import UserAssets from './pages/User/UserAssets';
+import CompletedMrn from './pages/Inventory/CompletedMrn';
+import MRNDetails from './pages/Inventory/MRNDetails';
+import ViewLeadDetails from './pages/Inventory/ViewLeadDetails';
+import PurchaseApproval from './pages/Inventory/PurchaseApproval';
+import PurchaseMrn from './pages/Inventory/PurchaseMrn';
 
 
 
@@ -763,7 +768,7 @@ path="/schedule/settings/:id"
 />
 
 
-       <Route
+<Route
               path="/generatemrn"
               element={
                 <ProtectedRoute menuKey="mrn.generatemrn">
@@ -810,6 +815,66 @@ path="/schedule/settings/:id"
                 </ProtectedRoute>
               }
             />
+
+             <Route
+              path="/purchasemrn"
+              element={
+                <ProtectedRoute menuKey="mrn.purchasemrn">
+                  <DefaultLayout userRole={userRole}>
+                    <PageTitle title="PurchaseMrn" />
+                    <PurchaseMrn />
+                  </DefaultLayout>
+                </ProtectedRoute>
+              }
+            />
+
+              <Route
+              path="/purchaseapproval"
+              element={
+                <ProtectedRoute menuKey="mrn.purchaseapp">
+                  <DefaultLayout userRole={userRole}>
+                    <PageTitle title="purchaseapproval" />
+                    <PurchaseApproval />
+                  </DefaultLayout>
+                </ProtectedRoute>
+              }
+            />
+   <Route
+              path="/mrn-list/:master_id"
+              element={
+                <ProtectedRoute menuKey="">
+                  <DefaultLayout userRole={userRole}>
+                    <PageTitle title="MRN List" />
+                    <ViewLeadDetails />
+                  </DefaultLayout>
+                </ProtectedRoute>
+              }
+            />
+
+            <Route
+              path="/mrn/view/:mrn_number"
+              element={
+                <ProtectedRoute menuKey="">
+                  <DefaultLayout userRole={userRole}>
+                    <PageTitle title="MRN Details" />
+                    <MRNDetails />
+                  </DefaultLayout>
+                </ProtectedRoute>
+              }
+            />
+
+                 <Route
+              path="/completedmrn"
+              element={
+                <ProtectedRoute menuKey="">
+                  <DefaultLayout userRole={userRole}>
+                    <PageTitle title="MRN Details" />
+                    <CompletedMrn/>
+                  </DefaultLayout>
+                </ProtectedRoute>
+              }
+            />
+            
 
 <Route
   path="/execution/daily"

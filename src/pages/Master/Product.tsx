@@ -253,7 +253,7 @@ const updated = {
               <tr>
                 <th className="p-4 text-left w-16 text-black dark:text-white">SrNo.</th>
                 <th className="p-4 text-left min-w-[200px] text-black dark:text-white">Product Type</th>
-                <th className="p-4 text-left min-w-[150px] text-black dark:text-white">Category</th>
+                <th className="p-4 text-left min-w-[150px] text-black dark:text-white">Subject</th>
                 <th className="p-4 text-center min-w-[100px] text-black dark:text-white">Brands</th>
                 <th className="p-4 text-center min-w-[100px] text-black dark:text-white">Models</th>
                 <th className="p-4 text-center w-32 text-black dark:text-white">Actions</th>

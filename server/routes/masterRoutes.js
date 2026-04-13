@@ -9,7 +9,7 @@ import { categoryList, createCategory,updateCategoryController,
 createKit , getKits , getProductsByCategory , getKitById , updateKit , toggleKitStatus , 
  getProductsAndKitsByCategory ,  createQuotation ,  getQuotationByMasterId , 
 getQuotationRevisionsByMasterId , updateQuotationWithRevision , getQuotationForEdit  , 
-getLatestQuotation , customisedCategoryList , 
+getLatestQuotation , customisedCategoryList ,  getAllCategories ,
 
 
 } from '../controllers/masterController.js';
@@ -22,9 +22,10 @@ const router = express.Router();
 
 router.post('/category', createCategory);
 router.get('/category', categoryList);
+router.get('/customised-categories', customisedCategoryList);
 router.delete('/category/:cat_id', removeCategory);
 router.put("/category/:cat_id", updateCategoryController);
-router.get('/customised-categories', customisedCategoryList);
+router.get('/all-categories', getAllCategories);
 
 
 // --------------------------- Product ---------------------------

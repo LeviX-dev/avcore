@@ -226,7 +226,7 @@ navigate('/quotation-template');
               fetchProductsByCategory(e.target.value);
             }}
           >
-            <option value="">Select Category</option>
+            <option value="">Select Subject</option>
             {categories.map((c) => (
               <option key={c.cat_id} value={c.cat_id}>
                 {c.cat_name}

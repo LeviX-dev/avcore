@@ -2838,7 +2838,7 @@ const QuotationPending = () => {
                 <th className="py-3 px-4 text-left">
                   <div className="flex items-center gap-2">
                     <MdCategory className="text-gray-600 dark:text-gray-400 text-sm" />
-                    <span className="font-semibold text-gray-900 dark:text-white text-sm">Category</span>
+                    <span className="font-semibold text-gray-900 dark:text-white text-sm">Subject</span>
                   </div>
                 </th>
                 <th className="py-3 px-4 text-left">

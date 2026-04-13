@@ -4,6 +4,7 @@ import axios from 'axios';
 import { FaArrowLeft } from 'react-icons/fa';
 import Breadcrumb from '../../components/Breadcrumbs/Breadcrumb';
 import { BASE_URL } from '../../../public/config';
+import logo from '../../images/logo/AVCoreLogo.png';
 
 const EditQuotation = () => {
   const { qt_id } = useParams();
@@ -11,6 +12,12 @@ const EditQuotation = () => {
   const navigate = useNavigate();
 
   const revision = location.state?.revision;
+
+  const [installments, setInstallments] = useState([
+  { description: 'Full Payment', percentage: 100, amount: 0 },
+]);
+
+const [isEditLoaded, setIsEditLoaded] = useState(false);
 
   /* ================= STATE ================= */
   const [qtNumber, setQtNumber] = useState('');
@@ -68,6 +75,18 @@ const EditQuotation = () => {
         return;
       }
 
+        if (q.installments?.length) {
+  setInstallments(
+    q.installments.map((i) => ({
+      description: i.description || '',
+      percentage: Number(i.percentage || 0),
+      amount: Number(i.amount || 0),
+    }))
+  );
+  setIsEditLoaded(true); // ✅ IMPORTANT
+}
+
+
       setQtNumber(q.qt_number || '');
       setQuoteType(q.type || '');
       setLeadName(q.lead?.name || '');
@@ -124,6 +143,7 @@ const EditQuotation = () => {
       console.error('Failed to load quotation for edit', error);
     }
   };
+
 
   const fetchCategories = async () => {
     try {
@@ -203,6 +223,7 @@ const EditQuotation = () => {
       gst_app_amt: quoteType === 'with_gst' ? gstBaseAmount : 0,
       gst_percent: 18,
       acoustic_terms: finalAcousticTerms,
+        installments: installments, // ✅ ADD THIS
     };
 
     try {
@@ -251,6 +272,83 @@ const EditQuotation = () => {
       setSelectedKitData({ ...kit, items: mappedItems });
     }
   }, [selectedKit, kits]);
+
+
+  useEffect(() => {
+  // ❌ DO NOT override DB data
+  if (isEditLoaded) return;
+
+  if (installments.length === 1 && installments[0].percentage === 100) {
+    setInstallments([
+      {
+        description: 'Full Payment',
+        percentage: 100,
+        amount: Number(totalWithGST || 0),
+      },
+    ]);
+  }
+}, [totalWithGST, isEditLoaded]);
+
+
+const updateInstallment = (index, field, value) => {
+  const updated = [...installments];
+  const total = Number(totalWithGST || 0);
+
+  if (value === '') {
+    updated[index][field] = '';
+    setInstallments(updated);
+    return;
+  }
+
+  if (field === 'percentage') {
+    const percent = Number(value);
+    updated[index].percentage = percent;
+    updated[index].amount = (total * percent) / 100;
+  }
+
+  if (field === 'amount') {
+    const amt = Number(value);
+    updated[index].amount = amt;
+    updated[index].percentage = total ? (amt / total) * 100 : 0;
+  }
+
+  if (field === 'description') {
+    updated[index].description = value;
+  }
+
+  const totalPercent = updated.reduce(
+    (sum, i) => sum + Number(i.percentage || 0),
+    0
+  );
+
+  if (totalPercent > 100) {
+    alert('Total percentage cannot exceed 100%');
+    return;
+  }
+
+  setInstallments(updated);
+};
+
+const addInstallment = () => {
+  const totalPercent = installments.reduce(
+    (sum, i) => sum + Number(i.percentage || 0),
+    0
+  );
+
+  if (totalPercent >= 100) {
+    alert('Already reached 100%');
+    return;
+  }
+
+  setInstallments([
+    ...installments,
+    { description: '', percentage: 0, amount: 0 },
+  ]);
+};
+
+const removeInstallment = (index) => {
+  setInstallments(installments.filter((_, i) => i !== index));
+};
 
   const handleAddKitToQuotation = () => {
     if (!selectedCategory || !selectedKitData) {
@@ -398,21 +496,50 @@ const EditQuotation = () => {
           </button>
         </div>
 
-        {/* Header Info */}
-        <div className="bg-gray-100 p-4 rounded mb-6 grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div>
-            <span className="font-medium text-sm">Lead</span>
-            <div className="font-medium">{leadName}</div>
-          </div>
-          <div>
-            <span className="font-medium text-sm">Quotation No</span>
-            <div className="border px-3 py-2 rounded bg-gray-50 font-medium">
-              {qtNumber}
-            </div>
-          </div>
-        </div>
+      {/* HEADER SECTION */}
+<div className="flex justify-between items-start mb-6 border-b pb-4">
+  {/* LEFT SIDE */}
+  <div className="flex flex-col text-left leading-tight">
+    <h1 className="text-4xl font-bold text-[#7d20a0] underline decoration-[#7d20a0] decoration-4 underline-offset-4 mb-2">
+      AV CORE
+    </h1>
 
-        <form onSubmit={handleSubmit} autoComplete="off" className="space-y-6">
+    <p className="font-bold text-[13px] text-black uppercase mb-1">
+      ALL ABOUT AUDIO VIDEO
+    </p>
+
+    <p className="text-[12px] font-bold text-black uppercase">
+      1ST FLOOR GAYATRI BUILDING, BESIDE JUPITER HOSPITAL, BANER 411045,
+      PUNE.
+    </p>
+
+    <p className="text-[16px] font-bold text-black">
+      Email: <span className="text-blue-600">avcoreindia@gmail.com</span>
+    </p>
+
+    <p className="text-[16px] font-bold text-black">
+      Website: <span className="text-blue-600">www.avcore.in</span>
+    </p>
+
+    <p className="text-[12px] font-bold text-black uppercase">
+      CO.NO: 8329728210 / 8766786026
+    </p>
+  </div>
+
+  {/* RIGHT SIDE LOGO */}
+  <div className="bg-black p-1">
+    <img
+      src={logo}
+      className="w-28 h-auto border border-black"
+      alt="Logo"
+    />
+  </div>
+</div>
+
+
+
+
+        <form onSubmit={handleSubmit} autoComplete="off" className="space-y-6 mt-6">
           {/* Quotation Type + Actions */}
           <div className="grid grid-cols-1 md:grid-cols-[1fr_1fr_auto_auto] gap-4 items-end">
             {/* Quotation Type */}
@@ -470,13 +597,13 @@ const EditQuotation = () => {
 
               {/* Category Selection */}
               <div>
-                <label className="block mb-1 font-medium">Category</label>
+                <label className="block mb-1 font-medium">Subject</label>
                 <select
                   className="w-full border px-4 py-2 rounded"
                   value={selectedCategory}
                   onChange={(e) => setSelectedCategory(e.target.value)}
                 >
-                  <option value="">Select category</option>
+                  <option value="">Select Subject</option>
                   {categories.map((c) => (
                     <option key={c.cat_id} value={c.cat_id}>
                       {c.cat_name}
@@ -767,7 +894,7 @@ const EditQuotation = () => {
 
                 {/* Category */}
                 <div className="mb-3">
-                  <label className="block mb-1 font-medium">Category</label>
+                  <label className="block mb-1 font-medium">Subject</label>
                   <select
                     className="border px-3 py-2 rounded w-full"
                     value={spCategory}
@@ -780,7 +907,7 @@ const EditQuotation = () => {
                       setSpPrice(0);
                     }}
                   >
-                    <option value="">Select Category</option>
+                    <option value="">Select Subject</option>
                     {categories.map((c) => (
                       <option key={c.cat_id} value={c.cat_id}>
                         {c.cat_name}
@@ -957,7 +1084,86 @@ const EditQuotation = () => {
           {/* Total */}
           <div className="text-right bg-green-100 p-3 rounded font-semibold text-lg">
             TOTAL: ₹{totalWithGST.toFixed(2)}
-          </div>
+          </div> 
+
+          {/* INSTALLMENTS */}
+<div className="bg-yellow-50 p-4 rounded mt-4">
+  <h4 className="font-semibold mb-3">Payment Installments</h4>
+
+  {/* HEADER */}
+  <div className="grid grid-cols-[2fr_1fr_1fr_auto] gap-2 mb-2 font-semibold text-gray-700">
+    <div>Description</div>
+    <div>Percent %</div>
+    <div>Amount (₹)</div>
+    <div></div>
+  </div>
+
+  {installments.map((row, idx) => (
+    <div
+      key={idx}
+      className="grid grid-cols-[2fr_1fr_1fr_auto] gap-2 mb-2 items-center"
+    >
+      <input
+        className="border px-2 py-1 rounded"
+        placeholder="Advance / Final"
+        value={row.description}
+        onChange={(e) =>
+          updateInstallment(idx, 'description', e.target.value)
+        }
+      />
+
+      <input
+        type="number"
+        className="border px-2 py-1 rounded"
+        placeholder="%"
+        value={row.percentage === 0 ? '' : row.percentage}
+        onChange={(e) =>
+          updateInstallment(idx, 'percentage', e.target.value)
+        }
+      />
+
+      <input
+        type="number"
+        className="border px-2 py-1 rounded"
+        placeholder="₹"
+        value={row.amount === 0 ? '' : row.amount}
+        onChange={(e) =>
+          updateInstallment(idx, 'amount', e.target.value)
+        }
+      />
+
+      <div className="flex gap-1">
+        {idx === installments.length - 1 && (
+          <button
+            type="button"
+            onClick={addInstallment}
+            className="bg-green-500 text-white px-2 rounded"
+          >
+            +
+          </button>
+        )}
+
+        {installments.length > 1 && (
+          <button
+            type="button"
+            onClick={() => removeInstallment(idx)}
+            className="bg-red-500 text-white px-2 rounded"
+          >
+            ✕
+          </button>
+        )}
+      </div>
+    </div>
+  ))}
+
+  <div className="text-right text-sm text-gray-600 mt-2">
+    Total:{" "}
+    {installments.reduce(
+      (sum, i) => sum + Number(i.percentage || 0),
+      0
+    ).toFixed(2)}%
+  </div>
+</div>
 
           {/* Action Buttons */}
           <div className="flex justify-end gap-3 border-t pt-4">

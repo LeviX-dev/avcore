@@ -1,97 +1,186 @@
-// MaterialIssueLogs.tsx
-import React from "react";
+import React, { useState, useEffect } from "react";
+import axios from "axios";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {
-  faFileAlt,
-  faCheckCircle,
-  faClipboardCheck,
-  faTruck,
-  faUser,
-  faCalendarAlt,
-  faClock,
   faInfoCircle,
+  faUser,
+  faSpinner,
+  faTimesCircle,
 } from "@fortawesome/free-solid-svg-icons";
+import { BASE_URL } from '../../../public/config.js';
 
-interface MaterialIssueLogsProps {
+interface MRNLog {
+  log_id: number;
+  action_type: string;
+  status: string;
+  created_at: string;
+  action_by: string;
+}
+
+interface MrnHistoryLogsProps {
   lead: any;
   onClose: () => void;
 }
 
-const MrnHistoryLogs = ({ lead, onClose }: MaterialIssueLogsProps) => {
+const MrnHistoryLogs = ({ lead, onClose }: MrnHistoryLogsProps) => {
+  const [logs, setLogs] = useState<MRNLog[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+useEffect(() => {
+  if (lead && lead.mrn_id) {
+    fetchMRNLogs();
+  }
+}, [lead]);
+
+const fetchMRNLogs = async () => {
+  try {
+    setLoading(true);
+    setError(null);
+
+    const response = await axios.get(
+      `${BASE_URL}api/mrn/logs/${lead.mrn_id}`,
+      { withCredentials: true }
+    );
+
+    if (response.data?.success && response.data?.data) {
+      const rawLogs: MRNLog[] = response.data.data;
+
+      /* ✅ CLEAN + GROUP LOGS */
+     const groupedLogsMap = new Map();
+
+rawLogs.forEach((log: MRNLog) => {
+  let key: any = "";
+
+  if (
+    log.action_type === "MRN_APPROVED" ||
+    log.action_type === "MRN_STATUS_UPDATE"
+  ) {
+    key = log.action_type;
+  }
+  else if (log.action_type === "VERIFICATION") {
+    key = "VERIFICATION";
+  }
+  else if (log.action_type === "APPROVAL") {
+    key = "APPROVAL";
+  }
+  else if (log.action_type === "ISSUE") {
+    key = `ISSUE_${log.log_id}`;
+  }
+  else if (log.action_type === "PURCHASE_REQUEST") {
+    key = `PR_${log.log_id}`;
+  }
+  else {
+    key = log.log_id;
+  }
+
+  if (!groupedLogsMap.has(key)) {
+    groupedLogsMap.set(key, log);
+  }
+});
+
+      /* ✅ FINAL SORT (latest first) */
+    const finalLogs = rawLogs.sort(
+  (a: MRNLog, b: MRNLog) =>
+    new Date(b.created_at).getTime() -
+    new Date(a.created_at).getTime()
+);
+
+setLogs(finalLogs);
+    } else {
+      setError("Failed to fetch MRN logs");
+    }
+  } catch (err: any) {
+    console.error("Error fetching MRN logs:", err);
+    setError(
+      err.response?.data?.message || "Failed to fetch MRN logs"
+    );
+  } finally {
+    setLoading(false);
+  }
+};
+
   if (!lead) return null;
 
-  // Static sample logs data
-  const materialLogs = [
-    {
-      id: 1,
-      action: "MRN Generated",
-      action_type: "generate",
-      mrn_number: "MRN/2024/001",
-      performed_by: "Rajesh Kumar",
-      performed_at: "2024-02-15 10:30 AM",
-      remarks: "MRN created based on approved quotation",
-      icon: faFileAlt,
-      iconBg: "bg-blue-100 dark:bg-blue-900/30",
-      iconColor: "text-blue-600 dark:text-blue-400",
-      borderColor: "border-blue-200 dark:border-blue-800",
-    },
-    {
-      id: 2,
-      action: "MRN Verified",
-      action_type: "verify",
-      mrn_number: "MRN/2024/001",
-      performed_by: "Amit Sharma",
-      performed_at: "2024-02-16 11:45 AM",
-      remarks: "All materials verified against quotation, quantities are correct",
-      icon: faClipboardCheck,
-      iconBg: "bg-yellow-100 dark:bg-yellow-900/30",
-      iconColor: "text-yellow-600 dark:text-yellow-400",
-      borderColor: "border-yellow-200 dark:border-yellow-800",
-    },
-    {
-      id: 3,
-      action: "MRN Approved",
-      action_type: "approve",
-      mrn_number: "MRN/2024/001",
-      performed_by: "Priya Patel",
-      performed_at: "2024-02-17 09:15 AM",
-      remarks: "Materials approved for issue, stock availability confirmed",
-      icon: faCheckCircle,
-      iconBg: "bg-green-100 dark:bg-green-900/30",
-      iconColor: "text-green-600 dark:text-green-400",
-      borderColor: "border-green-200 dark:border-green-800",
-    },
-    {
-      id: 4,
-      action: "Materials Issued",
-      action_type: "issue",
-      mrn_number: "MRN/2024/001",
-      performed_by: "Suresh Yadav",
-      performed_at: "2024-02-18 02:30 PM",
-      remarks: "All materials issued to site, delivery note generated",
-      issued_items: [
-        { name: "Premium Paint", qty: 10 },
-        { name: "Wall Putty", qty: 5 },
-        { name: "Primer", qty: 3 },
-      ],
-      icon: faTruck,
-      iconBg: "bg-purple-100 dark:bg-purple-900/30",
-      iconColor: "text-purple-600 dark:text-purple-400",
-      borderColor: "border-purple-200 dark:border-purple-800",
-    },
-
- 
-  ];
-
-  const getActionBadge = (action_type: string) => {
-    const badges = {
-      generate: "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300",
-      verify: "bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-300",
-      approve: "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300",
-      issue: "bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-300",
-    };
-    return badges[action_type as keyof typeof badges] || "bg-gray-100 text-gray-800";
+  const formatDate = (dateString: string) => {
+    if (!dateString) return '—';
+    return new Date(dateString).toLocaleString('en-IN', {
+      day: '2-digit',
+      month: 'short',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+    });
   };
+
+  const getActionName = (log: MRNLog) => {
+  switch (log.action_type) {
+    case 'GENERATE':
+      return 'MRN Generated';
+
+    case 'VERIFICATION':
+      return log.status === 'Verified'
+        ? 'Material Verified'
+        : 'Verification Started';
+
+    case 'APPROVAL':
+      return 'Material Approved';
+
+    case 'PURCHASE_REQUEST':
+      return 'Purchase Requested';
+
+    case 'PURCHASE_APPROVAL':
+      return 'Purchase Approved';
+
+    case 'PO_CREATED':
+      return 'PO Created';
+
+    case 'ISSUE':
+      return 'Material Issued';
+
+    case 'MRN_STATUS_UPDATE':
+      return `MRN ${log.status}`; // Approved / Partially Issued
+
+    default:
+      return log.status || '—';
+  }
+};
+
+const getActionBadge = (log: MRNLog) => {
+  if (log.action_type === 'ISSUE') {
+    return "bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-300";
+  }
+
+  if (log.action_type === 'APPROVAL') {
+    return "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300";
+  }
+
+  if (log.action_type === 'PURCHASE_APPROVAL') {
+    return "bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-300";
+  }
+
+  if (log.action_type === 'PURCHASE_REQUEST') {
+    return "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300";
+  }
+
+  if (log.action_type === 'PO_CREATED') {
+    return "bg-indigo-100 text-indigo-800 dark:bg-indigo-900/30 dark:text-indigo-300";
+  }
+
+  if (log.action_type === 'VERIFICATION') {
+    return "bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-300";
+  }
+
+  if (log.status === 'Generated') {
+    return "bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300";
+  }
+
+  if (log.status === 'Partially Issued') {
+    return "bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-300";
+  }
+
+  return "bg-gray-100 text-gray-800 dark:bg-gray-800/50 dark:text-gray-300";
+};
 
   return (
     <div className="fixed inset-0 z-50 bg-black/40 flex items-center ml-40 justify-center">
@@ -107,7 +196,6 @@ const MrnHistoryLogs = ({ lead, onClose }: MaterialIssueLogsProps) => {
               <h2 className="text-lg font-semibold text-gray-800 dark:text-white">
                 Material Issue History
               </h2>
-             
             </div>
           </div>
           <button
@@ -118,96 +206,78 @@ const MrnHistoryLogs = ({ lead, onClose }: MaterialIssueLogsProps) => {
           </button>
         </div>
 
-        {/* Client Info Card */}
-        <div className="bg-gradient-to-r from-purple-50 to-indigo-50 dark:from-purple-900/20 dark:to-indigo-900/20 p-4 rounded-lg mb-6">
-          <h3 className="font-semibold mb-3 text-gray-700 dark:text-gray-200 flex items-center gap-2">
-            <FontAwesomeIcon icon={faUser} className="h-4 w-4" />
-            Client Details
+
+        {/* Activity Table Header */}
+        <div className="flex items-center justify-between mb-3">
+          <h3 className="font-semibold text-gray-700 dark:text-gray-200">
+            MRN Activity Logs
           </h3>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
-            <div>
-              <p className="text-xs text-gray-500 dark:text-gray-400">Name</p>
-              <p className="font-medium dark:text-white">{lead.name}</p>
-            </div>
-            <div>
-              <p className="text-xs text-gray-500 dark:text-gray-400">Mobile</p>
-              <p className="font-medium dark:text-white">{lead.number}</p>
-            </div>
-            <div>
-              <p className="text-xs text-gray-500 dark:text-gray-400">City</p>
-              <p className="font-medium dark:text-white">{lead.city}</p>
-            </div>
-            <div>
-              <p className="text-xs text-gray-500 dark:text-gray-400">Category</p>
-              <p className="font-medium dark:text-white">{lead.cat_name}</p>
-            </div>
-          </div>
+          <span className="text-xs bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400 px-2 py-1 rounded">
+            {logs.length} Events
+          </span>
         </div>
 
-   {/* Activity Table Header */}
-<div className="flex items-center justify-between mb-3">
-  <h3 className="font-semibold text-gray-700 dark:text-gray-200">
-    MRN Activity Logs
-  </h3>
-  <span className="text-xs bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400 px-2 py-1 rounded">
-    {materialLogs.length} Events
-  </span>
-</div>
+        {/* Table */}
+        <div className="border rounded-lg overflow-hidden max-h-[350px] overflow-y-auto">
+          {loading ? (
+            <div className="flex justify-center items-center py-12">
+              <FontAwesomeIcon icon={faSpinner} className="h-6 w-6 animate-spin text-purple-500" />
+            </div>
+          ) : error ? (
+            <div className="text-center text-red-600 dark:text-red-400 py-12">
+              <FontAwesomeIcon icon={faTimesCircle} className="h-8 w-8 mx-auto mb-2" />
+              <p>{error}</p>
+            </div>
+          ) : logs.length === 0 ? (
+            <div className="text-center text-gray-500 dark:text-gray-400 py-12">
+              <p>No logs found</p>
+            </div>
+          ) : (
+            <table className="w-full text-sm">
+              <thead className="bg-gray-100 dark:bg-gray-700 sticky top-0">
+                <tr>
+                  <th className="p-2 text-left">Action</th>
+                  <th className="p-2 text-left">MRN No</th>
+                  <th className="p-2 text-left">Performed By</th>
+                  <th className="p-2 text-left">Date</th>
+                </tr>
+              </thead>
 
-{/* Table */}
-<div className="border rounded-lg overflow-hidden max-h-[350px] overflow-y-auto">
-  <table className="w-full text-sm">
-    <thead className="bg-gray-100 dark:bg-gray-700 sticky top-0">
-      <tr>
-        <th className="p-2 text-left">Action</th>
-        <th className="p-2 text-left">MRN No</th>
-        <th className="p-2 text-left">Performed By</th>
-        <th className="p-2 text-left">Date</th>
-       
-      </tr>
-    </thead>
+              <tbody className="divide-y dark:divide-gray-700">
+                {logs.map((log) => (
+                  <tr
+                    key={log.log_id}
+                    className="hover:bg-gray-50 dark:hover:bg-gray-800/50"
+                  >
+                    {/* Action */}
+                    <td className="p-2">
+                      <span
+                        className={`text-xs px-2 py-1 rounded-full font-medium ${getActionBadge(log)}`}
+                      >
+                        {getActionName(log)}
+                      </span>
+                    </td>
 
-    <tbody className="divide-y dark:divide-gray-700">
-      {materialLogs.map((log) => (
-        <tr
-          key={log.id}
-          className="hover:bg-gray-50 dark:hover:bg-gray-800/50"
-        >
-          {/* Action */}
-          <td className="p-2">
-            <span
-              className={`text-xs px-2 py-1 rounded-full font-medium ${getActionBadge(
-                log.action_type
-              )}`}
-            >
-              {log.action}
-            </span>
-          </td>
+                    {/* MRN */}
+                    <td className="p-2 font-mono text-gray-700 dark:text-gray-300">
+                      {lead.mrn_number}
+                    </td>
 
-          {/* MRN */}
-          <td className="p-2 font-mono text-gray-700 dark:text-gray-300">
-            {log.mrn_number}
-          </td>
+                    {/* User */}
+                    <td className="p-2 dark:text-gray-300">
+                      {log.action_by || 'System'}
+                    </td>
 
-          {/* User */}
-          <td className="p-2 dark:text-gray-300">
-            {log.performed_by}
-          </td>
-
-          {/* Date */}
-          <td className="p-2 dark:text-gray-300">
-            {log.performed_at}
-          </td>
-
-      
-        </tr>
-      ))}
-    </tbody>
-  </table>
-</div>
-      
-
-        
+                    {/* Date */}
+                    <td className="p-2 dark:text-gray-300">
+                      {formatDate(log.created_at)}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </div>
       </div>
     </div>
   );

@@ -1,5 +1,5 @@
-// MaterialIssueModal.tsx
 import React, { useState } from "react";
+import axios from "axios";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {
   faCheckCircle,
@@ -9,7 +9,37 @@ import {
   faBoxOpen,
   faClipboardCheck,
   faExclamationTriangle,
+  faBox,
+  faUser,
+  faMapMarkerAlt,
+  faCalendar,
 } from "@fortawesome/free-solid-svg-icons";
+import { BASE_URL } from '../../../public/config.js';
+
+interface IssueItem {
+  mpm_id: number;
+  prod_id: number;
+  model_id: number;
+  brand_id: number;
+  brand_name: string;
+  model_no: string;
+  requested_qty: number;
+  verified_qty: number;
+  approval_qty: number;
+  issued_qty: string;
+  remaining_qty: string;
+  issue_status: string;
+}
+
+interface IssueMRNData {
+  mrn_id: number;
+  mrn_number: string;
+  mrn_status: string;
+  created_at: string;
+  client_name: string;
+  city: string;
+  items: IssueItem[];
+}
 
 interface MaterialIssueModalProps {
   data: any;
@@ -20,146 +50,228 @@ interface MaterialIssueModalProps {
 const MaterialIssueModal = ({ data, onClose, onSave }: MaterialIssueModalProps) => {
   const [issueNotes, setIssueNotes] = useState("");
   const [isIssuing, setIsIssuing] = useState(false);
-  const [issuedQuantities, setIssuedQuantities] = useState<Record<string, string>>({});
+  const [issuedQuantities, setIssuedQuantities] = useState<Record<number, string>>({});
   const [selectedAction, setSelectedAction] = useState<"issue" | "partial" | null>(null);
 
   if (!data) return null;
 
-  const quotation = data.quotations?.[0];
+  const mrnData: IssueMRNData = data;
 
-  const handleQtyChange = (key: string, value: string) => {
+  const handleQtyChange = (mpmId: number, value: string, maxQty: number) => {
+    let qty = parseInt(value) || 0;
+    if (qty > maxQty) qty = maxQty;
+    if (qty < 0) qty = 0;
+    
     setIssuedQuantities({
       ...issuedQuantities,
-      [key]: value,
+      [mpmId]: qty.toString(),
     });
   };
 
-  const calculatePendingQty = (requestedQty: number, approvedQty: number, issuedQty: string) => {
-    const issued = parseInt(issuedQty) || 0;
-    return Math.max(approvedQty - issued, 0);
+  const calculateRemainingQty = (item: IssueItem, issuedQty: number) => {
+    const approvalQty = item.approval_qty;
+    return Math.max(approvalQty - issuedQty, 0);
   };
 
   const calculateTotalIssued = () => {
     let total = 0;
-    quotation?.kits?.forEach((kit: any, kIndex: number) => {
-      kit.items?.forEach((item: any, iIndex: number) => {
-        const key = `${kIndex}-${iIndex}`;
-        const issued = parseInt(issuedQuantities[key]) || 0;
-        total += issued;
-      });
+    mrnData?.items?.forEach((item: IssueItem) => {
+      const issued = parseInt(issuedQuantities[item.mpm_id]) || 0;
+      total += issued;
     });
     return total;
   };
 
-  const handleIssueMaterial = () => {
+  const calculateTotalApproved = () => {
+    return mrnData?.items?.reduce((total, item) => total + item.approval_qty, 0) || 0;
+  };
+
+  const calculateTotalRequested = () => {
+    return mrnData?.items?.reduce((total, item) => total + item.requested_qty, 0) || 0;
+  };
+
+  const handleIssueMaterial = async () => {
     setSelectedAction("issue");
+
     const confirmAction = window.confirm(
       "Are you sure you want to issue these materials?"
     );
     if (!confirmAction) return;
 
-    setIsIssuing(true);
+    try {
+      setIsIssuing(true);
 
-    setTimeout(() => {
-      const issuedMRN = {
-        master_id: data.master_id,
-        mrn_number: data.mrn_number,
-        issue_date: new Date().toISOString(),
+      const itemsPayload: any[] = [];
+
+      mrnData?.items?.forEach((item: IssueItem) => {
+        const qty = parseInt(issuedQuantities[item.mpm_id]) || 0;
+
+        if (qty > 0) {
+          itemsPayload.push({
+            mpm_id: item.mpm_id,
+            model_id: item.model_id,
+            prod_id: item.prod_id,
+            brand_id: item.brand_id,
+            issue_qty: qty,
+          });
+        }
+      });
+
+      if (itemsPayload.length === 0) {
+        alert("Please enter at least one quantity to issue");
+        setIsIssuing(false);
+        return;
+      }
+
+      const payload = {
+        mrn_id: mrnData.mrn_id,
+        mrn_number: mrnData.mrn_number,
         issued_by: "Current User",
         issue_notes: issueNotes,
-        status: "material_issued",
-        lead_details: data.lead,
-        action: "issued",
-        issued_quantities: issuedQuantities,
-        total_items_issued: calculateTotalIssued(),
+        items: itemsPayload,
+        action: "issued"
       };
 
-      onSave(issuedMRN);
+      const response = await axios.post(`${BASE_URL}api/issue-mrn`, payload, {
+        withCredentials: true
+      });
+
+      if (response.data?.success) {
+        alert(response.data.message || "Items issued successfully");
+        onSave(response.data);
+        onClose();
+      } else {
+        throw new Error(response.data?.message || "Issue failed");
+      }
+    } catch (error: any) {
+      console.error(error);
+      alert(error?.response?.data?.message || "Issue failed. Please try again.");
+    } finally {
       setIsIssuing(false);
-    }, 1000);
+    }
   };
 
-  const handlePartialIssue = () => {
+  const handlePartialIssue = async () => {
     setSelectedAction("partial");
+
     const confirmAction = window.confirm(
       "Are you sure you want to issue partial materials?"
     );
     if (!confirmAction) return;
 
-    setIsIssuing(true);
+    try {
+      setIsIssuing(true);
 
-    setTimeout(() => {
-      const issuedMRN = {
-        master_id: data.master_id,
-        mrn_number: data.mrn_number,
-        issue_date: new Date().toISOString(),
+      const itemsPayload: any[] = [];
+
+      mrnData?.items?.forEach((item: IssueItem) => {
+        const qty = parseInt(issuedQuantities[item.mpm_id]) || 0;
+
+        if (qty > 0) {
+          itemsPayload.push({
+            mpm_id: item.mpm_id,
+            model_id: item.model_id,
+            prod_id: item.prod_id,
+            brand_id: item.brand_id,
+            issue_qty: qty,
+          });
+        }
+      });
+
+      if (itemsPayload.length === 0) {
+        alert("Please enter at least one quantity to issue");
+        setIsIssuing(false);
+        return;
+      }
+
+      const payload = {
+        mrn_id: mrnData.mrn_id,
+        mrn_number: mrnData.mrn_number,
         issued_by: "Current User",
         issue_notes: issueNotes,
-        status: "partially_issued",
-        lead_details: data.lead,
-        action: "partial",
-        issued_quantities: issuedQuantities,
-        total_items_issued: calculateTotalIssued(),
+        items: itemsPayload,
+        action: "partial"
       };
 
-      onSave(issuedMRN);
-      setIsIssuing(false);
-    }, 1000);
-  };
-
-  const calculateTotal = () => {
-    let total = 0;
-    quotation?.kits?.forEach((kit: any) => {
-      kit.items?.forEach((item: any) => {
-        total += (item.prod_price * item.prod_qty) || 0;
+      const response = await axios.post(`${BASE_URL}api/issue-mrn`, payload, {
+        withCredentials: true
       });
-    });
-    return total;
+
+      if (response.data?.success) {
+        alert(response.data.message || "Partial issue successful");
+        onSave(response.data);
+        onClose();
+      } else {
+        throw new Error(response.data?.message || "Partial issue failed");
+      }
+    } catch (error: any) {
+      console.error(error);
+      alert(error?.response?.data?.message || "Partial issue failed. Please try again.");
+    } finally {
+      setIsIssuing(false);
+    }
   };
 
-  const InfoBox = ({ label, value, highlight = false }: any) => (
-    <div className="bg-white dark:bg-gray-700 p-2 rounded border dark:border-gray-600">
-      <p className="text-xs text-gray-500 dark:text-gray-400">{label}</p>
-      <p
-        className={`text-sm font-medium ${
-          highlight ? "text-purple-600 font-mono" : "dark:text-white"
-        }`}
-      >
+  const formatDate = (dateString: string) => {
+    if (!dateString) return '—';
+    return new Date(dateString).toLocaleDateString('en-IN', {
+      day: '2-digit',
+      month: 'short',
+      year: 'numeric',
+    });
+  };
+
+  const InfoBox = ({ label, value, highlight = false, icon }: any) => (
+    <div className="bg-gray-50 dark:bg-gray-700 p-2 rounded-lg border dark:border-gray-600">
+      <div className="flex items-center gap-1 mb-0.5">
+        {icon && <FontAwesomeIcon icon={icon} className="text-purple-500 text-xs" />}
+        <p className="text-[10px] text-gray-500 dark:text-gray-400">{label}</p>
+      </div>
+      <p className={`text-sm font-semibold ${highlight ? "text-purple-600 font-mono" : "dark:text-white"}`}>
         {value || "-"}
       </p>
     </div>
   );
 
+  const getIssueStatusBadge = (status: string) => {
+    switch (status) {
+      case 'Issued':
+        return <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300">Issued</span>;
+      case 'Partially Issued':
+        return <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-300">Partial</span>;
+      case 'Not Issued':
+        return <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-300">Not Issued</span>;
+      default:
+        return <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-800">{status}</span>;
+    }
+  };
+
   // Check if any quantities have been entered
   const hasIssuedQuantities = Object.values(issuedQuantities).some(qty => parseInt(qty) > 0);
+  const totalIssued = calculateTotalIssued();
+  const totalApproved = calculateTotalApproved();
+  const totalRequested = calculateTotalRequested();
 
   return (
     <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4">
       {/* Modal Container */}
-      <div className="bg-white dark:bg-gray-800 w-full max-w-5xl max-h-[90vh] mt-20 ml-70 rounded-xl shadow-lg flex flex-col">
+      <div className="bg-white dark:bg-gray-800 w-full ml-60 mt-10 max-w-4xl max-h-[85vh] rounded-lg shadow-lg flex flex-col">
 
         {/* Header */}
-        <div className="flex justify-between items-center p-4 border-b dark:border-gray-700 bg-gradient-to-r from-purple-50 to-indigo-50 dark:from-purple-900/20 dark:to-indigo-900/20">
-          <div className="flex items-center gap-3">
-            <div className="p-2 bg-purple-100 dark:bg-purple-900/30 rounded-lg">
-              <FontAwesomeIcon
-                icon={faTruck}
-                className="h-5 w-5 text-purple-600 dark:text-purple-400"
-              />
+        <div className="flex justify-between items-center p-3 border-b dark:border-gray-700 bg-gradient-to-r from-purple-50 to-indigo-50 dark:from-purple-900/20 dark:to-indigo-900/20 rounded-t-lg">
+          <div className="flex items-center gap-2">
+            <div className="p-1.5 bg-purple-100 dark:bg-purple-900/30 rounded-lg">
+              <FontAwesomeIcon icon={faTruck} className="h-4 w-4 text-purple-600 dark:text-purple-400" />
             </div>
             <div>
-              <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
-                Issue Material
-              </h2>
-              <p className="text-xs text-gray-500 dark:text-gray-400">
-                Issue materials against approved MRN
-              </p>
+              <h2 className="text-sm font-semibold text-gray-900 dark:text-white">Issue Material</h2>
+              <p className="text-[10px] text-gray-500 dark:text-gray-400">Issue materials against approved MRN</p>
             </div>
           </div>
 
           <button
             onClick={onClose}
-            className="text-gray-500 hover:text-gray-700 text-2xl dark:text-gray-400 dark:hover:text-gray-200"
+            className="text-gray-500 hover:text-gray-700 text-xl dark:text-gray-400 dark:hover:text-gray-200"
             disabled={isIssuing}
           >
             ×
@@ -167,142 +279,177 @@ const MaterialIssueModal = ({ data, onClose, onSave }: MaterialIssueModalProps) 
         </div>
 
         {/* Scrollable Content */}
-        <div className="p-4 overflow-y-auto flex-1">
+        <div className="p-3 overflow-y-auto flex-1">
 
           {/* Client Info */}
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
-            <InfoBox label="MRN No" value={data.mrn_number} highlight />
-            <InfoBox label="Client" value={data.lead?.name} />
-            <InfoBox label="Mobile" value={data.lead?.number} />
-            <InfoBox label="City" value={data.lead?.city} />
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-2 mb-4">
+            <InfoBox label="MRN Number" value={mrnData.mrn_number} highlight icon={faBox} />
+            <InfoBox label="Client Name" value={mrnData.client_name} icon={faUser} />
+            <InfoBox label="City" value={mrnData.city} icon={faMapMarkerAlt} />
+            <InfoBox label="Created Date" value={formatDate(mrnData.created_at)} icon={faCalendar} />
           </div>
 
-          {/* Quotation Header */}
+          {/* Material Issue Details Header */}
           <div className="flex justify-between items-center mb-2">
-            <h3 className="text-xs font-semibold text-gray-600 dark:text-gray-300 uppercase tracking-wider">
+            <h3 className="text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wider flex items-center gap-1">
+              <FontAwesomeIcon icon={faBoxOpen} className="text-purple-500 text-xs" />
               Material Issue Details
             </h3>
-            <span className="text-xs bg-purple-100 dark:bg-purple-900/30 text-purple-800 dark:text-purple-300 px-2 py-1 rounded">
-              QT: {quotation?.qt_number || "N/A"}
+            <span className="text-[10px] bg-purple-100 dark:bg-purple-900/30 text-purple-800 dark:text-purple-300 px-2 py-0.5 rounded-full">
+              {mrnData.items?.length || 0} Item(s)
             </span>
           </div>
 
           {/* Scrollable Table */}
-          <div className="border dark:border-gray-700 rounded-lg max-h-[280px] overflow-y-auto mb-4">
-            <table className="w-full text-sm">
-              <thead className="bg-gray-100 dark:bg-gray-700 sticky top-0">
-                <tr>
-                  <th className="p-2 text-left text-gray-600 dark:text-gray-300 font-medium">Product</th>
-                  <th className="p-2 text-left text-gray-600 dark:text-gray-300 font-medium">Brand</th>
-                  <th className="p-2 text-right text-gray-600 dark:text-gray-300 font-medium">Requested</th>
-                  <th className="p-2 text-right text-gray-600 dark:text-gray-300 font-medium">Approved</th>
-                  <th className="p-2 text-right text-gray-600 dark:text-gray-300 font-medium">Issued</th>
-                  <th className="p-2 text-right text-gray-600 dark:text-gray-300 font-medium">Pending</th>
-                </tr>
-              </thead>
+          <div className="border dark:border-gray-700 rounded-lg overflow-hidden mb-3">
+            <div className="max-h-[320px] overflow-y-auto">
+              <table className="w-full text-xs">
+                <thead className="bg-gray-100 dark:bg-gray-700 sticky top-0">
+                  <tr className="text-xs">
+                    <th className="p-2 text-left text-gray-700 dark:text-gray-300 font-semibold">Product</th>
+                    <th className="p-2 text-left text-gray-700 dark:text-gray-300 font-semibold">Brand</th>
+                    <th className="p-2 text-center text-gray-700 dark:text-gray-300 font-semibold w-16">Requested</th>
+                    <th className="p-2 text-center text-gray-700 dark:text-gray-300 font-semibold w-16">Approved</th>
+                    <th className="p-2 text-center text-gray-700 dark:text-gray-300 font-semibold w-20">Issued</th>
+                    <th className="p-2 text-center text-gray-700 dark:text-gray-300 font-semibold w-16">Remaining</th>
+                    <th className="p-2 text-center text-gray-700 dark:text-gray-300 font-semibold w-20">Status</th>
+                  </tr>
+                </thead>
 
-              <tbody className="divide-y dark:divide-gray-700">
-                {quotation?.kits?.map((kit: any, kIndex: number) =>
-                  kit.items.map((item: any, iIndex: number) => {
-                    const key = `${kIndex}-${iIndex}`;
-                    const issuedQty = issuedQuantities[key] || "";
-                    const approvedQty = item.prod_qty; 
-                    const requestedQty = item.prod_qty;
-                    const pendingQty = calculatePendingQty(requestedQty, approvedQty, issuedQty);
+                <tbody className="divide-y dark:divide-gray-700">
+                  {mrnData?.items?.map((item: IssueItem) => {
+                    const issuedQty = issuedQuantities[item.mpm_id] || "";
+                    const approvedQty = item.approval_qty;
+                    const requestedQty = item.requested_qty;
+                    const remainingQty = calculateRemainingQty(item, parseInt(issuedQty) || 0);
                     
                     return (
-                      <tr key={key} className="hover:bg-gray-50 dark:hover:bg-gray-800/50">
+                      <tr key={item.mpm_id} className="hover:bg-gray-50 dark:hover:bg-gray-800/50">
                         <td className="p-2">
-                          <div className="font-medium dark:text-white">{kit.kit_name}</div>
-                          <div className="text-xs text-gray-500 dark:text-gray-400">
-                            {item.model}
+                          <div className="font-medium dark:text-white text-xs">
+                            {item.model_no}
                           </div>
                         </td>
-                        <td className="p-2 dark:text-gray-300">{item.brand_name}</td>
-                        <td className="p-2 text-right font-medium dark:text-white">
+                        <td className="p-2 dark:text-gray-300 text-xs">
+                          {item.brand_name}
+                        </td>
+                        <td className="p-2 text-center font-medium dark:text-white">
                           {requestedQty}
                         </td>
-                        <td className="p-2 text-right font-medium text-green-600 dark:text-green-400">
+                        <td className="p-2 text-center font-semibold text-green-600 dark:text-green-400">
                           {approvedQty}
                         </td>
-                        <td className="p-2 text-right">
+                        <td className="p-2 text-center">
                           <input
                             type="number"
                             min="0"
                             max={approvedQty}
                             value={issuedQty}
-                            onChange={(e) => handleQtyChange(key, e.target.value)}
-                            className="w-16 text-right border border-gray-200 dark:border-gray-600 rounded px-1 py-1 bg-white dark:bg-gray-700 focus:ring-1 focus:ring-purple-500 dark:text-white"
+                            onChange={(e) => handleQtyChange(item.mpm_id, e.target.value, approvedQty)}
+                            className="w-16 text-center border border-gray-200 dark:border-gray-600 rounded px-1 py-0.5 bg-white dark:bg-gray-700 focus:ring-1 focus:ring-purple-500 dark:text-white text-xs"
                             placeholder="0"
                             disabled={isIssuing}
                           />
                         </td>
-                        <td className="p-2 text-right">
-                          <span className={`font-medium ${
-                            pendingQty > 0 
+                        <td className="p-2 text-center">
+                          <span className={`font-semibold text-xs ${
+                            remainingQty > 0 
                               ? 'text-orange-600 dark:text-orange-400' 
                               : 'text-green-600 dark:text-green-400'
                           }`}>
-                            {pendingQty}
+                            {remainingQty}
                           </span>
+                        </td>
+                        <td className="p-2 text-center">
+                          {getIssueStatusBadge(item.issue_status)}
                         </td>
                       </tr>
                     );
-                  })
-                )}
-              </tbody>
-            </table>
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          {/* Issue Notes */}
+          <div className="mb-3">
+            <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+              Issue Notes
+            </label>
+            <textarea
+              rows={2}
+              value={issueNotes}
+              onChange={(e) => setIssueNotes(e.target.value)}
+              className="w-full px-2 py-1.5 text-xs border dark:border-gray-600 rounded-lg dark:bg-gray-700 dark:text-white focus:outline-none focus:ring-1 focus:ring-purple-500"
+              placeholder="Enter issue notes (optional)..."
+              disabled={isIssuing}
+            />
           </div>
 
           {/* Summary Cards */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-4">
-            <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-3">
-              <p className="text-xs text-blue-600 dark:text-blue-400">Total Requested Items</p>
-              <p className="text-lg font-bold text-blue-800 dark:text-blue-300">
-                {quotation?.kits?.reduce((total: number, kit: any) => 
-                  total + kit.items.reduce((sum: number, item: any) => sum + item.prod_qty, 0), 0
-                )}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
+            <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-2">
+              <p className="text-[10px] text-blue-600 dark:text-blue-400">Total Requested</p>
+              <p className="text-base font-bold text-blue-800 dark:text-blue-300">
+                {totalRequested}
               </p>
             </div>
-            <div className="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg p-3">
-              <p className="text-xs text-green-600 dark:text-green-400">Total Issued</p>
-              <p className="text-lg font-bold text-green-800 dark:text-green-300">
-                {calculateTotalIssued()}
+            <div className="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg p-2">
+              <p className="text-[10px] text-green-600 dark:text-green-400">Total Approved</p>
+              <p className="text-base font-bold text-green-800 dark:text-green-300">
+                {totalApproved}
               </p>
             </div>
-            <div className="bg-purple-50 dark:bg-purple-900/20 border border-purple-200 dark:border-purple-800 rounded-lg p-3">
-              <p className="text-xs text-purple-600 dark:text-purple-400">Grand Total</p>
-              <p className="text-lg font-bold text-purple-800 dark:text-purple-300">
-                ₹ {calculateTotal().toLocaleString()}
+            <div className="bg-purple-50 dark:bg-purple-900/20 border border-purple-200 dark:border-purple-800 rounded-lg p-2">
+              <p className="text-[10px] text-purple-600 dark:text-purple-400">Total Issuing</p>
+              <p className="text-base font-bold text-purple-800 dark:text-purple-300">
+                {totalIssued}
               </p>
             </div>
           </div>
-
         </div>
 
         {/* Footer */}
-        <div className="flex justify-end gap-3 p-4 border-t dark:border-gray-700">
+        <div className="flex justify-end gap-2 p-3 border-t dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50 rounded-b-lg">
           <button
             onClick={onClose}
-            className="px-4 py-2 bg-gray-200 dark:bg-gray-700 rounded text-gray-700 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors"
+            className="px-3 py-1.5 bg-gray-200 dark:bg-gray-700 rounded-lg text-xs text-gray-700 dark:text-gray-300 hover:bg-gray-300 transition-colors"
             disabled={isIssuing}
           >
             Cancel
           </button>
 
+          {/* <button
+            onClick={handlePartialIssue}
+            disabled={isIssuing || !hasIssuedQuantities}
+            className="px-3 py-1.5 bg-gradient-to-r from-orange-500 to-orange-600 text-white rounded-lg text-xs flex items-center gap-1 hover:from-orange-600 hover:to-orange-700 transition-all disabled:opacity-50"
+          >
+            {isIssuing && selectedAction === "partial" ? (
+              <>
+                <FontAwesomeIcon icon={faSpinner} className="animate-spin h-3 w-3" />
+                Processing...
+              </>
+            ) : (
+              <>
+                <FontAwesomeIcon icon={faBoxOpen} className="h-3 w-3" />
+                Partial Issue
+              </>
+            )}
+          </button> */}
+
           <button
             onClick={handleIssueMaterial}
             disabled={isIssuing || !hasIssuedQuantities}
-            className="px-6 py-2 bg-gradient-to-r from-green-500 to-green-600 text-white rounded flex items-center gap-2 hover:from-green-600 hover:to-green-700 transition-all disabled:opacity-50"
+            className="px-3 py-1.5 bg-gradient-to-r from-green-500 to-green-600 text-white rounded-lg text-xs flex items-center gap-1 hover:from-green-600 hover:to-green-700 transition-all disabled:opacity-50"
           >
             {isIssuing && selectedAction === "issue" ? (
               <>
-                <FontAwesomeIcon icon={faSpinner} className="animate-spin" />
+                <FontAwesomeIcon icon={faSpinner} className="animate-spin h-3 w-3" />
                 Issuing...
               </>
             ) : (
               <>
-                <FontAwesomeIcon icon={faTruck} />
+                <FontAwesomeIcon icon={faTruck} className="h-3 w-3" />
                 Issue Material
               </>
             )}
