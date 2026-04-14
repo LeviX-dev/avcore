@@ -49,6 +49,11 @@ import metaReportRoutes from "./routes/metaReportRoutes.js";
 
 import { checkTimeLogout } from './middleware/sessionExpiry.js';
 
+import expenseRoutes from './routes/expenseRoutes.js';
+import vendorRoutes from './routes/vendoExpRoutes.js';
+import walletRoutes from './routes/walletRoutes.js'; 
+
+
 
 
 import path from 'path';
@@ -200,6 +205,10 @@ app.use("/api/daily-execution", dailyExecutionRoutes);
 
 app.use("/api/report", metaReportRoutes);
 
+
+app.use('/api/wallet', walletRoutes);
+app.use('/api', expenseRoutes);
+app.use('/api', vendorRoutes);
 
 
 // ✅ ADD CRON HERE

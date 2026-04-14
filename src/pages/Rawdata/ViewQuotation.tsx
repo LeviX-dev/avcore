@@ -1010,7 +1010,7 @@ const ViewQuotation = () => {
           <div className="mt-36">
 
             <div className="grid grid-cols-2 gap-4 mb-10">
-  {/* LEFT COLUMN - BANK DETAILS */}
+  {/* LEFT COLUMN - BANK DETAILS (Always shown) */}
   <div className="border-2 border-black overflow-hidden">
     <div className="bg-black text-white text-center py-2 font-bold text-sm tracking-wider uppercase">
       BANK DETAILS
@@ -1038,25 +1038,25 @@ const ViewQuotation = () => {
     </table>
   </div>
 
-  {/* RIGHT COLUMN - INSTALLMENTS */}
-  <div className="border-2 border-black overflow-hidden">
-    <div className="bg-black text-white text-center py-2 font-bold text-sm tracking-wider uppercase">
-      PAYMENT INSTALLMENTS
-    </div>
-    <table className="w-full text-[13px] border-collapse">
-      <thead>
-        <tr className="bg-gray-200">
-          <th className="px-3 py-2 border-r border-black border-b-2 border-black font-bold text-center w-3/5">
-            DESCRIPTION
-          </th>
-          <th className="px-3 py-2 border-b-2 border-black font-bold text-center">
-            PERCENT (%)
-          </th>
-        </tr>
-      </thead>
-      <tbody>
-        {quotation.installments && quotation.installments.length > 0 ? (
-          quotation.installments.map((inst, idx) => (
+  {/* RIGHT COLUMN - INSTALLMENTS (Only show if installments exist) */}
+  {quotation.installments && quotation.installments.length > 0 && (
+    <div className="border-2 border-black overflow-hidden">
+      <div className="bg-black text-white text-center py-2 font-bold text-sm tracking-wider uppercase">
+        PAYMENT INSTALLMENTS
+      </div>
+      <table className="w-full text-[13px] border-collapse">
+        <thead>
+          <tr className="bg-gray-200">
+            <th className="px-3 py-2 border-r border-black border-b-2 border-black font-bold text-center w-3/5">
+              DESCRIPTION
+            </th>
+            <th className="px-3 py-2 border-b-2 border-black font-bold text-center">
+              PERCENT (%)
+            </th>
+          </tr>
+        </thead>
+        <tbody>
+          {quotation.installments.map((inst, idx) => (
             <tr 
               key={idx} 
               className={`${idx % 2 === 0 ? 'bg-white' : 'bg-gray-100'} border-b border-black`}
@@ -1068,18 +1068,13 @@ const ViewQuotation = () => {
                 {inst.percentage}%
               </td>
             </tr>
-          ))
-        ) : (
-          <tr>
-            <td colSpan={2} className="px-3 py-8 text-center text-gray-500 border-b border-black">
-              No installments defined
-            </td>
-          </tr>
-        )}
-      </tbody>
-    </table>
-  </div>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  )}
 </div>
+
             {/* TERMS & CONDITIONS HEADER */}
             <h3 className="text-xl font-bold text-blue-600 underline mb-4 decoration-2 underline-offset-4">
               TERMS & CONDITIONS: -

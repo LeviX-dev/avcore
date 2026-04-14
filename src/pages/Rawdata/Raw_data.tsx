@@ -3068,22 +3068,19 @@ const RawData = () => {
           ? STAGE_PERCENTAGE_MAP[stageForPercentage] || 0
           : 0;
 
-        // 🔥 IMPORTANT: Determine display city with priority: area_name first, then city
-        let displayCity = '';
-        const areaName = parseValue(item.area_name);
-        const cityName = parseValue(item.city);
+          // 🔥 IMPORTANT: Determine display city with priority: area_name first, then city
+let displayCity = '';
+const areaName = parseValue(item.area_name);
+const cityName = parseValue(item.city);
 
-        if (areaName && areaName !== '' && areaName !== 'Not Available') {
-          displayCity = areaName;
-        } else if (
-          cityName &&
-          cityName !== '' &&
-          cityName !== 'Not Available'
-        ) {
-          displayCity = cityName;
-        } else {
-          displayCity = '';
-        }
+if (areaName && areaName !== '' && areaName !== 'Not Available') {
+  displayCity = areaName;
+} else if (cityName && cityName !== '' && cityName !== 'Not Available') {
+  displayCity = cityName;
+} else {
+  displayCity = '';
+}
+
 
         return {
           id: item.master_id,

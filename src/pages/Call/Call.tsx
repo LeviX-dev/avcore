@@ -1733,22 +1733,19 @@ const CallList = () => {
           ? STAGE_PERCENTAGE_MAP[stageForPercentage] || 0
           : 0;
 
-        // 🔥 IMPORTANT: Determine display city with priority: area_name first, then city
-        let displayCity = '';
-        const areaName = parseValue(item.area_name);
-        const cityName = parseValue(item.city);
+  // 🔥 IMPORTANT: Determine display city with priority: area_name first, then city
+let displayCity = '';
+const areaName = parseValue(item.area_name);
+const cityName = parseValue(item.city);
 
-        if (areaName && areaName !== '' && areaName !== 'Not Available') {
-          displayCity = areaName; // Use area_name if available
-        } else if (
-          cityName &&
-          cityName !== '' &&
-          cityName !== 'Not Available'
-        ) {
-          displayCity = cityName; // Fallback to city if area_name not available
-        } else {
-          displayCity = ''; // Empty if neither available
-        }
+if (areaName && areaName !== '' && areaName !== 'Not Available') {
+  displayCity = areaName; // Use area_name if available
+} else if (cityName && cityName !== '' && cityName !== 'Not Available') {
+  displayCity = cityName; // Fallback to city if area_name not available
+} else {
+  displayCity = ''; // Empty if neither available
+}
+
 
         // Process reassignment_remarks
         let reassignmentRemarks = [];
@@ -2747,6 +2744,38 @@ const CallList = () => {
       alert('❌ Error deleting document. Please try again.');
     }
   };
+
+  const [showUpdateLocationPopup, setShowUpdateLocationPopup] = useState(false);
+const [updateLocationClient, setUpdateLocationClient] = useState(null);
+const [newLocationLink, setNewLocationLink] = useState('');
+
+const handleUpdateLocation = async () => {
+  if (!updateLocationClient || !newLocationLink) {
+    alert('Please enter a location link');
+    return;
+  }
+
+  try {
+    const response = await axios.put(
+      `${BASE_URL}api/update-location/${updateLocationClient.master_id}`,
+      { location_link: newLocationLink },
+      { withCredentials: true }
+    );
+
+    if (response.data.success) {
+      alert('✅ Location link updated successfully!');
+      setShowUpdateLocationPopup(false);
+      setUpdateLocationClient(null);
+      setNewLocationLink('');
+      refreshDataWithPagePreservation();
+    } else {
+      alert('❌ Failed to update location link');
+    }
+  } catch (error) {
+    console.error('Error updating location:', error);
+    alert('❌ Error updating location link');
+  }
+};
 
   // Add these state variables for favorites
   const [favoriteStatus, setFavoriteStatus] = useState({});
@@ -4014,6 +4043,8 @@ const CallList = () => {
                             className="text-xs"
                           />
                         </ActionButton>
+
+                        
                       </div>
                     </td>
                   </tr>
@@ -4024,36 +4055,65 @@ const CallList = () => {
         )}
       </div>
 
-      {/* Combined Documents/Upload Modal */}
-      {showDocsPopup && docsClient && (
-        <div className="fixed inset-0 bg-black/70 flex justify-center items-start z-[9999] overflow-y-auto p-4 sm:p-10">
-          <div className="bg-white dark:bg-boxdark p-6 rounded-xl shadow-2xl w-full max-w-5xl max-h-[90vh] overflow-y-auto border border-gray-300 dark:border-gray-700">
-            {/* Header */}
-            <div className="flex justify-between items-center border-b pb-4 mb-6 dark:border-gray-700">
-              <div>
-                <h2 className="text-2xl font-bold text-gray-800 dark:text-white">
-                  📁 Files for {docsClient.name}
-                </h2>
-                <p className="text-sm text-gray-600 dark:text-gray-400">
-                  Manage documents, links, and remarks in one place
-                </p>
-              </div>
-              <button
-                onClick={() => {
-                  setShowDocsPopup(false);
-                  setUploadFiles([]);
-                  setLocationLink('');
-                  setRemark('');
-                  setDetailedRemark('');
-                  setFollowupDate('');
-                  setSelectedUsers([]);
-                  setLeadStage('');
-                }}
-                className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 text-2xl p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-full transition-colors"
-              >
-                <FontAwesomeIcon icon={faTimes} />
-              </button>
-            </div>
+{/* Combined Documents/Upload Modal */}
+{showDocsPopup && docsClient && (
+  <div className="fixed inset-0 bg-black/70 flex justify-center items-start z-[9999] overflow-y-auto p-4 sm:p-10">
+    <div className="bg-white dark:bg-boxdark p-6 rounded-xl shadow-2xl w-full max-w-5xl max-h-[90vh] overflow-y-auto border border-gray-300 dark:border-gray-700">
+      {/* Header */}
+      <div className="flex justify-between items-center border-b pb-4 mb-6 dark:border-gray-700">
+<div className="flex items-start justify-between gap-4 flex-wrap">
+  
+  {/* LEFT SIDE */}
+  <div>
+    <h2 className="text-2xl font-bold text-gray-800 dark:text-white">
+      📁 Files for {docsClient.name}
+    </h2>
+    <p className="text-sm text-gray-600 dark:text-gray-400">
+      Manage documents, links, and remarks in one place
+    </p>
+  </div>
+
+  {/* RIGHT SIDE BUTTON */}
+  <div className="flex flex-col items-end">
+    <button
+      onClick={() => {
+        setUpdateLocationClient(docsClient);
+        setNewLocationLink(
+          docsClient?.document_location_link || 
+          docsClient?.location_link || 
+          ''
+        );
+        setShowUpdateLocationPopup(true);
+      }}
+      className="inline-flex items-center gap-2 px-4 py-2.5 bg-gradient-to-r from-emerald-500 to-green-600 hover:from-emerald-600 hover:to-green-700 text-white rounded-lg font-medium text-sm transition-all shadow-md hover:shadow-lg"
+    >
+      <FontAwesomeIcon icon={faMapMarkerAlt} className="h-4 w-4" />
+      Update Location Only
+    </button>
+
+   
+  </div>
+
+</div>
+
+        <button
+          onClick={() => {
+            setShowDocsPopup(false);
+            setUploadFiles([]);
+            setLocationLink('');
+            setRemark('');
+            setDetailedRemark('');
+            setFollowupDate('');
+            setSelectedUsers([]);
+            setLeadStage('');
+          }}
+          className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 text-2xl p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-full transition-colors"
+        >
+          <FontAwesomeIcon icon={faTimes} />
+        </button>
+      </div>
+
+    
 
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
               {/* Left Column - Upload Section */}
@@ -4208,69 +4268,70 @@ const CallList = () => {
                           </span>
                         </div>
 
-                        {/* Users List */}
-                        {docsFilteredUsers.length > 0 ? (
-                          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-2">
-                            {docsFilteredUsers.map((user) => {
-                              const isSelected = selectedUsers.includes(
-                                user.user_id || user.id,
-                              );
+                       {/* Users List - Single column full names */}
+{docsFilteredUsers.length > 0 ? (
+  <div className="flex flex-col gap-2">
+    {docsFilteredUsers.map((user) => {
+      const isSelected = selectedUsers.includes(
+        user.user_id || user.id,
+      );
 
-                              return (
-                                <div
-                                  key={user.user_id || user.id}
-                                  className={`flex items-start p-2 rounded transition-colors min-h-[60px] ${
-                                    isSelected
-                                      ? 'bg-blue-50 dark:bg-blue-900/30 border border-blue-200 dark:border-blue-700'
-                                      : 'border border-transparent hover:bg-gray-50 dark:hover:bg-gray-800 hover:border-gray-200 dark:hover:border-gray-700'
-                                  }`}
-                                >
-                                  <input
-                                    type="checkbox"
-                                    id={`doc-user-${user.user_id || user.id}`}
-                                    checked={isSelected}
-                                    onChange={() => {
-                                      const userId = user.user_id || user.id;
-                                      if (selectedUsers.includes(userId)) {
-                                        setSelectedUsers((prev) =>
-                                          prev.filter((id) => id !== userId),
-                                        );
-                                      } else {
-                                        setSelectedUsers((prev) => [
-                                          ...prev,
-                                          userId,
-                                        ]);
-                                      }
-                                    }}
-                                    className="h-4 w-4 text-blue-600 rounded focus:ring-blue-500 focus:ring-offset-0 mt-1 flex-shrink-0"
-                                  />
+      return (
+        <div
+          key={user.user_id || user.id}
+          className={`flex items-center p-2 rounded transition-colors ${
+            isSelected
+              ? 'bg-blue-50 dark:bg-blue-900/30 border border-blue-200 dark:border-blue-700'
+              : 'border border-transparent hover:bg-gray-50 dark:hover:bg-gray-800 hover:border-gray-200 dark:hover:border-gray-700'
+          }`}
+        >
+          <input
+            type="checkbox"
+            id={`doc-user-${user.user_id || user.id}`}
+            checked={isSelected}
+            onChange={() => {
+              const userId = user.user_id || user.id;
+              if (selectedUsers.includes(userId)) {
+                setSelectedUsers((prev) =>
+                  prev.filter((id) => id !== userId),
+                );
+              } else {
+                setSelectedUsers((prev) => [
+                  ...prev,
+                  userId,
+                ]);
+              }
+            }}
+            className="h-4 w-4 text-blue-600 rounded focus:ring-blue-500 focus:ring-offset-0 flex-shrink-0"
+          />
 
-                                  <label
-                                    htmlFor={`doc-user-${
-                                      user.user_id || user.id
-                                    }`}
-                                    className="ml-2 text-sm text-gray-700 dark:text-gray-300 cursor-pointer flex-1 min-w-0"
-                                  >
-                                    <div className="font-semibold text-sm truncate">
-                                      {user.name}
-                                    </div>
-                                    <div className="text-xs text-gray-500 dark:text-gray-400 truncate">
-                                      {user.role_label || user.role}
-                                    </div>
-                                  </label>
-                                </div>
-                              );
-                            })}
-                          </div>
-                        ) : (
-                          <div className="text-center py-4 text-gray-500 dark:text-gray-400">
-                            <div className="text-2xl mb-2">🔍</div>
-                            <p className="text-sm">No users found</p>
-                            <p className="text-xs mt-1">
-                              Try a different search term
-                            </p>
-                          </div>
-                        )}
+          <label
+            htmlFor={`doc-user-${
+              user.user_id || user.id
+            }`}
+            className="ml-2 text-sm text-gray-700 dark:text-gray-300 cursor-pointer flex-1"
+          >
+            <div className="font-semibold text-sm">
+              {user.name}
+            </div>
+            <div className="text-xs text-gray-500 dark:text-gray-400">
+              {user.role_label || user.role}
+            </div>
+          </label>
+        </div>
+      );
+    })}
+  </div>
+) : (
+  <div className="text-center py-4 text-gray-500 dark:text-gray-400">
+    <div className="text-2xl mb-2">🔍</div>
+    <p className="text-sm">No users found</p>
+    <p className="text-xs mt-1">
+      Try a different search term
+    </p>
+  </div>
+)}
+
                       </div>
 
                       {/* Selected Users Preview */}
@@ -5273,6 +5334,94 @@ const CallList = () => {
           </div>
         </div>
       )}
+
+      {/* Update Location Only Popup */}
+{showUpdateLocationPopup && updateLocationClient && (
+  <div className="fixed inset-0 bg-black/70 flex justify-center items-center z-[10000] p-4">
+    <div className="bg-white dark:bg-boxdark p-6 rounded-xl shadow-2xl w-full max-w-md border border-gray-300 dark:border-gray-700">
+      <div className="flex justify-between items-center border-b pb-4 mb-4 dark:border-gray-700">
+        <div>
+          <h2 className="text-xl font-bold text-gray-800 dark:text-white">
+            Update Location Link
+          </h2>
+          <p className="text-sm text-gray-600 dark:text-gray-400">
+            For: {updateLocationClient.name}
+          </p>
+        </div>
+        <button
+          onClick={() => {
+            setShowUpdateLocationPopup(false);
+            setUpdateLocationClient(null);
+            setNewLocationLink('');
+          }}
+          className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 text-2xl p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-full transition-colors"
+        >
+          <FontAwesomeIcon icon={faTimes} />
+        </button>
+      </div>
+
+      <div className="space-y-4">
+        <div>
+          <label className="block mb-2 text-sm font-bold text-gray-700 dark:text-gray-300">
+            Location Link (Google Maps URL)
+          </label>
+          <input
+            type="text"
+            placeholder="https://maps.google.com/..."
+            value={newLocationLink}
+            onChange={(e) => setNewLocationLink(e.target.value)}
+            className="w-full p-3 border border-gray-300 dark:border-gray-600 rounded-lg text-sm dark:text-white dark:bg-gray-800 focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
+          />
+          <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+            Enter a Google Maps or location URL
+          </p>
+        </div>
+
+        {/* Current Location Preview */}
+        {updateLocationClient.document_location_link && (
+          <div className="p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
+            <p className="text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">
+              Current Location:
+            </p>
+            <a
+              href={updateLocationClient.document_location_link}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-xs text-blue-600 dark:text-blue-400 hover:underline break-all"
+            >
+              {updateLocationClient.document_location_link}
+            </a>
+          </div>
+        )}
+
+        <div className="flex gap-3 pt-4">
+          <button
+            onClick={() => {
+              setShowUpdateLocationPopup(false);
+              setUpdateLocationClient(null);
+              setNewLocationLink('');
+            }}
+            className="flex-1 px-4 py-2 bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-gray-200 rounded-lg font-medium hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={handleUpdateLocation}
+            disabled={!newLocationLink}
+            className={`flex-1 px-4 py-2 rounded-lg font-medium transition-all ${
+              newLocationLink
+                ? 'bg-gradient-to-r from-emerald-600 to-green-600 hover:from-emerald-700 hover:to-green-700 text-white'
+                : 'bg-gray-300 dark:bg-gray-600 text-gray-500 dark:text-gray-400 cursor-not-allowed'
+            }`}
+          >
+            Update Location
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+)}
+
     </div>
   );
 };

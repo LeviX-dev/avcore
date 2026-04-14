@@ -2010,7 +2010,7 @@ export const getCompleteRawData = async (req, res) => {
       LEFT JOIN documents d ON d.master_id = rd.master_id
 
       WHERE 1=1
-        AND rd.lead_stage NOT IN ('Drop', 'Closed Deal')
+AND rd.lead_stage NOT IN ('Drop', 'Closed Deal', 'lost')
     `;
 
     const params = [];
@@ -4053,6 +4053,58 @@ export const uploadDocuments = async (req, res) => {
   }
 };
 
+export const updateLocationLink = async (req, res) => {
+  try {
+    const { master_id } = req.params;
+    const { location_link } = req.body;
+
+    if (!master_id) {
+      return res.status(400).json({ message: 'master_id is required' });
+    }
+
+    if (!location_link) {
+      return res.status(400).json({ message: 'location_link is required' });
+    }
+
+    // 🔥 FIRST: Check if any document exists for this master_id
+    const [existingDocs] = await db.query(
+      `SELECT doc_id FROM documents WHERE master_id = ? LIMIT 1`,
+      [master_id]
+    );
+
+    if (existingDocs.length > 0) {
+      // ✅ UPDATE existing document
+      await db.query(
+        `UPDATE documents SET location_link = ? WHERE master_id = ?`,
+        [location_link, master_id]
+      );
+      console.log(`✅ Updated location_link for master_id: ${master_id}`);
+    } else {
+      // ✅ CREATE new entry with location_link
+      // 🔥 FIX: Use 'uploaded_at' instead of 'created_at'
+      await db.query(
+        `INSERT INTO documents (master_id, location_link, document_type, uploaded_at) 
+         VALUES (?, ?, 'link', NOW())`,
+        [master_id, location_link]
+      );
+      console.log(`✅ Created new location entry for master_id: ${master_id}`);
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: existingDocs.length > 0 
+        ? 'Location link updated successfully' 
+        : 'Location link created successfully'
+    });
+
+  } catch (error) {
+    console.error('UPDATE LOCATION ERROR:', error.message);
+    return res.status(500).json({
+      success: false,
+      message: 'Server error during location update'
+    });
+  }
+};
 
 
 export const deleteDocument = async (req, res) => {

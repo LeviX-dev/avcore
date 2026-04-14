@@ -1467,6 +1467,42 @@ const fetchDocumentsForModal = async () => {
     }
   };
 
+  const [showUpdateLocationPopup, setShowUpdateLocationPopup] = useState(false);
+const [updateLocationClient, setUpdateLocationClient] = useState<Lead | null>(null);
+const [newLocationLink, setNewLocationLink] = useState('');
+
+
+const handleUpdateLocation = async () => {
+  if (!updateLocationClient || !newLocationLink) {
+    alert('Please enter a location link');
+    return;
+  }
+
+  try {
+    // ✅ CHANGE: Use PUT instead of POST to match backend route
+    const response = await axios.put(
+      `${BASE_URL}api/update-location/${updateLocationClient.master_id}`,
+      { location_link: newLocationLink },
+      { withCredentials: true }
+    );
+
+    if (response.data.success) {
+      alert('✅ Location link updated successfully!');
+      setShowUpdateLocationPopup(false);
+      setUpdateLocationClient(null);
+      setNewLocationLink('');
+      fetchClosedLeads();
+    } else {
+      alert('❌ Failed to update location link');
+    }
+  } catch (error) {
+    console.error('Error updating location:', error);
+    alert('❌ Error updating location link');
+  }
+};
+
+
+
   const getFileIcon = (fileName: string) => {
     const ext = fileName.split('.').pop()?.toLowerCase() || '';
     switch (ext) {
@@ -2303,31 +2339,55 @@ const fetchDocumentsForModal = async () => {
     return (
       <div className="fixed inset-0 bg-black/70 flex justify-center items-start z-[9999] overflow-y-auto p-4 sm:p-10">
         <div className="bg-white dark:bg-boxdark p-6 rounded-xl shadow-2xl w-full max-w-5xl max-h-[90vh] overflow-y-auto border border-gray-300 dark:border-gray-700">
-          {/* Header */}
-          <div className="flex justify-between items-center border-b pb-4 mb-6 dark:border-gray-700">
-            <div>
-              <h2 className="text-2xl font-bold text-gray-800 dark:text-white">
-                📁 Files for {docsClient.name}
-              </h2>
-              <p className="text-sm text-gray-600 dark:text-gray-400">
-                Manage documents, links, and remarks in one place
-              </p>
-            </div>
-            <button
-              onClick={() => {
-                setShowDocsPopup(false);
-                setUploadFiles([]);
-                setLocationLink("");
-                setDetailedRemark("");
-                setFollowupDate("");
-                setSelectedUsers([]);
-                setLeadStage("");
-              }}
-              className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 text-2xl p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-full transition-colors"
-            >
-              <FontAwesomeIcon icon={faTimes} />
-            </button>
-          </div>
+        <div className="flex justify-between items-center border-b pb-4 mb-6 dark:border-gray-700">
+  <div className="flex items-start justify-between gap-4 flex-wrap w-full">
+    {/* LEFT SIDE */}
+    <div>
+      <h2 className="text-2xl font-bold text-gray-800 dark:text-white">
+        📁 Files for {docsClient.name}
+      </h2>
+      <p className="text-[13px] text-gray-600 dark:text-gray-400">
+        Manage documents, links, and remarks in one place
+      </p>
+    </div>
+
+    {/* RIGHT SIDE BUTTON */}
+    <div className="flex flex-col items-end">
+      <button
+        onClick={() => {
+          setUpdateLocationClient(docsClient);
+          setNewLocationLink(
+            docsClient?.document_location_link || 
+            docsClient?.location_link || 
+            ''
+          );
+          setShowUpdateLocationPopup(true);
+        }}
+        className="inline-flex items-center gap-2 px-4 py-2.5 bg-gradient-to-r from-emerald-500 to-green-600 hover:from-emerald-600 hover:to-green-700 text-white rounded-lg font-medium text-[13px] transition-all shadow-md hover:shadow-lg"
+      >
+        <FontAwesomeIcon icon={faMapMarkerAlt} className="h-4 w-4" />
+        Update Location Only
+      </button>
+    </div>
+  </div>
+
+  <button
+    onClick={() => {
+      setShowDocsPopup(false);
+      setUploadFiles([]);
+      setLocationLink('');
+      setRemark('');
+      setDetailedRemark('');
+      setFollowupDate('');
+      setSelectedUsers([]);
+      setLeadStage('');
+    }}
+    className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 text-2xl p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-full transition-colors ml-4"
+  >
+    <FontAwesomeIcon icon={faTimes} />
+  </button>
+</div>
+
 
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
             {/* Left Column - Upload Section */}
@@ -2368,148 +2428,185 @@ const fetchDocumentsForModal = async () => {
                     />
                   </div>
 
-                  {/* Reassign To Users */}
-                  <div>
-                    <label className="block mb-1.5 text-xs font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400">
-                      Reassign To (Multiple Users)
-                    </label>
-                    
-                    {/* Search Box */}
-                    <div className="mb-2">
-                      <div className="relative">
-                        <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                          <svg className="h-4 w-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                          </svg>
-                        </div>
-                        <input
-                          type="text"
-                          value={searchUserTerm}
-                          onChange={(e) => setSearchUserTerm(e.target.value)}
-                          className="w-full pl-9 pr-8 py-2 border border-gray-300 dark:border-gray-600 rounded text-sm dark:bg-form-input dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                          placeholder="Search users by name or role..."
-                        />
-                        {searchUserTerm && (
-                          <button
-                            type="button"
-                            onClick={() => setSearchUserTerm('')}
-                            className="absolute inset-y-0 right-0 pr-2 flex items-center text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
-                          >
-                            <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                            </svg>
-                          </button>
-                        )}
-                      </div>
-                      {searchUserTerm && (
-                        <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                          Showing {filteredUsers.length} of {users.length} users
-                        </p>
-                      )}
-                    </div>
-                    
-                    {/* Checkbox Selection Area */}
-                    <div className="border border-gray-300 dark:border-gray-600 rounded p-3 max-h-40 overflow-y-auto">
-                      {/* Select All Filtered Button */}
-                      <div className="mb-2 pb-2 border-b dark:border-gray-700 flex items-center justify-between">
-                        <button
-                          type="button"
-                          onClick={() => {
-                            const allFilteredSelected = filteredUsers.every(user => 
-                              selectedUsers.includes(user.user_id || user.id)
-                            );
-                            
-                            if (allFilteredSelected) {
-                              setSelectedUsers(prev => 
-                                prev.filter(userId => 
-                                  !filteredUsers.some(user => user.user_id === userId || user.id === userId)
-                                )
-                              );
-                            } else {
-                              const filteredUserIds = filteredUsers.map(user => user.user_id || user.id);
-                              setSelectedUsers(prev => [...new Set([...prev, ...filteredUserIds])]);
-                            }
-                          }}
-                          className="text-xs px-3 py-1.5 bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300 rounded hover:bg-blue-200 dark:hover:bg-blue-800 transition-colors"
-                        >
-                          {filteredUsers.length > 0 && 
-                          filteredUsers.every(user => 
-                            selectedUsers.includes(user.user_id || user.id)
-                          ) 
-                            ? 'Deselect All Filtered' 
-                            : 'Select All Filtered'}
-                        </button>
-                        <span className="text-xs text-gray-500 dark:text-gray-400">
-                          {selectedUsers.length} selected
-                        </span>
-                      </div>
-                      
-                      {/* Users List */}
-                      {filteredUsers.length > 0 ? (
-                        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-2">
-                          {filteredUsers.map((user) => {
-                            const isSelected = selectedUsers.includes(user.user_id || user.id);
-                            return (
-                              <div 
-                                key={user.user_id || user.id} 
-                                className={`flex items-start p-2 rounded transition-colors min-h-[60px] ${
-                                  isSelected 
-                                    ? 'bg-blue-50 dark:bg-blue-900/30 border border-blue-200 dark:border-blue-700' 
-                                    : 'border border-transparent hover:bg-gray-50 dark:hover:bg-gray-800 hover:border-gray-200 dark:hover:border-gray-700'
-                                }`}
-                              >
-                                <input
-                                  type="checkbox"
-                                  id={`user-${user.user_id || user.id}`}
-                                  checked={isSelected}
-                                  onChange={() => {
-                                    const userId = user.user_id || user.id;
-                                    if (selectedUsers.includes(userId)) {
-                                      setSelectedUsers(prev => prev.filter(id => id !== userId));
-                                    } else {
-                                      setSelectedUsers(prev => [...prev, userId]);
-                                    }
-                                  }}
-                                  className="h-4 w-4 text-blue-600 rounded focus:ring-blue-500 focus:ring-offset-0 mt-1 flex-shrink-0"
-                                />
-                                <label 
-                                  htmlFor={`user-${user.user_id || user.id}`}
-                                  className="ml-2 text-sm text-gray-700 dark:text-gray-300 cursor-pointer flex-1 min-w-0"
-                                >
-                                  <div className="font-semibold text-sm truncate">
-                                    {user.name}
-                                  </div>
-                                </label>
-                              </div>
-                            );
-                          })}
-                        </div>
-                      ) : (
-                        <div className="text-center py-4 text-gray-500 dark:text-gray-400">
-                          <div className="text-2xl mb-2">🔍</div>
-                          <p className="text-sm">No users found</p>
-                          <p className="text-xs mt-1">Try a different search term</p>
-                        </div>
-                      )}
-                    </div>
-                    
-                    {/* Selected Users Preview */}
-                    {selectedUsers.length > 0 && (
-                      <div className="mt-2 p-2 bg-blue-50 dark:bg-blue-900/30 rounded border border-blue-200 dark:border-blue-800">
-                        <div className="text-xs text-blue-700 dark:text-blue-300 mb-1 font-medium">
-                          Selected Users ({selectedUsers.length}):
-                        </div>
-                        <div className="text-xs text-gray-600 dark:text-gray-400 break-words">
-                          {selectedUsers.map(userId => {
-                            const user = users.find(u => u.user_id === userId || u.id === userId);
-                            return user
-                              ? `${user.name}${user.role ? ` (${user.role})` : ''}`
-                              : userId;
-                          }).join(', ')}
-                        </div>
-                      </div>
-                    )}
+                       <div>
+  <label className="block mb-1.5 text-[12px] font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400">
+    Reassign To (Multiple Users)
+  </label>
+  <div className="mb-2">
+    <div className="relative">
+      <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+        <svg
+          className="h-4 w-4 text-gray-400"
+          fill="none"
+          stroke="currentColor"
+          viewBox="0 0 24 24"
+        >
+          <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            strokeWidth={2}
+            d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
+          />
+        </svg>
+      </div>
+      <input
+        type="text"
+        value={searchUserTerm}
+        onChange={(e) => setSearchUserTerm(e.target.value)}
+        className="w-full pl-9 pr-8 py-2 border border-gray-300 dark:border-gray-600 rounded text-[13px] dark:bg-form-input dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+        placeholder="Search users by name or role..."
+      />
+      {searchUserTerm && (
+        <button
+          type="button"
+          onClick={() => setSearchUserTerm('')}
+          className="absolute inset-y-0 right-0 pr-2 flex items-center text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
+        >
+          <svg
+            className="h-4 w-4"
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2}
+              d="M6 18L18 6M6 6l12 12"
+            />
+          </svg>
+        </button>
+      )}
+    </div>
+    {searchUserTerm && (
+      <p className="text-[12px] text-gray-500 dark:text-gray-400 mt-1">
+        Showing {filteredUsers.length} of {users.length} users
+      </p>
+    )}
+  </div>
+  <div className="border border-gray-300 dark:border-gray-600 rounded p-3 max-h-40 overflow-y-auto">
+    <div className="mb-2 pb-2 border-b dark:border-gray-700 flex items-center justify-between">
+      <button
+        type="button"
+        onClick={() => {
+          const allFilteredSelected = filteredUsers.every(
+            (user) =>
+              selectedUsers.includes(user.user_id || user.id),
+          );
+          if (allFilteredSelected) {
+            setSelectedUsers((prev) =>
+              prev.filter(
+                (userId) =>
+                  !filteredUsers.some(
+                    (user) =>
+                      user.user_id === userId ||
+                      user.id === userId,
+                  ),
+              ),
+            );
+          } else {
+            const filteredUserIds = filteredUsers.map(
+              (user) => user.user_id || user.id,
+            );
+            setSelectedUsers((prev) => [
+              ...new Set([...prev, ...filteredUserIds]),
+            ]);
+          }
+        }}
+        className="text-[12px] px-3 py-1.5 bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300 rounded hover:bg-blue-200 dark:hover:bg-blue-800 transition-colors"
+      >
+        {filteredUsers.length > 0 &&
+        filteredUsers.every((user) =>
+          selectedUsers.includes(user.user_id || user.id),
+        )
+          ? 'Deselect All Filtered'
+          : 'Select All Filtered'}
+      </button>
+      <span className="text-[12px] text-gray-500 dark:text-gray-400">
+        {selectedUsers.length} selected
+      </span>
+    </div>
+    {filteredUsers.length > 0 ? (
+      <div className="flex flex-col gap-2">
+        {filteredUsers.map((user) => {
+          const isSelected = selectedUsers.includes(
+            user.user_id || user.id,
+          );
+          return (
+            <div
+              key={user.user_id || user.id}
+              className={`flex items-start p-2 rounded transition-colors min-h-[60px] ${
+                isSelected
+                  ? 'bg-blue-50 dark:bg-blue-900/30 border border-blue-200 dark:border-blue-700'
+                  : 'border border-transparent hover:bg-gray-50 dark:hover:bg-gray-800 hover:border-gray-200 dark:hover:border-gray-700'
+              }`}
+            >
+              <input
+                type="checkbox"
+                id={`user-${user.user_id || user.id}`}
+                checked={isSelected}
+                onChange={() => {
+                  const userId = user.user_id || user.id;
+                  if (selectedUsers.includes(userId)) {
+                    setSelectedUsers((prev) =>
+                      prev.filter((id) => id !== userId),
+                    );
+                  } else {
+                    setSelectedUsers((prev) => [
+                      ...prev,
+                      userId,
+                    ]);
+                  }
+                }}
+                className="h-4 w-4 text-blue-600 rounded focus:ring-blue-500 focus:ring-offset-0 mt-1 flex-shrink-0"
+              />
+              <label
+                htmlFor={`user-${user.user_id || user.id}`}
+                className="ml-2 text-[13px] text-gray-700 dark:text-gray-300 cursor-pointer flex-1 min-w-0"
+              >
+                <div className="font-semibold text-[13px]">
+                  {user.name}
+                </div>
+                {user.role && (
+                  <div className="text-[11px] text-gray-500 dark:text-gray-400 mt-0.5">
+                    {user.role}
                   </div>
+                )}
+              </label>
+            </div>
+          );
+        })}
+      </div>
+    ) : (
+      <div className="text-center py-4 text-gray-500 dark:text-gray-400">
+        <div className="text-2xl mb-2">🔍</div>
+        <p className="text-[13px]">No users found</p>
+        <p className="text-[12px] mt-1">
+          Try a different search term
+        </p>
+      </div>
+    )}
+  </div>
+  {selectedUsers.length > 0 && (
+    <div className="mt-2 p-2 bg-blue-50 dark:bg-blue-900/30 rounded border border-blue-200 dark:border-blue-800">
+      <div className="text-[12px] text-blue-700 dark:text-blue-300 mb-1 font-medium">
+        Selected Users ({selectedUsers.length}):
+      </div>
+      <div className="text-[12px] text-gray-600 dark:text-gray-400 break-words">
+        {selectedUsers
+          .map((userId) => {
+            const user = users.find(
+              (u) => u.user_id === userId || u.id === userId,
+            );
+            return user
+              ? `${user.name}${user.role ? ` (${user.role})` : ''}`
+              : userId;
+          })
+          .join(', ')}
+      </div>
+    </div>
+  )}
+</div>
 
                   {/* Lead Stage */}
                   <div>
@@ -4121,6 +4218,94 @@ const fetchDocumentsForModal = async () => {
           </div>
         </div>
       )}
+
+      {/* Update Location Only Popup */}
+{showUpdateLocationPopup && updateLocationClient && (
+  <div className="fixed inset-0 bg-black/70 flex justify-center items-center z-[10000] p-4">
+    <div className="bg-white dark:bg-boxdark p-6 rounded-xl shadow-2xl w-full max-w-md border border-gray-300 dark:border-gray-700">
+      <div className="flex justify-between items-center border-b pb-4 mb-4 dark:border-gray-700">
+        <div>
+          <h2 className="text-xl font-bold text-gray-800 dark:text-white">
+            Update Location Link
+          </h2>
+          <p className="text-[13px] text-gray-600 dark:text-gray-400">
+            For: {updateLocationClient.name}
+          </p>
+        </div>
+        <button
+          onClick={() => {
+            setShowUpdateLocationPopup(false);
+            setUpdateLocationClient(null);
+            setNewLocationLink('');
+          }}
+          className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 text-2xl p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-full transition-colors"
+        >
+          <FontAwesomeIcon icon={faTimes} />
+        </button>
+      </div>
+
+      <div className="space-y-4">
+        <div>
+          <label className="block mb-2 text-[13px] font-bold text-gray-700 dark:text-gray-300">
+            Location Link (Google Maps URL)
+          </label>
+          <input
+            type="text"
+            placeholder="https://maps.google.com/..."
+            value={newLocationLink}
+            onChange={(e) => setNewLocationLink(e.target.value)}
+            className="w-full p-3 border border-gray-300 dark:border-gray-600 rounded-lg text-[13px] dark:text-white dark:bg-gray-800 focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
+          />
+          <p className="text-[12px] text-gray-500 dark:text-gray-400 mt-1">
+            Enter a Google Maps or location URL
+          </p>
+        </div>
+
+        {/* Current Location Preview */}
+        {(updateLocationClient.document_location_link || updateLocationClient.location_link) && (
+          <div className="p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
+            <p className="text-[12px] font-medium text-gray-600 dark:text-gray-400 mb-1">
+              Current Location:
+            </p>
+            <a
+              href={updateLocationClient.document_location_link || updateLocationClient.location_link || ''}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-[12px] text-blue-600 dark:text-blue-400 hover:underline break-all"
+            >
+              {updateLocationClient.document_location_link || updateLocationClient.location_link}
+            </a>
+          </div>
+        )}
+
+        <div className="flex gap-3 pt-4">
+          <button
+            onClick={() => {
+              setShowUpdateLocationPopup(false);
+              setUpdateLocationClient(null);
+              setNewLocationLink('');
+            }}
+            className="flex-1 px-4 py-2 bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-gray-200 rounded-lg font-medium hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={handleUpdateLocation}
+            disabled={!newLocationLink}
+            className={`flex-1 px-4 py-2 rounded-lg font-medium transition-all ${
+              newLocationLink
+                ? 'bg-gradient-to-r from-emerald-600 to-green-600 hover:from-emerald-700 hover:to-green-700 text-white'
+                : 'bg-gray-300 dark:bg-gray-600 text-gray-500 dark:text-gray-400 cursor-not-allowed'
+            }`}
+          >
+            Update Location
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+)}
+
     </div>
   );
 };

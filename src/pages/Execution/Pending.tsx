@@ -469,6 +469,7 @@ const ChecklistEditModal = ({
 };
 
 
+
 const QuotationViewModal: React.FC<QuotationViewModalProps> = ({
   show,
   onClose,
@@ -479,6 +480,7 @@ const QuotationViewModal: React.FC<QuotationViewModalProps> = ({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [selectedRevision, setSelectedRevision] = useState<number>(1);
+  const [availableRevisions, setAvailableRevisions] = useState<number[]>([1]);
 
   useEffect(() => {
     if (show && master_id) {
@@ -493,7 +495,13 @@ const QuotationViewModal: React.FC<QuotationViewModalProps> = ({
       const response = await axios.get(
         `${BASE_URL}api/quotation/${master_id}/${selectedRevision}`
       );
+      console.log('API Response:', response.data); // Debug log
       setData(response.data);
+      
+      // You might need to fetch available revisions separately
+      // or the API should return them. For now, we'll just use revision 1
+      setAvailableRevisions([selectedRevision]);
+      
     } catch (err) {
       console.error('Error fetching quotation:', err);
       setError('Failed to load quotation data');
@@ -504,176 +512,195 @@ const QuotationViewModal: React.FC<QuotationViewModalProps> = ({
 
   if (!show) return null;
 
-  const quotationData = data?.quotations?.[0] || {};
+  // FIXED: Access data.quotation directly, not data.quotations[0]
+  const quotationData = data?.quotation || {};
   const leadInfo = data?.lead || lead || {};
 
   // Calculate totals
   const isGST = quotationData.type === 'with_gst';
-  const subtotal = Number(quotationData.total_price || 0);
   
-  const additionalPrices = (quotationData.additional_prices || []).filter(
-    (additional: any) => additional.add_price_name && additional.add_price_name.trim() !== ''
-  );
+  // Get revision details
+  const revisionDetails = quotationData.revision_details || {};
+  const totalWithoutGST = Number(revisionDetails.total_without_gst || 0);
+  const totalWithGST = Number(revisionDetails.total_with_gst || 0);
   
+  // Additional prices
+  const additionalPrices = quotationData.additional_prices || [];
   let additionalTotal = 0;
   additionalPrices.forEach((additional: any) => {
     additionalTotal += Number(additional.price) || 0;
   });
 
-  let gstAmount = 0;
-  let projectTotal = subtotal + additionalTotal;
-  
-  if (isGST) {
-    projectTotal = Number(quotationData.totals?.total_with_gst || 0) + additionalTotal;
-  } else {
-    gstAmount = subtotal * 0.18;
-    projectTotal = subtotal + gstAmount + additionalTotal;
-  }
+  // Calculate project total
+  let projectTotal = totalWithGST > 0 ? totalWithGST : totalWithoutGST;
+  projectTotal += additionalTotal;
 
   return (
-  <div className="fixed inset-0 z-[9999] bg-black/60 flex justify-center items-start pt-32 px-3 overflow-y-auto">
-    <div className="bg-white dark:bg-boxdark w-full max-w-3xl rounded-lg shadow-lg border border-gray-200 dark:border-gray-700 text-xs">
+    <div className="fixed inset-0 z-[9999] bg-black/60 flex justify-center items-start pt-32 px-3 overflow-y-auto">
+      <div className="bg-white dark:bg-boxdark w-full max-w-3xl rounded-lg shadow-lg border border-gray-200 dark:border-gray-700 text-xs">
 
-      {/* Header */}
-      <div className="flex justify-between items-center px-4 py-2 border-b dark:border-gray-700">
-        <div>
-          <div className="font-semibold">Quotation</div>
-          {leadInfo.name && (
-            <div className="text-xs text-gray-500">
-              {leadInfo.name} • {leadInfo.city || ''} • #{master_id}
-            </div>
-          )}
-        </div>
-
-        <div className="flex items-center gap-2">
-          {data?.quotations?.[0]?.revisions?.length > 0 && (
-            <select
-              value={selectedRevision}
-              onChange={(e) => setSelectedRevision(Number(e.target.value))}
-              className="border px-2 py-1 rounded text-xs dark:bg-gray-700"
-            >
-              {data.quotations[0].revisions.map((rev: any) => (
-                <option key={rev.revision} value={rev.revision}>
-                  V{rev.revision}
-                </option>
-              ))}
-            </select>
-          )}
-
-          <button onClick={onClose} className="text-lg px-2">×</button>
-        </div>
-      </div>
-
-      {/* Body */}
-      <div className="p-4 space-y-4">
-
-        {loading ? (
-          <div className="text-center py-6">Loading...</div>
-        ) : error ? (
-          <div className="text-center text-red-500 py-6">{error}</div>
-        ) : !quotationData.qt_number ? (
-          <div className="text-center py-6 text-gray-500">
-            No quotation found
+        {/* Header */}
+        <div className="flex justify-between items-center px-4 py-2 border-b dark:border-gray-700">
+          <div>
+            <div className="font-semibold">Quotation</div>
+            {leadInfo.name && (
+              <div className="text-xs text-gray-500">
+                {leadInfo.name} • {leadInfo.city || ''} • #{master_id}
+              </div>
+            )}
           </div>
-        ) : (
-          <>
-            {/* QT Number */}
-            <div className="flex justify-between items-center border p-2 rounded">
-              <div>
-                <div className="text-xs text-gray-500">QT No</div>
-                <div className="font-semibold">{quotationData.qt_number}</div>
-              </div>
-              <div className="text-xs font-medium">
-                {isGST ? "GST Included" : "GST Extra"}
-              </div>
+
+          <div className="flex items-center gap-2">
+            {/* Revision selector - you'll need to modify your API to return available revisions */}
+            {availableRevisions.length > 1 && (
+              <select
+                value={selectedRevision}
+                onChange={(e) => setSelectedRevision(Number(e.target.value))}
+                className="border px-2 py-1 rounded text-xs dark:bg-gray-700"
+              >
+                {availableRevisions.map((rev) => (
+                  <option key={rev} value={rev}>
+                    V{rev}
+                  </option>
+                ))}
+              </select>
+            )}
+
+            <button onClick={onClose} className="text-lg px-2">×</button>
+          </div>
+        </div>
+
+        {/* Body */}
+        <div className="p-4 space-y-4">
+
+          {loading ? (
+            <div className="text-center py-6">Loading...</div>
+          ) : error ? (
+            <div className="text-center text-red-500 py-6">{error}</div>
+          ) : !quotationData.qt_number ? (
+            <div className="text-center py-6 text-gray-500">
+              No quotation found for revision {selectedRevision}
             </div>
-
-            {/* Items */}
-            <table className="w-full text-xs border">
-              <thead className="bg-gray-100 dark:bg-gray-800">
-                <tr>
-                  <th className="px-2 py-1 text-left">Model</th>
-                  <th className="px-2 py-1 text-right">Qty</th>
-                  <th className="px-2 py-1 text-right">Rate</th>
-                  <th className="px-2 py-1 text-right">Amt</th>
-                </tr>
-              </thead>
-              <tbody>
-                {quotationData.items?.flatMap((kit: any) =>
-                  kit.items?.map((item: any, idx: number) => (
-                    <tr key={idx} className="border-t">
-                      <td className="px-2 py-1">
-                        <div className="font-medium">{item.model}</div>
-                        <div className="text-[10px] text-gray-500">{item.brand_name}</div>
-                      </td>
-                      <td className="px-2 py-1 text-right">{item.qty}</td>
-                      <td className="px-2 py-1 text-right">
-                        ₹{Number(item.price / (parseInt(item.qty) || 1)).toLocaleString('en-IN')}
-                      </td>
-                      <td className="px-2 py-1 text-right font-medium">
-                        ₹{Number(item.price).toLocaleString('en-IN')}
-                      </td>
-                    </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
-
-            {/* Summary */}
-            <div className="border rounded p-2 space-y-1 text-xs">
-              <div className="flex justify-between">
-                <span>Subtotal</span>
-                <span>₹{subtotal.toLocaleString('en-IN')}</span>
+          ) : (
+            <>
+              {/* QT Number */}
+              <div className="flex justify-between items-center border p-2 rounded">
+                <div>
+                  <div className="text-xs text-gray-500">QT No</div>
+                  <div className="font-semibold">{quotationData.qt_number}</div>
+                </div>
+                <div className="text-xs font-medium">
+                  {isGST ? "GST Included" : "GST Extra"}
+                </div>
               </div>
 
-              {additionalPrices.map((add: any, i: number) => (
-                <div key={i} className="flex justify-between">
-                  <span>{add.add_price_name}</span>
-                  <span>₹{Number(add.price).toLocaleString('en-IN')}</span>
-                </div>
-              ))}
+              {/* Items */}
+              <table className="w-full text-xs border">
+                <thead className="bg-gray-100 dark:bg-gray-800">
+                  <tr>
+                    <th className="px-2 py-1 text-left">Model</th>
+                    <th className="px-2 py-1 text-right">Qty</th>
+                    <th className="px-2 py-1 text-right">Rate</th>
+                    <th className="px-2 py-1 text-right">Amt</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {quotationData.items?.flatMap((kit: any) =>
+                    kit.items?.map((item: any, idx: number) => (
+                      <tr key={idx} className="border-t">
+                        <td className="px-2 py-1">
+                          <div className="font-medium">{item.model}</div>
+                          <div className="text-[10px] text-gray-500">{item.brand_name}</div>
+                        </td>
+                        <td className="px-2 py-1 text-right">{item.qty}</td>
+                        <td className="px-2 py-1 text-right">
+                          ₹{Number(item.price / (parseInt(item.qty) || 1)).toLocaleString('en-IN')}
+                        </td>
+                        <td className="px-2 py-1 text-right font-medium">
+                          ₹{Number(item.price).toLocaleString('en-IN')}
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
 
-              {!isGST && gstAmount > 0 && (
+              {/* Summary */}
+              <div className="border rounded p-2 space-y-1 text-xs">
                 <div className="flex justify-between">
-                  <span>GST 18%</span>
-                  <span>₹{gstAmount.toLocaleString('en-IN')}</span>
+                  <span>Subtotal</span>
+                  <span>₹{totalWithoutGST.toLocaleString('en-IN')}</span>
+                </div>
+
+                {additionalPrices.map((add: any, i: number) => (
+                  <div key={i} className="flex justify-between">
+                    <span>{add.add_price_name}</span>
+                    <span>₹{Number(add.price).toLocaleString('en-IN')}</span>
+                  </div>
+                ))}
+
+                {!isGST && revisionDetails.gst_calculated_amount > 0 && (
+                  <div className="flex justify-between">
+                    <span>GST {revisionDetails.gst_percent || 18}%</span>
+                    <span>₹{Number(revisionDetails.gst_calculated_amount).toLocaleString('en-IN')}</span>
+                  </div>
+                )}
+
+                <div className="flex justify-between font-semibold border-t pt-1 mt-1">
+                  <span>Total</span>
+                  <span>₹{projectTotal.toLocaleString('en-IN')}</span>
+                </div>
+              </div>
+
+              {/* Installments */}
+              {quotationData.installments && quotationData.installments.length > 0 && (
+                <div className="border rounded p-2 text-xs">
+                  <div className="font-medium mb-1">Payment Installments</div>
+                  <table className="w-full">
+                    <thead>
+                      <tr className="border-b">
+                        <th className="text-left py-1">Description</th>
+                        <th className="text-right py-1">Percentage</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {quotationData.installments.map((inst: any, i: number) => (
+                        <tr key={i}>
+                          <td className="py-1">{inst.description || '-'}</td>
+                          <td className="text-right py-1">{inst.percentage}%</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
                 </div>
               )}
 
-              <div className="flex justify-between font-semibold border-t pt-1 mt-1">
-                <span>Total</span>
-                <span>₹{projectTotal.toLocaleString('en-IN')}</span>
-              </div>
-            </div>
-
-            {/* Terms */}
-            {quotationData.acoustic_terms && (
-              <div className="border rounded p-2 text-xs">
-                <div className="font-medium mb-1">Terms</div>
-                <div className="text-gray-600 dark:text-gray-300">
-                  {quotationData.acoustic_terms}
+              {/* Terms */}
+              {quotationData.acoustic_terms && (
+                <div className="border rounded p-2 text-xs">
+                  <div className="font-medium mb-1">Terms</div>
+                  <div className="text-gray-600 dark:text-gray-300 whitespace-pre-line">
+                    {quotationData.acoustic_terms}
+                  </div>
                 </div>
-              </div>
-            )}
-          </>
-        )}
-      </div>
+              )}
+            </>
+          )}
+        </div>
 
-      {/* Footer */}
-      <div className="flex justify-end border-t px-4 py-2">
-        <button
-          onClick={onClose}
-          className="px-4 py-1.5 bg-indigo-600 text-white rounded text-sm"
-        >
-          Close
-        </button>
+        {/* Footer */}
+        <div className="flex justify-end border-t px-4 py-2">
+          <button
+            onClick={onClose}
+            className="px-4 py-1.5 bg-indigo-600 text-white rounded text-sm"
+          >
+            Close
+          </button>
+        </div>
       </div>
     </div>
-  </div>
-);
-
+  );
 };
-
 
 
 // Pagination Component

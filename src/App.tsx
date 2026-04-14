@@ -100,6 +100,14 @@ import PurchaseMrn from './pages/Inventory/PurchaseMrn';
 
 
 
+import ExpensePrototype from './pages/Expense/ExpensePrototype';
+import ExpenseCategoryManagement from './pages/Expense/ExpenseCategoryManagement';
+import WalletManagement from './pages/Wallet/WalletManagement';
+import WalletTransactions from './pages/Wallet/WalletTransactions';
+
+
+
+
 function App() {
   const [loading, setLoading] = useState<boolean>(true);
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(false);
@@ -1000,6 +1008,56 @@ path="/schedule/settings/:id"
             />
 
 
+            <Route
+              path="/expense/prototype"
+              element={
+                <ProtectedRoute menuKey="expense.entry">
+                  <DefaultLayout userRole={userRole}>
+                    <PageTitle title="Expense Prototype" />
+                    <ExpensePrototype />
+                  </DefaultLayout>
+                </ProtectedRoute>
+              }
+            />
+
+            <Route
+              path="/expense/categories"
+              element={
+                <ProtectedRoute menuKey="expense.categories">
+                  <DefaultLayout userRole={userRole}>
+                    <PageTitle title="Expense Categories" />
+                    <ExpenseCategoryManagement />
+                  </DefaultLayout>
+                </ProtectedRoute>
+              }
+            />
+
+                {/* WALLET ROUTES */}
+                <Route
+                  path="/wallet/transactions"
+                  element={
+                    <ProtectedRoute menuKey="wallet_my_transactions">
+                      <DefaultLayout userRole={userRole}>
+                        <PageTitle title="My Wallet Transactions" />
+                        <WalletTransactions />
+                      </DefaultLayout>
+                    </ProtectedRoute>
+                  }
+                />
+                {(userRole === 'admin' || userRole === 'hr' || userRole === 'accountant') && (
+                  <Route
+                    path="/wallet/management"
+                    element={
+                      <ProtectedRoute menuKey="wallet_management">
+                        <DefaultLayout userRole={userRole}>
+                          <PageTitle title="Wallet Management" />
+                          <WalletManagement />
+                        </DefaultLayout>
+                      </ProtectedRoute>
+                    }
+                  />
+                )}
+                
 
           </>
         ) : (

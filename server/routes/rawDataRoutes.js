@@ -23,7 +23,7 @@ getEmployeeLeadList ,getEmployeeDetailedReport  ,getQuotationClosedLeads ,
     getFavorites, 
     checkFavorite,
     getFavoritesBatch ,
-
+  updateLocationLink ,
 
 } from '../controllers/rawDataController.js';
 import uploadMiddleware from '../middleware/upload.js';
@@ -47,6 +47,8 @@ router.post('/master-data/delete-multiple', deleteMultipleClients);
 router.post('/sujit-master-data/add-single', addSingleRawData);
 
 router.post('/upload/:master_id', uploadMiddleware, uploadDocuments); 
+router.put('/update-location/:master_id', updateLocationLink);
+
 // routes/documents.js (or your existing routes file)
 
 router.delete('/document/:doc_id', deleteDocument);

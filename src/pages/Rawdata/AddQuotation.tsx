@@ -22,9 +22,9 @@ const AddQuotation = () => {
   const leadCity = state?.city || state?.address || 'N/A';
   const leadAddress = state?.address || '';
 
-  const [installments, setInstallments] = useState([
-    { description: 'Full Payment', percentage: 100, amount: 0 },
-  ]);
+const [installments, setInstallments] = useState([]); // Start with empty array
+const [showInstallments, setShowInstallments] = useState(false); // New state to control visibility 
+
 
   /* ---------------- STATES ---------------- */
   const [quotationName, setQuotationName] = useState('');
@@ -61,11 +61,10 @@ const AddQuotation = () => {
   ]);
 
  
-  const updateInstallment = (index, field, value) => {
+const updateInstallment = (index, field, value) => {
   const updated = [...installments];
   const total = Number(totalWithGST || 0);
 
-  // ALLOW EMPTY INPUT (important)
   if (value === '') {
     updated[index][field] = '';
     setInstallments(updated);
@@ -88,7 +87,6 @@ const AddQuotation = () => {
     updated[index].description = value;
   }
 
-  // VALIDATION - only alert, don't revert
   const totalPercent = updated.reduce(
     (sum, i) => sum + Number(i.percentage || 0),
     0,
@@ -96,12 +94,12 @@ const AddQuotation = () => {
 
   if (totalPercent > 100) {
     alert('Total percentage cannot exceed 100%');
-    // Don't return, allow the value but show warning
   }
 
   setInstallments(updated);
 };
 
+// Update addInstallment function
 const addInstallment = () => {
   const totalPercent = installments.reduce(
     (sum, i) => sum + Number(i.percentage || 0),
@@ -119,25 +117,37 @@ const addInstallment = () => {
   ]);
 };
 
+// Update removeInstallment function
 const removeInstallment = (index) => {
   const updated = installments.filter((_, i) => i !== index);
   setInstallments(updated);
 };
 
-// MODIFIED: Add this new function to validate before submit
+// Add function to initialize default installment
+const initializeDefaultInstallment = () => {
+  setShowInstallments(true);
+  setInstallments([
+    { description: 'Full Payment', percentage: 100, amount: Number(totalWithGST || 0) },
+  ]);
+};
+
+// Update validateInstallments - now only validates if installments exist
 const validateInstallments = () => {
+  // If no installments, it's valid (optional)
+  if (installments.length === 0) {
+    return true;
+  }
+  
   const totalPercentage = installments.reduce(
     (sum, installment) => sum + Number(installment.percentage || 0),
     0
   );
   
-  // Check if total percentage is exactly 100%
-  if (Math.abs(totalPercentage - 100) > 0.01) { // Using small epsilon for floating point comparison
+  if (Math.abs(totalPercentage - 100) > 0.01) {
     alert(`Payment installment total must be 100%. Current total: ${totalPercentage.toFixed(2)}%`);
     return false;
   }
   
-  // Check if any installment has empty description
   const hasEmptyDescription = installments.some(
     installment => !installment.description || installment.description.trim() === ''
   );
@@ -147,7 +157,6 @@ const validateInstallments = () => {
     return false;
   }
   
-  // Check if any installment has zero percentage (unless it's the only one)
   const hasZeroPercentage = installments.some(
     installment => Number(installment.percentage || 0) === 0
   );
@@ -319,10 +328,10 @@ const handleSubmit = async (e) => {
     return;
   }
 
-  // ADD THIS VALIDATION BEFORE SUBMITTING
   if (!validateInstallments()) {
-    return; // Stop submission if validation fails
+    return;
   }
+
 
   // Check if ACOUSTIC category exists
   const isAcoustic = queuedCategories.some(
@@ -348,7 +357,7 @@ const handleSubmit = async (e) => {
     type: quoteType,
     master_id,
     acoustic_terms: acousticTerms,
-    installments: installments,
+    installments: installments, // This will be empty array if no installments added
     gst_app_amt: quoteType === 'with_gst' ? Number(gstBaseAmount || 0) : 0,
 
     items: queuedCategories.map((item) => ({
@@ -383,20 +392,17 @@ const handleSubmit = async (e) => {
 };
 
 
+useEffect(() => {
+  if (installments.length > 0 && totalWithGST > 0) {
+    const updatedInstallments = installments.map(inst => ({
+      ...inst,
+      amount: (totalWithGST * (inst.percentage / 100))
+    }));
+    setInstallments(updatedInstallments);
+  }
+}, [totalWithGST]);
 
-  useEffect(() => {
-    if (installments.length === 1 && installments[0].percentage === 100) {
-      setInstallments([
-        {
-          description: 'Full Payment',
-          percentage: 100,
-          amount: Number(totalWithGST || 0),
-        },
-      ]);
-    }
-  }, [totalWithGST]);
-
-  const toggleExpand = (index) => {
+const toggleExpand = (index) => {
     setExpandedIndex(expandedIndex === index ? null : index);
   };
 
@@ -998,89 +1004,114 @@ const handleSubmit = async (e) => {
             TOTAL AMOUNT: ₹{Number(totalWithGST || 0).toFixed(2)}
           </div>
 
-          {/* INSTALLMENTS SECTION */}
-          <div className="bg-yellow-50 p-4 rounded mt-4">
-            <h4 className="font-semibold mb-3">Payment Installments</h4>
+        {/* INSTALLMENTS SECTION - OPTIONAL */}
+<div className="bg-yellow-50 p-4 rounded mt-4">
+  <div className="flex justify-between items-center mb-3">
+    <h4 className="font-semibold">Payment Installments (Optional)</h4>
+    {!showInstallments && (
+      <button
+        type="button"
+        onClick={initializeDefaultInstallment}
+        className="bg-blue-600 text-white px-4 py-2 rounded text-sm hover:bg-blue-700"
+      >
+        + Add Installment Details
+      </button>
+    )}
+  </div>
 
-            {/* HEADER */}
-            <div className="grid grid-cols-[2fr_1fr_1fr_auto] gap-2 mb-2 font-semibold text-gray-700">
-              <div>Description</div>
-              <div>Percent%</div>
-              <div>Amount (₹)</div>
-              <div></div>
-            </div>
+  {showInstallments && (
+    <>
+      {/* HEADER */}
+      <div className="grid grid-cols-[2fr_1fr_1fr_auto] gap-2 mb-2 font-semibold text-gray-700">
+        <div>Description</div>
+        <div>Percent%</div>
+        <div>Amount (₹)</div>
+        <div></div>
+      </div>
 
-            {installments.map((row, idx) => (
-              <div
-                key={idx}
-                className="grid grid-cols-[2fr_1fr_1fr_auto] gap-2 mb-2 items-center"
+      {installments.map((row, idx) => (
+        <div
+          key={idx}
+          className="grid grid-cols-[2fr_1fr_1fr_auto] gap-2 mb-2 items-center"
+        >
+          <input
+            className="border px-2 py-1 rounded"
+            placeholder="Advance / Final"
+            value={row.description}
+            onChange={(e) =>
+              updateInstallment(idx, 'description', e.target.value)
+            }
+          />
+
+          <input
+            type="number"
+            className="border px-2 py-1 rounded"
+            placeholder="%"
+            value={row.percentage === 0 ? '' : row.percentage}
+            onChange={(e) =>
+              updateInstallment(idx, 'percentage', e.target.value)
+            }
+          />
+
+          <input
+            type="number"
+            className="border px-2 py-1 rounded"
+            placeholder="₹"
+            value={row.amount === 0 ? '' : row.amount}
+            onChange={(e) =>
+              updateInstallment(idx, 'amount', e.target.value)
+            }
+          />
+
+          <div className="flex gap-1">
+            {idx === installments.length - 1 && (
+              <button
+                type="button"
+                onClick={addInstallment}
+                className="bg-green-500 text-white px-2 rounded"
               >
-                {/* DESCRIPTION */}
-                <input
-                  className="border px-2 py-1 rounded"
-                  placeholder="Advance / Final"
-                  value={row.description}
-                  onChange={(e) =>
-                    updateInstallment(idx, 'description', e.target.value)
-                  }
-                />
+                +
+              </button>
+            )}
 
-                {/* % */}
-                <input
-                  type="number"
-                  className="border px-2 py-1 rounded"
-                  placeholder="%"
-                  value={row.percentage === 0 ? '' : row.percentage}
-                  onChange={(e) =>
-                    updateInstallment(idx, 'percentage', e.target.value)
-                  }
-                />
-
-                {/* AMOUNT */}
-                <input
-                  type="number"
-                  className="border px-2 py-1 rounded"
-                  placeholder="₹"
-                  value={row.amount === 0 ? '' : row.amount}
-                  onChange={(e) =>
-                    updateInstallment(idx, 'amount', e.target.value)
-                  }
-                />
-
-                {/* ACTIONS */}
-                <div className="flex gap-1">
-                  {idx === installments.length - 1 && (
-                    <button
-                      type="button"
-                      onClick={addInstallment}
-                      className="bg-green-500 text-white px-2 rounded"
-                    >
-                      +
-                    </button>
-                  )}
-
-                  {installments.length > 1 && (
-                    <button
-                      type="button"
-                      onClick={() => removeInstallment(idx)}
-                      className="bg-red-500 text-white px-2 rounded"
-                    >
-                      ✕
-                    </button>
-                  )}
-                </div>
-              </div>
-            ))}
-
-            {/* TOTAL */}
-            <div className="text-right text-sm text-gray-600 mt-2">
-              Total:{' '}
-              {installments
-                .reduce((sum, i) => sum + Number(i.percentage || 0), 0)
-                .toFixed(2)}
-              %
-            </div>
+            {installments.length > 1 && (
+              <button
+                type="button"
+                onClick={() => removeInstallment(idx)}
+                className="bg-red-500 text-white px-2 rounded"
+              >
+                ✕
+              </button>
+            )}
           </div>
+        </div>
+      ))}
+
+      {/* TOTAL */}
+      <div className="text-right text-sm text-gray-600 mt-2">
+        Total:{' '}
+        {installments
+          .reduce((sum, i) => sum + Number(i.percentage || 0), 0)
+          .toFixed(2)}
+        %
+      </div>
+
+      {/* Remove Installments Button */}
+      <div className="text-right mt-3">
+        <button
+          type="button"
+          onClick={() => {
+            setShowInstallments(false);
+            setInstallments([]);
+          }}
+          className="text-red-500 text-sm hover:text-red-700"
+        >
+          Remove All Installments
+        </button>
+      </div>
+    </>
+  )}
+</div>
 
           {/* ACTIONS */}
           <div className="flex justify-end gap-3 border-t pt-4">

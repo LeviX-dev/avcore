@@ -13,11 +13,9 @@ const EditQuotation = () => {
 
   const revision = location.state?.revision;
 
-  const [installments, setInstallments] = useState([
-  { description: 'Full Payment', percentage: 100, amount: 0 },
-]);
-
-const [isEditLoaded, setIsEditLoaded] = useState(false);
+  const [installments, setInstallments] = useState([]);
+  const [showInstallments, setShowInstallments] = useState(false);
+  const [isEditLoaded, setIsEditLoaded] = useState(false);
 
   /* ================= STATE ================= */
   const [qtNumber, setQtNumber] = useState('');
@@ -57,6 +55,99 @@ const [isEditLoaded, setIsEditLoaded] = useState(false);
   const [fabricBy, setFabricBy] = useState('THE CLIENT');
   const [ceilingBy, setCeilingBy] = useState('THE CLIENT');
 
+  /* ================= TOTAL CALCULATION ================= */
+  // MOVE THIS BEFORE ANY FUNCTION THAT USES IT
+  const totalQuotationPrice =
+    queuedCategories.reduce((sum, c) => sum + c.category_total, 0) +
+    additionalPrices.reduce((sum, a) => sum + Number(a.price || 0), 0);
+  
+  const totalWithGST =
+    quoteType === 'with_gst' ? totalQuotationPrice * 1.18 : totalQuotationPrice;
+
+  /* ================= INSTALLMENT HANDLERS ================= */
+  const initializeDefaultInstallment = () => {
+    setShowInstallments(true);
+    setInstallments([
+      { description: 'Full Payment', percentage: 100, amount: Number(totalWithGST || 0) },
+    ]);
+  };
+
+  const updateInstallment = (index, field, value) => {
+    const updated = [...installments];
+    const total = Number(totalWithGST || 0);
+
+    if (value === '') {
+      updated[index][field] = '';
+      setInstallments(updated);
+      return;
+    }
+
+    if (field === 'percentage') {
+      const percent = Number(value);
+      updated[index].percentage = percent;
+      updated[index].amount = (total * percent) / 100;
+    }
+
+    if (field === 'amount') {
+      const amt = Number(value);
+      updated[index].amount = amt;
+      updated[index].percentage = total ? (amt / total) * 100 : 0;
+    }
+
+    if (field === 'description') {
+      updated[index].description = value;
+    }
+
+    const totalPercent = updated.reduce(
+      (sum, i) => sum + Number(i.percentage || 0),
+      0
+    );
+
+    if (totalPercent > 100) {
+      alert('Total percentage cannot exceed 100%');
+      return;
+    }
+
+    setInstallments(updated);
+  };
+
+  const addInstallment = () => {
+    const totalPercent = installments.reduce(
+      (sum, i) => sum + Number(i.percentage || 0),
+      0
+    );
+
+    if (totalPercent >= 100) {
+      alert('Already reached 100%');
+      return;
+    }
+
+    setInstallments([
+      ...installments,
+      { description: '', percentage: 0, amount: 0 },
+    ]);
+  };
+
+  const removeInstallment = (index) => {
+    setInstallments(installments.filter((_, i) => i !== index));
+  };
+
+  const removeAllInstallments = () => {
+    setShowInstallments(false);
+    setInstallments([]);
+  };
+
+  // Update installment amounts when total changes (only if installments exist)
+  useEffect(() => {
+    if (installments.length > 0 && totalWithGST > 0 && isEditLoaded) {
+      const updatedInstallments = installments.map(inst => ({
+        ...inst,
+        amount: (totalWithGST * (inst.percentage / 100))
+      }));
+      setInstallments(updatedInstallments);
+    }
+  }, [totalWithGST, isEditLoaded]);
+
   /* ================= FETCH EXISTING QUOTATION ================= */
   useEffect(() => {
     fetchQuotationForEdit();
@@ -75,17 +166,22 @@ const [isEditLoaded, setIsEditLoaded] = useState(false);
         return;
       }
 
-        if (q.installments?.length) {
-  setInstallments(
-    q.installments.map((i) => ({
-      description: i.description || '',
-      percentage: Number(i.percentage || 0),
-      amount: Number(i.amount || 0),
-    }))
-  );
-  setIsEditLoaded(true); // ✅ IMPORTANT
-}
-
+      // Check if installments exist in the database
+      if (q.installments && q.installments.length > 0) {
+        setInstallments(
+          q.installments.map((i) => ({
+            description: i.description || '',
+            percentage: Number(i.percentage || 0),
+            amount: Number(i.amount || 0),
+          }))
+        );
+        setShowInstallments(true);
+      } else {
+        setInstallments([]);
+        setShowInstallments(false);
+      }
+      
+      setIsEditLoaded(true);
 
       setQtNumber(q.qt_number || '');
       setQuoteType(q.type || '');
@@ -143,7 +239,6 @@ const [isEditLoaded, setIsEditLoaded] = useState(false);
       console.error('Failed to load quotation for edit', error);
     }
   };
-
 
   const fetchCategories = async () => {
     try {
@@ -205,6 +300,28 @@ const [isEditLoaded, setIsEditLoaded] = useState(false);
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
+    // Validate installments only if they exist
+    if (showInstallments && installments.length > 0) {
+      const totalPercentage = installments.reduce(
+        (sum, inst) => sum + Number(inst.percentage || 0),
+        0
+      );
+      
+      if (Math.abs(totalPercentage - 100) > 0.01) {
+        alert(`Payment installment total must be 100%. Current total: ${totalPercentage.toFixed(2)}%`);
+        return;
+      }
+      
+      const hasEmptyDescription = installments.some(
+        inst => !inst.description || inst.description.trim() === ''
+      );
+      
+      if (hasEmptyDescription) {
+        alert('Please enter description for all payment installments');
+        return;
+      }
+    }
+
     const isAcoustic = queuedCategories.some(
       (q) => q.cat_name?.toLowerCase() === 'customised acoustic quotation',
     );
@@ -223,7 +340,7 @@ const [isEditLoaded, setIsEditLoaded] = useState(false);
       gst_app_amt: quoteType === 'with_gst' ? gstBaseAmount : 0,
       gst_percent: 18,
       acoustic_terms: finalAcousticTerms,
-        installments: installments, // ✅ ADD THIS
+      installments: showInstallments ? installments : [],
     };
 
     try {
@@ -234,13 +351,6 @@ const [isEditLoaded, setIsEditLoaded] = useState(false);
       console.error('Update failed', error);
     }
   };
-
-  /* ================= TOTAL ================= */
-  const totalQuotationPrice =
-    queuedCategories.reduce((sum, c) => sum + c.category_total, 0) +
-    additionalPrices.reduce((sum, a) => sum + Number(a.price || 0), 0);
-  const totalWithGST =
-    quoteType === 'with_gst' ? totalQuotationPrice * 1.18 : totalQuotationPrice;
 
   /* ================= KIT LOGIC ================= */
   useEffect(() => {
@@ -272,83 +382,6 @@ const [isEditLoaded, setIsEditLoaded] = useState(false);
       setSelectedKitData({ ...kit, items: mappedItems });
     }
   }, [selectedKit, kits]);
-
-
-  useEffect(() => {
-  // ❌ DO NOT override DB data
-  if (isEditLoaded) return;
-
-  if (installments.length === 1 && installments[0].percentage === 100) {
-    setInstallments([
-      {
-        description: 'Full Payment',
-        percentage: 100,
-        amount: Number(totalWithGST || 0),
-      },
-    ]);
-  }
-}, [totalWithGST, isEditLoaded]);
-
-
-const updateInstallment = (index, field, value) => {
-  const updated = [...installments];
-  const total = Number(totalWithGST || 0);
-
-  if (value === '') {
-    updated[index][field] = '';
-    setInstallments(updated);
-    return;
-  }
-
-  if (field === 'percentage') {
-    const percent = Number(value);
-    updated[index].percentage = percent;
-    updated[index].amount = (total * percent) / 100;
-  }
-
-  if (field === 'amount') {
-    const amt = Number(value);
-    updated[index].amount = amt;
-    updated[index].percentage = total ? (amt / total) * 100 : 0;
-  }
-
-  if (field === 'description') {
-    updated[index].description = value;
-  }
-
-  const totalPercent = updated.reduce(
-    (sum, i) => sum + Number(i.percentage || 0),
-    0
-  );
-
-  if (totalPercent > 100) {
-    alert('Total percentage cannot exceed 100%');
-    return;
-  }
-
-  setInstallments(updated);
-};
-
-const addInstallment = () => {
-  const totalPercent = installments.reduce(
-    (sum, i) => sum + Number(i.percentage || 0),
-    0
-  );
-
-  if (totalPercent >= 100) {
-    alert('Already reached 100%');
-    return;
-  }
-
-  setInstallments([
-    ...installments,
-    { description: '', percentage: 0, amount: 0 },
-  ]);
-};
-
-const removeInstallment = (index) => {
-  setInstallments(installments.filter((_, i) => i !== index));
-};
 
   const handleAddKitToQuotation = () => {
     if (!selectedCategory || !selectedKitData) {
@@ -496,53 +529,42 @@ const removeInstallment = (index) => {
           </button>
         </div>
 
-      {/* HEADER SECTION */}
-<div className="flex justify-between items-start mb-6 border-b pb-4">
-  {/* LEFT SIDE */}
-  <div className="flex flex-col text-left leading-tight">
-    <h1 className="text-4xl font-bold text-[#7d20a0] underline decoration-[#7d20a0] decoration-4 underline-offset-4 mb-2">
-      AV CORE
-    </h1>
+        {/* HEADER SECTION */}
+        <div className="flex justify-between items-start mb-6 border-b pb-4">
+          <div className="flex flex-col text-left leading-tight">
+            <h1 className="text-4xl font-bold text-[#7d20a0] underline decoration-[#7d20a0] decoration-4 underline-offset-4 mb-2">
+              AV CORE
+            </h1>
+            <p className="font-bold text-[13px] text-black uppercase mb-1">
+              ALL ABOUT AUDIO VIDEO
+            </p>
+            <p className="text-[12px] font-bold text-black uppercase">
+              1ST FLOOR GAYATRI BUILDING, BESIDE JUPITER HOSPITAL, BANER 411045,
+              PUNE.
+            </p>
+            <p className="text-[16px] font-bold text-black">
+              Email: <span className="text-blue-600">avcoreindia@gmail.com</span>
+            </p>
+            <p className="text-[16px] font-bold text-black">
+              Website: <span className="text-blue-600">www.avcore.in</span>
+            </p>
+            <p className="text-[12px] font-bold text-black uppercase">
+              CO.NO: 8329728210 / 8766786026
+            </p>
+          </div>
 
-    <p className="font-bold text-[13px] text-black uppercase mb-1">
-      ALL ABOUT AUDIO VIDEO
-    </p>
-
-    <p className="text-[12px] font-bold text-black uppercase">
-      1ST FLOOR GAYATRI BUILDING, BESIDE JUPITER HOSPITAL, BANER 411045,
-      PUNE.
-    </p>
-
-    <p className="text-[16px] font-bold text-black">
-      Email: <span className="text-blue-600">avcoreindia@gmail.com</span>
-    </p>
-
-    <p className="text-[16px] font-bold text-black">
-      Website: <span className="text-blue-600">www.avcore.in</span>
-    </p>
-
-    <p className="text-[12px] font-bold text-black uppercase">
-      CO.NO: 8329728210 / 8766786026
-    </p>
-  </div>
-
-  {/* RIGHT SIDE LOGO */}
-  <div className="bg-black p-1">
-    <img
-      src={logo}
-      className="w-28 h-auto border border-black"
-      alt="Logo"
-    />
-  </div>
-</div>
-
-
-
+          <div className="bg-black p-1">
+            <img
+              src={logo}
+              className="w-28 h-auto border border-black"
+              alt="Logo"
+            />
+          </div>
+        </div>
 
         <form onSubmit={handleSubmit} autoComplete="off" className="space-y-6 mt-6">
           {/* Quotation Type + Actions */}
           <div className="grid grid-cols-1 md:grid-cols-[1fr_1fr_auto_auto] gap-4 items-end">
-            {/* Quotation Type */}
             <div>
               <label className="font-medium block mb-1">Quotation Type</label>
               <select
@@ -556,7 +578,6 @@ const removeInstallment = (index) => {
               </select>
             </div>
 
-            {/* GST Applicable Amount */}
             <div>
               <label className="font-medium block mb-1">
                 GST Applicable Amount
@@ -571,7 +592,6 @@ const removeInstallment = (index) => {
               />
             </div>
 
-            {/* Add Kit Button */}
             <button
               type="button"
               className="bg-blue-600 text-white px-4 py-2 rounded h-[42px]"
@@ -580,7 +600,6 @@ const removeInstallment = (index) => {
               + Add Kit
             </button>
 
-            {/* Add Product Button */}
             <button
               type="button"
               className="bg-green-600 text-white px-4 py-2 rounded h-[42px]"
@@ -595,7 +614,6 @@ const removeInstallment = (index) => {
             <div className="border rounded bg-gray-50 p-4 space-y-4">
               <h4 className="font-semibold">Add New Kit</h4>
 
-              {/* Category Selection */}
               <div>
                 <label className="block mb-1 font-medium">Subject</label>
                 <select
@@ -612,13 +630,11 @@ const removeInstallment = (index) => {
                 </select>
               </div>
 
-              {/* ACOUSTIC SPECIAL TERMS - ONLY FOR "Customised Acoustic Quotation" */}
               {selectedCategory && getCategoryName(selectedCategory) === 'Customised Acoustic Quotation' && (
                 <div className="border rounded bg-gray-50 p-4 space-y-3 mb-4">
                   <h2 className="font-semibold text-blue-600">
                     Acoustic Special Terms
                   </h2>
-
                   <div>
                     <label className="text-base font-semibold text-gray-500">
                       All Framing Will Be Done By
@@ -632,7 +648,6 @@ const removeInstallment = (index) => {
                       <option value="THE CLIENT">BY THE CLIENT</option>
                     </select>
                   </div>
-
                   <div>
                     <label className="text-base font-semibold text-gray-500">
                       Fabric & Floor Carpet Provided By
@@ -646,7 +661,6 @@ const removeInstallment = (index) => {
                       <option value="THE CLIENT">BY THE CLIENT</option>
                     </select>
                   </div>
-
                   <div>
                     <label className="text-base font-semibold text-gray-500">
                       Ceiling Related Work Provided By
@@ -660,12 +674,9 @@ const removeInstallment = (index) => {
                       <option value="THE CLIENT">BY THE CLIENT</option>
                     </select>
                   </div>
-
-              
                 </div>
               )}
 
-              {/* Kit Selection */}
               {selectedCategory && (
                 <div>
                   <label className="block mb-1 font-medium">Kit</label>
@@ -685,7 +696,6 @@ const removeInstallment = (index) => {
                 </div>
               )}
 
-              {/* Kit Quantity */}
               {selectedKit && (
                 <div>
                   <label className="block mb-1 font-medium">Kit Quantity</label>
@@ -700,7 +710,6 @@ const removeInstallment = (index) => {
                 </div>
               )}
 
-              {/* Selected Kit Details */}
               {selectedKitData && (
                 <div className="bg-yellow-50 p-4 rounded">
                   <h4 className="font-semibold mb-2">Kit Items</h4>
@@ -729,7 +738,6 @@ const removeInstallment = (index) => {
                 </div>
               )}
 
-              {/* Action Buttons */}
               <div className="flex justify-end gap-3">
                 <button
                   type="button"
@@ -760,7 +768,6 @@ const removeInstallment = (index) => {
             ) : (
               queuedCategories.map((cat, cIdx) => (
                 <div key={cIdx} className="bg-white border rounded p-3 mb-3">
-                  {/* Category Header */}
                   <div
                     className="flex justify-between items-center mb-2 cursor-pointer"
                     onClick={() => toggleExpand(cIdx)}
@@ -778,7 +785,6 @@ const removeInstallment = (index) => {
                     </span>
                   </div>
 
-                  {/* Expanded Products */}
                   {expandedIndex === cIdx && (
                     <div className="mt-3 border-t pt-3 space-y-3">
                       {cat.products.map((p, pIdx) => (
@@ -820,7 +826,6 @@ const removeInstallment = (index) => {
                     </div>
                   )}
 
-                  {/* Remove Button */}
                   <div className="mt-2 text-right">
                     <button
                       type="button"
@@ -892,7 +897,6 @@ const removeInstallment = (index) => {
                   Add Single Product
                 </h3>
 
-                {/* Category */}
                 <div className="mb-3">
                   <label className="block mb-1 font-medium">Subject</label>
                   <select
@@ -916,13 +920,11 @@ const removeInstallment = (index) => {
                   </select>
                 </div>
 
-                {/* ACOUSTIC SPECIAL TERMS - ONLY FOR "Customised Acoustic Quotation" */}
                 {spCategory && getCategoryName(spCategory) === 'Customised Acoustic Quotation' && (
                   <div className="border rounded bg-gray-50 p-4 space-y-3 mb-4">
                     <h2 className="font-semibold text-blue-600">
                       Acoustic Special Terms
                     </h2>
-
                     <div>
                       <label className="text-base font-semibold text-gray-500">
                         All Framing Will Be Done By
@@ -936,7 +938,6 @@ const removeInstallment = (index) => {
                         <option value="THE CLIENT">BY THE CLIENT</option>
                       </select>
                     </div>
-
                     <div>
                       <label className="text-base font-semibold text-gray-500">
                         Fabric & Floor Carpet Provided By
@@ -950,7 +951,6 @@ const removeInstallment = (index) => {
                         <option value="THE CLIENT">BY THE CLIENT</option>
                       </select>
                     </div>
-
                     <div>
                       <label className="text-base font-semibold text-gray-500">
                         Ceiling Related Work Provided By
@@ -964,12 +964,9 @@ const removeInstallment = (index) => {
                         <option value="THE CLIENT">BY THE CLIENT</option>
                       </select>
                     </div>
-
-                   
                   </div>
                 )}
 
-                {/* Product Type */}
                 <div className="mb-3">
                   <label className="block mb-1 font-medium">Product Type</label>
                   <select
@@ -990,7 +987,6 @@ const removeInstallment = (index) => {
                   </select>
                 </div>
 
-                {/* Brand */}
                 <div className="mb-3">
                   <label className="block mb-1 font-medium">Brand</label>
                   <select
@@ -1008,7 +1004,6 @@ const removeInstallment = (index) => {
                   </select>
                 </div>
 
-                {/* Model */}
                 <div className="mb-3">
                   <label className="block mb-1 font-medium">Model</label>
                   <select
@@ -1026,7 +1021,6 @@ const removeInstallment = (index) => {
                   </select>
                 </div>
 
-                {/* Qty & Price */}
                 {selectedSingleModel && (
                   <div className="grid grid-cols-2 gap-4 mb-3">
                     <div className="flex flex-col">
@@ -1053,7 +1047,6 @@ const removeInstallment = (index) => {
                   </div>
                 )}
 
-                {/* Description */}
                 {selectedSingleModel?.description && (
                   <div className="mb-3 text-sm text-gray-600 whitespace-pre-line border p-2 rounded bg-gray-50">
                     <span className="font-medium">Description:</span>{' '}
@@ -1061,7 +1054,6 @@ const removeInstallment = (index) => {
                   </div>
                 )}
 
-                {/* Buttons */}
                 <div className="flex justify-end gap-2">
                   <button
                     onClick={() => setOpenSingleProductPopup(false)}
@@ -1084,86 +1076,110 @@ const removeInstallment = (index) => {
           {/* Total */}
           <div className="text-right bg-green-100 p-3 rounded font-semibold text-lg">
             TOTAL: ₹{totalWithGST.toFixed(2)}
-          </div> 
+          </div>
 
-          {/* INSTALLMENTS */}
-<div className="bg-yellow-50 p-4 rounded mt-4">
-  <h4 className="font-semibold mb-3">Payment Installments</h4>
+          {/* INSTALLMENTS SECTION - OPTIONAL */}
+          <div className="bg-yellow-50 p-4 rounded mt-4">
+            <div className="flex justify-between items-center mb-3">
+              <h4 className="font-semibold">Payment Installments (Optional)</h4>
+              {!showInstallments && (
+                <button
+                  type="button"
+                  onClick={initializeDefaultInstallment}
+                  className="bg-blue-600 text-white px-4 py-2 rounded text-sm hover:bg-blue-700"
+                >
+                  + Add Installment Details
+                </button>
+              )}
+            </div>
 
-  {/* HEADER */}
-  <div className="grid grid-cols-[2fr_1fr_1fr_auto] gap-2 mb-2 font-semibold text-gray-700">
-    <div>Description</div>
-    <div>Percent %</div>
-    <div>Amount (₹)</div>
-    <div></div>
-  </div>
+            {showInstallments && (
+              <>
+                <div className="grid grid-cols-[2fr_1fr_1fr_auto] gap-2 mb-2 font-semibold text-gray-700">
+                  <div>Description</div>
+                  <div>Percent %</div>
+                  <div>Amount (₹)</div>
+                  <div></div>
+                </div>
 
-  {installments.map((row, idx) => (
-    <div
-      key={idx}
-      className="grid grid-cols-[2fr_1fr_1fr_auto] gap-2 mb-2 items-center"
-    >
-      <input
-        className="border px-2 py-1 rounded"
-        placeholder="Advance / Final"
-        value={row.description}
-        onChange={(e) =>
-          updateInstallment(idx, 'description', e.target.value)
-        }
-      />
+                {installments.map((row, idx) => (
+                  <div
+                    key={idx}
+                    className="grid grid-cols-[2fr_1fr_1fr_auto] gap-2 mb-2 items-center"
+                  >
+                    <input
+                      className="border px-2 py-1 rounded"
+                      placeholder="Advance / Final"
+                      value={row.description}
+                      onChange={(e) =>
+                        updateInstallment(idx, 'description', e.target.value)
+                      }
+                    />
 
-      <input
-        type="number"
-        className="border px-2 py-1 rounded"
-        placeholder="%"
-        value={row.percentage === 0 ? '' : row.percentage}
-        onChange={(e) =>
-          updateInstallment(idx, 'percentage', e.target.value)
-        }
-      />
+                    <input
+                      type="number"
+                      className="border px-2 py-1 rounded"
+                      placeholder="%"
+                      value={row.percentage === 0 ? '' : row.percentage}
+                      onChange={(e) =>
+                        updateInstallment(idx, 'percentage', e.target.value)
+                      }
+                    />
 
-      <input
-        type="number"
-        className="border px-2 py-1 rounded"
-        placeholder="₹"
-        value={row.amount === 0 ? '' : row.amount}
-        onChange={(e) =>
-          updateInstallment(idx, 'amount', e.target.value)
-        }
-      />
+                    <input
+                      type="number"
+                      className="border px-2 py-1 rounded"
+                      placeholder="₹"
+                      value={row.amount === 0 ? '' : row.amount}
+                      onChange={(e) =>
+                        updateInstallment(idx, 'amount', e.target.value)
+                      }
+                    />
 
-      <div className="flex gap-1">
-        {idx === installments.length - 1 && (
-          <button
-            type="button"
-            onClick={addInstallment}
-            className="bg-green-500 text-white px-2 rounded"
-          >
-            +
-          </button>
-        )}
+                    <div className="flex gap-1">
+                      {idx === installments.length - 1 && (
+                        <button
+                          type="button"
+                          onClick={addInstallment}
+                          className="bg-green-500 text-white px-2 rounded"
+                        >
+                          +
+                        </button>
+                      )}
 
-        {installments.length > 1 && (
-          <button
-            type="button"
-            onClick={() => removeInstallment(idx)}
-            className="bg-red-500 text-white px-2 rounded"
-          >
-            ✕
-          </button>
-        )}
-      </div>
-    </div>
-  ))}
+                      {installments.length > 1 && (
+                        <button
+                          type="button"
+                          onClick={() => removeInstallment(idx)}
+                          className="bg-red-500 text-white px-2 rounded"
+                        >
+                          ✕
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                ))}
 
-  <div className="text-right text-sm text-gray-600 mt-2">
-    Total:{" "}
-    {installments.reduce(
-      (sum, i) => sum + Number(i.percentage || 0),
-      0
-    ).toFixed(2)}%
-  </div>
-</div>
+                <div className="text-right text-sm text-gray-600 mt-2">
+                  Total:{" "}
+                  {installments.reduce(
+                    (sum, i) => sum + Number(i.percentage || 0),
+                    0
+                  ).toFixed(2)}%
+                </div>
+
+                <div className="text-right mt-3">
+                  <button
+                    type="button"
+                    onClick={removeAllInstallments}
+                    className="text-red-500 text-sm hover:text-red-700"
+                  >
+                    Remove All Installments
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
 
           {/* Action Buttons */}
           <div className="flex justify-end gap-3 border-t pt-4">

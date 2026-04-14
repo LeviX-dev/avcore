@@ -2139,139 +2139,185 @@ const renderDetailsModal = () => {
                     />
                   </div>
 
-                  <div>
-                    <label className="block mb-1.5 text-xs font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400">
-                      Reassign To (Multiple Users)
-                    </label>
-                    
-                    <div className="mb-2">
-                      <div className="relative">
-                        <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                          <svg className="h-4 w-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                          </svg>
-                        </div>
-                        <input
-                          type="text"
-                          value={searchUserTerm}
-                          onChange={(e) => setSearchUserTerm(e.target.value)}
-                          className="w-full pl-9 pr-8 py-2 border border-gray-300 dark:border-gray-600 rounded text-xs dark:bg-form-input dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                          placeholder="Search users by name or role..."
-                        />
-                        {searchUserTerm && (
-                          <button
-                            type="button"
-                            onClick={() => setSearchUserTerm('')}
-                            className="absolute inset-y-0 right-0 pr-2 flex items-center text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
-                          >
-                            <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                            </svg>
-                          </button>
-                        )}
-                      </div>
-                      {searchUserTerm && (
-                        <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                          Showing {filteredUsers.length} of {users.length} users
-                        </p>
-                      )}
-                    </div>
-                    
-                    <div className="border border-gray-300 dark:border-gray-600 rounded p-3 max-h-40 overflow-y-auto">
-                      <div className="mb-2 pb-2 border-b dark:border-gray-700">
-                        <button
-                          type="button"
-                          onClick={() => {
-                            const allFilteredSelected = filteredUsers.every(user => 
-                              selectedUsers.includes(user.user_id || user.id)
-                            );
-                            
-                            if (allFilteredSelected) {
-                              setSelectedUsers(prev => 
-                                prev.filter(userId => 
-                                  !filteredUsers.some(user => user.user_id === userId || user.id === userId)
-                                )
-                              );
-                            } else {
-                              const filteredUserIds = filteredUsers.map(user => user.user_id || user.id);
-                              setSelectedUsers(prev => [...new Set([...prev, ...filteredUserIds])]);
-                            }
-                          }}
-                          className="text-xs px-3 py-1.5 bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300 rounded hover:bg-blue-200 dark:hover:bg-blue-800 transition-colors"
-                        >
-                          {filteredUsers.length > 0 && 
-                          filteredUsers.every(user => 
-                            selectedUsers.includes(user.user_id || user.id)
-                          ) 
-                            ? 'Deselect All Filtered' 
-                            : 'Select All Filtered'}
-                        </button>
-                        <span className="text-xs text-gray-500 dark:text-gray-400 ml-2">
-                          {selectedUsers.length} selected
-                        </span>
-                      </div>
-                      
-                      {filteredUsers.length > 0 ? (
-                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2">
-                          {filteredUsers.map((user) => {
-                            const isSelected = selectedUsers.includes(user.user_id || user.id);
-                            return (
-                              <div 
-                                key={user.user_id || user.id} 
-                                className={`flex items-start p-2 rounded transition-colors ${
-                                  isSelected 
-                                    ? 'bg-blue-50 dark:bg-blue-900/30 border border-blue-200 dark:border-blue-700' 
-                                    : 'border border-transparent hover:bg-gray-50 dark:hover:bg-gray-800 hover:border-gray-200 dark:hover:border-gray-700'
-                                }`}
-                              >
-                                <input
-                                  type="checkbox"
-                                  id={`user-${user.user_id || user.id}`}
-                                  checked={isSelected}
-                                  onChange={() => {
-                                    const userId = user.user_id || user.id;
-                                    if (selectedUsers.includes(userId)) {
-                                      setSelectedUsers(prev => prev.filter(id => id !== userId));
-                                    } else {
-                                      setSelectedUsers(prev => [...prev, userId]);
-                                    }
-                                  }}
-                                  className="h-4 w-4 text-blue-600 rounded focus:ring-blue-500 focus:ring-offset-0 mt-1"
-                                />
-                                <label 
-                                  htmlFor={`user-${user.user_id || user.id}`}
-                                  className="ml-2 text-xs text-gray-700 dark:text-gray-300 cursor-pointer flex-1"
-                                >
-                                  <div className="font-medium line-clamp-1">{user.name}</div>
-                                </label>
-                              </div>
-                            );
-                          })}
-                        </div>
-                      ) : (
-                        <div className="text-center py-4 text-gray-500 dark:text-gray-400">
-                          <div className="text-2xl mb-2">🔍</div>
-                          <p className="text-xs">No users found</p>
-                          <p className="text-xs mt-1">Try a different search term</p>
-                        </div>
-                      )}
-                    </div>
-                    
-                    {selectedUsers.length > 0 && (
-                      <div className="mt-2 p-2 bg-blue-50 dark:bg-blue-900/30 rounded border border-blue-200 dark:border-blue-800">
-                        <div className="text-xs text-blue-700 dark:text-blue-300 mb-1 font-medium">
-                          Selected Users ({selectedUsers.length}):
-                        </div>
-                        <div className="text-xs text-gray-600 dark:text-gray-400">
-                          {selectedUsers.map(userId => {
-                            const user = users.find(u => u.user_id === userId || u.id === userId);
-                            return user ? `${user.name}${user.role ? ` (${user.role})` : ''}` : userId;
-                          }).join(', ')}
-                        </div>
-                      </div>
-                    )}
+               <div>
+  <label className="block mb-1.5 text-[12px] font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400">
+    Reassign To (Multiple Users)
+  </label>
+  <div className="mb-2">
+    <div className="relative">
+      <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+        <svg
+          className="h-4 w-4 text-gray-400"
+          fill="none"
+          stroke="currentColor"
+          viewBox="0 0 24 24"
+        >
+          <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            strokeWidth={2}
+            d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
+          />
+        </svg>
+      </div>
+      <input
+        type="text"
+        value={searchUserTerm}
+        onChange={(e) => setSearchUserTerm(e.target.value)}
+        className="w-full pl-9 pr-8 py-2 border border-gray-300 dark:border-gray-600 rounded text-[13px] dark:bg-form-input dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+        placeholder="Search users by name or role..."
+      />
+      {searchUserTerm && (
+        <button
+          type="button"
+          onClick={() => setSearchUserTerm('')}
+          className="absolute inset-y-0 right-0 pr-2 flex items-center text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
+        >
+          <svg
+            className="h-4 w-4"
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2}
+              d="M6 18L18 6M6 6l12 12"
+            />
+          </svg>
+        </button>
+      )}
+    </div>
+    {searchUserTerm && (
+      <p className="text-[12px] text-gray-500 dark:text-gray-400 mt-1">
+        Showing {filteredUsers.length} of {users.length} users
+      </p>
+    )}
+  </div>
+  <div className="border border-gray-300 dark:border-gray-600 rounded p-3 max-h-40 overflow-y-auto">
+    <div className="mb-2 pb-2 border-b dark:border-gray-700 flex items-center justify-between">
+      <button
+        type="button"
+        onClick={() => {
+          const allFilteredSelected = filteredUsers.every(
+            (user) =>
+              selectedUsers.includes(user.user_id || user.id),
+          );
+          if (allFilteredSelected) {
+            setSelectedUsers((prev) =>
+              prev.filter(
+                (userId) =>
+                  !filteredUsers.some(
+                    (user) =>
+                      user.user_id === userId ||
+                      user.id === userId,
+                  ),
+              ),
+            );
+          } else {
+            const filteredUserIds = filteredUsers.map(
+              (user) => user.user_id || user.id,
+            );
+            setSelectedUsers((prev) => [
+              ...new Set([...prev, ...filteredUserIds]),
+            ]);
+          }
+        }}
+        className="text-[12px] px-3 py-1.5 bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300 rounded hover:bg-blue-200 dark:hover:bg-blue-800 transition-colors"
+      >
+        {filteredUsers.length > 0 &&
+        filteredUsers.every((user) =>
+          selectedUsers.includes(user.user_id || user.id),
+        )
+          ? 'Deselect All Filtered'
+          : 'Select All Filtered'}
+      </button>
+      <span className="text-[12px] text-gray-500 dark:text-gray-400">
+        {selectedUsers.length} selected
+      </span>
+    </div>
+    {filteredUsers.length > 0 ? (
+      <div className="flex flex-col gap-2">
+        {filteredUsers.map((user) => {
+          const isSelected = selectedUsers.includes(
+            user.user_id || user.id,
+          );
+          return (
+            <div
+              key={user.user_id || user.id}
+              className={`flex items-start p-2 rounded transition-colors min-h-[60px] ${
+                isSelected
+                  ? 'bg-blue-50 dark:bg-blue-900/30 border border-blue-200 dark:border-blue-700'
+                  : 'border border-transparent hover:bg-gray-50 dark:hover:bg-gray-800 hover:border-gray-200 dark:hover:border-gray-700'
+              }`}
+            >
+              <input
+                type="checkbox"
+                id={`user-${user.user_id || user.id}`}
+                checked={isSelected}
+                onChange={() => {
+                  const userId = user.user_id || user.id;
+                  if (selectedUsers.includes(userId)) {
+                    setSelectedUsers((prev) =>
+                      prev.filter((id) => id !== userId),
+                    );
+                  } else {
+                    setSelectedUsers((prev) => [
+                      ...prev,
+                      userId,
+                    ]);
+                  }
+                }}
+                className="h-4 w-4 text-blue-600 rounded focus:ring-blue-500 focus:ring-offset-0 mt-1 flex-shrink-0"
+              />
+              <label
+                htmlFor={`user-${user.user_id || user.id}`}
+                className="ml-2 text-[13px] text-gray-700 dark:text-gray-300 cursor-pointer flex-1 min-w-0"
+              >
+                <div className="font-semibold text-[13px]">
+                  {user.name}
+                </div>
+                {user.role && (
+                  <div className="text-[11px] text-gray-500 dark:text-gray-400 mt-0.5">
+                    {user.role}
                   </div>
-
+                )}
+              </label>
+            </div>
+          );
+        })}
+      </div>
+    ) : (
+      <div className="text-center py-4 text-gray-500 dark:text-gray-400">
+        <div className="text-2xl mb-2">🔍</div>
+        <p className="text-[13px]">No users found</p>
+        <p className="text-[12px] mt-1">
+          Try a different search term
+        </p>
+      </div>
+    )}
+  </div>
+  {selectedUsers.length > 0 && (
+    <div className="mt-2 p-2 bg-blue-50 dark:bg-blue-900/30 rounded border border-blue-200 dark:border-blue-800">
+      <div className="text-[12px] text-blue-700 dark:text-blue-300 mb-1 font-medium">
+        Selected Users ({selectedUsers.length}):
+      </div>
+      <div className="text-[12px] text-gray-600 dark:text-gray-400 break-words">
+        {selectedUsers
+          .map((userId) => {
+            const user = users.find(
+              (u) => u.user_id === userId || u.id === userId,
+            );
+            return user
+              ? `${user.name}${user.role ? ` (${user.role})` : ''}`
+              : userId;
+          })
+          .join(', ')}
+      </div>
+    </div>
+  )}
+</div>
                   <div>
                     <label className="block mb-1.5 text-xs font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400">
                       Lead Stage
