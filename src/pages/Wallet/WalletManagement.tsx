@@ -285,7 +285,7 @@ const WalletManagement: React.FC = () => {
                     <td className="p-2">{user.name}</td>
                     <td className="p-2">{user.email}</td>
                     <td className="p-2">{user.role}</td>
-                    <td className="p-2 font-bold text-blue-600 dark:text-blue-400">{formatINR(Number(user.wallet_balance))}</td>
+                    <td className={`p-2 font-bold ${Number(user.wallet_balance) < 0 ? 'text-red-600 dark:text-red-400' : 'text-blue-600 dark:text-blue-400'}`}>{Number(user.wallet_balance) < 0 ? '−' : '₹'}{Math.abs(Number(user.wallet_balance)).toLocaleString('en-IN')}</td>
                     <td className="p-2 text-green-600 dark:text-green-400">{formatINR(Number(user.total_credited))}</td>
                     <td className="p-2 text-red-600 dark:text-red-400">{formatINR(Number(user.total_debited))}</td>
                     <td className="p-2 flex gap-2">
@@ -385,8 +385,8 @@ const WalletManagement: React.FC = () => {
                       <td className="p-2">{txn.type}</td>
                       <td className="p-2">{txn.reference_type}</td>
                       <td className={`p-2 font-bold ${['credit','reversal'].includes(txn.type) ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>{['credit','reversal'].includes(txn.type) ? '↑' : '↓'}{formatINR(Number(txn.amount))}</td>
-                      <td className="p-2">{formatINR(Number(txn.balance_before))}</td>
-                      <td className="p-2">{formatINR(Number(txn.balance_after))}</td>
+                      <td className={Number(txn.balance_before) < 0 ? 'p-2 text-red-600 dark:text-red-400' : 'p-2'}>{Number(txn.balance_before) < 0 ? '−' : '₹'}{Math.abs(Number(txn.balance_before)).toLocaleString('en-IN')}</td>
+                      <td className={Number(txn.balance_after) < 0 ? 'p-2 text-red-600 dark:text-red-400' : 'p-2'}>{Number(txn.balance_after) < 0 ? '−' : '₹'}{Math.abs(Number(txn.balance_after)).toLocaleString('en-IN')}</td>
                       <td className="p-2">{txn.status}</td>
                       <td className="p-2">{txn.remarks}</td>
                     </tr>

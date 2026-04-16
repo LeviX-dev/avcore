@@ -338,29 +338,28 @@ const ExpenseEntryModal: React.FC<Props> = ({
   // mode = 'submit'     → full validation, status='pending'
   //                        server reads expense_mode to decide draft_pending vs pending
 
-  const submit = async (mode: 'save_draft' | 'submit') => {
-    // BUG FIX: 'save_draft' always saves as draft regardless of expense_mode
-    // 'submit' always goes to server for full processing:
+  const submit = async (e?: React.MouseEvent<HTMLButtonElement>) => {
+    // Always goes to server for full processing
     //   - expense_mode='draft'  → server sets status='draft_pending' (admin review)
     //   - expense_mode='direct' → server sets status='pending' (wallet deducted)
-    const error = mode === 'save_draft' ? validateDraft() : validate();
+    const error = validate();
     if (error) { setFeedback(error); return; }
 
     setSaving(true);
     setFeedback(null);
 
-    const statusToSend = mode === 'save_draft' ? 'draft' : 'pending';
+    const statusToSend = 'pending';
     const payload = buildPayload(statusToSend);
 
     try {
       if (editingExpense?.expense_id) {
         await axios.put(
-          `${BASE_URL}api/expense/${editingExpense.expense_id}`,
+          `${BASE_URL}api/v1/expense/${editingExpense.expense_id}`,
           payload,
           { withCredentials: true }
         );
       } else {
-        await axios.post(`${BASE_URL}api/expense`, payload, { withCredentials: true });
+        await axios.post(`${BASE_URL}api/v1/expense`, payload, { withCredentials: true });
       }
       onClose();
       setTimeout(onSaved, 100);
@@ -480,7 +479,9 @@ const ExpenseEntryModal: React.FC<Props> = ({
                 <div className="flex items-center justify-between">
                   <p className="text-xs text-gray-500 dark:text-gray-300">Available Budget</p>
                   <p className="text-sm font-semibold text-blue-600 dark:text-blue-400">
-                    ₹{walletBalance.toLocaleString('en-IN')}
+                    <span className={walletBalance < 0 ? 'text-red-600 dark:text-red-400' : 'text-blue-600 dark:text-blue-400'}>
+                      {walletBalance < 0 ? '−' : '₹'}{Math.abs(walletBalance).toLocaleString('en-IN')}
+                    </span>
                   </p>
                 </div>
               ) : (
@@ -612,15 +613,6 @@ const ExpenseEntryModal: React.FC<Props> = ({
             <input name="amount" type="number" min="0" step="0.01" value={form.amount} onChange={onChange}
               placeholder="0.00"
               className="w-full rounded-lg border border-stroke bg-transparent px-4 py-3 text-black dark:border-strokedark dark:text-white" required />
-            {/* Insufficient balance warning — informational only, does not block */}
-            {walletBalance !== null && form.amount && Number(form.amount) > walletBalance && (
-              <div className="mt-1.5 flex items-center gap-1.5">
-                <span>⚠️</span>
-                <p className="text-xs text-yellow-600 dark:text-yellow-400">
-                  Amount exceeds available budget of ₹{walletBalance.toLocaleString('en-IN')}. Server will block if insufficient.
-                </p>
-              </div>
-            )}
           </div>
 
           {/* Expense Date */}
@@ -665,19 +657,8 @@ const ExpenseEntryModal: React.FC<Props> = ({
               Cancel
             </button>
 
-            {/* Save as Draft — only for employees adding new or editing own draft */}
-            {(!canSelectAnyEmployee || editingStatus === 'draft') && (
-              <button type="button" disabled={saving} onClick={() => submit('save_draft')}
-                className="rounded-lg bg-warning px-5 py-2.5 text-white transition hover:bg-warning/90 disabled:opacity-70">
-                {saving ? 'Saving...' : 'Save as Draft'}
-              </button>
-            )}
-
-            {/* Main submit button */}
-            {/* BUG FIX: always calls submit('submit') so expense_mode is properly sent to server.
-                When expense_mode='draft' → server sets draft_pending (for review, NO wallet deduction)
-                When expense_mode='direct' → server sets pending (wallet deducted immediately) */}
-            <button type="button" disabled={saving} onClick={() => submit('submit')}
+            {/* Only one submit button for add or edit, backend enforces status transitions */}
+            <button type="button" disabled={saving} onClick={submit}
               className="rounded-lg bg-blue-500 px-5 py-2.5 text-white transition hover:bg-blue-600 disabled:opacity-70">
               {submitLabel()}
             </button>

@@ -11,7 +11,7 @@ const EditExpenseCategoryForm = ({ category, onClose, onCategoryUpdated }) => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     try {
-      await axios.put(`${BASE_URL}api/expense/categories/${category.category_id}`, {
+      await axios.put(`${BASE_URL}api/v1/expense/categories/${category.category_id}`, {
         category_name: categoryName,
         category_description: categoryDescription,
       });

@@ -15,9 +15,14 @@ const WalletTransactions: React.FC = () => {
   const [pageSize] = useState(20);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(false);
+  const [showAllUsers, setShowAllUsers] = useState(false);
   const navigate = useNavigate();
 
-   
+  // Fetch user role on mount
+  useEffect(() => {
+    fetchUserRole();
+  }, []);
+
 const fetchUserRole = async () => {
     try {
       const response = await axios.get(`${BASE_URL}auth/get-role`, {
@@ -31,12 +36,22 @@ const fetchUserRole = async () => {
       console.error("Error fetching user role:", err);
     }
   };
-
-  // Fetch stats
+  // Calculate stats from shown transactions
   useEffect(() => {
-    axios.get(`${BASE_URL}api/wallet/balance`, { withCredentials: true })
-      .then(res => setStats(res.data.data || {}));
-  }, []);
+    // Only recalculate if rows change
+    let wallet_balance = 0;
+    let total_credited = 0;
+    let total_debited = 0;
+    if (rows.length > 0) {
+      // Use the last transaction's balance_after as wallet_balance
+      wallet_balance = Number(rows[0].balance_after);
+      for (const txn of rows) {
+        if (["credit", "reversal"].includes(txn.transaction_type)) total_credited += Number(txn.amount);
+        if (["debit", "hold"].includes(txn.transaction_type)) total_debited += Number(txn.amount);
+      }
+    }
+    setStats({ wallet_balance, total_credited, total_debited });
+  }, [rows]);
 
   // Fetch transactions
   const fetchRows = () => {
@@ -47,7 +62,7 @@ const fetchUserRole = async () => {
     if (filters.from) params.from = filters.from;
     if (filters.to) params.to = filters.to;
     let url = `${BASE_URL}api/wallet/transactions`;
-    if (role === 'admin' || role === 'sub_admin') {
+    if ((role === 'admin' || role === 'sub_admin') && showAllUsers) {
       url = `${BASE_URL}api/wallet/admin/wallet/all-transactions`;
     }
     axios.get(url, { params, withCredentials: true })
@@ -58,7 +73,7 @@ const fetchUserRole = async () => {
       .catch(() => setRows([]))
       .finally(() => setLoading(false));
   };
-  useEffect(() => { fetchRows(); }, [filters, page, role]);
+  useEffect(() => { fetchRows(); }, [filters, page, role, showAllUsers]);
 
   // Filter handlers
   const handleFilter = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
@@ -77,7 +92,7 @@ const fetchUserRole = async () => {
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
         <div className="bg-blue-100 dark:bg-blue-900 rounded-lg p-4 flex flex-col items-center">
           <div className="text-sm text-blue-700 dark:text-blue-200">Wallet Balance</div>
-          <div className="text-2xl font-bold text-blue-800 dark:text-blue-300">{formatINR(Number(stats.wallet_balance) || 0)}</div>
+          <div className={`text-2xl font-bold ${Number(stats.wallet_balance) < 0 ? 'text-red-800 dark:text-red-400' : 'text-blue-800 dark:text-blue-300'}`}>{Number(stats.wallet_balance) < 0 ? '−' : '₹'}{Math.abs(Number(stats.wallet_balance)).toLocaleString('en-IN')}</div>
         </div>
         <div className="bg-green-100 dark:bg-green-900 rounded-lg p-4 flex flex-col items-center">
           <div className="text-sm text-green-700 dark:text-green-200">Total Credited</div>
@@ -119,9 +134,19 @@ const fetchUserRole = async () => {
           <input type="date" name="to" value={filters.to} onChange={handleFilter} className="p-2 rounded border dark:bg-gray-800 dark:text-white" />
         </div>
         <button className="bg-gray-200 dark:bg-gray-700 text-black dark:text-white px-3 py-2 rounded ml-2" onClick={resetFilters} type="button">Reset Filters</button>
-        {(role === 'admin' || role === 'hr') && (
-          <button className="ml-auto bg-blue-600 text-white px-4 py-2 rounded" onClick={() => navigate('/wallet/management')}>View All Users</button>
-        )}
+        {/* {(role === 'admin' || role === 'sub_admin') && ( */}
+          <div className="flex items-center ml-4">
+            <input
+              type="checkbox"
+              id="showAllUsers"
+              checked={showAllUsers}
+              onChange={e => setShowAllUsers(e.target.checked)}
+              className="mr-2"
+            />
+            <label htmlFor="showAllUsers" className="text-xs font-semibold dark:text-gray-200">Show all users</label>
+          </div>
+         {/* )} */}
+ 
       </div>
 
       {/* Table */}
@@ -160,7 +185,7 @@ const fetchUserRole = async () => {
                   <td className="p-2">{txn.transaction_type}</td>
                   <td className="p-2">{txn.reference_type}</td>
                   <td className={`p-2 font-bold ${['credit','reversal'].includes(txn.transaction_type) ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>{['credit','reversal'].includes(txn.transaction_type) ? '↑' : '↓'}{formatINR(Number(txn.amount))}</td>
-                  <td className="p-2">{formatINR(Number(txn.balance_after))}</td>
+                  <td className={Number(txn.balance_after) < 0 ? 'p-2 text-red-600 dark:text-red-400' : 'p-2'}>{Number(txn.balance_after) < 0 ? '−' : '₹'}{Math.abs(Number(txn.balance_after)).toLocaleString('en-IN')}</td>
                   <td className="p-2">{statusBadge(txn.status)}</td>
                 </tr>
               );

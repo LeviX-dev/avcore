@@ -23,7 +23,7 @@ const ExpenseCategoryManagement: React.FC = () => {
 
   const fetchCategories = async () => {
     try {
-      const response = await axios.get(`${BASE_URL}api/expense/categories`, {
+      const response = await axios.get(`${BASE_URL}api/v1/expense/categories`, {
         withCredentials: true,
       });
       setCategories(response.data?.data || []);
@@ -46,7 +46,7 @@ const ExpenseCategoryManagement: React.FC = () => {
     if (!confirmDelete) return;
 
     try {
-      await axios.delete(`${BASE_URL}api/expense/categories/${categoryId}`, {
+      await axios.delete(`${BASE_URL}api/v1/expense/categories/${categoryId}`, {
         withCredentials: true,
       });
 

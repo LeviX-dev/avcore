@@ -40,7 +40,8 @@ const ExecutionDashboard = () => {
   'project_manager',
   'av_engineer',
   'acoustic_engineer',
-  'acoustic_designer'
+  'acoustic_designer' ,
+  'carpenter',
 ];
 
 const isProjectManager = DASHBOARD_ROLES.includes(role);

@@ -207,7 +207,8 @@ app.use("/api/report", metaReportRoutes);
 
 
 app.use('/api/wallet', walletRoutes);
-app.use('/api', expenseRoutes);
+// app.use('/api', expenseRoutes); 
+app.use('/api/v1', expenseRoutes);
 app.use('/api', vendorRoutes);
 
 

@@ -29,7 +29,7 @@ type ExpenseOptionsResponse = {
   canSelectAnyEmployee: boolean;
 };
 
-const DRAFT_STATUSES = ['draft', 'draft_pending', 'draft_approved', 'draft_rejected'];
+const DRAFT_STATUSES = ['draft_pending', 'draft_approved', 'draft_rejected'];
 
 // ─── Component ───────────────────────────────────────────────────────────────
 
@@ -48,6 +48,8 @@ const ExpensePrototype: React.FC = () => {
   const [canSelectAnyEmployee, setCanSelectAnyEmployee] = useState(false);
   const [currentUserId, setCurrentUserId] = useState<number | null>(null);
   const [currentUserRole, setCurrentUserRole] = useState<string>('');
+  // Track if admin role is loaded from /auth/get-role
+  const [roleLoaded, setRoleLoaded] = useState(false);
 
   const [loading, setLoading] = useState(false);
   const [modalOpen, setModalOpen] = useState(false);
@@ -79,7 +81,7 @@ const ExpensePrototype: React.FC = () => {
   const [userFilter, setUserFilter] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
 
-  const isAdmin = canSelectAnyEmployee;
+  const isAdmin = currentUserRole === 'admin' || currentUserRole === 'sub_admin' || currentUserRole === 'hr';
 
   const showToast = (msg: string, type: 'success' | 'error') => {
     setMessage(msg);
@@ -93,7 +95,7 @@ const ExpensePrototype: React.FC = () => {
     setLoading(true);
     try {
       const params: any = { status: tab === 'drafts' ? 'drafts' : tab };
-      const response = await axios.get(`${BASE_URL}api/expense`, { params, withCredentials: true });
+      const response = await axios.get(`${BASE_URL}api/v1/expense`, { params, withCredentials: true });
       setRows(response.data?.data || []);
     } catch {
       setRows([]);
@@ -105,10 +107,10 @@ const ExpensePrototype: React.FC = () => {
   const fetchTabCounts = useCallback(async () => {
     try {
       const [a, p, r, d] = await Promise.all([
-        axios.get(`${BASE_URL}api/expense`, { params: { status: 'approved' }, withCredentials: true }),
-        axios.get(`${BASE_URL}api/expense`, { params: { status: 'pending'  }, withCredentials: true }),
-        axios.get(`${BASE_URL}api/expense`, { params: { status: 'rejected' }, withCredentials: true }),
-        axios.get(`${BASE_URL}api/expense`, { params: { status: 'drafts'   }, withCredentials: true }),
+        axios.get(`${BASE_URL}api/v1/expense`, { params: { status: 'approved' }, withCredentials: true }),
+        axios.get(`${BASE_URL}api/v1/expense`, { params: { status: 'pending'  }, withCredentials: true }),
+        axios.get(`${BASE_URL}api/v1/expense`, { params: { status: 'rejected' }, withCredentials: true }),
+        axios.get(`${BASE_URL}api/v1/expense`, { params: { status: 'drafts'   }, withCredentials: true }),
       ]);
       setTabCounts({
         approved: (a.data?.data || []).length,
@@ -121,14 +123,14 @@ const ExpensePrototype: React.FC = () => {
 
   const fetchCategories = async () => {
     try {
-      const r = await axios.get(`${BASE_URL}api/expense/categories`, { withCredentials: true });
+      const r = await axios.get(`${BASE_URL}api/v1/expense/categories`, { withCredentials: true });
       setCategories(r.data?.data || []);
     } catch { setCategories([]); }
   };
 
   const fetchOptions = async () => {
     try {
-      const r = await axios.get(`${BASE_URL}api/expense/options`, { withCredentials: true });
+      const r = await axios.get(`${BASE_URL}api/v1/expense/options`, { withCredentials: true });
       const data: ExpenseOptionsResponse = r.data?.data || {
         projects: [], siteLocations: [], vendors: [], employees: [],
         currentUser: { id: 0, role: '', name: null }, canSelectAnyEmployee: false,
@@ -139,17 +141,31 @@ const ExpensePrototype: React.FC = () => {
       setEmployees(data.employees || []);
       setCanSelectAnyEmployee(Boolean(data.canSelectAnyEmployee));
       setCurrentUserId(data.currentUser?.id || null);
-      setCurrentUserRole(data.currentUser?.role || '');
+      // Do not set role here; will be set by fetchUserRole
     } catch {
       setProjects([]); setSiteLocations([]); setVendors([]);
       setEmployees([]); setCanSelectAnyEmployee(false); setCurrentUserId(null);
     }
   };
 
+  // Fetch admin role from /auth/get-role
+  const fetchUserRole = async () => {
+    try {
+      const r = await axios.get(`${BASE_URL}auth/get-role`, { withCredentials: true });
+      setCurrentUserRole(r.data?.role || '');
+    } catch {
+      setCurrentUserRole('');
+    } finally {
+      setRoleLoaded(true);
+    }
+  };
+
+
   useEffect(() => {
     fetchExpenses(activeTab);
     fetchCategories();
     fetchOptions();
+    fetchUserRole();
   }, [activeTab]);
 
   useEffect(() => { fetchTabCounts(); }, []);
@@ -186,7 +202,7 @@ const ExpensePrototype: React.FC = () => {
   const onDelete = async (id: number) => {
     if (!window.confirm('Delete this expense?')) return;
     try {
-      await axios.delete(`${BASE_URL}api/expense/${id}`, { withCredentials: true });
+      await axios.delete(`${BASE_URL}api/v1/expense/${id}`, { withCredentials: true });
       showToast('Expense deleted.', 'success');
       fetchExpenses(activeTab);
       fetchTabCounts();
@@ -204,7 +220,7 @@ const ExpensePrototype: React.FC = () => {
     setStatusSaving(true);
     try {
       await axios.patch(
-        `${BASE_URL}api/expense/${statusModal.expense.expense_id}/status`,
+        `${BASE_URL}api/v1/expense/${statusModal.expense.expense_id}/status`,
         { status: statusModal.action, status_remark: statusRemark },
         { withCredentials: true }
       );
@@ -226,7 +242,7 @@ const ExpensePrototype: React.FC = () => {
     setDraftSaving(true);
     try {
       await axios.put(
-        `${BASE_URL}api/expense/${draftModal.expense.expense_id}/draft-status`,
+        `${BASE_URL}api/v1/expense/${draftModal.expense.expense_id}/draft-status`,
         { status: draftModal.action, remark: draftRemark },
         { withCredentials: true }
       );
@@ -246,11 +262,6 @@ const ExpensePrototype: React.FC = () => {
   const submitDraftForReview = async (id: number) => {
     if (!window.confirm('Submit this draft for admin review?')) return;
     try {
-      // We reuse the update endpoint — set status to draft_pending via expense_mode=draft submit
-      // Actually we POST to a dedicated path. Backend handles draft→draft_pending via
-      // updateExpense when employee resubmits a draft (finalStatus = draft_pending).
-      // Simplest: just open edit modal so the user clicks "Submit for Review".
-      // Alternatively, we can do a lightweight PATCH. Let's open edit modal for accuracy.
       const row = rows.find((r) => r.expense_id === id);
       if (row) openEditModal(row);
     } catch (e: any) {
@@ -263,7 +274,7 @@ const ExpensePrototype: React.FC = () => {
     if (!window.confirm('Convert this approved draft to an expense? Wallet will be deducted.')) return;
     try {
       await axios.post(
-        `${BASE_URL}api/expense/${id}/make-expense`,
+        `${BASE_URL}api/v1/expense/${id}/make-expense`,
         {},
         { withCredentials: true }
       );
@@ -272,6 +283,37 @@ const ExpensePrototype: React.FC = () => {
       fetchTabCounts();
     } catch (e: any) {
       showToast(e?.response?.data?.message || 'Failed to create expense.', 'error');
+    }
+  };
+
+  // ── Resubmit rejected expense
+  // BUG FIX: was incorrectly defined inside JSX — moved here to component body
+  const handleResubmit = async (expenseId: number) => {
+    if (!window.confirm('Resubmit this expense for approval?')) return;
+    try {
+      // Fetch the existing expense details (to get all required fields)
+      const { data } = await axios.get(`${BASE_URL}api/v1/expense`, {
+        params: { id: expenseId },
+        withCredentials: true
+      });
+      const expense = (data?.data || []).find((e: any) => e.expense_id === expenseId);
+      if (!expense) throw new Error('Expense not found');
+
+      // Prepare payload for update (minimal fields + status)
+      const payload = {
+        ...expense,
+        status: 'pending',
+      };
+      await axios.put(
+        `${BASE_URL}api/v1/expense/${expenseId}`,
+        payload,
+        { withCredentials: true }
+      );
+      showToast('Expense resubmitted for approval.', 'success');
+      fetchExpenses(activeTab);
+      fetchTabCounts();
+    } catch (e: any) {
+      showToast(e?.response?.data?.message || 'Failed to resubmit.', 'error');
     }
   };
 
@@ -507,23 +549,16 @@ const ExpensePrototype: React.FC = () => {
                             <FontAwesomeIcon icon={faEye} />
                           </button>
 
+                          
+
                           {/* ── DRAFT TAB ACTIONS ── */}
                           {activeTab === 'drafts' && (
                             <>
-                              {/* Edit: only for own draft or draft_rejected */}
-                              {(isAdmin || (isOwnRow && ['draft', 'draft_rejected'].includes(s))) && (
+                              {/* Edit: only for own draft_pending or draft_rejected, or admin */}
+                              {isAdmin   && (
                                 <button type="button" title="Edit" onClick={() => openEditModal(row)}
                                   className="rounded-md bg-warning px-2.5 py-1.5 text-white transition hover:bg-warning/90">
                                   <FontAwesomeIcon icon={faPenToSquare} />
-                                </button>
-                              )}
-
-                              {/* Submit for Review: employee, status=draft */}
-                              {isOwnRow && s === 'draft' && (
-                                <button type="button" title="Submit for Review"
-                                  onClick={() => submitDraftForReview(row.expense_id)}
-                                  className="rounded-md bg-blue-500 px-2.5 py-1.5 text-white transition hover:bg-blue-600">
-                                  <FontAwesomeIcon icon={faPaperPlane} />
                                 </button>
                               )}
 
@@ -547,7 +582,7 @@ const ExpensePrototype: React.FC = () => {
                               )}
 
                               {/* Admin Reject Draft: admin, status=draft_pending */}
-                              {isAdmin && s === 'draft_pending' && (
+                              {isAdmin && s === 'draft_pend' && (
                                 <button type="button" title="Reject Draft"
                                   onClick={() => openDraftModal(row, 'draft_rejected')}
                                   className="rounded-md bg-red-500 px-2.5 py-1.5 text-white transition hover:bg-red-600">
@@ -555,8 +590,8 @@ const ExpensePrototype: React.FC = () => {
                                 </button>
                               )}
 
-                              {/* Delete: own draft/draft_pending/draft_rejected or admin */}
-                              {(isAdmin || (isOwnRow && ['draft', 'draft_pending', 'draft_rejected'].includes(s))) && (
+                              {/* Delete: own draft_pending/draft_rejected or admin */}
+                              {((isAdmin && ['draft_pending', 'draft_rejected'].includes(s)) || (isOwnRow && ['draft_pending', 'draft_rejected'].includes(s))) && (
                                 <button type="button" title="Delete" onClick={() => onDelete(row.expense_id)}
                                   className="rounded-md bg-danger px-2.5 py-1.5 text-white transition hover:bg-danger/90">
                                   <FontAwesomeIcon icon={faTrashCan} />
@@ -573,6 +608,16 @@ const ExpensePrototype: React.FC = () => {
                                 <button type="button" title="Edit" onClick={() => openEditModal(row)}
                                   className="rounded-md bg-warning px-2.5 py-1.5 text-white transition hover:bg-warning/90">
                                   <FontAwesomeIcon icon={faPenToSquare} />
+                                </button>
+                              )}
+
+                              {/* Resubmit: own rejected expense (not admin) */}
+                              {(!isAdmin && isOwnRow && s === 'rejected') && (
+                                <button type="button" title="Resubmit Expense"
+                                  onClick={() => handleResubmit(row.expense_id)}
+                                  className="rounded-md bg-blue-500 px-2.5 py-1.5 text-white transition hover:bg-blue-600">
+                                  <FontAwesomeIcon icon={faPaperPlane} className="mr-1" />
+                                  Resubmit
                                 </button>
                               )}
 

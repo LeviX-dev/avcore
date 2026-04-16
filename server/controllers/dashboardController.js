@@ -14,6 +14,7 @@ const TELECALLER_ROLES = [
   'acoustic_designer',
   'hr_executive',
     'project_manager',
+    'carpenter',
 ];
 
 const ADMIN_ROLES = ['admin', 'sub_admin'];
@@ -2061,7 +2062,7 @@ export const getExecutionDashboardCounts1 = async (req, res) => {
   }
 };
 
-export const getExecutionDashboardCounts = async (req, res) => {
+export const getExecutionDashboardCounts2 = async (req, res) => {
   try {
     const user = req.session.user;
 
@@ -2165,6 +2166,114 @@ export const getExecutionDashboardCounts = async (req, res) => {
       daily_operation: dailyOperationCount,
       total_closed: preExecutionCount + executionCount,
     });
+  } catch (error) {
+    console.error('ExecutionDashboardCounts error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Server error',
+    });
+  }
+};
+
+
+export const getExecutionDashboardCounts = async (req, res) => {
+  try {
+    const user = req.session.user;
+
+    if (!user) {
+      return res.status(401).json({
+        success: false,
+        message: 'Unauthorized',
+      });
+    }
+
+    const { id: userId, role } = user;
+
+    // ================= PRE EXECUTION =================
+    let closedQuery = `
+      SELECT COUNT(DISTINCT rd.master_id) AS total
+      FROM raw_data rd
+      WHERE rd.lead_stage = 'Pre Execution'
+      AND NOT EXISTS (
+        SELECT 1 
+        FROM execution_start es
+        WHERE FIND_IN_SET(rd.master_id, es.lead_ids)
+      )
+    `;
+
+    const closedParams = [];
+
+    // ✅ FIXED: using assign_id instead of assigned_to
+    if (isTelecallerLike(role)) {
+      closedQuery += ` AND rd.assign_id = ?`;
+      closedParams.push(userId);
+    }
+
+    const [closedRows] = await db.query(closedQuery, closedParams);
+    const preExecutionCount = closedRows[0]?.total || 0;
+
+    // ================= EXECUTION =================
+    let closedExeQuery = `
+      SELECT COUNT(DISTINCT rd.master_id) AS total
+      FROM raw_data rd
+      WHERE rd.lead_stage = 'Execution'
+      AND EXISTS (
+        SELECT 1 
+        FROM execution_start es
+        WHERE FIND_IN_SET(rd.master_id, es.lead_ids)
+        AND es.status != 'complete'
+      )
+    `;
+
+    const closedExeParams = [];
+
+    // ✅ FIXED: using assign_id
+    if (isTelecallerLike(role)) {
+      closedExeQuery += ` AND rd.assign_id = ?`;
+      closedExeParams.push(userId);
+    }
+
+    const [closedExeRows] = await db.query(closedExeQuery, closedExeParams);
+    const executionCount = closedExeRows[0]?.total || 0;
+
+    // ================= DAILY OPERATION =================
+    let managerQuery = `
+      SELECT COUNT(*) AS total
+      FROM execution_documents ed
+    `;
+
+    const managerParams = [];
+
+    if (role !== 'admin') {
+      managerQuery += ` WHERE ed.uploaded_by = ?`;
+      managerParams.push(userId);
+    }
+
+    const [managerRows] = await db.query(managerQuery, managerParams);
+    const dailyOperationCount = managerRows[0]?.total || 0;
+
+    // ================= ASSIGNED PROCESS =================
+    const [dailyRows] = await db.query(
+      `
+      SELECT COUNT(*) AS total
+      FROM execution_process_user_map epum
+      WHERE epum.user_id = ?
+      `,
+      [userId]
+    );
+
+    const assignedProcessCount = dailyRows[0]?.total || 0;
+
+    // ================= FINAL RESPONSE =================
+    return res.json({
+      success: true,
+      pre_execution: preExecutionCount,
+      execution: executionCount,
+      assigned_process: assignedProcessCount,
+      daily_operation: dailyOperationCount,
+      total_closed: preExecutionCount + executionCount,
+    });
+
   } catch (error) {
     console.error('ExecutionDashboardCounts error:', error);
     res.status(500).json({

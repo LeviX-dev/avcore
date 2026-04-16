@@ -576,7 +576,7 @@ export const getManagerDocumentDashboard = async (req, res) => {
     }
 
     // Check if user is admin or manager
-    const allowedRoles = ['admin', 'sub_admin', 'technical_head', 'manager' , 'av_engineer' , 'acoustic_engineer' , 'acoustic_designer'];
+    const allowedRoles = ['admin', 'sub_admin', 'technical_head', 'manager' , 'av_engineer' , 'acoustic_engineer' , 'acoustic_designer','carpenter',];
     if (!allowedRoles.includes(user.role)) {
       return res.status(403).json({
         success: false,

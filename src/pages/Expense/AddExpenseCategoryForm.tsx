@@ -25,7 +25,7 @@ const AddExpenseCategoryForm: React.FC<AddExpenseCategoryFormProps> = ({
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      await axios.post(BASE_URL + "api/expense/categories", formData, {
+      await axios.post(BASE_URL + "api/v1/expense/categories", formData, {
         headers: { "Content-Type": "application/json" },
         withCredentials: true,
       });

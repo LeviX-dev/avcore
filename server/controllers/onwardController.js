@@ -4262,7 +4262,7 @@ export const issueMRN = async (req, res) => {
   }
 };
 
-export const getCompletedMRNs = async (req, res) => {
+export const getCompletedMRNs1 = async (req, res) => {
   const connection = await db.getConnection();
 
   try {
@@ -4408,7 +4408,248 @@ export const getCompletedMRNs = async (req, res) => {
   } finally {
     connection.release();
   }
+}; 
+
+
+export const getCompletedMRNs = async (req, res) => {
+  const connection = await db.getConnection();
+
+  try {
+    const query = `
+      SELECT 
+        gm.mrn_id,
+        gm.mrn_number,
+        gm.master_id,
+        gm.qt_id,
+        gm.expected_date,
+        gm.created_at,
+        gm.mrn_status,
+
+        rd.name AS client_name,
+        rd.city,
+
+        es.execution_id,
+        es.schedule_name,
+
+        mpm.mpm_id,
+        mpm.prod_id,
+        mpm.model_id,
+        mpm.brand_id,
+
+        IFNULL(mpm.requested_qty,0) AS requested_qty,
+        IFNULL(mpm.verified_qty,0) AS verified_qty,
+        IFNULL(mpm.approval_qty,0) AS approval_qty,
+        IFNULL(mpm.purchase_qty,0) AS purchase_qty,
+        IFNULL(mpm.purchase_status,'') AS purchase_status,
+
+        IFNULL(iss.total_issued,0) AS issued_qty,
+        (IFNULL(mpm.approval_qty,0) - IFNULL(iss.total_issued,0)) AS remaining_qty,
+
+        mpm.status AS item_status,
+
+        b.brand_name,
+        m.model_no,
+
+        /* PURCHASE ORDER */
+        po.po_id,
+        po.po_number,
+        po.qty AS po_qty,
+        po.unit_price,
+        po.total_price,
+        po.status AS po_status,
+        po.received_qty,
+        po.bill_status,
+
+        /* BILL */
+        pb.bill_id,
+        pb.bill_number,
+        pb.bill_date,
+        pb.total_amount,
+
+        /* BILL IMAGES */
+        pbi.image_path
+
+      FROM generate_mrn gm
+
+      LEFT JOIN raw_data rd 
+        ON gm.master_id = rd.master_id
+
+      LEFT JOIN execution_start es 
+        ON FIND_IN_SET(gm.master_id, es.lead_ids)
+
+      LEFT JOIN mrn_prod_map mpm 
+        ON gm.mrn_id = mpm.mrn_id
+
+      LEFT JOIN brands b 
+        ON b.brand_id = mpm.brand_id
+
+      LEFT JOIN models m 
+        ON m.model_id = mpm.model_id
+
+      /* ISSUE */
+      LEFT JOIN (
+        SELECT mpm_id, SUM(issued_qty) AS total_issued
+        FROM issue_items
+        GROUP BY mpm_id
+      ) iss ON iss.mpm_id = mpm.mpm_id
+
+      /* CORRECT FLOW */
+      LEFT JOIN purchase_request pr 
+        ON pr.mpm_id = mpm.mpm_id
+
+      LEFT JOIN purchase_order po 
+        ON po.pr_id = pr.pr_id
+
+      LEFT JOIN purchase_bill pb 
+        ON pb.po_id = po.po_id
+
+      LEFT JOIN purchase_bill_images pbi 
+        ON pbi.bill_id = pb.bill_id
+
+      WHERE gm.mrn_status = 'Completed'
+
+      ORDER BY gm.created_at DESC
+    `;
+
+    const [rows] = await connection.query(query);
+
+    const mrnMap = {};
+
+    rows.forEach((row) => {
+
+      /* ===== MRN LEVEL ===== */
+      if (!mrnMap[row.mrn_id]) {
+        mrnMap[row.mrn_id] = {
+          mrn_id: row.mrn_id,
+          mrn_number: row.mrn_number,
+          master_id: row.master_id,
+          qt_id: row.qt_id,
+          expected_date: row.expected_date,
+          created_at: row.created_at,
+          mrn_status: row.mrn_status,
+
+          client_name: row.client_name,
+          city: row.city,
+
+          execution: {
+            execution_id: row.execution_id,
+            schedule_name: row.schedule_name,
+          },
+
+          items: [],
+        };
+      }
+
+      if (!row.mpm_id) return;
+
+      /* ===== ITEM LEVEL ===== */
+      let item = mrnMap[row.mrn_id].items.find(
+        (i) => i.mpm_id === row.mpm_id
+      );
+
+      if (!item) {
+        item = {
+          mpm_id: row.mpm_id,
+          model_id: row.model_id,
+          brand_id: row.brand_id,
+
+          brand_name: row.brand_name,
+          model_no: row.model_no,
+
+          requested_qty: row.requested_qty,
+          verified_qty: row.verified_qty,
+          approval_qty: row.approval_qty,
+          purchase_qty: row.purchase_qty,
+
+          purchase_status: row.purchase_status,
+
+          issued_qty: row.issued_qty,
+          remaining_qty: row.remaining_qty > 0 ? row.remaining_qty : 0,
+
+          status: row.item_status || 'Completed',
+
+          purchase_orders: [],
+        };
+
+        mrnMap[row.mrn_id].items.push(item);
+      }
+
+      /* ===== PO LEVEL ===== */
+      if (row.po_id) {
+        let po = item.purchase_orders.find(
+          (p) => p.po_id === row.po_id
+        );
+
+        if (!po) {
+          po = {
+            po_id: row.po_id,
+            po_number: row.po_number,
+            qty: row.po_qty,
+            unit_price: row.unit_price,
+            total_price: row.total_price,
+            status: row.po_status,
+            received_qty: row.received_qty,
+            bill_status: row.bill_status,
+            bills: [],
+          };
+
+          item.purchase_orders.push(po);
+        }
+
+        /* ===== BILL LEVEL ===== */
+        if (row.bill_id) {
+          let bill = po.bills.find(
+            (b) => b.bill_id === row.bill_id
+          );
+
+          if (!bill) {
+            bill = {
+              bill_id: row.bill_id,
+              bill_number: row.bill_number,
+              bill_date: row.bill_date,
+              total_amount: row.total_amount,
+              images: [],
+            };
+
+            po.bills.push(bill);
+          }
+
+const BASE_URL = process.env.BASE_URL || 'http://localhost:3000';
+
+if (row.image_path && !bill.images.includes(row.image_path)) {
+  const cleanPath = row.image_path
+    .replace(/\\/g, '/')
+    .split('uploads/')[1]; // remove system path
+
+  bill.images.push(`${BASE_URL}/uploads/${cleanPath}`);
+}
+        }
+      }
+    });
+
+    const result = Object.values(mrnMap);
+
+    return res.status(200).json({
+      success: true,
+      message: result.length
+        ? 'Completed MRNs with PO & Bill details fetched'
+        : 'No Completed MRNs found',
+      data: result,
+    });
+
+  } catch (error) {
+    console.error('getCompletedMRNs Error:', error);
+
+    return res.status(500).json({
+      success: false,
+      message: 'Failed to fetch completed MRNs',
+      error: error.message,
+    });
+  } finally {
+    connection.release();
+  }
 };
+
 
 
 
