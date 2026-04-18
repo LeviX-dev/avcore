@@ -8,7 +8,6 @@ import { toast } from 'react-toastify';
 const formatINR = (amount: number) => `₹${amount.toLocaleString('en-IN')}`;
 
 const WalletManagement: React.FC = () => {
-  // Removed role-based UI restrictions; rely on permission only
   const [tab, setTab] = useState<'requests' | 'users'>('requests');
   const [showTopupModal, setShowTopupModal] = useState(false);
   const [showAdjustModal, setShowAdjustModal] = useState(false);

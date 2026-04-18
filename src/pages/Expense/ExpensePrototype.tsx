@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import axios from 'axios';
-import Breadcrumb from '../../components/Breadcrumbs/Breadcrumb';
+import Breadcrumb from '../../components/Breadcrumbs/Breadcrumb.js';
 import { BASE_URL } from '../../../public/config.js';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import {
@@ -14,7 +14,7 @@ import ExpenseEntryModal, {
   ProjectOption,
   SiteLocationOption,
   VendorOption,
-} from './ExpenseEntryModal';
+} from './ExpenseEntryModal.js';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -108,15 +108,15 @@ const ExpensePrototype: React.FC = () => {
     try {
       const [a, p, r, d] = await Promise.all([
         axios.get(`${BASE_URL}api/v1/expense`, { params: { status: 'approved' }, withCredentials: true }),
-        axios.get(`${BASE_URL}api/v1/expense`, { params: { status: 'pending'  }, withCredentials: true }),
+        axios.get(`${BASE_URL}api/v1/expense`, { params: { status: 'pending' }, withCredentials: true }),
         axios.get(`${BASE_URL}api/v1/expense`, { params: { status: 'rejected' }, withCredentials: true }),
-        axios.get(`${BASE_URL}api/v1/expense`, { params: { status: 'drafts'   }, withCredentials: true }),
+        axios.get(`${BASE_URL}api/v1/expense`, { params: { status: 'drafts' }, withCredentials: true }),
       ]);
       setTabCounts({
         approved: (a.data?.data || []).length,
-        pending:  (p.data?.data || []).length,
+        pending: (p.data?.data || []).length,
         rejected: (r.data?.data || []).length,
-        drafts:   (d.data?.data || []).length,
+        drafts: (d.data?.data || []).length,
       });
     } catch { /* non-critical */ }
   }, []);
@@ -196,7 +196,7 @@ const ExpensePrototype: React.FC = () => {
 
   // ─── Actions ──────────────────────────────────────────────────────────────
 
-  const openAddModal  = () => { setEditingExpense(null); setModalOpen(true); };
+  const openAddModal = () => { setEditingExpense(null); setModalOpen(true); };
   const openEditModal = (row: ExpenseRow) => { setEditingExpense(row); setModalOpen(true); };
 
   const onDelete = async (id: number) => {
@@ -285,35 +285,27 @@ const ExpensePrototype: React.FC = () => {
       showToast(e?.response?.data?.message || 'Failed to create expense.', 'error');
     }
   };
-
   // ── Resubmit rejected expense
-  // BUG FIX: was incorrectly defined inside JSX — moved here to component body
-  const handleResubmit = async (expenseId: number) => {
-    if (!window.confirm('Resubmit this expense for approval?')) return;
-    try {
-      // Fetch the existing expense details (to get all required fields)
-      const { data } = await axios.get(`${BASE_URL}api/v1/expense`, {
-        params: { id: expenseId },
-        withCredentials: true
-      });
-      const expense = (data?.data || []).find((e: any) => e.expense_id === expenseId);
-      if (!expense) throw new Error('Expense not found');
+  const [resubmittingId, setResubmittingId] = useState<number | null>(null);
 
-      // Prepare payload for update (minimal fields + status)
-      const payload = {
-        ...expense,
-        status: 'pending',
-      };
-      await axios.put(
-        `${BASE_URL}api/v1/expense/${expenseId}`,
-        payload,
+  const handleResubmit = async (expenseId: number) => {
+    if (!window.confirm('Resubmit this expense for approval? The amount will be deducted from wallet again.')) return;
+
+    setResubmittingId(expenseId);
+    try {
+      await axios.post(
+        `${BASE_URL}api/v1/expense/${expenseId}/resubmit`,
+        {},
         { withCredentials: true }
       );
       showToast('Expense resubmitted for approval.', 'success');
       fetchExpenses(activeTab);
       fetchTabCounts();
     } catch (e: any) {
-      showToast(e?.response?.data?.message || 'Failed to resubmit.', 'error');
+      console.error('Resubmit error:', e);
+      showToast(e?.response?.data?.message || 'Failed to resubmit expense.', 'error');
+    } finally {
+      setResubmittingId(null);
     }
   };
 
@@ -348,22 +340,22 @@ const ExpensePrototype: React.FC = () => {
   const statusBadge = (status: string | null) => {
     const s = (status || '').toLowerCase();
     const colorMap: Record<string, string> = {
-      approved:       'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400',
-      pending:        'bg-yellow-100  text-yellow-700  dark:bg-yellow-900/30  dark:text-yellow-400',
-      rejected:       'bg-red-100     text-red-700     dark:bg-red-900/30     dark:text-red-400',
-      draft:          'bg-gray-100    text-gray-600    dark:bg-gray-700       dark:text-gray-300',
-      draft_pending:  'bg-yellow-100  text-yellow-700  dark:bg-yellow-900/30  dark:text-yellow-400',
+      approved: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400',
+      pending: 'bg-yellow-100  text-yellow-700  dark:bg-yellow-900/30  dark:text-yellow-400',
+      rejected: 'bg-red-100     text-red-700     dark:bg-red-900/30     dark:text-red-400',
+      draft: 'bg-gray-100    text-gray-600    dark:bg-gray-700       dark:text-gray-300',
+      draft_pending: 'bg-yellow-100  text-yellow-700  dark:bg-yellow-900/30  dark:text-yellow-400',
       draft_approved: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400',
       draft_rejected: 'bg-red-100     text-red-700     dark:bg-red-900/30     dark:text-red-400',
     };
     const labelMap: Record<string, string> = {
-      draft:          'Saved',
-      draft_pending:  'Awaiting Review',
+      draft: 'Saved',
+      draft_pending: 'Awaiting Review',
       draft_approved: 'Approved',
       draft_rejected: 'Rejected',
-      approved:       'Approved',
-      pending:        'Pending',
-      rejected:       'Rejected',
+      approved: 'Approved',
+      pending: 'Pending',
+      rejected: 'Rejected',
     };
     return (
       <span className={`inline-block rounded-full px-2.5 py-0.5 text-xs font-medium ${colorMap[s] || colorMap.draft}`}>
@@ -376,9 +368,9 @@ const ExpensePrototype: React.FC = () => {
 
   const tabs: { key: Tab; label: string }[] = [
     { key: 'approved', label: 'Expenses' },
-    { key: 'pending',  label: 'Pending'  },
+    { key: 'pending', label: 'Pending' },
     { key: 'rejected', label: 'Rejected' },
-    { key: 'drafts',   label: 'Drafts'   },
+    { key: 'drafts', label: 'Drafts' },
   ];
 
   // ─── Render ───────────────────────────────────────────────────────────────
@@ -389,11 +381,10 @@ const ExpensePrototype: React.FC = () => {
 
       {/* Toast */}
       {message && (
-        <div className={`rounded-lg border px-4 py-3 text-sm ${
-          messageType === 'success'
-            ? 'border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-700/40 dark:bg-emerald-950/30 dark:text-emerald-300'
-            : 'border-red-200 bg-red-50 text-red-700 dark:border-red-700/40 dark:bg-red-950/30 dark:text-red-300'
-        }`}>{message}</div>
+        <div className={`rounded-lg border px-4 py-3 text-sm ${messageType === 'success'
+          ? 'border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-700/40 dark:bg-emerald-950/30 dark:text-emerald-300'
+          : 'border-red-200 bg-red-50 text-red-700 dark:border-red-700/40 dark:bg-red-950/30 dark:text-red-300'
+          }`}>{message}</div>
       )}
 
       <div className="rounded-2xl border border-stroke bg-white p-5 shadow-default dark:border-strokedark dark:bg-boxdark sm:p-6">
@@ -411,20 +402,18 @@ const ExpensePrototype: React.FC = () => {
         <div className="mb-5 flex gap-1 rounded-xl border border-stroke bg-gray-50 p-1 dark:border-strokedark dark:bg-meta-4/10">
           {tabs.map(({ key, label }) => (
             <button key={key} type="button" onClick={() => setActiveTab(key)}
-              className={`flex-1 rounded-lg px-4 py-2 text-sm font-medium transition ${
-                activeTab === key
-                  ? 'bg-white text-black shadow dark:bg-boxdark dark:text-white'
-                  : 'text-gray-500 hover:text-black dark:text-gray-400 dark:hover:text-white'
-              }`}>
+              className={`flex-1 rounded-lg px-4 py-2 text-sm font-medium transition ${activeTab === key
+                ? 'bg-white text-black shadow dark:bg-boxdark dark:text-white'
+                : 'text-gray-500 hover:text-black dark:text-gray-400 dark:hover:text-white'
+                }`}>
               {label}
               {tabCounts[key] > 0 && (
-                <span className={`ml-2 rounded-full px-2 py-0.5 text-xs ${
-                  activeTab === key
-                    ? key === 'pending' || key === 'drafts'
-                      ? 'bg-yellow-100 text-yellow-700'
-                      : 'bg-blue-100 text-blue-700'
-                    : 'bg-gray-200 text-gray-600 dark:bg-gray-700 dark:text-gray-300'
-                }`}>
+                <span className={`ml-2 rounded-full px-2 py-0.5 text-xs ${activeTab === key
+                  ? key === 'pending' || key === 'drafts'
+                    ? 'bg-yellow-100 text-yellow-700'
+                    : 'bg-blue-100 text-blue-700'
+                  : 'bg-gray-200 text-gray-600 dark:bg-gray-700 dark:text-gray-300'
+                  }`}>
                   {tabCounts[key]}
                 </span>
               )}
@@ -543,26 +532,33 @@ const ExpensePrototype: React.FC = () => {
                       <td className="px-2 py-3">
                         <div className="flex flex-wrap gap-1.5">
 
-                          {/* View */}
+                          {/* View - Always visible */}
                           <button type="button" title="View" onClick={() => setViewingExpense(row)}
                             className="rounded-md bg-blue-600 px-2.5 py-1.5 text-white transition hover:bg-blue-700">
                             <FontAwesomeIcon icon={faEye} />
                           </button>
 
-                          
-
                           {/* ── DRAFT TAB ACTIONS ── */}
                           {activeTab === 'drafts' && (
                             <>
-                              {/* Edit: only for own draft_pending or draft_rejected, or admin */}
-                              {isAdmin   && (
+                              {/* Edit: Admin can edit any draft, Employee can edit own draft_pending or draft_rejected */}
+                              {(isAdmin || (isOwnRow && (s === 'draft_pending' || s === 'draft_rejected'))) && (
                                 <button type="button" title="Edit" onClick={() => openEditModal(row)}
                                   className="rounded-md bg-warning px-2.5 py-1.5 text-white transition hover:bg-warning/90">
                                   <FontAwesomeIcon icon={faPenToSquare} />
                                 </button>
                               )}
 
-                              {/* Make Expense: employee, status=draft_approved */}
+                              {/* Resubmit: Employee can resubmit draft_rejected */}
+                              {isAdmin && isOwnRow && s === 'draft_rejected' && (
+                                <button type="button" title="Resubmit Draft" onClick={() => openEditModal(row)}
+                                  className="rounded-md bg-blue-500 px-2.5 py-1.5 text-white transition hover:bg-blue-600">
+                                  <FontAwesomeIcon icon={faPaperPlane} className="mr-1" />
+                                  Resubmit
+                                </button>
+                              )}
+
+                              {/* Make Expense: Employee, status=draft_approved */}
                               {isOwnRow && s === 'draft_approved' && (
                                 <button type="button" title="Make Expense"
                                   onClick={() => makeExpense(row.expense_id)}
@@ -572,7 +568,7 @@ const ExpensePrototype: React.FC = () => {
                                 </button>
                               )}
 
-                              {/* Admin Approve Draft: admin, status=draft_pending */}
+                              {/* Admin Approve Draft: status=draft_pending */}
                               {isAdmin && s === 'draft_pending' && (
                                 <button type="button" title="Approve Draft"
                                   onClick={() => openDraftModal(row, 'draft_approved')}
@@ -581,8 +577,8 @@ const ExpensePrototype: React.FC = () => {
                                 </button>
                               )}
 
-                              {/* Admin Reject Draft: admin, status=draft_pending */}
-                              {isAdmin && s === 'draft_pend' && (
+                              {/* Admin Reject Draft: status=draft_pending */}
+                              {isAdmin && s === 'draft_pending' && (
                                 <button type="button" title="Reject Draft"
                                   onClick={() => openDraftModal(row, 'draft_rejected')}
                                   className="rounded-md bg-red-500 px-2.5 py-1.5 text-white transition hover:bg-red-600">
@@ -590,8 +586,8 @@ const ExpensePrototype: React.FC = () => {
                                 </button>
                               )}
 
-                              {/* Delete: own draft_pending/draft_rejected or admin */}
-                              {((isAdmin && ['draft_pending', 'draft_rejected'].includes(s)) || (isOwnRow && ['draft_pending', 'draft_rejected'].includes(s))) && (
+                              {/* Delete: Admin can delete any draft, Employee can delete own draft_pending/draft_rejected */}
+                              {(isAdmin || (isOwnRow && (s === 'draft_pending' || s === 'draft_rejected'))) && (
                                 <button type="button" title="Delete" onClick={() => onDelete(row.expense_id)}
                                   className="rounded-md bg-danger px-2.5 py-1.5 text-white transition hover:bg-danger/90">
                                   <FontAwesomeIcon icon={faTrashCan} />
@@ -600,10 +596,10 @@ const ExpensePrototype: React.FC = () => {
                             </>
                           )}
 
-                          {/* ── NON-DRAFT TABS ── */}
+                          {/* ── NON-DRAFT TABS (approved, pending, rejected) ── */}
                           {activeTab !== 'drafts' && (
                             <>
-                              {/* Edit: own rejected expense or admin */}
+                              {/* Edit: Admin can edit any, Employee can edit own rejected */}
                               {(isAdmin || (isOwnRow && s === 'rejected')) && (
                                 <button type="button" title="Edit" onClick={() => openEditModal(row)}
                                   className="rounded-md bg-warning px-2.5 py-1.5 text-white transition hover:bg-warning/90">
@@ -611,18 +607,25 @@ const ExpensePrototype: React.FC = () => {
                                 </button>
                               )}
 
-                              {/* Resubmit: own rejected expense (not admin) */}
-                              {(!isAdmin && isOwnRow && s === 'rejected') && (
+                              {/* Resubmit: Owner of rejected expense can resubmit (regardless of admin status) */}
+                              {(isOwnRow && s === 'rejected') && (
                                 <button type="button" title="Resubmit Expense"
                                   onClick={() => handleResubmit(row.expense_id)}
-                                  className="rounded-md bg-blue-500 px-2.5 py-1.5 text-white transition hover:bg-blue-600">
-                                  <FontAwesomeIcon icon={faPaperPlane} className="mr-1" />
-                                  Resubmit
+                                  disabled={resubmittingId === row.expense_id}
+                                  className="rounded-md bg-blue-500 px-2.5 py-1.5 text-white transition hover:bg-blue-600 disabled:opacity-50">
+                                  {resubmittingId === row.expense_id ? (
+                                    '...'
+                                  ) : (
+                                    <>
+                                      <FontAwesomeIcon icon={faPaperPlane} className="mr-1" />
+                                      Resubmit
+                                    </>
+                                  )}
                                 </button>
                               )}
 
-                              {/* Admin approve/reject pending */}
-                              {isAdmin && activeTab === 'pending' && (
+                              {/* Admin Approve/Reject Pending Expenses */}
+                              {isAdmin && activeTab === 'pending' && s === 'pending' && (
                                 <>
                                   <button type="button" title="Approve"
                                     onClick={() => openStatusModal(row, 'approved')}
@@ -637,7 +640,7 @@ const ExpensePrototype: React.FC = () => {
                                 </>
                               )}
 
-                              {/* Delete: own pending or admin */}
+                              {/* Delete: Admin can delete any, Employee can delete own pending */}
                               {(isAdmin || (isOwnRow && s === 'pending')) && (
                                 <button type="button" title="Delete" onClick={() => onDelete(row.expense_id)}
                                   className="rounded-md bg-danger px-2.5 py-1.5 text-white transition hover:bg-danger/90">
@@ -667,15 +670,15 @@ const ExpensePrototype: React.FC = () => {
             </h3>
             <div className="grid grid-cols-1 gap-3 text-sm md:grid-cols-2">
               {[
-                { label: 'Status',       value: statusBadge(viewingExpense.status) },
-                { label: 'Employee',     value: viewingExpense.employee_name || '-' },
-                { label: 'Type',         value: (viewingExpense.expense_type || 'direct_expense').replace('_', ' ') },
-                { label: 'Project',      value: viewingExpense.project_name || '-' },
-                { label: 'Site',         value: viewingExpense.site_location || '-' },
-                { label: 'Category',     value: viewingExpense.category || '-' },
-                { label: 'Vendor',       value: viewingExpense.vendor_name || '-' },
-                { label: 'Amount',       value: viewingExpense.amount ? `₹${Number(viewingExpense.amount).toLocaleString('en-IN')}` : '-' },
-                { label: 'Date',         value: viewingExpense.expense_date ? viewingExpense.expense_date.slice(0, 10) : '-' },
+                { label: 'Status', value: statusBadge(viewingExpense.status) },
+                { label: 'Employee', value: viewingExpense.employee_name || '-' },
+                { label: 'Type', value: (viewingExpense.expense_type || 'direct_expense').replace('_', ' ') },
+                { label: 'Project', value: viewingExpense.project_name || '-' },
+                { label: 'Site', value: viewingExpense.site_location || '-' },
+                { label: 'Category', value: viewingExpense.category || '-' },
+                { label: 'Vendor', value: viewingExpense.vendor_name || '-' },
+                { label: 'Amount', value: viewingExpense.amount ? `₹${Number(viewingExpense.amount).toLocaleString('en-IN')}` : '-' },
+                { label: 'Date', value: viewingExpense.expense_date ? viewingExpense.expense_date.slice(0, 10) : '-' },
                 { label: 'Payment Mode', value: viewingExpense.payment_mode || '-' },
               ].map(({ label, value }) => (
                 <div key={label} className="rounded-md bg-gray-50 p-3 dark:bg-meta-4/20">
@@ -747,9 +750,8 @@ const ExpensePrototype: React.FC = () => {
               <button type="button"
                 disabled={statusSaving || (statusModal.action === 'rejected' && !statusRemark.trim())}
                 onClick={submitStatusChange}
-                className={`rounded-lg px-5 py-2.5 text-white transition disabled:opacity-60 ${
-                  statusModal.action === 'approved' ? 'bg-emerald-600 hover:bg-emerald-700' : 'bg-red-500 hover:bg-red-600'
-                }`}>
+                className={`rounded-lg px-5 py-2.5 text-white transition disabled:opacity-60 ${statusModal.action === 'approved' ? 'bg-emerald-600 hover:bg-emerald-700' : 'bg-red-500 hover:bg-red-600'
+                  }`}>
                 {statusSaving ? 'Saving...' : statusModal.action === 'approved' ? 'Approve' : 'Reject'}
               </button>
             </div>
@@ -787,9 +789,8 @@ const ExpensePrototype: React.FC = () => {
               <button type="button"
                 disabled={draftSaving || (draftModal.action === 'draft_rejected' && !draftRemark.trim())}
                 onClick={submitDraftStatusChange}
-                className={`rounded-lg px-5 py-2.5 text-white transition disabled:opacity-60 ${
-                  draftModal.action === 'draft_approved' ? 'bg-emerald-600 hover:bg-emerald-700' : 'bg-red-500 hover:bg-red-600'
-                }`}>
+                className={`rounded-lg px-5 py-2.5 text-white transition disabled:opacity-60 ${draftModal.action === 'draft_approved' ? 'bg-emerald-600 hover:bg-emerald-700' : 'bg-red-500 hover:bg-red-600'
+                  }`}>
                 {draftSaving
                   ? 'Saving...'
                   : draftModal.action === 'draft_approved' ? 'Approve Draft' : 'Reject Draft'}

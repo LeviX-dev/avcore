@@ -1,9 +1,9 @@
 import React, { useEffect, useState } from 'react';
 import axios from 'axios';
 import { BASE_URL } from '../../../public/config.js';
-import AddExpenseCategoryForm from './AddExpenseCategoryForm';
-import EditExpenseCategoryForm from './EditExpenseCategoryForm';
-import Breadcrumb from '../../components/Breadcrumbs/Breadcrumb';
+import AddExpenseCategoryForm from './AddExpenseCategoryForm.js';
+import EditExpenseCategoryForm from './EditExpenseCategoryForm.js';
+import Breadcrumb from '../../components/Breadcrumbs/Breadcrumb.js';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faEdit, faTrashCan } from '@fortawesome/free-solid-svg-icons';
 

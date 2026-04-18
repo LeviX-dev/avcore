@@ -106,6 +106,8 @@ import WalletManagement from './pages/Wallet/WalletManagement';
 import WalletTransactions from './pages/Wallet/WalletTransactions';
 
 
+import ExpenseReports from './pages/Report/ExpenseReports';
+
 
 
 function App() {
@@ -649,6 +651,18 @@ function App() {
   }
 />
 
+
+<Route
+  path="/expense/reports"
+  element={
+    <ProtectedRoute menuKey="expense.reports">
+      <DefaultLayout userRole={userRole}>
+        <PageTitle title="Expense Reports" />
+        <ExpenseReports />
+      </DefaultLayout>
+    </ProtectedRoute>
+  }
+/>
 
 <Route
   path="/attendance-report"

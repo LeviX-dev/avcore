@@ -122,7 +122,7 @@ const initialForm: ExpenseForm = {
   remark: '',
 };
 
-const DRAFT_STATUSES = ['draft', 'draft_pending', 'draft_rejected'];
+const DRAFT_STATUSES = ['draft_pending', 'draft_approved', 'draft_rejected'];
 
 // ─── Component ────────────────────────────────────────────────────────────────
 
@@ -144,21 +144,18 @@ const ExpenseEntryModal: React.FC<Props> = ({
   const [saving, setSaving] = useState(false);
   const [feedback, setFeedback] = useState<string | null>(null);
 
-  // ── expense_mode: 'direct' = deduct wallet on submit
-  //                 'draft'  = send for admin review first, wallet deducted on "Make Expense"
+  // expense_mode: 'direct' = deduct wallet now, 'draft' = send for admin review
   const [expenseMode, setExpenseMode] = useState<'direct' | 'draft'>('direct');
 
-  // ── Wallet balance (fetch for selected employee if admin, else self)
+  // Wallet balance
   const [walletBalance, setWalletBalance] = useState<number | null>(null);
   const [walletLoading, setWalletLoading] = useState(false);
 
-  // Helper: get userId to fetch wallet for
   const getWalletUserId = () => {
     if (canSelectAnyEmployee && form.employee_id) return form.employee_id;
     return currentUserId ? String(currentUserId) : '';
   };
 
-  // Fetch wallet balance for selected user
   const fetchWalletBalance = (userId: string) => {
     if (!userId) { setWalletBalance(null); return; }
     setWalletLoading(true);
@@ -172,24 +169,16 @@ const ExpenseEntryModal: React.FC<Props> = ({
       .finally(() => setWalletLoading(false));
   };
 
-  // On open or employee change, fetch correct wallet
   useEffect(() => {
-    if (open) {
-      fetchWalletBalance(getWalletUserId());
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    if (open) fetchWalletBalance(getWalletUserId());
   }, [open, form.employee_id, canSelectAnyEmployee]);
-
-  // ── Populate form when editing ────────────────────────────────────────────
 
   useEffect(() => {
     if (!open) return;
     if (editingExpense) {
       setForm({
         expense_type: editingExpense.expense_type === 'project_expense' ? 'project_expense' : 'direct_expense',
-        employee_id: editingExpense.employee_id
-          ? String(editingExpense.employee_id)
-          : currentUserId ? String(currentUserId) : '',
+        employee_id: editingExpense.employee_id ? String(editingExpense.employee_id) : (currentUserId ? String(currentUserId) : ''),
         project_master_id: editingExpense.project_master_id ? String(editingExpense.project_master_id) : '',
         project_name: editingExpense.project_name || '',
         site_location: editingExpense.site_location || '',
@@ -206,14 +195,11 @@ const ExpenseEntryModal: React.FC<Props> = ({
         attachment_name: editingExpense.attachment_name || '',
         remark: editingExpense.remark || '',
       });
-      // Lock mode based on existing status — can't change on edit
       setExpenseMode(DRAFT_STATUSES.includes(editingExpense.status || '') ? 'draft' : 'direct');
     } else {
       setForm({
         ...initialForm,
-        employee_id: currentUserId
-          ? String(currentUserId)
-          : employees[0] ? String(employees[0].user_id) : '',
+        employee_id: currentUserId ? String(currentUserId) : (employees[0] ? String(employees[0].user_id) : ''),
       });
       setExpenseMode('direct');
     }
@@ -222,23 +208,16 @@ const ExpenseEntryModal: React.FC<Props> = ({
     setSaving(false);
   }, [open, editingExpense, currentUserId, employees]);
 
-  // Reset mode when modal closes
   useEffect(() => {
     if (!open) setExpenseMode('direct');
   }, [open]);
 
   if (!open) return null;
 
-  // ── Helpers ───────────────────────────────────────────────────────────────
-
-  const isEditing   = Boolean(editingExpense);
+  const isEditing = Boolean(editingExpense);
   const editingStatus = editingExpense?.status || '';
 
-  // ── Handlers ──────────────────────────────────────────────────────────────
-
-  const onChange = (
-    e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>
-  ) => {
+  const onChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
 
     if (name === 'expense_type') {
@@ -254,7 +233,6 @@ const ExpenseEntryModal: React.FC<Props> = ({
 
     if (name === 'employee_id') {
       setForm((prev) => ({ ...prev, employee_id: value }));
-      // Wallet will be fetched by useEffect
       return;
     }
 
@@ -282,8 +260,6 @@ const ExpenseEntryModal: React.FC<Props> = ({
     setForm((prev) => ({ ...prev, [name]: value }));
   };
 
-  // ── Validation ────────────────────────────────────────────────────────────
-
   const validate = () => {
     if (!form.expense_type) return 'Expense type is required';
     if (!form.employee_id) return 'Employee is required';
@@ -292,22 +268,15 @@ const ExpenseEntryModal: React.FC<Props> = ({
     if (!form.category_id) return 'Expense category is required';
     if (!form.amount) return 'Amount is required';
     if (!form.expense_date) return 'Expense date is required';
-    if (!form.vendor_id && !form.vendor_name) return 'Vendor is required';
-    if (!form.payment_mode) return 'Payment mode is required';
-    if (!form.bill_number) return 'Bill number is required';
+    if (expenseMode === 'direct') {
+      if (!form.vendor_id && !form.vendor_name) return 'Vendor is required';
+      if (!form.payment_mode) return 'Payment mode is required';
+      if (!form.bill_number) return 'Bill number is required';
+    }
     return null;
   };
 
-  const validateDraft = () => {
-    if (!form.employee_id) return 'Employee is required';
-    if (!form.amount) return 'Amount is required';
-    if (!form.expense_date) return 'Expense date is required';
-    return null;
-  };
-
-  // ── Build FormData ────────────────────────────────────────────────────────
-
-  const buildPayload = (statusToSend: string): FormData => {
+  const buildPayload = (): FormData => {
     const payload = new FormData();
     payload.append('expense_type', form.expense_type);
     payload.append('employee_id', form.employee_id);
@@ -326,30 +295,18 @@ const ExpenseEntryModal: React.FC<Props> = ({
     payload.append('remark', form.remark || '');
     payload.append('attachment_path', form.attachment_path);
     payload.append('attachment_name', form.attachment_name);
-    payload.append('status', statusToSend);
     payload.append('expense_mode', expenseMode);
     if (attachmentFile) payload.append('attachment', attachmentFile);
     return payload;
   };
 
-  // ── Submit ────────────────────────────────────────────────────────────────
-  //
-  // mode = 'save_draft' → minimal validation, status='draft' (just save)
-  // mode = 'submit'     → full validation, status='pending'
-  //                        server reads expense_mode to decide draft_pending vs pending
-
-  const submit = async (e?: React.MouseEvent<HTMLButtonElement>) => {
-    // Always goes to server for full processing
-    //   - expense_mode='draft'  → server sets status='draft_pending' (admin review)
-    //   - expense_mode='direct' → server sets status='pending' (wallet deducted)
+  const submit = async () => {
     const error = validate();
     if (error) { setFeedback(error); return; }
 
     setSaving(true);
     setFeedback(null);
-
-    const statusToSend = 'pending';
-    const payload = buildPayload(statusToSend);
+    const payload = buildPayload();
 
     try {
       if (editingExpense?.expense_id) {
@@ -370,25 +327,20 @@ const ExpenseEntryModal: React.FC<Props> = ({
     }
   };
 
-  // ── Submit button label ───────────────────────────────────────────────────
-
   const submitLabel = () => {
     if (saving) return 'Submitting...';
     if (isEditing) {
       if (editingStatus === 'draft_rejected') return 'Resubmit for Review';
-      if (editingStatus === 'rejected')       return 'Resubmit Expense';
+      if (editingStatus === 'rejected') return 'Resubmit Expense';
       return 'Update Expense';
     }
-    return expenseMode === 'draft' ? 'Submit for Review' : 'Submit Expense';
+    return expenseMode === 'draft' ? 'Save as Draft' : 'Submit Expense';
   };
-
-  // ─── Render ───────────────────────────────────────────────────────────────
 
   return (
     <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black bg-opacity-50 px-2 pt-20 pb-6 lg:pl-72">
       <div className="w-[92%] rounded-lg bg-white p-6 shadow-lg dark:bg-boxdark sm:w-[80%] lg:w-[70%]">
 
-        {/* Header */}
         <div className="mb-5 flex items-center justify-between">
           <h3 className="text-lg font-semibold text-black dark:text-white">
             {isEditing ? 'Edit Expense' : 'Add Expense'}
@@ -397,17 +349,15 @@ const ExpenseEntryModal: React.FC<Props> = ({
             <span className={`rounded-full px-3 py-1 text-xs font-medium capitalize ${
               editingStatus === 'approved'       ? 'bg-emerald-100 text-emerald-700' :
               editingStatus === 'rejected'       ? 'bg-red-100 text-red-600' :
-              editingStatus === 'draft'          ? 'bg-gray-100 text-gray-600' :
               editingStatus === 'draft_pending'  ? 'bg-yellow-100 text-yellow-700' :
               editingStatus === 'draft_approved' ? 'bg-emerald-100 text-emerald-700' :
               editingStatus === 'draft_rejected' ? 'bg-red-100 text-red-600' :
                                                    'bg-yellow-100 text-yellow-700'
             }`}>
               {{
-                draft:          'Saved',
                 draft_pending:  'Awaiting Review',
-                draft_approved: 'Approved',
-                draft_rejected: 'Rejected',
+                draft_approved: 'Draft Approved',
+                draft_rejected: 'Draft Rejected',
                 approved:       'Approved',
                 pending:        'Pending',
                 rejected:       'Rejected',
@@ -416,7 +366,6 @@ const ExpenseEntryModal: React.FC<Props> = ({
           )}
         </div>
 
-        {/* ── Expense Mode Toggle (only when ADDING new expense) ── */}
         {!isEditing && (
           <div className="mb-5">
             <div className="flex gap-2">
@@ -443,19 +392,10 @@ const ExpenseEntryModal: React.FC<Props> = ({
                 Draft (Request First)
               </button>
             </div>
-            <p className={`mt-1.5 text-xs ${
-              expenseMode === 'direct'
-                ? 'text-gray-500 dark:text-gray-400'
-                : 'text-yellow-600 dark:text-yellow-400'
-            }`}>
-              {expenseMode === 'direct'
-                ? 'Amount will be deducted from company wallet immediately on submit.'
-                : 'Draft sent for admin review first. Wallet is only deducted when you click "Make Expense".'}
-            </p>
+           
           </div>
         )}
 
-        {/* Rejected notice */}
         {isEditing && (editingStatus === 'rejected' || editingStatus === 'draft_rejected') && editingExpense?.status_remark && (
           <div className="mb-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 dark:border-red-700/40 dark:bg-red-950/30 dark:text-red-400">
             <strong>Rejected:</strong> {editingExpense.status_remark}
@@ -470,7 +410,6 @@ const ExpenseEntryModal: React.FC<Props> = ({
 
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
 
-          {/* ── Available Budget card — TOP of form ── */}
           <div className="md:col-span-2 xl:col-span-3">
             <div className="rounded-lg border border-stroke bg-gray-50 px-4 py-2.5 dark:border-strokedark dark:bg-meta-4/20">
               {walletLoading ? (
@@ -478,10 +417,8 @@ const ExpenseEntryModal: React.FC<Props> = ({
               ) : walletBalance !== null ? (
                 <div className="flex items-center justify-between">
                   <p className="text-xs text-gray-500 dark:text-gray-300">Available Budget</p>
-                  <p className="text-sm font-semibold text-blue-600 dark:text-blue-400">
-                    <span className={walletBalance < 0 ? 'text-red-600 dark:text-red-400' : 'text-blue-600 dark:text-blue-400'}>
-                      {walletBalance < 0 ? '−' : '₹'}{Math.abs(walletBalance).toLocaleString('en-IN')}
-                    </span>
+                  <p className={`text-sm font-semibold ${walletBalance < 0 ? 'text-red-600 dark:text-red-400' : 'text-blue-600 dark:text-blue-400'}`}>
+                    {walletBalance < 0 ? '−' : '₹'}{Math.abs(walletBalance).toLocaleString('en-IN')}
                   </p>
                 </div>
               ) : (
@@ -490,7 +427,6 @@ const ExpenseEntryModal: React.FC<Props> = ({
             </div>
           </div>
 
-          {/* Expense Type */}
           <div>
             <label className="mb-2 block text-sm font-medium text-black dark:text-white">Expense Type</label>
             <select name="expense_type" value={form.expense_type} onChange={onChange}
@@ -500,7 +436,6 @@ const ExpenseEntryModal: React.FC<Props> = ({
             </select>
           </div>
 
-          {/* Employee */}
           <div>
             <label className="mb-2 block text-sm font-medium text-black dark:text-white">Employee</label>
             <select name="employee_id" value={form.employee_id} onChange={onChange}
@@ -513,13 +448,11 @@ const ExpenseEntryModal: React.FC<Props> = ({
             </select>
           </div>
 
-          {/* Project */}
           {form.expense_type === 'project_expense' && (
             <div>
               <label className="mb-2 block text-sm font-medium text-black dark:text-white">Project</label>
               <select name="project_master_id" value={form.project_master_id} onChange={onChange}
-                className="w-full rounded-lg border border-stroke bg-transparent px-4 py-3 text-black dark:border-strokedark dark:text-white"
-                required>
+                className="w-full rounded-lg border border-stroke bg-transparent px-4 py-3 text-black dark:border-strokedark dark:text-white" required>
                 <option value="">Select project</option>
                 {projects.map((p) => (
                   <option key={p.master_id} value={p.master_id}>{p.project_name}</option>
@@ -528,7 +461,6 @@ const ExpenseEntryModal: React.FC<Props> = ({
             </div>
           )}
 
-          {/* Site Location */}
           {form.expense_type === 'project_expense' && (
             <div>
               <label className="mb-2 block text-sm font-medium text-black dark:text-white">Site / Location</label>
@@ -542,7 +474,6 @@ const ExpenseEntryModal: React.FC<Props> = ({
             </div>
           )}
 
-          {/* Category */}
           <div>
             <label className="mb-2 block text-sm font-medium text-black dark:text-white">Expense Category</label>
             <select name="category_id" value={form.category_id} onChange={onChange}
@@ -554,7 +485,6 @@ const ExpenseEntryModal: React.FC<Props> = ({
             </select>
           </div>
 
-          {/* Vendor Type */}
           <div>
             <label className="mb-2 block text-sm font-medium text-black dark:text-white">Vendor Type</label>
             <select name="vendor_source" value={form.vendor_source} onChange={onChange}
@@ -564,7 +494,6 @@ const ExpenseEntryModal: React.FC<Props> = ({
             </select>
           </div>
 
-          {/* Vendor */}
           {form.vendor_source === 'vendor' ? (
             <div>
               <label className="mb-2 block text-sm font-medium text-black dark:text-white">Vendor</label>
@@ -587,7 +516,6 @@ const ExpenseEntryModal: React.FC<Props> = ({
             </div>
           )}
 
-          {/* Payment Mode */}
           <div>
             <label className="mb-2 block text-sm font-medium text-black dark:text-white">Payment Mode</label>
             <select name="payment_mode" value={form.payment_mode} onChange={onChange}
@@ -597,39 +525,41 @@ const ExpenseEntryModal: React.FC<Props> = ({
                 <option key={m.value} value={m.value}>{m.label}</option>
               ))}
             </select>
+            {expenseMode === 'direct' && !form.payment_mode && (
+              <p className="mt-1 text-xs text-orange-500">Required for direct expense</p>
+            )}
           </div>
 
-          {/* Bill Number */}
           <div>
             <label className="mb-2 block text-sm font-medium text-black dark:text-white">Bill Number</label>
             <input name="bill_number" value={form.bill_number} onChange={onChange}
               placeholder="Bill / invoice number"
               className="w-full rounded-lg border border-stroke bg-transparent px-4 py-3 text-black dark:border-strokedark dark:text-white" />
+            {expenseMode === 'direct' && !form.bill_number && (
+              <p className="mt-1 text-xs text-orange-500">Required for direct expense</p>
+            )}
           </div>
 
-          {/* Amount */}
           <div>
             <label className="mb-2 block text-sm font-medium text-black dark:text-white">Amount (₹)</label>
             <input name="amount" type="number" min="0" step="0.01" value={form.amount} onChange={onChange}
               placeholder="0.00"
               className="w-full rounded-lg border border-stroke bg-transparent px-4 py-3 text-black dark:border-strokedark dark:text-white" required />
+           
           </div>
 
-          {/* Expense Date */}
           <div>
             <label className="mb-2 block text-sm font-medium text-black dark:text-white">Expense Date</label>
             <input name="expense_date" type="date" value={form.expense_date} onChange={onChange}
               className="w-full rounded-lg border border-stroke bg-transparent px-4 py-3 text-black dark:border-strokedark dark:text-white" required />
           </div>
 
-          {/* Description */}
           <div className="xl:col-span-3">
             <label className="mb-2 block text-sm font-medium text-black dark:text-white">Description</label>
             <textarea name="description" value={form.description} onChange={onChange} rows={3}
               className="w-full rounded-lg border border-stroke bg-transparent px-4 py-3 text-black dark:border-strokedark dark:text-white" />
           </div>
 
-          {/* Attachment */}
           <div className="xl:col-span-2">
             <label className="mb-2 block text-sm font-medium text-black dark:text-white">
               Attachment (Bill / Invoice)
@@ -642,7 +572,6 @@ const ExpenseEntryModal: React.FC<Props> = ({
               className="w-full rounded-lg border border-stroke bg-transparent px-4 py-3 text-black dark:border-strokedark dark:text-white" />
           </div>
 
-          {/* Remark */}
           <div className="xl:col-span-1">
             <label className="mb-2 block text-sm font-medium text-black dark:text-white">Remark</label>
             <input name="remark" value={form.remark} onChange={onChange}
@@ -650,14 +579,11 @@ const ExpenseEntryModal: React.FC<Props> = ({
               className="w-full rounded-lg border border-stroke bg-transparent px-4 py-3 text-black dark:border-strokedark dark:text-white" />
           </div>
 
-          {/* ── Buttons ── */}
           <div className="xl:col-span-3 mt-2 flex flex-wrap justify-end gap-3">
             <button type="button" onClick={onClose}
               className="rounded-lg bg-gray-300 px-5 py-2.5 text-black transition hover:bg-gray-400 dark:bg-gray-600 dark:text-white">
               Cancel
             </button>
-
-            {/* Only one submit button for add or edit, backend enforces status transitions */}
             <button type="button" disabled={saving} onClick={submit}
               className="rounded-lg bg-blue-500 px-5 py-2.5 text-white transition hover:bg-blue-600 disabled:opacity-70">
               {submitLabel()}

@@ -2,7 +2,34 @@ import db from '../database/db.js';
 import WalletService from '../services/walletService.js';
 
   // --- USER ENDPOINTS ---
-
+// GET /api/wallet/admin/wallet/all-transactions
+export const getAllWalletTransactions = async (req, res) => {
+  try {
+    const user = req.session?.user;
+    if (!user || !['admin','hr','sub_admin','accountant'].includes(user.role)) {
+      return res.status(403).json({ success: false, message: 'Forbidden' });
+    }
+    const { page = 1, pageSize = 20, type, status, from, to } = req.query;
+    const offset = (page - 1) * pageSize;
+    let where = 'WHERE 1=1';
+    const params = [];
+    if (type) { where += ' AND transaction_type = ?'; params.push(type); }
+    if (status) { where += ' AND status = ?'; params.push(status); }
+    if (from) { where += ' AND created_at >= ?'; params.push(from); }
+    if (to) { where += ' AND created_at <= ?'; params.push(to); }
+    const [rows] = await db.query(
+      `SELECT * FROM wallet_transactions ${where} ORDER BY created_at DESC LIMIT ? OFFSET ?`,
+      [...params, +pageSize, +offset]
+    );
+    const [[{ total }]] = await db.query(
+      `SELECT COUNT(*) as total FROM wallet_transactions ${where}`,
+      params
+    );
+    res.json({ success: true, data: rows, total });
+  } catch (err) {
+    res.status(500).json({ success: false, message: 'Failed to fetch all transactions' });
+  }
+};
   // POST /api/wallet/topup-request
   export const submitTopupRequest = async (req, res) => {
     try {
@@ -33,6 +60,9 @@ import WalletService from '../services/walletService.js';
   export const getMyTopupRequests = async (req, res) => {
     try {
       const user = req.session?.user;
+      console.log(req.session)
+      console.log('Session user:', user);
+      
       if (!user) return res.status(401).json({ success: false, message: 'Unauthorized' });
       const [rows] = await db.query(
         `SELECT * FROM wallet_topup_requests WHERE requested_by = ? ORDER BY requested_at DESC`,
@@ -47,7 +77,11 @@ import WalletService from '../services/walletService.js';
   // GET /api/wallet/balance
   export const getMyWalletBalance = async (req, res) => {
     try {
-   const user = req.query.user_id;
+      const user = req.query.user_id || req.session?.user?.id;
+      if (!user) {
+        return res.status(401).json({ success: false, message: 'Unauthorized' });
+      }
+  
       if (!user) return res.status(401).json({ success: false, message: 'Unauthorized' });
       const [[row]] = await db.query(
         `SELECT wallet_balance, total_credited, total_debited FROM users WHERE user_id = ?`,
@@ -55,6 +89,7 @@ import WalletService from '../services/walletService.js';
       );
       res.json({ success: true, data: row });
     } catch (err) {
+      console.log(err)
       res.status(500).json({ success: false, message: 'Failed to fetch wallet balance' });
     }
   };
@@ -155,7 +190,8 @@ import WalletService from '../services/walletService.js';
   export const getAllUsersWithWallet = async (req, res) => {
     try {
       const user = req.session?.user;
-      if (!user || !['admin','hr','sub_admin','accountant'].includes(user.role)) return res.status(403).json({ success: false, message: 'Forbidden' });
+     // uncomment below line to restrict this endpoint to admin/HR only, but currently allowing all logged in users to access for better UX in expense entry where they can see their own balance and transactions along with colleagues for better transparency
+      // if (!user || !['admin','hr','sub_admin','accountant'].includes(user.role)) return res.status(403).json({ success: false, message: 'Forbidden' });
       const [rows] = await db.query(
         `SELECT user_id, name, email, role, wallet_balance, total_credited, total_debited FROM users`
       );
@@ -169,7 +205,9 @@ import WalletService from '../services/walletService.js';
 export const getUsersList = async (req, res) => {
   try {
     const user = req.session?.user;
-    if (!user || !['admin','hr','hr_executive','accountant','sub_admin'].includes(user.role)) return res.status(403).json({ success: false, message: 'Forbidden' });
+
+    // /enable if want to restrict this endpoint to admin/HR only, but currently allowing all logged in users to access for better UX in expense entry
+    // if (!user || !['admin','hr','hr_executive','accountant','sub_admin'].includes(user.role)) return res.status(403).json({ success: false, message: 'Forbidden' });
     const [rows] = await db.query(
       `SELECT user_id, name, email, role FROM users WHERE role NOT IN ('admin','hr','accountant','sub_admin') AND status = 'active' ORDER BY name ASC`
     );

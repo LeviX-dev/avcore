@@ -854,7 +854,7 @@ const ViewQuotation = () => {
                   PRODUCT DESCRIPTION
                 </th>
                 <th className="border-2 border-black p-1 w-24  text-black font-extrabold ">
-                  QUANTITY
+                  QTY/PRICE
                 </th>
                 <th className="border-2 border-black p-1 w-24  text-black font-extrabold ">
                   PICTURE

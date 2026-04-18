@@ -55,7 +55,7 @@ export const WalletService = {
       const [[user]] = await conn.query('SELECT wallet_balance, total_debited FROM users WHERE user_id = ?', [userId]);
       if (!user) throw new Error('User not found');
       const balanceBefore = parseFloat(user.wallet_balance);
-      if (balanceBefore < amount) throw new Error('Insufficient wallet balance');
+      // ALLOW NEGATIVE BALANCE: Remove insufficient balance check
       const balanceAfter = balanceBefore - parseFloat(amount);
       // Insert transaction
       await conn.query(
@@ -91,7 +91,7 @@ export const WalletService = {
       const [[user]] = await conn.query('SELECT wallet_balance FROM users WHERE user_id = ?', [userId]);
       if (!user) throw new Error('User not found');
       const balanceBefore = parseFloat(user.wallet_balance);
-      if (balanceBefore < amount) throw new Error('Insufficient wallet balance');
+      // ALLOW NEGATIVE BALANCE: Remove insufficient balance check
       const balanceAfter = balanceBefore - parseFloat(amount);
       // Insert hold transaction (status: pending)
       await conn.query(

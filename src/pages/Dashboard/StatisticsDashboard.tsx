@@ -579,11 +579,11 @@ const StatisticsDashboard = () => {
                   <div className="flex justify-between items-center mb-4">
                     <div>
                       <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
-                        {isAdminOrSubAdmin ? 'Area-wise Active Leads' : 'Your Leads by Area'}
+                        {isAdminOrSubAdmin ? 'City-wise Active Leads' : 'Your Leads by Area'}
                       </h2>
                       <p className="text-sm text-gray-500 dark:text-gray-400">
                         {isAdminOrSubAdmin
-                          ? `Showing ${Object.keys(filteredAreaData).length} areas in Maharashtra - Click any bar to view leads in that area`
+                          ? `Showing ${Object.keys(filteredAreaData).length} City in Maharashtra - Click any bar to view leads in that area`
                           : `Your leads across ${Object.keys(filteredAreaData).length} areas - Click to view`}
                       </p>
                     </div>
