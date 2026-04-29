@@ -10,6 +10,12 @@ createKit , getKits , getProductsByCategory , getKitById , updateKit , toggleKit
  getProductsAndKitsByCategory ,  createQuotation ,  getQuotationByMasterId , 
 getQuotationRevisionsByMasterId , updateQuotationWithRevision , getQuotationForEdit  , 
 getLatestQuotation , customisedCategoryList ,  getAllCategories ,
+addAdditionalChargeController ,
+getAdditionalChargesController ,
+updateAdditionalChargeController ,
+deleteAdditionalChargeController ,
+updateAdditionalChargeStatusController ,
+
 
 
 } from '../controllers/masterController.js';
@@ -75,7 +81,7 @@ router.get('/category-products-kits/:cat_id', getProductsAndKitsByCategory);
 router.post('/quotation', createQuotation);
 
 // router.get('/quotation/:master_id', getQuotationByMasterId);
-router.get('/quotation/:master_id/:revision', getQuotationByMasterId);
+// router.get('/quotation/:master_id/:revision', getQuotationByMasterId);
 
 router.get('/revisions/:master_id', getQuotationRevisionsByMasterId);
 
@@ -100,6 +106,17 @@ router.put('/quotation/:qt_id', updateQuotationWithRevision);
 
 router.get('/quotation/:qt_id/revision/:revision', getQuotationForEdit);
 
+
+
+
+//charges 
+
+// Additional Charges Master Routes
+router.post('/additional-charges', addAdditionalChargeController);
+router.get('/additional-charges', getAdditionalChargesController);
+router.put('/additional-charges/:id', updateAdditionalChargeController);
+router.delete('/additional-charges/:id', deleteAdditionalChargeController);
+router.patch('/additional-charges/:id/status', updateAdditionalChargeStatusController);
 
 
 export default router;

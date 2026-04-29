@@ -223,30 +223,39 @@ const QuotationRevisionPage = () => {
                     </div>
                   </td>
 
-                  {/* Total - Smaller Font */}
-                  <td className="py-3 px-4">
-                    <div className="flex flex-col items-start">
-                      <div className="text-lg font-bold text-green-600 dark:text-green-400 mb-0.5">
-                        ₹{' '}
-                        {rev.totals
-                          ? Number(
-                              rev.totals.with_gst &&
-                                rev.totals.with_gst !== '0.00'
-                                ? rev.totals.with_gst
-                                : rev.totals.without_gst,
-                            ).toLocaleString('en-IN', {
-                              minimumFractionDigits: 2,
-                            })
-                          : calculateRevisionTotal(rev)}
-                      </div>
+                {/* Total - shows finalized total like ViewQuotation */}
+<td className="py-3 px-4">
+  <div className="flex flex-col items-start">
 
-                      <div className="text-[11px] text-gray-600 dark:text-gray-400">
-                        {rev.totals?.with_gst && rev.totals.with_gst !== '0.00'
-                          ? 'Incl. GST'
-                          : 'Excl. GST'}
-                      </div>
-                    </div>
-                  </td>
+    {/* ✅ Show finalized total (after discount) if available */}
+    <div className="text-lg font-bold text-green-600 dark:text-green-400 mb-0.5">
+      ₹{' '}
+      {rev.finalized_total != null && rev.finalized_total > 0
+        ? Number(rev.finalized_total).toLocaleString('en-IN', { minimumFractionDigits: 2 })
+        : rev.totals
+          ? Number(
+              rev.totals.with_gst && rev.totals.with_gst !== '0.00'
+                ? rev.totals.with_gst
+                : rev.totals.without_gst
+            ).toLocaleString('en-IN', { minimumFractionDigits: 2 })
+          : calculateRevisionTotal(rev)}
+    </div>
+
+    {/* ✅ Show discount badge if final offer was applied */}
+    {rev.final_offer_amount > 0 && (
+      <div className="text-[11px] text-orange-600 dark:text-orange-400 font-semibold">
+        Discount: ₹{Number(rev.final_offer_amount).toLocaleString('en-IN')}
+      </div>
+    )}
+
+    <div className="text-[11px] text-gray-600 dark:text-gray-400">
+      {rev.totals?.with_gst && rev.totals.with_gst !== '0.00'
+        ? 'Incl. GST'
+        : 'Excl. GST'}
+    </div>
+
+  </div>
+</td>
 
                   {/* Created Info */}
                   <td className="py-3 px-4">

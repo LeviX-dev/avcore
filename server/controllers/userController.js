@@ -114,7 +114,7 @@ const ROLE_HIERARCHY = {
     description: 'Business Head (Sub Admin)'
   },
   tele_caller: {
-    canSee: ['tele_caller', 'field_marketing_executive', 'admin', 'sub_admin'],
+    canSee: ['tele_caller', 'field_marketing_executive', 'admin', 'sub_admin', 'junior_autocad_designer', 'senior_autocad_designer'],
     description: 'Tele Caller'
   },
   digital_marketing: {

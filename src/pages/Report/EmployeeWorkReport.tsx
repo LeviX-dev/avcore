@@ -12,8 +12,11 @@ interface EmployeeWork {
   current_stage: string;
   category: string;
   reference_name: string;
+
+  worked_by: string;   // ✅ ADD THIS
   assigned_by: string;
   assigned_to: string;
+
   reassigned_stage: string;
   remark: string;
   created_at: string;
@@ -76,9 +79,9 @@ const TableRow = memo(({ row, index, onCityClick, onRemarkClick, onClientClick }
       <td className="p-2 text-gray-600 dark:text-gray-400 whitespace-nowrap">
         {formatDate(row.created_at)}
        </td>
-      <td className="p-2 font-medium whitespace-nowrap">
-        {formatField(row.assigned_to)}
-       </td>
+     <td className="p-2 font-medium whitespace-nowrap">
+  {formatField(row.worked_by)}
+</td>
       
       <td className="p-2 max-w-[160px]">
   {row.client_name ? (
@@ -315,7 +318,7 @@ requestAnimationFrame(() => {
         const processed = chunk.map((item: EmployeeWork, index: number) => ({
           'S.No': i + index + 1,
           'Date': new Date(item.created_at).toLocaleDateString('en-IN'),
-          'Employee Name': item.assigned_to || '-',
+          'Employee Name': item.worked_by || '-',
           'Client Name': item.client_name || '-',
           'Number': item.number || '-',
           'City': item.city || '-',
@@ -505,7 +508,7 @@ requestAnimationFrame(() => {
                 <tr>
                   <th className="p-2 text-left font-semibold w-12">S.No</th>
                   <th className="p-2 text-left font-semibold">Work Date</th>
-                  <th className="p-2 text-left font-semibold">Employee</th>
+                  <th className="p-2 text-left font-semibold">Worked By </th>
                   <th className="p-2 text-left font-semibold">Client</th>
                   <th className="p-2 text-left font-semibold">Number</th>
                   <th className="p-2 text-left font-semibold">City</th>

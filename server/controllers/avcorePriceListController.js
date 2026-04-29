@@ -1,0 +1,91 @@
+import db from '../database/db.js';
+import path from 'path';
+import fs from 'fs';
+
+const uploadDir = 'uploads/avcore_pricelist';
+
+if (!fs.existsSync(uploadDir)) {
+  fs.mkdirSync(uploadDir, { recursive: true });
+}
+
+// GET
+export const getPriceList = async (req, res) => {
+  try {
+    const [rows] = await db.query(`
+      SELECT ap.*, u.name as uploaded_by_name, u.role as uploaded_by_role
+      FROM avcore_pricelist ap
+      LEFT JOIN users u ON ap.uploaded_by = u.user_id
+      ORDER BY ap.created_at DESC
+    `);
+
+    const baseUrl = `${req.protocol}://${req.get('host')}`;
+
+    const data = rows.map(doc => ({
+      ...doc,
+      file_url: `${baseUrl}/${doc.file_path}`,
+      preview_url: doc.file_type.startsWith('image') ? `${baseUrl}/${doc.file_path}` : null
+    }));
+
+    res.json({ success: true, documents: data });
+
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+};
+
+// UPLOAD
+export const uploadPriceList = async (req, res) => {
+  try {
+    const file = req.files?.file;
+    const remark = req.body.remark || '';
+    const userId = req.session?.user?.id;
+
+    if (!file) return res.status(400).json({ message: "No file" });
+
+    const ext = path.extname(file.name);
+    const fileName = `price_${Date.now()}${ext}`;
+    const filePath = `${uploadDir}/${fileName}`;
+
+    await file.mv(filePath);
+
+    await db.query(`
+      INSERT INTO avcore_pricelist 
+      (file_name, file_path, file_type, file_size, remark, uploaded_by)
+      VALUES (?, ?, ?, ?, ?, ?)
+    `, [
+      file.name,
+      filePath,
+      file.mimetype,
+      file.size,
+      remark,
+      userId
+    ]);
+
+    res.json({ success: true, message: "Uploaded" });
+
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+};
+
+// DELETE
+export const deletePriceList = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const [[doc]] = await db.query("SELECT * FROM avcore_pricelist WHERE id = ?", [id]);
+
+    if (!doc) return res.status(404).json({ message: "Not found" });
+
+    if (fs.existsSync(doc.file_path)) {
+      fs.unlinkSync(doc.file_path);
+    }
+
+    await db.query("DELETE FROM avcore_pricelist WHERE id = ?", [id]);
+
+    res.json({ success: true });
+
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+};

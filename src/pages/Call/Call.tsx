@@ -2,8 +2,13 @@ import React, { useEffect, useState, useRef } from 'react';
 import { BASE_URL } from '../../../public/config.js';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 // Add these imports with your other FontAwesome imports
-import { faStar as faStarSolid } from '@fortawesome/free-solid-svg-icons';
+import {
+  faFileInvoiceDollar,
+  faStar as faStarSolid,
+  faHistory  , 
+} from '@fortawesome/free-solid-svg-icons';
 import { faStar as faStarRegular } from '@fortawesome/free-regular-svg-icons';
+import { useLocation, useNavigate } from 'react-router-dom';
 
 import {
   faPhone,
@@ -195,9 +200,10 @@ const ActionButton = ({
       'bg-gradient-to-r from-purple-500 to-violet-600 hover:from-purple-600 hover:to-violet-700 text-white',
     view: 'bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700 text-white',
     viewDocs:
-      'bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-600 hover:to-orange-700 text-white', // ← ADD THIS
+      'bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-600 hover:to-orange-700 text-white',
+    quotation:
+      'bg-gradient-to-r from-teal-500 to-emerald-600 hover:from-teal-600 hover:to-emerald-700 text-white', // ← ADD THIS
   };
-
   const buttonStyles = `${baseStyles} ${variantStyles[variant]} ${className}`;
 
   return (
@@ -395,7 +401,9 @@ const Pagination: React.FC<PaginationProps> = ({
 };
 
 const CallList = () => {
+  const navigate = useNavigate(); // Add this line
   const [clients, setClients] = useState<Client[]>([]);
+    const [filterFromNavigation, setFilterFromNavigation] = useState<string | null>(null);
   const [filteredClients, setFilteredClients] = useState<Client[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [successMessage, setSuccessMessage] = useState('');
@@ -1093,55 +1101,64 @@ const CallList = () => {
                   </div>
                 )}
 
-                {/* Remarks */}
-                {hasRemarks && (
-                  <div className="bg-gradient-to-r from-gray-50 to-slate-50 dark:from-gray-800/50 dark:to-slate-900/50 p-3 rounded-lg border border-gray-200 dark:border-gray-700">
-                    <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2 flex items-center gap-2">
-                      <FontAwesomeIcon
-                        icon={faInfoCircle}
-                        className="h-4 w-4 text-gray-500"
-                      />
-                      Remarks
-                    </h3>
-                    <div className="text-sm">
-                      {hasField('quick_remark') && (
-                        <div className="mb-2">
-                          <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">
-                            Quick Remark
-                          </div>
-                          <div className="font-medium text-black dark:text-white bg-white dark:bg-gray-800 p-2 rounded border border-gray-200 dark:border-gray-700">
-                            <span
-                              className={`px-2 py-1 rounded-full text-xs ${
-                                selectedClientDetails.quick_remark ===
-                                'Interested'
-                                  ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300'
-                                  : selectedClientDetails.quick_remark ===
-                                    'Not Interested'
-                                  ? 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300'
-                                  : selectedClientDetails.quick_remark ===
-                                    'Not Reachable'
-                                  ? 'bg-gray-100 text-gray-800 dark:bg-gray-900/30 dark:text-gray-300'
-                                  : 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300'
-                              }`}
-                            >
-                              {formatValue(selectedClientDetails.quick_remark)}
-                            </span>
-                          </div>
-                        </div>
-                      )}
-                      {hasField('detailed_remark') && (
-                        <div>
-                          <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">
-                            Detailed Remark
-                          </div>
-                          <div className="text-black dark:text-white bg-white dark:bg-gray-800 p-2 rounded border border-gray-200 dark:border-gray-700 whitespace-pre-line">
-                            {formatValue(selectedClientDetails.detailed_remark)}
-                          </div>
-                        </div>
+{/* Reassignment History - Using ONLY created_at */}
+{selectedClientDetails.reassignment_remarks &&
+  Array.isArray(selectedClientDetails.reassignment_remarks) &&
+  selectedClientDetails.reassignment_remarks.length > 0 && (
+    <div className="bg-gradient-to-r from-purple-50 to-pink-50 dark:from-purple-900/20 dark:to-pink-900/20 p-3 rounded-lg border border-purple-100 dark:border-purple-800/30">
+      <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2 flex items-center gap-2">
+        <FontAwesomeIcon icon={faHistory} className="h-4 w-4 text-purple-500" />
+        Remark History ({selectedClientDetails.reassignment_remarks.length})
+      </h3>
+      <div className="space-y-2 max-h-60 overflow-y-auto">
+        {selectedClientDetails.reassignment_remarks.map((remark, index) => (
+          <div key={index} className="bg-white dark:bg-gray-800/50 p-3 rounded-lg border border-gray-200 dark:border-gray-700">
+            {typeof remark === 'object' ? (
+              <>
+                <div className="flex justify-between items-start mb-2 flex-wrap gap-2">
+                  <div className="flex-1">
+                    <div className="flex items-center flex-wrap gap-2">
+                      <span className="font-medium text-blue-600 dark:text-blue-400">
+                        {remark.name || 'Unknown'}
+                      </span>
+                      <span className="text-gray-400">→</span>
+                      <span className="font-medium text-green-600 dark:text-green-400">
+                        {remark.assignedTo || 'Unknown'}
+                      </span>
+                      {remark.leadStage && (
+                        <span className="text-xs bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-300 px-2 py-0.5 rounded-full">
+                          {remark.leadStage}
+                        </span>
                       )}
                     </div>
                   </div>
+                  
+                  {/* 🔥 ONLY USING created_at DATE */}
+                  <div className="text-right">
+                    <span className="text-xs text-gray-500 whitespace-nowrap bg-gray-100 dark:bg-gray-700 px-2 py-1 rounded-full inline-flex items-center gap-1">
+                      <FontAwesomeIcon icon={faCalendarAlt} className="text-[10px]" />
+                      {remark.created_at || 'Date not available'}
+                    </span>
+                  </div>
+                </div>
+                
+                {remark.remark && (
+                  <p className="text-sm text-gray-600 dark:text-gray-300 mt-2 pt-2 border-t border-gray-100 dark:border-gray-700">
+                    <span className="font-medium text-gray-500">Remark:</span> {remark.remark}
+                  </p>
                 )}
+              </>
+            ) : (
+              <div className="flex justify-between items-start">
+                <p className="text-sm text-gray-600 dark:text-gray-300">{remark}</p>
+                <span className="text-xs text-gray-500">Date not available</span>
+              </div>
+            )}
+          </div>
+        ))}
+      </div>
+    </div>
+  )}
               </div>
             ) : (
               // Documents Tab Content
@@ -1368,6 +1385,58 @@ const CallList = () => {
       </div>
     );
   };
+
+
+
+// FIXED: Use location.state instead of navigate.state
+const location = useLocation();
+
+useEffect(() => {
+  const navigationState = location.state as { filterStage?: string } | null;
+  if (navigationState?.filterStage) {
+    const stageToFilter = navigationState.filterStage;
+    console.log('📌 Applying filter from navigation:', stageToFilter);
+    setFilterFromNavigation(stageToFilter);
+    
+    // Clear the navigation state after reading it
+    window.history.replaceState({}, document.title);
+  }
+}, [location.state]); 
+
+
+// Apply the filter when clients are loaded and filterFromNavigation is set
+useEffect(() => {
+  if (clients.length > 0 && filterFromNavigation) {
+    console.log(`🔍 Filtering ${clients.length} clients by stage: "${filterFromNavigation}"`);
+    
+    // Debug: Log sample clients to verify stage field
+    console.log('Sample client stages:', clients.slice(0, 3).map(c => ({ 
+      name: c.name, 
+      stage: c.stage,
+      lead_stage: c.lead_stage 
+    })));
+    
+    // Filter clients by the stage (check both stage and lead_stage fields)
+    const filtered = clients.filter(client => {
+      const clientStage = client.stage || client.lead_stage || '';
+      return clientStage === filterFromNavigation;
+    });
+    
+    console.log(`✅ Filtered to ${filtered.length} records for stage "${filterFromNavigation}"`);
+    
+    setFilteredClients(filtered);
+    setCurrentPage(1);
+    
+    // Also set the stage filter in the UI (shows as active filter)
+    if (!selectedStages.includes(filterFromNavigation)) {
+      setSelectedStages([filterFromNavigation]);
+    }
+    
+    // Clear the filter after applying
+    setFilterFromNavigation(null);
+  }
+}, [clients, filterFromNavigation]); 
+
 
   // Reset when client changes
   useEffect(() => {
@@ -1733,19 +1802,22 @@ const CallList = () => {
           ? STAGE_PERCENTAGE_MAP[stageForPercentage] || 0
           : 0;
 
-  // 🔥 IMPORTANT: Determine display city with priority: area_name first, then city
-let displayCity = '';
-const areaName = parseValue(item.area_name);
-const cityName = parseValue(item.city);
+        // 🔥 IMPORTANT: Determine display city with priority: area_name first, then city
+        let displayCity = '';
+        const areaName = parseValue(item.area_name);
+        const cityName = parseValue(item.city);
 
-if (areaName && areaName !== '' && areaName !== 'Not Available') {
-  displayCity = areaName; // Use area_name if available
-} else if (cityName && cityName !== '' && cityName !== 'Not Available') {
-  displayCity = cityName; // Fallback to city if area_name not available
-} else {
-  displayCity = ''; // Empty if neither available
-}
-
+        if (areaName && areaName !== '' && areaName !== 'Not Available') {
+          displayCity = areaName; // Use area_name if available
+        } else if (
+          cityName &&
+          cityName !== '' &&
+          cityName !== 'Not Available'
+        ) {
+          displayCity = cityName; // Fallback to city if area_name not available
+        } else {
+          displayCity = ''; // Empty if neither available
+        }
 
         // Process reassignment_remarks
         let reassignmentRemarks = [];
@@ -2746,36 +2818,36 @@ if (areaName && areaName !== '' && areaName !== 'Not Available') {
   };
 
   const [showUpdateLocationPopup, setShowUpdateLocationPopup] = useState(false);
-const [updateLocationClient, setUpdateLocationClient] = useState(null);
-const [newLocationLink, setNewLocationLink] = useState('');
+  const [updateLocationClient, setUpdateLocationClient] = useState(null);
+  const [newLocationLink, setNewLocationLink] = useState('');
 
-const handleUpdateLocation = async () => {
-  if (!updateLocationClient || !newLocationLink) {
-    alert('Please enter a location link');
-    return;
-  }
-
-  try {
-    const response = await axios.put(
-      `${BASE_URL}api/update-location/${updateLocationClient.master_id}`,
-      { location_link: newLocationLink },
-      { withCredentials: true }
-    );
-
-    if (response.data.success) {
-      alert('✅ Location link updated successfully!');
-      setShowUpdateLocationPopup(false);
-      setUpdateLocationClient(null);
-      setNewLocationLink('');
-      refreshDataWithPagePreservation();
-    } else {
-      alert('❌ Failed to update location link');
+  const handleUpdateLocation = async () => {
+    if (!updateLocationClient || !newLocationLink) {
+      alert('Please enter a location link');
+      return;
     }
-  } catch (error) {
-    console.error('Error updating location:', error);
-    alert('❌ Error updating location link');
-  }
-};
+
+    try {
+      const response = await axios.put(
+        `${BASE_URL}api/update-location/${updateLocationClient.master_id}`,
+        { location_link: newLocationLink },
+        { withCredentials: true },
+      );
+
+      if (response.data.success) {
+        alert('✅ Location link updated successfully!');
+        setShowUpdateLocationPopup(false);
+        setUpdateLocationClient(null);
+        setNewLocationLink('');
+        refreshDataWithPagePreservation();
+      } else {
+        alert('❌ Failed to update location link');
+      }
+    } catch (error) {
+      console.error('Error updating location:', error);
+      alert('❌ Error updating location link');
+    }
+  };
 
   // Add these state variables for favorites
   const [favoriteStatus, setFavoriteStatus] = useState({});
@@ -2867,6 +2939,70 @@ const handleUpdateLocation = async () => {
       }
     }
   }, [currentPage, itemsPerPage, filteredClients.length]); // Only run when pagination changes
+
+  // Add these with your other state declarations
+  const [showVersionDropdown, setShowVersionDropdown] = useState<number | null>(
+    null,
+  );
+  const [quotationVersionsCache, setQuotationVersionsCache] = useState<{
+    [key: number]: any;
+  }>({});
+  const [loadingVersions, setLoadingVersions] = useState<{
+    [key: number]: boolean;
+  }>({});
+
+  // Fetch quotation versions for a specific client
+  const fetchClientQuotationVersions = async (master_id: number) => {
+    if (quotationVersionsCache[master_id]) {
+      // Toggle dropdown if already loaded
+      setShowVersionDropdown(
+        showVersionDropdown === master_id ? null : master_id,
+      );
+      return;
+    }
+
+    setLoadingVersions((prev) => ({ ...prev, [master_id]: true }));
+
+    try {
+      const response = await axios.get(
+        `${BASE_URL}api/revisions/${master_id}`,
+        {
+          withCredentials: true,
+        },
+      );
+
+      setQuotationVersionsCache((prev) => ({
+        ...prev,
+        [master_id]: response.data,
+      }));
+      setShowVersionDropdown(master_id);
+    } catch (error) {
+      console.error('Error fetching quotation versions:', error);
+      alert('Failed to fetch quotation details');
+    } finally {
+      setLoadingVersions((prev) => ({ ...prev, [master_id]: false }));
+    }
+  };
+
+  // Handle view quotation redirect - Use existing route
+  const handleViewQuotationRedirect = (master_id: number, revision: number) => {
+    navigate(`/lead/view/${master_id}/${revision}`);
+  };
+
+  // Close version dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (showVersionDropdown !== null) {
+        const target = event.target as HTMLElement;
+        if (!target.closest('.version-dropdown-container')) {
+          setShowVersionDropdown(null);
+        }
+      }
+    };
+
+    document.addEventListener('click', handleClickOutside);
+    return () => document.removeEventListener('click', handleClickOutside);
+  }, [showVersionDropdown]);
 
   return (
     <div className="p-4">
@@ -3862,26 +3998,46 @@ const handleUpdateLocation = async () => {
 
                     {/* FollowUp Date */}
                     <td className="py-4 px-4">
-                      <div
-                        className={`inline-flex items-center px-3 py-1.5 rounded-lg font-semibold text-sm border shadow-sm ${
-                          client.followup_date &&
-                          new Date(client.followup_date) < new Date()
-                            ? 'bg-gradient-to-r from-red-50 to-red-100 dark:from-red-900/20 dark:to-red-800/10 text-red-800 dark:text-red-300 border-red-200 dark:border-red-800/30'
-                            : 'bg-gradient-to-r from-green-50 to-green-100 dark:from-green-900/20 dark:to-green-800/10 text-green-800 dark:text-green-300 border-green-200 dark:border-green-800/30'
-                        }`}
-                      >
-                        {client.followup_date
-                          ? new Date(client.followup_date).toLocaleDateString(
-                              'en-GB',
-                            )
-                          : '—'}
-                      </div>
+                      {(() => {
+                        const getFollowupDateColor = () => {
+                          if (!client.followup_date)
+                            return 'bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400';
+
+                          const today = new Date();
+                          today.setHours(0, 0, 0, 0);
+
+                          const followupDate = new Date(client.followup_date);
+                          followupDate.setHours(0, 0, 0, 0);
+
+                          if (followupDate < today) {
+                            return 'bg-gradient-to-r from-red-50 to-red-100 dark:from-red-900/30 dark:to-red-800/20 text-red-700 dark:text-red-300 border-red-200 dark:border-red-800/30';
+                          } else if (
+                            followupDate.getTime() === today.getTime()
+                          ) {
+                            return 'bg-gradient-to-r from-green-50 to-green-100 dark:from-green-900/30 dark:to-green-800/20 text-green-700 dark:text-green-300 border-green-200 dark:border-green-800/30';
+                          } else {
+                            return 'bg-gradient-to-r from-yellow-50 to-yellow-100 dark:from-yellow-900/30 dark:to-yellow-800/20 text-yellow-700 dark:text-yellow-300 border-yellow-200 dark:border-yellow-800/30';
+                          }
+                        };
+
+                        return (
+                          <div
+                            className={`inline-flex items-center px-3 py-1.5 rounded-lg font-semibold text-sm border shadow-sm ${getFollowupDateColor()}`}
+                          >
+                            {client.followup_date
+                              ? new Date(
+                                  client.followup_date,
+                                ).toLocaleDateString('en-GB')
+                              : '—'}
+                          </div>
+                        );
+                      })()}
                     </td>
 
-                    {/* Client Name - With Star Icon on Left */}
+                    {/* Client Name - With Quotation Button */}
                     <td className="py-4 px-4">
                       <div className="flex items-center gap-2 group">
-                        {/* Star Icon - Left side */}
+                        {/* Star Icon */}
                         <StarIcon
                           isFavorite={favoriteStatus[client.master_id] || false}
                           isLoading={favoritesLoading[client.master_id]}
@@ -3889,7 +4045,7 @@ const handleUpdateLocation = async () => {
                           master_id={undefined}
                         />
 
-                        {/* Client Name - Clickable */}
+                        {/* Client Name - Clickable for details */}
                         <div
                           onClick={() => {
                             setSelectedClientDetails(client);
@@ -3910,6 +4066,8 @@ const handleUpdateLocation = async () => {
                             </div>
                           </div>
                         </div>
+
+                       
                       </div>
                     </td>
 
@@ -4044,7 +4202,195 @@ const handleUpdateLocation = async () => {
                           />
                         </ActionButton>
 
-                        
+                       {/* NEW: Quotation Versions Button - Beside Client Name */}
+                        <div className="relative">
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              fetchClientQuotationVersions(client.master_id);
+                            }}
+                            className="relative inline-flex items-center justify-center w-8 h-8 rounded-lg transition-all duration-300 hover:scale-105 bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700 text-white shadow-md"
+                            title="View Quotation Versions"
+                          >
+                            <FontAwesomeIcon
+                              icon={faFileInvoiceDollar}
+                              className="text-xs"
+                            />
+                            {loadingVersions[client.master_id] && (
+                              <div className="absolute -top-1 -right-1 w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                            )}
+                          </button>
+
+                          {/* Version Dropdown */}
+                          {showVersionDropdown === client.master_id &&
+                            quotationVersionsCache[client.master_id] && (
+                              <div className="absolute right-0 mt-2 z-50 bg-white dark:bg-boxdark rounded-lg shadow-2xl border border-gray-200 dark:border-gray-700 min-w-[320px] max-w-[400px] overflow-hidden">
+                                {/* Dropdown Header */}
+                                <div className="bg-gradient-to-r from-indigo-50 to-purple-50 dark:from-gray-800 dark:to-gray-900 p-3 border-b border-gray-200 dark:border-gray-700">
+                                  <div className="flex justify-between items-center">
+                                    <span className="text-sm font-bold text-gray-800 dark:text-white">
+                                      Quotation Versions
+                                    </span>
+                                    <button
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        setShowVersionDropdown(null);
+                                      }}
+                                      className="text-gray-500 hover:text-gray-700 dark:text-gray-400"
+                                    >
+                                      ×
+                                    </button>
+                                  </div>
+                                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                                    {
+                                      quotationVersionsCache[client.master_id]
+                                        ?.lead?.name
+                                    }
+                                  </p>
+                                </div>
+
+                                {/* Versions List */}
+                                <div className="max-h-80 overflow-y-auto">
+                                  {quotationVersionsCache[client.master_id]
+                                    ?.quotations?.length > 0 ? (
+                                    <table className="w-full text-sm">
+                                      <thead className="bg-gray-50 dark:bg-gray-800 sticky top-0">
+                                        <tr className="border-b border-gray-200 dark:border-gray-700">
+                                          <th className="py-2 px-3 text-left text-xs font-semibold text-gray-600 dark:text-gray-400">
+                                            Version
+                                          </th>
+                                          <th className="py-2 px-3 text-left text-xs font-semibold text-gray-600 dark:text-gray-400">
+                                            Amount
+                                          </th>
+                                          <th className="py-2 px-3 text-left text-xs font-semibold text-gray-600 dark:text-gray-400">
+                                            Date
+                                          </th>
+                                          <th className="py-2 px-3 text-center text-xs font-semibold text-gray-600 dark:text-gray-400">
+                                            Action
+                                          </th>
+                                        </tr>
+                                      </thead>
+                                      <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
+                                        {quotationVersionsCache[
+                                          client.master_id
+                                        ].quotations.map((quotation: any) =>
+                                          quotation.revisions.map(
+                                            (rev: any, idx: number) => {
+                                              const isLatest = rev.is_latest;
+                                              return (
+                                                <tr
+                                                  key={`${quotation.qt_id}-${rev.revision}`}
+                                                  className="hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors"
+                                                >
+                                                  <td className="py-2 px-3">
+                                                    <div className="flex items-center gap-1">
+                                                      <span
+                                                        className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-bold ${
+                                                          isLatest
+                                                            ? 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400'
+                                                            : 'bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400'
+                                                        }`}
+                                                      >
+                                                        V{rev.revision}
+                                                      </span>
+                                                      {isLatest && (
+                                                        <span className="text-[10px] px-1 py-0.5 bg-green-200 dark:bg-green-800 text-green-800 dark:text-green-300 rounded-full">
+                                                          Latest
+                                                        </span>
+                                                      )}
+                                                    </div>
+                                                  </td>
+                                                  <td className="py-2 px-3">
+                                                    <span className="font-semibold text-green-600 dark:text-green-400 text-sm">
+                                                      ₹
+                                                      {rev.totals?.with_gst &&
+                                                      rev.totals.with_gst !==
+                                                        '0.00'
+                                                        ? Number(
+                                                            rev.totals.with_gst,
+                                                          ).toLocaleString(
+                                                            'en-IN',
+                                                          )
+                                                        : Number(
+                                                            rev.totals
+                                                              ?.without_gst ||
+                                                              0,
+                                                          ).toLocaleString(
+                                                            'en-IN',
+                                                          )}
+                                                    </span>
+                                                  </td>
+                                                  <td className="py-2 px-3">
+                                                    <span className="text-xs text-gray-500 dark:text-gray-400">
+                                                      {rev.created_at
+                                                        ? new Date(
+                                                            rev.created_at,
+                                                          ).toLocaleDateString(
+                                                            'en-GB',
+                                                          )
+                                                        : '-'}
+                                                    </span>
+                                                  </td>
+                                                  <td className="py-2 px-3 text-center">
+                                                    <button
+                                                      onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        handleViewQuotationRedirect(
+                                                          client.master_id,
+                                                          rev.revision,
+                                                        );
+                                                      }}
+                                                      className="inline-flex items-center gap-1 px-2 py-1 rounded-md bg-blue-500 hover:bg-blue-600 text-white text-xs transition-colors"
+                                                      title="View Quotation"
+                                                    >
+                                                      <FontAwesomeIcon
+                                                        icon={faEye}
+                                                        className="text-[10px]"
+                                                      />
+                                                      <span>View</span>
+                                                    </button>
+                                                  </td>
+                                                </tr>
+                                              );
+                                            },
+                                          ),
+                                        )}
+                                      </tbody>
+                                    </table>
+                                  ) : (
+                                    <div className="text-center py-8">
+                                      <FontAwesomeIcon
+                                        icon={faFileInvoiceDollar}
+                                        className="text-3xl text-gray-300 mb-2"
+                                      />
+                                      <p className="text-sm text-gray-500 dark:text-gray-400">
+                                        No quotations found
+                                      </p>
+                                    </div>
+                                  )}
+                                </div>
+
+                                {/* Footer with View All link */}
+                                {quotationVersionsCache[client.master_id]
+                                  ?.quotations?.length > 0 && (
+                                  <div className="border-t border-gray-200 dark:border-gray-700 p-2 bg-gray-50 dark:bg-gray-800/50">
+                                    <button
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        // Use the correct route path: /quotation/revisions/:master_id
+                                        navigate(
+                                          `/quotation/revisions/${client.master_id}`,
+                                        );
+                                      }}
+                                      className="w-full text-center text-xs text-blue-600 dark:text-blue-400 hover:underline py-1"
+                                    >
+                                      View All Versions →
+                                    </button>
+                                  </div>
+                                )}
+                              </div>
+                            )}
+                        </div>
                       </div>
                     </td>
                   </tr>
@@ -4055,65 +4401,62 @@ const handleUpdateLocation = async () => {
         )}
       </div>
 
-{/* Combined Documents/Upload Modal */}
-{showDocsPopup && docsClient && (
-  <div className="fixed inset-0 bg-black/70 flex justify-center items-start z-[9999] overflow-y-auto p-4 sm:p-10">
-    <div className="bg-white dark:bg-boxdark p-6 rounded-xl shadow-2xl w-full max-w-5xl max-h-[90vh] overflow-y-auto border border-gray-300 dark:border-gray-700">
-      {/* Header */}
-      <div className="flex justify-between items-center border-b pb-4 mb-6 dark:border-gray-700">
-<div className="flex items-start justify-between gap-4 flex-wrap">
-  
-  {/* LEFT SIDE */}
-  <div>
-    <h2 className="text-2xl font-bold text-gray-800 dark:text-white">
-      📁 Files for {docsClient.name}
-    </h2>
-    <p className="text-sm text-gray-600 dark:text-gray-400">
-      Manage documents, links, and remarks in one place
-    </p>
-  </div>
+      {/* Combined Documents/Upload Modal */}
+      {showDocsPopup && docsClient && (
+        <div className="fixed inset-0 bg-black/70 flex justify-center items-start z-[9999] overflow-y-auto p-4 sm:p-10">
+          <div className="bg-white dark:bg-boxdark p-6 rounded-xl shadow-2xl w-full max-w-5xl max-h-[90vh] overflow-y-auto border border-gray-300 dark:border-gray-700">
+            {/* Header */}
+            <div className="flex justify-between items-center border-b pb-4 mb-6 dark:border-gray-700">
+              <div className="flex items-start justify-between gap-4 flex-wrap">
+                {/* LEFT SIDE */}
+                <div>
+                  <h2 className="text-2xl font-bold text-gray-800 dark:text-white">
+                    📁 Files for {docsClient.name}
+                  </h2>
+                  <p className="text-sm text-gray-600 dark:text-gray-400">
+                    Manage documents, links, and remarks in one place
+                  </p>
+                </div>
 
-  {/* RIGHT SIDE BUTTON */}
-  <div className="flex flex-col items-end">
-    <button
-      onClick={() => {
-        setUpdateLocationClient(docsClient);
-        setNewLocationLink(
-          docsClient?.document_location_link || 
-          docsClient?.location_link || 
-          ''
-        );
-        setShowUpdateLocationPopup(true);
-      }}
-      className="inline-flex items-center gap-2 px-4 py-2.5 bg-gradient-to-r from-emerald-500 to-green-600 hover:from-emerald-600 hover:to-green-700 text-white rounded-lg font-medium text-sm transition-all shadow-md hover:shadow-lg"
-    >
-      <FontAwesomeIcon icon={faMapMarkerAlt} className="h-4 w-4" />
-      Update Location Only
-    </button>
+                {/* RIGHT SIDE BUTTON */}
+                <div className="flex flex-col items-end">
+                  <button
+                    onClick={() => {
+                      setUpdateLocationClient(docsClient);
+                      setNewLocationLink(
+                        docsClient?.document_location_link ||
+                          docsClient?.location_link ||
+                          '',
+                      );
+                      setShowUpdateLocationPopup(true);
+                    }}
+                    className="inline-flex items-center gap-2 px-4 py-2.5 bg-gradient-to-r from-emerald-500 to-green-600 hover:from-emerald-600 hover:to-green-700 text-white rounded-lg font-medium text-sm transition-all shadow-md hover:shadow-lg"
+                  >
+                    <FontAwesomeIcon
+                      icon={faMapMarkerAlt}
+                      className="h-4 w-4"
+                    />
+                    Update Location Only
+                  </button>
+                </div>
+              </div>
 
-   
-  </div>
-
-</div>
-
-        <button
-          onClick={() => {
-            setShowDocsPopup(false);
-            setUploadFiles([]);
-            setLocationLink('');
-            setRemark('');
-            setDetailedRemark('');
-            setFollowupDate('');
-            setSelectedUsers([]);
-            setLeadStage('');
-          }}
-          className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 text-2xl p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-full transition-colors"
-        >
-          <FontAwesomeIcon icon={faTimes} />
-        </button>
-      </div>
-
-    
+              <button
+                onClick={() => {
+                  setShowDocsPopup(false);
+                  setUploadFiles([]);
+                  setLocationLink('');
+                  setRemark('');
+                  setDetailedRemark('');
+                  setFollowupDate('');
+                  setSelectedUsers([]);
+                  setLeadStage('');
+                }}
+                className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 text-2xl p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-full transition-colors"
+              >
+                <FontAwesomeIcon icon={faTimes} />
+              </button>
+            </div>
 
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
               {/* Left Column - Upload Section */}
@@ -4268,70 +4611,69 @@ const handleUpdateLocation = async () => {
                           </span>
                         </div>
 
-                       {/* Users List - Single column full names */}
-{docsFilteredUsers.length > 0 ? (
-  <div className="flex flex-col gap-2">
-    {docsFilteredUsers.map((user) => {
-      const isSelected = selectedUsers.includes(
-        user.user_id || user.id,
-      );
+                        {/* Users List - Single column full names */}
+                        {docsFilteredUsers.length > 0 ? (
+                          <div className="flex flex-col gap-2">
+                            {docsFilteredUsers.map((user) => {
+                              const isSelected = selectedUsers.includes(
+                                user.user_id || user.id,
+                              );
 
-      return (
-        <div
-          key={user.user_id || user.id}
-          className={`flex items-center p-2 rounded transition-colors ${
-            isSelected
-              ? 'bg-blue-50 dark:bg-blue-900/30 border border-blue-200 dark:border-blue-700'
-              : 'border border-transparent hover:bg-gray-50 dark:hover:bg-gray-800 hover:border-gray-200 dark:hover:border-gray-700'
-          }`}
-        >
-          <input
-            type="checkbox"
-            id={`doc-user-${user.user_id || user.id}`}
-            checked={isSelected}
-            onChange={() => {
-              const userId = user.user_id || user.id;
-              if (selectedUsers.includes(userId)) {
-                setSelectedUsers((prev) =>
-                  prev.filter((id) => id !== userId),
-                );
-              } else {
-                setSelectedUsers((prev) => [
-                  ...prev,
-                  userId,
-                ]);
-              }
-            }}
-            className="h-4 w-4 text-blue-600 rounded focus:ring-blue-500 focus:ring-offset-0 flex-shrink-0"
-          />
+                              return (
+                                <div
+                                  key={user.user_id || user.id}
+                                  className={`flex items-center p-2 rounded transition-colors ${
+                                    isSelected
+                                      ? 'bg-blue-50 dark:bg-blue-900/30 border border-blue-200 dark:border-blue-700'
+                                      : 'border border-transparent hover:bg-gray-50 dark:hover:bg-gray-800 hover:border-gray-200 dark:hover:border-gray-700'
+                                  }`}
+                                >
+                                  <input
+                                    type="checkbox"
+                                    id={`doc-user-${user.user_id || user.id}`}
+                                    checked={isSelected}
+                                    onChange={() => {
+                                      const userId = user.user_id || user.id;
+                                      if (selectedUsers.includes(userId)) {
+                                        setSelectedUsers((prev) =>
+                                          prev.filter((id) => id !== userId),
+                                        );
+                                      } else {
+                                        setSelectedUsers((prev) => [
+                                          ...prev,
+                                          userId,
+                                        ]);
+                                      }
+                                    }}
+                                    className="h-4 w-4 text-blue-600 rounded focus:ring-blue-500 focus:ring-offset-0 flex-shrink-0"
+                                  />
 
-          <label
-            htmlFor={`doc-user-${
-              user.user_id || user.id
-            }`}
-            className="ml-2 text-sm text-gray-700 dark:text-gray-300 cursor-pointer flex-1"
-          >
-            <div className="font-semibold text-sm">
-              {user.name}
-            </div>
-            <div className="text-xs text-gray-500 dark:text-gray-400">
-              {user.role_label || user.role}
-            </div>
-          </label>
-        </div>
-      );
-    })}
-  </div>
-) : (
-  <div className="text-center py-4 text-gray-500 dark:text-gray-400">
-    <div className="text-2xl mb-2">🔍</div>
-    <p className="text-sm">No users found</p>
-    <p className="text-xs mt-1">
-      Try a different search term
-    </p>
-  </div>
-)}
-
+                                  <label
+                                    htmlFor={`doc-user-${
+                                      user.user_id || user.id
+                                    }`}
+                                    className="ml-2 text-sm text-gray-700 dark:text-gray-300 cursor-pointer flex-1"
+                                  >
+                                    <div className="font-semibold text-sm">
+                                      {user.name}
+                                    </div>
+                                    <div className="text-xs text-gray-500 dark:text-gray-400">
+                                      {user.role_label || user.role}
+                                    </div>
+                                  </label>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        ) : (
+                          <div className="text-center py-4 text-gray-500 dark:text-gray-400">
+                            <div className="text-2xl mb-2">🔍</div>
+                            <p className="text-sm">No users found</p>
+                            <p className="text-xs mt-1">
+                              Try a different search term
+                            </p>
+                          </div>
+                        )}
                       </div>
 
                       {/* Selected Users Preview */}
@@ -5336,92 +5678,91 @@ const handleUpdateLocation = async () => {
       )}
 
       {/* Update Location Only Popup */}
-{showUpdateLocationPopup && updateLocationClient && (
-  <div className="fixed inset-0 bg-black/70 flex justify-center items-center z-[10000] p-4">
-    <div className="bg-white dark:bg-boxdark p-6 rounded-xl shadow-2xl w-full max-w-md border border-gray-300 dark:border-gray-700">
-      <div className="flex justify-between items-center border-b pb-4 mb-4 dark:border-gray-700">
-        <div>
-          <h2 className="text-xl font-bold text-gray-800 dark:text-white">
-            Update Location Link
-          </h2>
-          <p className="text-sm text-gray-600 dark:text-gray-400">
-            For: {updateLocationClient.name}
-          </p>
-        </div>
-        <button
-          onClick={() => {
-            setShowUpdateLocationPopup(false);
-            setUpdateLocationClient(null);
-            setNewLocationLink('');
-          }}
-          className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 text-2xl p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-full transition-colors"
-        >
-          <FontAwesomeIcon icon={faTimes} />
-        </button>
-      </div>
+      {showUpdateLocationPopup && updateLocationClient && (
+        <div className="fixed inset-0 bg-black/70 flex justify-center items-center z-[10000] p-4">
+          <div className="bg-white dark:bg-boxdark p-6 rounded-xl shadow-2xl w-full max-w-md border border-gray-300 dark:border-gray-700">
+            <div className="flex justify-between items-center border-b pb-4 mb-4 dark:border-gray-700">
+              <div>
+                <h2 className="text-xl font-bold text-gray-800 dark:text-white">
+                  Update Location Link
+                </h2>
+                <p className="text-sm text-gray-600 dark:text-gray-400">
+                  For: {updateLocationClient.name}
+                </p>
+              </div>
+              <button
+                onClick={() => {
+                  setShowUpdateLocationPopup(false);
+                  setUpdateLocationClient(null);
+                  setNewLocationLink('');
+                }}
+                className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 text-2xl p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-full transition-colors"
+              >
+                <FontAwesomeIcon icon={faTimes} />
+              </button>
+            </div>
 
-      <div className="space-y-4">
-        <div>
-          <label className="block mb-2 text-sm font-bold text-gray-700 dark:text-gray-300">
-            Location Link (Google Maps URL)
-          </label>
-          <input
-            type="text"
-            placeholder="https://maps.google.com/..."
-            value={newLocationLink}
-            onChange={(e) => setNewLocationLink(e.target.value)}
-            className="w-full p-3 border border-gray-300 dark:border-gray-600 rounded-lg text-sm dark:text-white dark:bg-gray-800 focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
-          />
-          <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-            Enter a Google Maps or location URL
-          </p>
-        </div>
+            <div className="space-y-4">
+              <div>
+                <label className="block mb-2 text-sm font-bold text-gray-700 dark:text-gray-300">
+                  Location Link (Google Maps URL)
+                </label>
+                <input
+                  type="text"
+                  placeholder="https://maps.google.com/..."
+                  value={newLocationLink}
+                  onChange={(e) => setNewLocationLink(e.target.value)}
+                  className="w-full p-3 border border-gray-300 dark:border-gray-600 rounded-lg text-sm dark:text-white dark:bg-gray-800 focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
+                />
+                <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                  Enter a Google Maps or location URL
+                </p>
+              </div>
 
-        {/* Current Location Preview */}
-        {updateLocationClient.document_location_link && (
-          <div className="p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
-            <p className="text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">
-              Current Location:
-            </p>
-            <a
-              href={updateLocationClient.document_location_link}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-xs text-blue-600 dark:text-blue-400 hover:underline break-all"
-            >
-              {updateLocationClient.document_location_link}
-            </a>
+              {/* Current Location Preview */}
+              {updateLocationClient.document_location_link && (
+                <div className="p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
+                  <p className="text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">
+                    Current Location:
+                  </p>
+                  <a
+                    href={updateLocationClient.document_location_link}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-xs text-blue-600 dark:text-blue-400 hover:underline break-all"
+                  >
+                    {updateLocationClient.document_location_link}
+                  </a>
+                </div>
+              )}
+
+              <div className="flex gap-3 pt-4">
+                <button
+                  onClick={() => {
+                    setShowUpdateLocationPopup(false);
+                    setUpdateLocationClient(null);
+                    setNewLocationLink('');
+                  }}
+                  className="flex-1 px-4 py-2 bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-gray-200 rounded-lg font-medium hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleUpdateLocation}
+                  disabled={!newLocationLink}
+                  className={`flex-1 px-4 py-2 rounded-lg font-medium transition-all ${
+                    newLocationLink
+                      ? 'bg-gradient-to-r from-emerald-600 to-green-600 hover:from-emerald-700 hover:to-green-700 text-white'
+                      : 'bg-gray-300 dark:bg-gray-600 text-gray-500 dark:text-gray-400 cursor-not-allowed'
+                  }`}
+                >
+                  Update Location
+                </button>
+              </div>
+            </div>
           </div>
-        )}
-
-        <div className="flex gap-3 pt-4">
-          <button
-            onClick={() => {
-              setShowUpdateLocationPopup(false);
-              setUpdateLocationClient(null);
-              setNewLocationLink('');
-            }}
-            className="flex-1 px-4 py-2 bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-gray-200 rounded-lg font-medium hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors"
-          >
-            Cancel
-          </button>
-          <button
-            onClick={handleUpdateLocation}
-            disabled={!newLocationLink}
-            className={`flex-1 px-4 py-2 rounded-lg font-medium transition-all ${
-              newLocationLink
-                ? 'bg-gradient-to-r from-emerald-600 to-green-600 hover:from-emerald-700 hover:to-green-700 text-white'
-                : 'bg-gray-300 dark:bg-gray-600 text-gray-500 dark:text-gray-400 cursor-not-allowed'
-            }`}
-          >
-            Update Location
-          </button>
         </div>
-      </div>
-    </div>
-  </div>
-)}
-
+      )}
     </div>
   );
 };

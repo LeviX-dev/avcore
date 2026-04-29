@@ -10081,7 +10081,7 @@ export const getEmployeeLeadsWithHistory = async (req, res) => {
 };
 
 
-export const getQuotationPendingLeads = async (req, res) => {
+export const getQuotationPendingLeads1 = async (req, res) => {
   const connection = await db.getConnection();
 
   try {
@@ -10211,7 +10211,280 @@ export const getQuotationPendingLeads = async (req, res) => {
   } finally {
     connection.release();
   }
+}; 
+
+export const getQuotationPendingLeads2 = async (req, res) => {
+  const connection = await db.getConnection();
+
+  try {
+    /* ================= MAIN LEADS ================= */
+    const [rows] = await connection.query(`
+      SELECT 
+        rd.master_id,
+        rd.name,
+        rd.number,
+        rd.email,
+        rd.address,
+        rd.city,
+        rd.status,
+        rd.lead_status,
+        rd.lead_stage,
+        rd.current_stage,
+        rd.created_by_user,
+        rd.assign_id,
+        rd.followup_date,
+        rd.cat_id,
+        rd.reference_id,
+        rd.area_id,
+        rd.room_length,
+        rd.room_width,
+        rd.room_height,
+        rd.location_link,
+        rd.p_type,
+        rd.budget_range,
+        rd.time_to_complete,
+        rd.site_visit_date,
+        rd.demo_date,
+        rd.lead_activity,
+        rd.ar_number,
+        rd.ca_number,
+        rd.e_number,
+        rd.sm_number,
+        rd.pop_number,
+        rd.other_number,
+        rd.quick_remark,
+        rd.detailed_remark,
+
+        a.area_name,
+        c.cat_name,
+        r.reference_name,
+
+        asg.assign_date,
+        asg.target_date,
+        asg.mode,
+        asg.remark AS assignment_remark,
+        asg.assigned_to,
+        asg.assigned_to_user_id,
+        asg.assign_type,
+
+        CASE WHEN q.qt_id IS NOT NULL THEN 1 ELSE 0 END AS created_flag
+
+      FROM raw_data rd
+      LEFT JOIN area a ON rd.area_id = a.area_id
+      LEFT JOIN category c ON rd.cat_id = c.cat_id
+      LEFT JOIN reference r ON rd.reference_id = r.reference_id
+      LEFT JOIN assignments asg ON rd.assign_id = asg.assign_id
+      LEFT JOIN quotation q ON rd.master_id = q.master_id
+
+      WHERE rd.lead_stage IN ('Quotation Pending', 'Quotation Created')
+
+      ORDER BY 
+        CASE WHEN q.qt_id IS NOT NULL THEN 1 ELSE 0 END DESC,
+        rd.master_id DESC
+    `);
+
+    /* ================= REASSIGNMENTS ================= */
+    const masterIds = rows.map((r) => r.master_id);
+    let reassignmentRows = [];
+
+    if (masterIds.length > 0) {
+      const [reassignments] = await connection.query(
+        `
+        SELECT 
+          rm.*, 
+          u.name, 
+          u.role
+        FROM reassignment rm
+        LEFT JOIN users u ON u.user_id = rm.created_by_user
+        WHERE rm.master_id IN (?)
+        ORDER BY rm.reassignment_date DESC, rm.created_at DESC
+        `,
+        [masterIds],
+      );
+
+      reassignmentRows = reassignments;
+    }
+
+    /* ================= FORMAT RESPONSE ================= */
+    const formattedRows = rows.map((row) => {
+      const reassignments = reassignmentRows
+        .filter((r) => r.master_id === row.master_id)
+        .map((r) => ({
+          remark: r.remark,
+          assignedTo: r.assignedTo,
+          leadStage: r.leadStage,
+          created_by_user: r.created_by_user,
+          created_at: r.created_at
+            ? new Date(r.created_at).toLocaleString('en-GB')
+            : null,
+          reassignment_date: r.reassignment_date
+            ? new Date(r.reassignment_date).toLocaleString('en-GB')
+            : null,
+          name: r.name,
+          role: r.role,
+        }));
+
+      return {
+        ...row,
+        reassignment_remarks: reassignments,
+        latest_assignedTo: reassignments.length
+          ? reassignments[0].assignedTo
+          : null,
+        latest_leadStage: reassignments.length
+          ? reassignments[0].leadStage
+          : null,
+      };
+    });
+
+    return res.status(200).json(formattedRows);
+  } catch (error) {
+    console.error('❌ Error fetching quotation leads:', error);
+    return res.status(500).json({
+      message: 'Failed to fetch quotation leads',
+    });
+  } finally {
+    connection.release();
+  }
 };
+
+
+
+export const getQuotationPendingLeads = async (req, res) => {
+  const connection = await db.getConnection();
+
+  try {
+    /* ================= MAIN LEADS ================= */
+    const [rows] = await connection.query(`
+      SELECT 
+        rd.master_id,
+        rd.name,
+        rd.number,
+        rd.email,
+        rd.address,
+        rd.city,
+        rd.status,
+        rd.lead_status,
+        rd.lead_stage,
+        rd.current_stage,
+        rd.created_by_user,
+        rd.assign_id,
+        rd.followup_date,
+        rd.cat_id,
+        rd.reference_id,
+        rd.area_id,
+        rd.room_length,
+        rd.room_width,
+        rd.room_height,
+        rd.location_link,
+        rd.p_type,
+        rd.budget_range,
+        rd.time_to_complete,
+        rd.site_visit_date,
+        rd.demo_date,
+        rd.lead_activity,
+        rd.ar_number,
+        rd.ca_number,
+        rd.e_number,
+        rd.sm_number,
+        rd.pop_number,
+        rd.other_number,
+        rd.quick_remark,
+        rd.detailed_remark,
+
+        a.area_name,
+        c.cat_name,
+        r.reference_name,
+
+        asg.assign_date,
+        asg.target_date,
+        asg.mode,
+        asg.remark AS assignment_remark,
+        asg.assigned_to,
+        asg.assigned_to_user_id,
+        asg.assign_type,
+
+        CASE WHEN q.qt_id IS NOT NULL THEN 1 ELSE 0 END AS created_flag,
+        q.created_at AS quotation_created_date
+
+      FROM raw_data rd
+      LEFT JOIN area a ON rd.area_id = a.area_id
+      LEFT JOIN category c ON rd.cat_id = c.cat_id
+      LEFT JOIN reference r ON rd.reference_id = r.reference_id
+      LEFT JOIN assignments asg ON rd.assign_id = asg.assign_id
+      LEFT JOIN quotation q ON rd.master_id = q.master_id
+
+      WHERE rd.lead_stage IN ('Quotation Pending', 'Quotation Created')
+
+      ORDER BY 
+        q.created_at DESC,
+        CASE WHEN q.qt_id IS NOT NULL THEN 1 ELSE 0 END DESC,
+        rd.master_id DESC
+    `);
+
+    /* ================= REASSIGNMENTS ================= */
+    const masterIds = rows.map((r) => r.master_id);
+    let reassignmentRows = [];
+
+    if (masterIds.length > 0) {
+      const [reassignments] = await connection.query(
+        `
+        SELECT 
+          rm.*, 
+          u.name, 
+          u.role
+        FROM reassignment rm
+        LEFT JOIN users u ON u.user_id = rm.created_by_user
+        WHERE rm.master_id IN (?)
+        ORDER BY rm.reassignment_date DESC, rm.created_at DESC
+        `,
+        [masterIds],
+      );
+
+      reassignmentRows = reassignments;
+    }
+
+    /* ================= FORMAT RESPONSE ================= */
+    const formattedRows = rows.map((row) => {
+      const reassignments = reassignmentRows
+        .filter((r) => r.master_id === row.master_id)
+        .map((r) => ({
+          remark: r.remark,
+          assignedTo: r.assignedTo,
+          leadStage: r.leadStage,
+          created_by_user: r.created_by_user,
+          created_at: r.created_at
+            ? new Date(r.created_at).toLocaleString('en-GB')
+            : null,
+          reassignment_date: r.reassignment_date
+            ? new Date(r.reassignment_date).toLocaleString('en-GB')
+            : null,
+          name: r.name,
+          role: r.role,
+        }));
+
+      return {
+        ...row,
+        reassignment_remarks: reassignments,
+        latest_assignedTo: reassignments.length
+          ? reassignments[0].assignedTo
+          : null,
+        latest_leadStage: reassignments.length
+          ? reassignments[0].leadStage
+          : null,
+      };
+    });
+
+    return res.status(200).json(formattedRows);
+  } catch (error) {
+    console.error('❌ Error fetching quotation leads:', error);
+    return res.status(500).json({
+      message: 'Failed to fetch quotation leads',
+    });
+  } finally {
+    connection.release();
+  }
+};
+
 
 
 export const getAssignedMissTodaysLeadsFullData1 = async (req, res) => {
@@ -12947,7 +13220,7 @@ export const getAssignedMissTodaysLeadsFullData = async (req, res) => {
   }
 };
 
-export const getQuotationClosedLeads = async (req, res) => {
+export const getQuotationClosedLeads1 = async (req, res) => {
   const connection = await db.getConnection();
 
   try {
@@ -13079,8 +13352,275 @@ ORDER BY rd.master_id DESC
 };
 
 
+export const getQuotationClosedLeads2 = async (req, res) => {
+  const connection = await db.getConnection();
 
+  try {
+    /* ================= MAIN LEADS ================= */
+    const [rows] = await connection.query(`
+      SELECT 
+        rd.master_id,
+        rd.name,
+        rd.number,
+        rd.email,
+        rd.address,
+        rd.city,
+        rd.status,
+        rd.lead_status,
+        rd.lead_stage,
+        rd.current_stage,
+        rd.created_by_user,
+        rd.assign_id,
+        rd.followup_date,
+        rd.cat_id,
+        rd.reference_id,
+        rd.area_id,
+        rd.room_length,
+        rd.room_width,
+        rd.room_height,
+        rd.location_link,
+        rd.p_type,
+        rd.budget_range,
+        rd.time_to_complete,
+        rd.site_visit_date,
+        rd.demo_date,
+        rd.lead_activity,
+        rd.ar_number,
+        rd.ca_number,
+        rd.e_number,
+        rd.sm_number,
+        rd.pop_number,
+        rd.other_number,
+        rd.quick_remark,
+        rd.detailed_remark,
 
+        a.area_name,
+        c.cat_name,
+        r.reference_name,
+
+        asg.assign_date,
+        asg.target_date,
+        asg.mode,
+        asg.remark AS assignment_remark,
+        asg.assigned_to,
+        asg.assigned_to_user_id,
+        asg.assign_type,
+
+        CASE WHEN q.qt_id IS NOT NULL THEN 1 ELSE 0 END AS created_flag
+
+      FROM raw_data rd
+      LEFT JOIN area a ON rd.area_id = a.area_id
+      LEFT JOIN category c ON rd.cat_id = c.cat_id
+      LEFT JOIN reference r ON rd.reference_id = r.reference_id
+      LEFT JOIN assignments asg ON rd.assign_id = asg.assign_id
+      LEFT JOIN quotation q ON rd.master_id = q.master_id
+
+      WHERE rd.lead_stage IN ('Quotation Created', 'Closed Deal', 'Execution')
+      
+      ORDER BY 
+        CASE WHEN q.qt_id IS NOT NULL THEN 1 ELSE 0 END DESC,
+        rd.master_id DESC
+    `);
+
+    /* ================= REASSIGNMENTS ================= */
+    const masterIds = rows.map((r) => r.master_id);
+    let reassignmentRows = [];
+
+    if (masterIds.length > 0) {
+      const [reassignments] = await connection.query(
+        `
+        SELECT 
+          rm.*, 
+          u.name, 
+          u.role
+        FROM reassignment rm
+        LEFT JOIN users u ON u.user_id = rm.created_by_user
+        WHERE rm.master_id IN (?)
+        ORDER BY rm.reassignment_date DESC, rm.created_at DESC
+        `,
+        [masterIds],
+      );
+
+      reassignmentRows = reassignments;
+    }
+
+    /* ================= FORMAT RESPONSE ================= */
+    const formattedRows = rows.map((row) => {
+      const reassignments = reassignmentRows
+        .filter((r) => r.master_id === row.master_id)
+        .map((r) => ({
+          remark: r.remark,
+          assignedTo: r.assignedTo,
+          leadStage: r.leadStage,
+          created_by_user: r.created_by_user,
+          created_at: r.created_at
+            ? new Date(r.created_at).toLocaleString('en-GB')
+            : null,
+          reassignment_date: r.reassignment_date
+            ? new Date(r.reassignment_date).toLocaleString('en-GB')
+            : null,
+          name: r.name,
+          role: r.role,
+        }));
+
+      return {
+        ...row,
+        reassignment_remarks: reassignments,
+        latest_assignedTo: reassignments.length
+          ? reassignments[0].assignedTo
+          : null,
+        latest_leadStage: reassignments.length
+          ? reassignments[0].leadStage
+          : null,
+      };
+    });
+
+    return res.status(200).json(formattedRows);
+  } catch (error) {
+    console.error('❌ Error fetching quotation leads:', error);
+    return res.status(500).json({
+      message: 'Failed to fetch quotation leads',
+    });
+  } finally {
+    connection.release();
+  }
+};
+
+export const getQuotationClosedLeads = async (req, res) => {
+  const connection = await db.getConnection();
+
+  try {
+    /* ================= MAIN LEADS ================= */
+    const [rows] = await connection.query(`
+      SELECT 
+        rd.master_id,
+        rd.name,
+        rd.number,
+        rd.email,
+        rd.address,
+        rd.city,
+        rd.status,
+        rd.lead_status,
+        rd.lead_stage,
+        rd.current_stage,
+        rd.created_by_user,
+        rd.assign_id,
+        rd.followup_date,
+        rd.cat_id,
+        rd.reference_id,
+        rd.area_id,
+        rd.room_length,
+        rd.room_width,
+        rd.room_height,
+        rd.location_link,
+        rd.p_type,
+        rd.budget_range,
+        rd.time_to_complete,
+        rd.site_visit_date,
+        rd.demo_date,
+        rd.lead_activity,
+        rd.ar_number,
+        rd.ca_number,
+        rd.e_number,
+        rd.sm_number,
+        rd.pop_number,
+        rd.other_number,
+        rd.quick_remark,
+        rd.detailed_remark,
+
+        a.area_name,
+        c.cat_name,
+        r.reference_name,
+
+        asg.assign_date,
+        asg.target_date,
+        asg.mode,
+        asg.remark AS assignment_remark,
+        asg.assigned_to,
+        asg.assigned_to_user_id,
+        asg.assign_type,
+
+        CASE WHEN q.qt_id IS NOT NULL THEN 1 ELSE 0 END AS created_flag,
+        q.created_at AS quotation_created_date
+
+      FROM raw_data rd
+      LEFT JOIN area a ON rd.area_id = a.area_id
+      LEFT JOIN category c ON rd.cat_id = c.cat_id
+      LEFT JOIN reference r ON rd.reference_id = r.reference_id
+      LEFT JOIN assignments asg ON rd.assign_id = asg.assign_id
+      LEFT JOIN quotation q ON rd.master_id = q.master_id
+
+      WHERE rd.lead_stage IN ('Quotation Created', 'Closed Deal', 'Execution')
+      
+      ORDER BY 
+        q.created_at DESC,
+        CASE WHEN q.qt_id IS NOT NULL THEN 1 ELSE 0 END DESC,
+        rd.master_id DESC
+    `);
+
+    /* ================= REASSIGNMENTS ================= */
+    const masterIds = rows.map((r) => r.master_id);
+    let reassignmentRows = [];
+
+    if (masterIds.length > 0) {
+      const [reassignments] = await connection.query(
+        `
+        SELECT 
+          rm.*, 
+          u.name, 
+          u.role
+        FROM reassignment rm
+        LEFT JOIN users u ON u.user_id = rm.created_by_user
+        WHERE rm.master_id IN (?)
+        ORDER BY rm.reassignment_date DESC, rm.created_at DESC
+        `,
+        [masterIds],
+      );
+
+      reassignmentRows = reassignments;
+    }
+
+    /* ================= FORMAT RESPONSE ================= */
+    const formattedRows = rows.map((row) => {
+      const reassignments = reassignmentRows
+        .filter((r) => r.master_id === row.master_id)
+        .map((r) => ({
+          remark: r.remark,
+          assignedTo: r.assignedTo,
+          leadStage: r.leadStage,
+          created_by_user: r.created_by_user,
+          created_at: r.created_at
+            ? new Date(r.created_at).toLocaleString('en-GB')
+            : null,
+          reassignment_date: r.reassignment_date
+            ? new Date(r.reassignment_date).toLocaleString('en-GB')
+            : null,
+          name: r.name,
+          role: r.role,
+        }));
+
+      return {
+        ...row,
+        reassignment_remarks: reassignments,
+        latest_assignedTo: reassignments.length
+          ? reassignments[0].assignedTo
+          : null,
+        latest_leadStage: reassignments.length
+          ? reassignments[0].leadStage
+          : null,
+      };
+    });
+
+    return res.status(200).json(formattedRows);
+  } catch (error) {
+    console.error('❌ Error fetching quotation leads:', error);
+    return res.status(500).json({
+      message: 'Failed to fetch quotation leads',
+    });
+  } finally {
+    connection.release();
+  }
+};
 
 
 export const getEmployeeWorkReport1 = async (req, res) => {
@@ -13270,7 +13810,7 @@ export const getEmployeeWorkReport = async (req, res) => {
         c.cat_name AS category,
         ref.reference_name AS reference_name,
 
-        u_from.name AS assigned_by,
+        u_from.name AS worked_by,  -- ✅ FIXED (actual worker)
         rs.assignedTo AS assigned_to,
 
         rs.leadStage AS reassigned_stage,
@@ -13284,20 +13824,31 @@ export const getEmployeeWorkReport = async (req, res) => {
       LEFT JOIN users u_from ON u_from.user_id = rs.created_by_user
 
       WHERE 1=1
+
+      -- ✅ REMOVE FAKE WORK
+      AND rs.remark IS NOT NULL
+      AND rs.remark NOT LIKE 'created_time:%'
+
+      -- ✅ REMOVE PURE ASSIGNMENT (Fresh Lead without real action)
+      AND NOT (
+        rs.leadStage = 'Fresh Lead'
+        AND rs.remark LIKE 'created_time:%'
+      )
     `;
 
     const queryParams = [];
 
     /* ================= ROLE FILTER ================= */
+    // 🚨 IMPORTANT CHANGE: filter by worked_by (NOT assignedTo)
     if (isTelecallerLike(role)) {
-      query += ` AND rs.assignedTo = ?`;
+      query += ` AND u_from.name = ?`;
       queryParams.push(currentUserName);
     } 
     else if (isAdminLike(role)) {
-      // Admin → no restriction
+      // no restriction
     } 
     else if (!isManagementLike(role)) {
-      query += ` AND rs.assignedTo = ?`;
+      query += ` AND u_from.name = ?`;
       queryParams.push(currentUserName);
     }
 
@@ -13337,7 +13888,7 @@ export const getEmployeeWorkReport = async (req, res) => {
         rd.name LIKE ? OR 
         rd.number LIKE ? OR 
         rd.city LIKE ? OR 
-        rs.assignedTo LIKE ?
+        u_from.name LIKE ?
       )`;
       const s = `%${search}%`;
       queryParams.push(s, s, s, s);
@@ -13367,8 +13918,11 @@ export const getEmployeeWorkReport = async (req, res) => {
 
     if (isAdminLike(role)) {
       let summaryParams = [];
-
-      let summaryWhere = ` WHERE 1=1 `;
+      let summaryWhere = `
+        WHERE 1=1
+        AND rs.remark IS NOT NULL
+        AND rs.remark NOT LIKE 'created_time:%'
+      `;
 
       if (fromDate) {
         summaryWhere += ` AND DATE(rs.created_at) >= ?`;
@@ -13380,20 +13934,21 @@ export const getEmployeeWorkReport = async (req, res) => {
         summaryParams.push(toDate);
       }
 
-      /* ===== USER WISE ===== */
+      /* ===== USER WISE (FIXED) ===== */
       const [userWise] = await db.query(`
-        SELECT rs.assignedTo, COUNT(*) as total
+        SELECT u_from.name AS worked_by, COUNT(*) as total
         FROM reassignment rs
+        LEFT JOIN users u_from ON u_from.user_id = rs.created_by_user
         ${summaryWhere}
-        GROUP BY rs.assignedTo
+        GROUP BY u_from.name
         ORDER BY total DESC
       `, summaryParams);
 
-      /* ===== ROLE WISE ===== */
+      /* ===== ROLE WISE (FIXED) ===== */
       const [roleWise] = await db.query(`
         SELECT u.role, COUNT(*) as total
         FROM reassignment rs
-        JOIN users u ON u.name = rs.assignedTo
+        JOIN users u ON u.user_id = rs.created_by_user
         ${summaryWhere}
         GROUP BY u.role
         ORDER BY total DESC
@@ -13410,7 +13965,7 @@ export const getEmployeeWorkReport = async (req, res) => {
       success: true,
       total,
       data: rows,
-      summary   // 👈 new (safe)
+      summary
     });
 
   } catch (error) {

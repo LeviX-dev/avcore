@@ -1,623 +1,10 @@
-// import React, { useEffect, useRef, useState } from 'react';
-// import { NavLink, useLocation } from 'react-router-dom';
-// import SidebarLinkGroup from './SidebarLinkGroup';
-// import axios from 'axios';
-// import { BASE_URL } from '../../../public/config';
-// import Logo from '../../images/logo/MMS_logo.png';
-// import { buildTree } from '../../utils/buildTree';
-
-// import {
-//   LayoutDashboard,
-//   Database,
-//   Users,
-//   FileText,
-//   Megaphone,
-//   PhoneOutgoing,
-//   CheckSquare,
-//   ClipboardList,
-//   CalendarDays,
-//   BarChart3,
-//   FolderOpen,
-//   Package,
-//   Bookmark,
-//   Map,
-//   UserPlus,
-//   List,
-//   FolderPlus,
-//   Eye,
-//   CheckCircle,
-//   ChevronDown,
-//   X,
-//   LogOut,
-//   TrendingUp,
-//   ShieldCheck,
-//   UserCog,
-//   ClipboardCheck,
-//   CalendarCheck,
-
-//   // ✅ ADD THESE
-//   Boxes,
-//   Warehouse,
-//   FileStack,
-//   Clipboard
-// } from 'lucide-react';
-
-
-
-// interface MenuItem {
-//   menu_key: string;
-//   label: string;
-//   path: string | null;
-//   parent_key: string | null;
-//   children?: MenuItem[];
-//   type?: string; // Add type to distinguish logout
-// }
-
-// interface SidebarProps {
-//   sidebarOpen: boolean;
-//   setSidebarOpen: (arg: boolean) => void;
-// }
-
-// const DynamicSidebar = ({ sidebarOpen, setSidebarOpen }: SidebarProps) => {
-//   const { pathname } = useLocation();
-//   const sidebar = useRef<HTMLDivElement | null>(null);
-//   const trigger = useRef<HTMLButtonElement | null>(null);
-
-//   const [menus, setMenus] = useState<MenuItem[]>([]);
-//   const [logoutItem, setLogoutItem] = useState<MenuItem | null>(null);
-//   const [openDropdown, setOpenDropdown] = useState<string | null>(null);
-//   const [showLogoutModal, setShowLogoutModal] = useState(false);
-
-//   // Fetch menus
-//   useEffect(() => {
-//     axios
-//       .get(`${BASE_URL}api/dynamic/sidebar`, { withCredentials: true })
-//       .then(res => {
-//         const allItems = res.data || [];
-        
-//         // Separate logout item from regular menus
-//         const logoutMenuItem = allItems.find((item: MenuItem) => 
-//           item.menu_key === 'logout' || item.label.toLowerCase() === 'logout'
-//         );
-        
-//         if (logoutMenuItem) {
-//           // Add type to identify logout item
-//           const logoutItemWithType = {
-//             ...logoutMenuItem,
-//             type: 'logout'
-//           };
-//           setLogoutItem(logoutItemWithType);
-//         }
-        
-//         // Filter out logout from regular menus
-//         const regularMenus = allItems.filter((item: MenuItem) => 
-//           !(item.menu_key === 'logout' || item.label.toLowerCase() === 'logout')
-//         );
-//         const tree = buildTree(regularMenus);
-//         setMenus(tree);
-//       })
-//       .catch(err => {
-//         console.error('❌ Sidebar load failed', err);
-//         setMenus([]);
-//       });
-//   }, []);
-
-//   // Function to handle dropdown toggle
-//   const handleDropdownToggle = (menuName: string) => {
-//     if (openDropdown === menuName) {
-//       setOpenDropdown(null);
-//     } else {
-//       setOpenDropdown(menuName);
-//     }
-//   };
-
-//   // Auto-open correct dropdown based on current route
-//   useEffect(() => {
-//     const findActiveMenu = (menus: MenuItem[]): string | null => {
-//       for (const menu of menus) {
-//         if (menu.children && menu.children.length > 0) {
-//           const childActive = menu.children.some(child =>
-//             child.path && (pathname === child.path || pathname.startsWith(child.path + '/'))
-//           );
-//           if (childActive) {
-//             return menu.menu_key;
-//           }
-          
-//           for (const child of menu.children) {
-//             if (child.children && child.children.length > 0) {
-//               const nestedActive = child.children.some(nestedChild =>
-//                 nestedChild.path && (pathname === nestedChild.path || pathname.startsWith(nestedChild.path + '/'))
-//               );
-//               if (nestedActive) {
-//                 return menu.menu_key;
-//               }
-//             }
-//           }
-//         }
-//       }
-//       return null;
-//     };
-
-//     const activeMenu = findActiveMenu(menus);
-//     setOpenDropdown(activeMenu);
-//   }, [pathname, menus]);
-
-//   // Close sidebar on click outside
-//   useEffect(() => {
-//     const clickHandler = ({ target }: MouseEvent) => {
-//       if (!sidebar.current || !trigger.current) return;
-//       if (
-//         !sidebarOpen ||
-//         sidebar.current.contains(target as Node) ||
-//         trigger.current.contains(target as Node)
-//       )
-//         return;
-//       setSidebarOpen(false);
-//     };
-//     document.addEventListener('click', clickHandler);
-//     return () => document.removeEventListener('click', clickHandler);
-//   }, [sidebarOpen, setSidebarOpen]);
-
-//   // Close sidebar on escape key
-//   useEffect(() => {
-//     const keyHandler = ({ key }: KeyboardEvent) => {
-//       if (!sidebarOpen || key !== 'Escape') return;
-//       setSidebarOpen(false);
-//     };
-//     document.addEventListener('keydown', keyHandler);
-//     return () => document.removeEventListener('keydown', keyHandler);
-//   }, [sidebarOpen, setSidebarOpen]);
-
-//   // Check if a path is active
-//   const isPathActive = (path?: string | null) =>
-//     path && (pathname === path || pathname.startsWith(path + '/'));
-
-
-
-//   const normalize = (text: string) =>
-//   text?.toLowerCase().replace(/['’]/g, "").trim();
-
-// const getIcon = (label: string) => {
-//   const key = normalize(label);
-
-//   const iconMap: Record<string, React.ReactNode> = {
-//     // ===== TOP MENUS =====
-//     "dashboard": <LayoutDashboard className="w-5 h-5" />,
-//     "master": <Database className="w-5 h-5" />,
-//     "user": <Users className="w-5 h-5" />,
-//     "master data": <FileText className="w-5 h-5" />,
-//     "campaign": <Megaphone className="w-5 h-5" />,
-//     "assigned call": <PhoneOutgoing className="w-5 h-5" />,
-//     "Today's Task": <CheckSquare className="w-5 h-5" />,
-//     "missed follow-up list": <ClipboardList className="w-5 h-5" />,
-//     "upcoming follow-ups": <CalendarDays className="w-5 h-5" />,
-//     "report": <BarChart3 className="w-5 h-5" />,
-//     "attendance report": <CalendarCheck className="w-5 h-5" />,
-
-//     // ===== EXECUTION =====
-//     "execution": <TrendingUp className="w-5 h-5" />,
-//     "Assigned Procress": <CalendarCheck className="w-5 h-5" />,
-//     "Daily Operations": <ClipboardCheck className="w-5 h-5" />,
-//     "process type": <ClipboardCheck className="w-4 h-4" />,
-//     "schedule": <CalendarCheck className="w-4 h-4" />,
-//     "pre execution": <CalendarCheck className="w-4 h-4" />,
-//     "complete execution": <CheckCircle className="w-4 h-4" />,
-
-//     // ===== INVENTORY =====
-//     "stock": <Warehouse className="w-5 h-5" />,
-//     "inword": <Boxes className="w-5 h-5" />,
-//     "mrn": <FileStack className="w-5 h-5" />,
-
-//     // MRN children
-//     "generate mrn": <FileStack className="w-4 h-4" />,
-//     "verify mrn": <CheckCircle className="w-4 h-4" />,
-//     "approve mrn": <CheckCircle className="w-4 h-4" />,
-//     "manage mrn": <Clipboard className="w-4 h-4" />,
-
-//     // ===== QUOTATION =====
-//     "quotation template": <FileStack className="w-5 h-5" />,
-//     "quotation": <Clipboard className="w-5 h-5" />,
-
-//     // ===== MASTER CHILDREN =====
-//     "category": <FolderOpen className="w-4 h-4" />,
-//     "product": <Package className="w-4 h-4" />,
-//     "reference": <Bookmark className="w-4 h-4" />,
-//     "area": <Map className="w-4 h-4" />,
-//     "kit": <Package className="w-4 h-4" />,
-
-//     // ===== USER =====
-//     "add user": <UserPlus className="w-4 h-4" />,
-//     "user list": <List className="w-4 h-4" />,
-
-//     // ===== CAMPAIGN =====
-//     "create campaign": <FolderPlus className="w-4 h-4" />,
-//     "view campaign": <Eye className="w-4 h-4" />,
-
-//     // ===== REPORT =====
-//     "drop leads report": <Eye className="w-4 h-4" />,
-//     "closed leads report": <CheckCircle className="w-4 h-4" />,
-//     "employeewise report": <Users className="w-4 h-4" />,
-//     "leadwise report": <TrendingUp className="w-4 h-4" />,
-
-//     // ===== ADMIN =====
-//     "role permission": <ShieldCheck className="w-4 h-4" />,
-//     "employee report": <UserCog className="w-4 h-4" />,
-
-//     "logout": <LogOut className="w-5 h-5" />,
-//     // Add this to your iconMap in the sidebar
-// "employee work report": <UserCog className="w-4 h-4" />,
-
-// "Meta Leads Report": <Package className="w-4 h-4" />,
-
-
-//   };
-
-//   return iconMap[key] || <FileText className="w-5 h-5" />;
-// };
-
-
-
-
-//   // Get color for menu item with static classes
-//   const getColorClass = (label: string) => {
-//     const colorMap: Record<string, {hover: string, active: string, childHover: string, childActive: string}> = {
-//       'Dashboard': { 
-//         hover: 'hover:bg-blue-500/20 hover:border-l-blue-400 hover:text-white',
-//         active: 'bg-blue-500/20 border-l-4 border-l-blue-400 text-white shadow-lg',
-//         childHover: 'hover:bg-blue-500/10 hover:text-white',
-//         childActive: 'text-white bg-blue-500/20'
-//       },
-//       'Master': { 
-//         hover: 'hover:bg-purple-500/20 hover:border-l-purple-400 hover:text-white',
-//         active: 'bg-purple-500/20 border-l-4 border-l-purple-400 text-white shadow-lg',
-//         childHover: 'hover:bg-purple-500/10 hover:text-white',
-//         childActive: 'text-white bg-purple-500/20'
-//       },
-//       'User': { 
-//         hover: 'hover:bg-green-500/20 hover:border-l-green-400 hover:text-white',
-//         active: 'bg-green-500/20 border-l-4 border-l-green-400 text-white shadow-lg',
-//         childHover: 'hover:bg-green-500/10 hover:text-white',
-//         childActive: 'text-white bg-green-500/20'
-//       },
-//       'Master Data': { 
-//         hover: 'hover:bg-orange-500/20 hover:border-l-orange-400 hover:text-white',
-//         active: 'bg-orange-500/20 border-l-4 border-l-orange-400 text-white shadow-lg',
-//         childHover: 'hover:bg-orange-500/10 hover:text-white',
-//         childActive: 'text-white bg-orange-500/20'
-//       },
-//       'Campaign': { 
-//         hover: 'hover:bg-pink-500/20 hover:border-l-pink-400 hover:text-white',
-//         active: 'bg-pink-500/20 border-l-4 border-l-pink-400 text-white shadow-lg',
-//         childHover: 'hover:bg-pink-500/10 hover:text-white',
-//         childActive: 'text-white bg-pink-500/20'
-//       },
-//       'Assigned Call': { 
-//         hover: 'hover:bg-teal-500/20 hover:border-l-teal-400 hover:text-white',
-//         active: 'bg-teal-500/20 border-l-4 border-l-teal-400 text-white shadow-lg',
-//         childHover: 'hover:bg-teal-500/10 hover:text-white',
-//         childActive: 'text-white bg-teal-500/20'
-//       },
-//       'Today\'s To-Do': { 
-//         hover: 'hover:bg-blue-500/20 hover:border-l-blue-400 hover:text-white',
-//         active: 'bg-blue-500/20 border-l-4 border-l-blue-400 text-white shadow-lg',
-//         childHover: 'hover:bg-blue-500/10 hover:text-white',
-//         childActive: 'text-white bg-blue-500/20'
-//       },
-//       'Missed Follow-up List': { 
-//         hover: 'hover:bg-yellow-500/20 hover:border-l-yellow-400 hover:text-white',
-//         active: 'bg-yellow-500/20 border-l-4 border-l-yellow-400 text-white shadow-lg',
-//         childHover: 'hover:bg-yellow-500/10 hover:text-white',
-//         childActive: 'text-white bg-yellow-500/20'
-//       },
-//       'Upcoming Follow-ups': { 
-//         hover: 'hover:bg-purple-500/20 hover:border-l-purple-400 hover:text-white',
-//         active: 'bg-purple-500/20 border-l-4 border-l-purple-400 text-white shadow-lg',
-//         childHover: 'hover:bg-purple-500/10 hover:text-white',
-//         childActive: 'text-white bg-purple-500/20'
-//       },
-//       'Report': { 
-//         hover: 'hover:bg-cyan-500/20 hover:border-l-cyan-400 hover:text-white',
-//         active: 'bg-cyan-500/20 border-l-4 border-l-cyan-400 text-white shadow-lg',
-//         childHover: 'hover:bg-cyan-500/10 hover:text-white',
-//         childActive: 'text-white bg-cyan-500/20'
-//       },
-//       'Logout': { 
-//         hover: 'hover:bg-red-500/20 hover:border-l-red-400 hover:text-red-600',
-//         active: 'bg-red-500/20 border-l-4 border-l-red-400 text-red-600 shadow-lg',
-//         childHover: 'hover:bg-red-500/10 hover:text-white',
-//         childActive: 'text-white bg-red-500/20'
-//       },
-//     };
-//     return colorMap[label] || colorMap['Dashboard'];
-//   };
-
-//   // Handle logout function
-//   const handleLogout = async () => {
-//     try {
-//       // Clear session data
-//       sessionStorage.removeItem('userToken');  
-//       sessionStorage.removeItem('userDetails'); 
-      
-//       // Call logout API if needed
-//       await axios.post(BASE_URL + 'auth/logout', {}, { withCredentials: true });
-      
-//       // Close modal and redirect
-//       setShowLogoutModal(false);
-//       window.location.href = '/signin'; 
-//     } catch (error) {
-//       console.error('Error during logout:', error);
-//       // Still redirect even if API call fails
-//       sessionStorage.clear();
-//       setShowLogoutModal(false);
-//       window.location.href = '/signin';
-//     }
-//   };
-
-//   // Render menu items
-//   const renderMenuItem = (menu: MenuItem) => {
-//     const color = getColorClass(menu.label);
-
-//     // Special handling for logout item
-//     if (menu.type === 'logout' || menu.label.toLowerCase() === 'logout') {
-//       return (
-//         <li key={menu.menu_key} className="mt-auto">
-//           <button
-//             onClick={() => setShowLogoutModal(true)}
-//             className={`group relative flex w-full items-center gap-3 rounded-lg py-3 px-4 font-medium text-sm lg:text-base duration-300 ease-in-out transition-all ${color.hover} ${
-//               pathname === menu.path
-//                 ? `${color.active} border-l-4`
-//                 : 'text-gray-300'
-//             }`}
-//           >
-//             {getIcon(menu.label)}
-//             <span className="transition-all duration-300 text-sm lg:text-base">
-//               {menu.label}
-//             </span>
-//           </button>
-//         </li>
-//       );
-//     }
-
-//     // Case 1: Parent menu with children
-//     if (menu.children && menu.children.length > 0) {
-//       const isActive = menu.children.some(child => isPathActive(child.path));
-//       const isOpen = openDropdown === menu.menu_key;
-
-//       return (
-//         <SidebarLinkGroup key={menu.menu_key} activeCondition={isActive}>
-//           {(handleClick, open) => (
-//             <>
-//               <NavLink
-//                 to="#"
-//                 className={`group relative flex items-center gap-3 rounded-lg py-3 px-4 font-medium duration-300 ease-in-out transition-all ${color.hover} ${
-//                   isActive
-//                     ? `${color.active} border-l-4`
-//                     : 'text-gray-300'
-//                 }`}
-//                 onClick={(e) => {
-//                   e.preventDefault();
-//                   handleDropdownToggle(menu.menu_key);
-//                 }}
-//               >
-//                 {getIcon(menu.label)}
-//                 <span className="transition-all duration-300 text-sm lg:text-base">
-//                   {menu.label}
-//                 </span>
-//                 <ChevronDown 
-//                   className={`absolute right-4 top-1/2 -translate-y-1/2 w-4 h-4 transition-transform duration-300 ${
-//                     isOpen ? 'rotate-180' : ''
-//                   }`}
-//                 />
-//               </NavLink>
-              
-//               {/* Dropdown Menu */}
-//               <div
-//                 className={`translate transform overflow-hidden transition-all duration-300 ${
-//                   !isOpen && 'hidden'
-//                 }`}
-//               >
-//                 <ul className="mt-2 mb-3 flex flex-col gap-1 pl-8">
-//                   {menu.children.map(child => (
-//                     <li key={child.menu_key}>
-//                       <NavLink
-//                         to={child.path!}
-//                         className={({ isActive }) =>
-//                           `group relative flex items-center gap-2 rounded-md px-3 py-2 text-sm font-medium transition-all duration-300 ${color.childHover} ${
-//                             isActive ? `${color.childActive}` : 'text-gray-400'
-//                           }`
-//                         }
-//                         onClick={() => {
-//                           if (window.innerWidth < 1024) {
-//                             setSidebarOpen(false);
-//                           }
-//                         }}
-//                       >
-//                         {getIcon(child.label)}
-//                         {child.label}
-//                       </NavLink>
-//                     </li>
-//                   ))}
-//                 </ul>
-//               </div>
-//             </>
-//           )}
-//         </SidebarLinkGroup>
-//       );
-//     }
-
-//     // Case 2: Standalone menu item
-//     if (menu.path) {
-//       return (
-//         <li key={menu.menu_key}>
-//           <NavLink
-//             to={menu.path}
-//             className={({ isActive }) =>
-//               `group relative flex items-center gap-3 rounded-lg py-3 px-4 font-medium duration-300 ease-in-out transition-all ${color.hover} ${
-//                 isActive 
-//                   ? `${color.active} border-l-4` 
-//                   : 'text-gray-300'
-//               }`
-//             }
-//             onClick={() => {
-//               setOpenDropdown(null);
-//               if (window.innerWidth < 1024) {
-//                 setSidebarOpen(false);
-//               }
-//             }}
-//           >
-//             {getIcon(menu.label)}
-//             <span className="transition-all duration-300 text-sm lg:text-base">
-//               {menu.label}
-//             </span>
-//           </NavLink>
-//         </li>
-//       );
-//     }
-
-//     return null;
-//   };
-
-//   return (
-//     <>
-//       <aside
-//         ref={sidebar}
-//         className={`fixed left-0 top-0 z-9999 flex h-screen w-full max-w-xs flex-col overflow-hidden bg-gradient-to-b from-gray-900 to-black duration-300 ease-linear lg:static lg:h-auto lg:w-72.5 lg:translate-x-0 ${
-//           sidebarOpen ? 'translate-x-0 shadow-2xl' : '-translate-x-full'
-//         }`}
-//         style={{
-//           maxHeight: '100dvh',
-//           minHeight: '-webkit-fill-available',
-//         }}
-//       >
-//         {/* SIDEBAR HEADER */}
-//         <div className="flex items-center justify-between gap-2 px-4 py-6 lg:py-4 flex-shrink-0">
-//           <NavLink to="/dashboard" className="flex items-center gap-3" onClick={() => setSidebarOpen(false)}>
-// <img
-//   src={Logo}
-//   alt="Logo"
-//   className="
-//     w-full
-//     max-w-[230px]
-//     lg:max-w-[300px]
-//     h-auto
-//     max-h-[60px]
-//     lg:max-h-[80px]
-//     object-contain
-//     rounded-xl
-//   "
-// />
-
-
-
-//           </NavLink>
-
-//           <button
-//             ref={trigger}
-//             onClick={() => setSidebarOpen(!sidebarOpen)}
-//             aria-controls="sidebar"
-//             aria-expanded={sidebarOpen}
-//             className="block lg:hidden"
-//           >
-//             <X className="w-6 h-6 text-white" />
-//           </button>
-//         </div>
-
-//         {/* SIDEBAR CONTENT */}
-//         <div 
-//           className="flex-1 overflow-y-auto overflow-x-hidden sidebar-scrollbar"
-//         >
-//           <style>{`
-//             .sidebar-scrollbar::-webkit-scrollbar {
-//               width: 4px;
-//             }
-//             .sidebar-scrollbar::-webkit-scrollbar-track {
-//               background: transparent;
-//             }
-//             .sidebar-scrollbar::-webkit-scrollbar-thumb {
-//               background-color: #4B5563;
-//               border-radius: 20px;
-//             }
-//             .sidebar-scrollbar::-webkit-scrollbar-thumb:hover {
-//               background-color: #6B7280;
-//             }
-//             @media (max-width: 1024px) {
-//               .sidebar-scrollbar::-webkit-scrollbar {
-//                 width: 3px;
-//               }
-//             }
-//           `}</style>
-
-//           <nav className="py-4 px-4 lg:px-6">
-//             <div>
-           
-//               <ul className="mb-6 flex flex-col gap-1.5">
-//                 {/* Render regular menus */}
-//                 {menus.map(menu => renderMenuItem(menu))}
-                
-//                 {/* Render logout item as part of the menu list */}
-//                 {logoutItem && renderMenuItem(logoutItem)}
-//               </ul>
-//             </div>
-//           </nav>
-//         </div>
-//       </aside>
-
-//       {/* Logout Confirmation Modal */}
-//       {showLogoutModal && (
-//         <div className="fixed inset-0 z-99999 flex items-center justify-center bg-black/50 p-4">
-//           <div className="relative w-full max-w-md rounded-lg bg-white p-6 shadow-lg dark:bg-boxdark">
-//             {/* Modal header */}
-//             <div className="flex items-center justify-between border-b border-stroke pb-4 mb-4">
-//               <h3 className="text-xl font-semibold text-black dark:text-white">
-//                 Confirm Logout
-//               </h3>
-//               <button
-//                 onClick={() => setShowLogoutModal(false)}
-//                 className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
-//               >
-//                 <X className="w-5 h-5" />
-//               </button>
-//             </div>
-
-//             {/* Modal content */}
-//             <div className="mb-6">
-//               <p className="text-gray-600 dark:text-gray-300">
-//                 Are you sure you want to logout from your account?
-//               </p>
-//             </div>
-
-//             {/* Modal footer */}
-//             <div className="flex justify-end gap-3">
-//               <button
-//                 onClick={() => setShowLogoutModal(false)}
-//                 className="px-4 py-2 rounded border border-stroke bg-gray-100 text-gray-700 hover:bg-gray-200 dark:border-strokedark dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700 transition-colors"
-//               >
-//                 Cancel
-//               </button>
-//               <button
-//                 onClick={handleLogout}
-//                 className="px-4 py-2 rounded bg-red-500 text-white hover:bg-red-600 transition-colors"
-//               >
-//                 Yes, Logout
-//               </button>
-//             </div>
-//           </div>
-//         </div>
-//       )}
-//     </>
-//   );
-// };
-
-// export default DynamicSidebar; 
-
 import React, { useEffect, useRef, useState } from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
 import SidebarLinkGroup from './SidebarLinkGroup';
 import axios from 'axios';
 import { BASE_URL } from '../../../public/config';
-import Logo from '../../images/logo/MMS_logo.png';
+import Logo from '../../images/logo/AVCoreLogoSide.png';
 import { buildTree } from '../../utils/buildTree';
-
 import {
   LayoutDashboard,
   Database,
@@ -650,126 +37,15 @@ import {
   Warehouse,
   FileStack,
   Clipboard,
-  MapPin,
   Activity,
-  AlertCircle,
   Clock,
-  UserCheck,
-  Target,
   Settings,
   GitBranch,
   Calendar,
-  Phone,
-  Mail,
-  MessageSquare,
-  PieChart,
-  LineChart,
-  Download,
-  Upload,
-  RefreshCw,
-  Flag,
-  Award,
-  Briefcase,
-  Home,
-  Grid,
-  Layers,
-  Tag,
-  Hash,
-  Crosshair,
-  Compass,
-  Globe,
-  Lock,
-  Unlock,
-  Key,
-  Bell,
-  BookOpen,
-  Box,
-  Truck,
-  ShoppingCart,
-  CreditCard,
-  DollarSign,
-  Percent,
-  Clock3,
-  Hourglass,
-  ThumbsUp,
-  ThumbsDown,
-  Star,
-  Heart,
-  Zap,
-  Wind,
-  Sun,
-  Moon,
-  Cloud,
-  CloudRain,
-  CloudSnow,
-  CloudLightning,
-  CloudDrizzle,
-  Droplets,
-  Flame,
-  Leaf,
-  TreePine,
-  Mountain,
-  Waves,
-  Anchor,
-  Ship,
-  Plane,
-  Car,
-  Bike,
-  Train,
-  Bus,
-  Coffee,
-  Pizza,
-  Utensils,
-  Wine,
-  Beer,
-  Cake,
-  Gift,
-  Gem,
-  Diamond,
-  Crown,
-  Rocket,
-  Satellite,
-  Telescope,
-  Microscope,
-  Beaker,
-  Atom,
-  Brain,
-  Cpu,
-  HardDrive,
-  Monitor,
-  Smartphone,
-  Tablet,
-  Watch,
-  Camera,
-  Video,
-  Music,
-  Headphones,
-  Mic,
-  Speaker,
-  Radio,
-  Tv,
-  Printer,
-  Copy,
-  Save,
-  Trash2,
-  Edit,
-  Search,
-  Filter,
-  SortAsc,
-  SortDesc,
-  Move,
-  Maximize2,
-  Minimize2,
-  ZoomIn,
-  ZoomOut,
   Plus,
-  Minus,
-  Divide,
-  Equal,
-  Infinity,
-  Pi,
-  Sigma,
-  Omega
+  ChevronRight,
+  PanelLeftClose,
+  PanelLeftOpen,
 } from 'lucide-react';
 
 interface MenuItem {
@@ -790,11 +66,16 @@ const DynamicSidebar = ({ sidebarOpen, setSidebarOpen }: SidebarProps) => {
   const { pathname } = useLocation();
   const sidebar = useRef<HTMLDivElement | null>(null);
   const trigger = useRef<HTMLButtonElement | null>(null);
-
   const [menus, setMenus] = useState<MenuItem[]>([]);
   const [logoutItem, setLogoutItem] = useState<MenuItem | null>(null);
   const [openDropdown, setOpenDropdown] = useState<string | null>(null);
   const [showLogoutModal, setShowLogoutModal] = useState(false);
+
+  // Mini mode: sidebar shrinks to icon-only, stays in same position
+  const [mini, setMini] = useState(false);
+
+  // Tooltip state for mini mode
+  const [tooltip, setTooltip] = useState<{ label: string; y: number } | null>(null);
 
   // Fetch menus
   useEffect(() => {
@@ -802,24 +83,21 @@ const DynamicSidebar = ({ sidebarOpen, setSidebarOpen }: SidebarProps) => {
       .get(`${BASE_URL}api/dynamic/sidebar`, { withCredentials: true })
       .then(res => {
         const allItems = res.data || [];
-        
-        const logoutMenuItem = allItems.find((item: MenuItem) => 
-          item.menu_key === 'logout' || item.label.toLowerCase() === 'logout'
+
+        const logoutMenuItem = allItems.find(
+          (item: MenuItem) =>
+            item.menu_key === 'logout' || item.label.toLowerCase() === 'logout',
         );
-        
+
         if (logoutMenuItem) {
-          const logoutItemWithType = {
-            ...logoutMenuItem,
-            type: 'logout'
-          };
-          setLogoutItem(logoutItemWithType);
+          setLogoutItem({ ...logoutMenuItem, type: 'logout' });
         }
-        
-        const regularMenus = allItems.filter((item: MenuItem) => 
-          !(item.menu_key === 'logout' || item.label.toLowerCase() === 'logout')
+
+        const regularMenus = allItems.filter(
+          (item: MenuItem) =>
+            !(item.menu_key === 'logout' || item.label.toLowerCase() === 'logout'),
         );
-        const tree = buildTree(regularMenus);
-        setMenus(tree);
+        setMenus(buildTree(regularMenus));
       })
       .catch(err => {
         console.error('❌ Sidebar load failed', err);
@@ -828,45 +106,38 @@ const DynamicSidebar = ({ sidebarOpen, setSidebarOpen }: SidebarProps) => {
   }, []);
 
   const handleDropdownToggle = (menuName: string) => {
-    if (openDropdown === menuName) {
-      setOpenDropdown(null);
-    } else {
-      setOpenDropdown(menuName);
-    }
+    if (mini) return; // no dropdowns in mini mode
+    setOpenDropdown(prev => (prev === menuName ? null : menuName));
   };
 
+  // Auto-open the active parent dropdown
   useEffect(() => {
-    const findActiveMenu = (menus: MenuItem[]): string | null => {
-      for (const menu of menus) {
-        if (menu.children && menu.children.length > 0) {
-          const childActive = menu.children.some(child =>
-            child.path && (pathname === child.path || pathname.startsWith(child.path + '/'))
+    const findActiveMenu = (items: MenuItem[]): string | null => {
+      for (const menu of items) {
+        if (menu.children?.length) {
+          const childActive = menu.children.some(
+            child => child.path && (pathname === child.path || pathname.startsWith(child.path + '/')),
           );
-          if (childActive) {
-            return menu.menu_key;
-          }
-          
+          if (childActive) return menu.menu_key;
+
           for (const child of menu.children) {
-            if (child.children && child.children.length > 0) {
-              const nestedActive = child.children.some(nestedChild =>
-                nestedChild.path && (pathname === nestedChild.path || pathname.startsWith(nestedChild.path + '/'))
+            if (child.children?.length) {
+              const nested = child.children.some(
+                nc => nc.path && (pathname === nc.path || pathname.startsWith(nc.path + '/')),
               );
-              if (nestedActive) {
-                return menu.menu_key;
-              }
+              if (nested) return menu.menu_key;
             }
           }
         }
       }
       return null;
     };
-
-    const activeMenu = findActiveMenu(menus);
-    setOpenDropdown(activeMenu);
+    setOpenDropdown(findActiveMenu(menus));
   }, [pathname, menus]);
 
+  // Close on outside click (mobile overlay behaviour kept)
   useEffect(() => {
-    const clickHandler = ({ target }: MouseEvent) => {
+    const handler = ({ target }: MouseEvent) => {
       if (!sidebar.current || !trigger.current) return;
       if (
         !sidebarOpen ||
@@ -876,286 +147,275 @@ const DynamicSidebar = ({ sidebarOpen, setSidebarOpen }: SidebarProps) => {
         return;
       setSidebarOpen(false);
     };
-    document.addEventListener('click', clickHandler);
-    return () => document.removeEventListener('click', clickHandler);
+    document.addEventListener('click', handler);
+    return () => document.removeEventListener('click', handler);
   }, [sidebarOpen, setSidebarOpen]);
 
   useEffect(() => {
-    const keyHandler = ({ key }: KeyboardEvent) => {
+    const handler = ({ key }: KeyboardEvent) => {
       if (!sidebarOpen || key !== 'Escape') return;
       setSidebarOpen(false);
     };
-    document.addEventListener('keydown', keyHandler);
-    return () => document.removeEventListener('keydown', keyHandler);
+    document.addEventListener('keydown', handler);
+    return () => document.removeEventListener('keydown', handler);
   }, [sidebarOpen, setSidebarOpen]);
 
   const isPathActive = (path?: string | null) =>
-    path && (pathname === path || pathname.startsWith(path + '/'));
+    !!path && (pathname === path || pathname.startsWith(path + '/'));
 
-  const normalize = (text: string) => {
-    return text?.toLowerCase()
-      .replace(/['’"`]/g, '')
+  const normalize = (text: string) =>
+    text
+      ?.toLowerCase()
+      .replace(/[''"`]/g, '')
       .replace(/[^\w\s]/g, ' ')
       .replace(/\s+/g, ' ')
       .trim();
-  };
 
   const getIcon = (label: string) => {
     const key = normalize(label);
-    
     const iconMap: Record<string, React.ReactNode> = {
-      // Dashboard
-      "dashboard": <LayoutDashboard className="w-5 h-5" />,
-      "dash board": <LayoutDashboard className="w-5 h-5" />,
-      
-      // Master
-      "master": <Database className="w-5 h-5" />,
-      "master data": <Database className="w-5 h-5" />,
-      
-      // User related
-      "user": <Users className="w-5 h-5" />,
-      "users": <Users className="w-5 h-5" />,
-      "add user": <UserPlus className="w-5 h-5" />,
-      "user list": <List className="w-5 h-5" />,
-      "employee wise report": <Users className="w-5 h-5" />,
-      "employee work report": <UserCog className="w-5 h-5" />,
-      "employeewise report": <Users className="w-5 h-5" />,
-      "role permission": <ShieldCheck className="w-5 h-5" />,
-      
-      // Campaign
-      "campaign": <Megaphone className="w-5 h-5" />,
-      "create campaign": <FolderPlus className="w-5 h-5" />,
-      "view campaign": <Eye className="w-5 h-5" />,
-      
-      // Calls & Tasks
-      "assigned call": <PhoneOutgoing className="w-5 h-5" />,
-      "assigned calls": <PhoneOutgoing className="w-5 h-5" />,
-      "today's task": <CheckSquare className="w-5 h-5" />,
-      "todays task": <CheckSquare className="w-5 h-5" />,
-      "today task": <CheckSquare className="w-5 h-5" />,
-      "missed follow up list": <ClipboardList className="w-5 h-5" />,
-      "missed follow-up list": <ClipboardList className="w-5 h-5" />,
-      "upcoming follow ups": <CalendarDays className="w-5 h-5" />,
-      "upcoming follow-ups": <CalendarDays className="w-5 h-5" />,
-      
-      // Reports
-      "report": <BarChart3 className="w-5 h-5" />,
-      "reports": <BarChart3 className="w-5 h-5" />,
-      "attendance report": <CalendarCheck className="w-5 h-5" />,
-      "drop leads report": <Eye className="w-5 h-5" />,
-      "closed leads report": <CheckCircle className="w-5 h-5" />,
-      "leadwise report": <TrendingUp className="w-5 h-5" />,
-      "lead wise report": <TrendingUp className="w-5 h-5" />,
-      "meta leads report": <Package className="w-5 h-5" />,
-      "statistics": <BarChart3 className="w-5 h-5" />,
-      
-      // Execution
-      "execution": <TrendingUp className="w-5 h-5" />,
-      "pre execution": <Clock className="w-5 h-5" />,
-      "complete execution": <CheckCircle className="w-5 h-5" />,
-      "assigned procress": <CalendarCheck className="w-5 h-5" />,
-      "assigned process": <CalendarCheck className="w-5 h-5" />,
-      "daily operations": <ClipboardCheck className="w-5 h-5" />,
-      "process type": <GitBranch className="w-5 h-5" />,
-      "schedule": <Calendar className="w-5 h-5" />,
-      "managed execution": <ClipboardCheck className="w-5 h-5" />,
-      
-      // Inventory/Stock
-      "stock": <Warehouse className="w-5 h-5" />,
-      "inword": <Boxes className="w-5 h-5" />,
-      "inward": <Boxes className="w-5 h-5" />,
-      "mrn": <FileStack className="w-5 h-5" />,
-      "generate mrn": <FileStack className="w-5 h-5" />,
-      "verify mrn": <CheckCircle className="w-5 h-5" />,
-      "approve mrn": <CheckCircle className="w-5 h-5" />,
-      "manage mrn": <Clipboard className="w-5 h-5" />,
-       "daily operation": <Activity className="w-5 h-5" />,        // <-- Second occurrence (duplicate key?)
-      
-      // Quotation
-      "quotation template": <FileText className="w-5 h-5" />,
-      "quotation": <FileText className="w-5 h-5" />,
-      "quotations": <FileText className="w-5 h-5" />,
-      
-      // Master Data children
-      "category": <FolderOpen className="w-5 h-5" />,
-      "categories": <FolderOpen className="w-5 h-5" />,
-      "product": <Package className="w-5 h-5" />,
-      "products": <Package className="w-5 h-5" />,
-      "sources": <Bookmark className="w-5 h-5" />,
-      "references": <Bookmark className="w-5 h-5" />,
-      "city": <Map className="w-5 h-5" />,
-      "areas": <Map className="w-5 h-5" />,
-      "kit": <Package className="w-5 h-5" />,
-      "kits": <Package className="w-5 h-5" />,
-      
-      // Logout
-      "logout": <LogOut className="w-5 h-5" />,
-      "sign out": <LogOut className="w-5 h-5" />,
-      
-      // Default icons for common patterns
-      "add": <Plus className="w-5 h-5" />,
-      "create": <Plus className="w-5 h-5" />,
-      "new": <Plus className="w-5 h-5" />,
-      "view": <Eye className="w-5 h-5" />,
-      "list": <List className="w-5 h-5" />,
-      "manage": <Settings className="w-5 h-5" />,
-      "settings": <Settings className="w-5 h-5" />,
-      "profile": <UserCog className="w-5 h-5" />,
+      dashboard: <LayoutDashboard className="w-5 h-5 flex-shrink-0" />,
+      'dash board': <LayoutDashboard className="w-5 h-5 flex-shrink-0" />,
+      master: <Database className="w-5 h-5 flex-shrink-0" />,
+      'master data': <Database className="w-5 h-5 flex-shrink-0" />,
+      user: <Users className="w-5 h-5 flex-shrink-0" />,
+      users: <Users className="w-5 h-5 flex-shrink-0" />,
+      'add user': <UserPlus className="w-5 h-5 flex-shrink-0" />,
+      'user list': <List className="w-5 h-5 flex-shrink-0" />,
+      'employee wise report': <Users className="w-5 h-5 flex-shrink-0" />,
+      'employee work report': <UserCog className="w-5 h-5 flex-shrink-0" />,
+      'employeewise report': <Users className="w-5 h-5 flex-shrink-0" />,
+      'role permission': <ShieldCheck className="w-5 h-5 flex-shrink-0" />,
+      campaign: <Megaphone className="w-5 h-5 flex-shrink-0" />,
+      'create campaign': <FolderPlus className="w-5 h-5 flex-shrink-0" />,
+      'view campaign': <Eye className="w-5 h-5 flex-shrink-0" />,
+      'assigned call': <PhoneOutgoing className="w-5 h-5 flex-shrink-0" />,
+      'assigned calls': <PhoneOutgoing className="w-5 h-5 flex-shrink-0" />,
+      "today's task": <CheckSquare className="w-5 h-5 flex-shrink-0" />,
+      'todays task': <CheckSquare className="w-5 h-5 flex-shrink-0" />,
+      'today task': <CheckSquare className="w-5 h-5 flex-shrink-0" />,
+      'missed follow up list': <ClipboardList className="w-5 h-5 flex-shrink-0" />,
+      'missed follow-up list': <ClipboardList className="w-5 h-5 flex-shrink-0" />,
+      'upcoming follow ups': <CalendarDays className="w-5 h-5 flex-shrink-0" />,
+      'upcoming follow-ups': <CalendarDays className="w-5 h-5 flex-shrink-0" />,
+      report: <BarChart3 className="w-5 h-5 flex-shrink-0" />,
+      reports: <BarChart3 className="w-5 h-5 flex-shrink-0" />,
+      'attendance report': <CalendarCheck className="w-5 h-5 flex-shrink-0" />,
+      'drop leads report': <Eye className="w-5 h-5 flex-shrink-0" />,
+      'closed leads report': <CheckCircle className="w-5 h-5 flex-shrink-0" />,
+      'leadwise report': <TrendingUp className="w-5 h-5 flex-shrink-0" />,
+      'lead wise report': <TrendingUp className="w-5 h-5 flex-shrink-0" />,
+      'meta leads report': <Package className="w-5 h-5 flex-shrink-0" />,
+      statistics: <BarChart3 className="w-5 h-5 flex-shrink-0" />,
+      execution: <TrendingUp className="w-5 h-5 flex-shrink-0" />,
+      'pre execution': <Clock className="w-5 h-5 flex-shrink-0" />,
+      'complete execution': <CheckCircle className="w-5 h-5 flex-shrink-0" />,
+      'assigned procress': <CalendarCheck className="w-5 h-5 flex-shrink-0" />,
+      'assigned process': <CalendarCheck className="w-5 h-5 flex-shrink-0" />,
+      'daily operations': <ClipboardCheck className="w-5 h-5 flex-shrink-0" />,
+      'process type': <GitBranch className="w-5 h-5 flex-shrink-0" />,
+      schedule: <Calendar className="w-5 h-5 flex-shrink-0" />,
+      'managed execution': <ClipboardCheck className="w-5 h-5 flex-shrink-0" />,
+      stock: <Warehouse className="w-5 h-5 flex-shrink-0" />,
+      inword: <Boxes className="w-5 h-5 flex-shrink-0" />,
+      inward: <Boxes className="w-5 h-5 flex-shrink-0" />,
+      mrn: <FileStack className="w-5 h-5 flex-shrink-0" />,
+      'generate mrn': <FileStack className="w-5 h-5 flex-shrink-0" />,
+      'verify mrn': <CheckCircle className="w-5 h-5 flex-shrink-0" />,
+      'approve mrn': <CheckCircle className="w-5 h-5 flex-shrink-0" />,
+      'manage mrn': <Clipboard className="w-5 h-5 flex-shrink-0" />,
+      'daily operation': <Activity className="w-5 h-5 flex-shrink-0" />,
+      'quotation template': <FileText className="w-5 h-5 flex-shrink-0" />,
+      quotation: <FileText className="w-5 h-5 flex-shrink-0" />,
+      quotations: <FileText className="w-5 h-5 flex-shrink-0" />,
+      category: <FolderOpen className="w-5 h-5 flex-shrink-0" />,
+      categories: <FolderOpen className="w-5 h-5 flex-shrink-0" />,
+      product: <Package className="w-5 h-5 flex-shrink-0" />,
+      products: <Package className="w-5 h-5 flex-shrink-0" />,
+      sources: <Bookmark className="w-5 h-5 flex-shrink-0" />,
+      references: <Bookmark className="w-5 h-5 flex-shrink-0" />,
+      city: <Map className="w-5 h-5 flex-shrink-0" />,
+      areas: <Map className="w-5 h-5 flex-shrink-0" />,
+      kit: <Package className="w-5 h-5 flex-shrink-0" />,
+      kits: <Package className="w-5 h-5 flex-shrink-0" />,
+      logout: <LogOut className="w-5 h-5 flex-shrink-0" />,
+      'sign out': <LogOut className="w-5 h-5 flex-shrink-0" />,
+      add: <Plus className="w-5 h-5 flex-shrink-0" />,
+      create: <Plus className="w-5 h-5 flex-shrink-0" />,
+      new: <Plus className="w-5 h-5 flex-shrink-0" />,
+      view: <Eye className="w-5 h-5 flex-shrink-0" />,
+      list: <List className="w-5 h-5 flex-shrink-0" />,
+      manage: <Settings className="w-5 h-5 flex-shrink-0" />,
+      settings: <Settings className="w-5 h-5 flex-shrink-0" />,
+      profile: <UserCog className="w-5 h-5 flex-shrink-0" />,
     };
 
-    // Try exact match first
-    if (iconMap[key]) {
-      return iconMap[key];
-    }
-
-    // Try to find partial match
+    if (iconMap[key]) return iconMap[key];
     for (const [mapKey, icon] of Object.entries(iconMap)) {
-      if (key.includes(mapKey) || mapKey.includes(key)) {
-        return icon;
-      }
+      if (key.includes(mapKey) || mapKey.includes(key)) return icon;
     }
-
-    // Return default icon if no match found
-    return <FileText className="w-5 h-5" />;
+    return <FileText className="w-5 h-5 flex-shrink-0" />;
   };
 
   const getColorClass = (label: string) => {
-    const colorMap: Record<string, {hover: string, active: string, childHover: string, childActive: string}> = {
-      'Dashboard': { 
+    const colorMap: Record<string, { hover: string; active: string; childHover: string; childActive: string }> = {
+      Dashboard: {
         hover: 'hover:bg-blue-500/20 hover:border-l-blue-400 hover:text-white',
         active: 'bg-blue-500/20 border-l-4 border-l-blue-400 text-white shadow-lg',
         childHover: 'hover:bg-blue-500/10 hover:text-white',
-        childActive: 'text-white bg-blue-500/20'
+        childActive: 'text-white bg-blue-500/20',
       },
-      'Master': { 
+      Master: {
         hover: 'hover:bg-purple-500/20 hover:border-l-purple-400 hover:text-white',
         active: 'bg-purple-500/20 border-l-4 border-l-purple-400 text-white shadow-lg',
         childHover: 'hover:bg-purple-500/10 hover:text-white',
-        childActive: 'text-white bg-purple-500/20'
+        childActive: 'text-white bg-purple-500/20',
       },
-      'User': { 
+      User: {
         hover: 'hover:bg-green-500/20 hover:border-l-green-400 hover:text-white',
         active: 'bg-green-500/20 border-l-4 border-l-green-400 text-white shadow-lg',
         childHover: 'hover:bg-green-500/10 hover:text-white',
-        childActive: 'text-white bg-green-500/20'
+        childActive: 'text-white bg-green-500/20',
       },
-      'Master Data': { 
+      'Master Data': {
         hover: 'hover:bg-orange-500/20 hover:border-l-orange-400 hover:text-white',
         active: 'bg-orange-500/20 border-l-4 border-l-orange-400 text-white shadow-lg',
         childHover: 'hover:bg-orange-500/10 hover:text-white',
-        childActive: 'text-white bg-orange-500/20'
+        childActive: 'text-white bg-orange-500/20',
       },
-      'Campaign': { 
+      Campaign: {
         hover: 'hover:bg-pink-500/20 hover:border-l-pink-400 hover:text-white',
         active: 'bg-pink-500/20 border-l-4 border-l-pink-400 text-white shadow-lg',
         childHover: 'hover:bg-pink-500/10 hover:text-white',
-        childActive: 'text-white bg-pink-500/20'
+        childActive: 'text-white bg-pink-500/20',
       },
-      'Assigned Call': { 
+      'Assigned Call': {
         hover: 'hover:bg-teal-500/20 hover:border-l-teal-400 hover:text-white',
         active: 'bg-teal-500/20 border-l-4 border-l-teal-400 text-white shadow-lg',
         childHover: 'hover:bg-teal-500/10 hover:text-white',
-        childActive: 'text-white bg-teal-500/20'
+        childActive: 'text-white bg-teal-500/20',
       },
-      'Today\'s Task': { 
+      "Today's Task": {
         hover: 'hover:bg-cyan-500/20 hover:border-l-cyan-400 hover:text-white',
         active: 'bg-cyan-500/20 border-l-4 border-l-cyan-400 text-white shadow-lg',
         childHover: 'hover:bg-cyan-500/10 hover:text-white',
-        childActive: 'text-white bg-cyan-500/20'
+        childActive: 'text-white bg-cyan-500/20',
       },
-      'Missed Follow-up List': { 
+      'Missed Follow-up List': {
         hover: 'hover:bg-yellow-500/20 hover:border-l-yellow-400 hover:text-white',
         active: 'bg-yellow-500/20 border-l-4 border-l-yellow-400 text-white shadow-lg',
         childHover: 'hover:bg-yellow-500/10 hover:text-white',
-        childActive: 'text-white bg-yellow-500/20'
+        childActive: 'text-white bg-yellow-500/20',
       },
-      'Upcoming Follow-ups': { 
+      'Upcoming Follow-ups': {
         hover: 'hover:bg-indigo-500/20 hover:border-l-indigo-400 hover:text-white',
         active: 'bg-indigo-500/20 border-l-4 border-l-indigo-400 text-white shadow-lg',
         childHover: 'hover:bg-indigo-500/10 hover:text-white',
-        childActive: 'text-white bg-indigo-500/20'
+        childActive: 'text-white bg-indigo-500/20',
       },
-      'Report': { 
+      Report: {
         hover: 'hover:bg-emerald-500/20 hover:border-l-emerald-400 hover:text-white',
         active: 'bg-emerald-500/20 border-l-4 border-l-emerald-400 text-white shadow-lg',
         childHover: 'hover:bg-emerald-500/10 hover:text-white',
-        childActive: 'text-white bg-emerald-500/20'
+        childActive: 'text-white bg-emerald-500/20',
       },
-      'Stock': { 
+      Stock: {
         hover: 'hover:bg-amber-500/20 hover:border-l-amber-400 hover:text-white',
         active: 'bg-amber-500/20 border-l-4 border-l-amber-400 text-white shadow-lg',
         childHover: 'hover:bg-amber-500/10 hover:text-white',
-        childActive: 'text-white bg-amber-500/20'
+        childActive: 'text-white bg-amber-500/20',
       },
-      'Logout': { 
+      Logout: {
         hover: 'hover:bg-red-500/20 hover:border-l-red-400 hover:text-red-400',
         active: 'bg-red-500/20 border-l-4 border-l-red-400 text-red-400 shadow-lg',
         childHover: 'hover:bg-red-500/10 hover:text-white',
-        childActive: 'text-white bg-red-500/20'
+        childActive: 'text-white bg-red-500/20',
       },
     };
-    
-    // Try to find exact match first
-    if (colorMap[label]) {
-      return colorMap[label];
-    }
-    
-    // Try to find partial match
+
+    if (colorMap[label]) return colorMap[label];
     for (const [key, value] of Object.entries(colorMap)) {
-      if (label.toLowerCase().includes(key.toLowerCase()) || 
-          key.toLowerCase().includes(label.toLowerCase())) {
+      if (label.toLowerCase().includes(key.toLowerCase()) || key.toLowerCase().includes(label.toLowerCase()))
         return value;
-      }
     }
-    
-    // Default to Dashboard colors
     return colorMap['Dashboard'];
   };
 
   const handleLogout = async () => {
     try {
-      sessionStorage.removeItem('userToken');  
-      sessionStorage.removeItem('userDetails'); 
-      
+      sessionStorage.removeItem('userToken');
+      sessionStorage.removeItem('userDetails');
       await axios.post(BASE_URL + 'auth/logout', {}, { withCredentials: true });
-      
       setShowLogoutModal(false);
-      window.location.href = '/signin'; 
-    } catch (error) {
-      console.error('Error during logout:', error);
+      window.location.href = '/signin';
+    } catch {
       sessionStorage.clear();
       setShowLogoutModal(false);
       window.location.href = '/signin';
     }
   };
 
+  // ─── Render a single menu item ────────────────────────────────────────────
   const renderMenuItem = (menu: MenuItem) => {
     const color = getColorClass(menu.label);
 
+    // ── Logout ──
     if (menu.type === 'logout' || menu.label.toLowerCase() === 'logout') {
       return (
-        <li key={menu.menu_key} className="mt-auto">
+        <li key={menu.menu_key}>
           <button
             onClick={() => setShowLogoutModal(true)}
-            className={`group relative flex w-full items-center gap-3 rounded-lg py-3 px-4 font-medium text-sm lg:text-base duration-300 ease-in-out transition-all ${color.hover} ${
-              pathname === menu.path
-                ? `${color.active} border-l-4`
-                : 'text-gray-300'
-            }`}
+            onMouseEnter={e => {
+              if (mini) {
+                const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+                setTooltip({ label: menu.label, y: rect.top + rect.height / 2 });
+              }
+            }}
+            onMouseLeave={() => setTooltip(null)}
+            title={mini ? menu.label : undefined}
+            className={`group relative flex w-full items-center rounded-lg py-3 font-medium text-sm duration-300 ease-in-out transition-all ${color.hover} ${
+              mini ? 'justify-center px-0' : 'gap-3 px-4'
+            } ${pathname === menu.path ? `${color.active} border-l-4` : 'text-gray-300'}`}
           >
             {getIcon(menu.label)}
-            <span className="transition-all duration-300 text-sm lg:text-base">
-              {menu.label}
-            </span>
+            {!mini && (
+              <span className="transition-all duration-300 text-sm lg:text-base">
+                {menu.label}
+              </span>
+            )}
           </button>
         </li>
       );
     }
 
+    // ── Parent with children ──
     if (menu.children && menu.children.length > 0) {
       const isActive = menu.children.some(child => isPathActive(child.path));
       const isOpen = openDropdown === menu.menu_key;
 
+      // In mini mode: parent acts as a direct link to first child (or shows tooltip)
+      if (mini) {
+        return (
+          <li key={menu.menu_key}>
+            <div
+              className={`group relative flex items-center justify-center rounded-lg py-3 px-0 font-medium duration-300 ease-in-out transition-all cursor-pointer ${color.hover} ${
+                isActive ? `${color.active} border-l-4` : 'text-gray-300'
+              }`}
+              onMouseEnter={e => {
+                const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+                setTooltip({ label: menu.label, y: rect.top + rect.height / 2 });
+              }}
+              onMouseLeave={() => setTooltip(null)}
+            >
+              {getIcon(menu.label)}
+              {/* Small arrow to indicate children */}
+              <ChevronRight className="w-3 h-3 absolute right-1 top-1/2 -translate-y-1/2 opacity-50" />
+            </div>
+          </li>
+        );
+      }
+
+      // Full mode: normal dropdown
       return (
         <SidebarLinkGroup key={menu.menu_key} activeCondition={isActive}>
           {(handleClick, open) => (
@@ -1163,11 +423,9 @@ const DynamicSidebar = ({ sidebarOpen, setSidebarOpen }: SidebarProps) => {
               <NavLink
                 to="#"
                 className={`group relative flex items-center gap-3 rounded-lg py-3 px-4 font-medium duration-300 ease-in-out transition-all ${color.hover} ${
-                  isActive
-                    ? `${color.active} border-l-4`
-                    : 'text-gray-300'
+                  isActive ? `${color.active} border-l-4` : 'text-gray-300'
                 }`}
-                onClick={(e) => {
+                onClick={e => {
                   e.preventDefault();
                   handleDropdownToggle(menu.menu_key);
                 }}
@@ -1176,18 +434,12 @@ const DynamicSidebar = ({ sidebarOpen, setSidebarOpen }: SidebarProps) => {
                 <span className="transition-all duration-300 text-sm lg:text-base flex-1">
                   {menu.label}
                 </span>
-                <ChevronDown 
-                  className={`w-4 h-4 transition-transform duration-300 ${
-                    isOpen ? 'rotate-180' : ''
-                  }`}
+                <ChevronDown
+                  className={`w-4 h-4 transition-transform duration-300 ${isOpen ? 'rotate-180' : ''}`}
                 />
               </NavLink>
-              
-              <div
-                className={`translate transform overflow-hidden transition-all duration-300 ${
-                  !isOpen && 'hidden'
-                }`}
-              >
+
+              <div className={`translate transform overflow-hidden transition-all duration-300 ${!isOpen && 'hidden'}`}>
                 <ul className="mt-2 mb-3 flex flex-col gap-1 pl-8">
                   {menu.children.map(child => (
                     <li key={child.menu_key}>
@@ -1195,13 +447,11 @@ const DynamicSidebar = ({ sidebarOpen, setSidebarOpen }: SidebarProps) => {
                         to={child.path!}
                         className={({ isActive }) =>
                           `group relative flex items-center gap-2 rounded-md px-3 py-2 text-sm font-medium transition-all duration-300 ${color.childHover} ${
-                            isActive ? `${color.childActive}` : 'text-gray-400'
+                            isActive ? color.childActive : 'text-gray-400'
                           }`
                         }
                         onClick={() => {
-                          if (window.innerWidth < 1024) {
-                            setSidebarOpen(false);
-                          }
+                          if (window.innerWidth < 1024) setSidebarOpen(false);
                         }}
                       >
                         {getIcon(child.label)}
@@ -1217,29 +467,35 @@ const DynamicSidebar = ({ sidebarOpen, setSidebarOpen }: SidebarProps) => {
       );
     }
 
+    // ── Leaf link ──
     if (menu.path) {
       return (
         <li key={menu.menu_key}>
           <NavLink
             to={menu.path}
+            onMouseEnter={e => {
+              if (mini) {
+                const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+                setTooltip({ label: menu.label, y: rect.top + rect.height / 2 });
+              }
+            }}
+            onMouseLeave={() => setTooltip(null)}
             className={({ isActive }) =>
-              `group relative flex items-center gap-3 rounded-lg py-3 px-4 font-medium duration-300 ease-in-out transition-all ${color.hover} ${
-                isActive 
-                  ? `${color.active} border-l-4` 
-                  : 'text-gray-300'
-              }`
+              `group relative flex items-center rounded-lg py-3 font-medium duration-300 ease-in-out transition-all ${color.hover} ${
+                mini ? 'justify-center px-0' : 'gap-3 px-4'
+              } ${isActive ? `${color.active} border-l-4` : 'text-gray-300'}`
             }
             onClick={() => {
               setOpenDropdown(null);
-              if (window.innerWidth < 1024) {
-                setSidebarOpen(false);
-              }
+              if (window.innerWidth < 1024) setSidebarOpen(false);
             }}
           >
             {getIcon(menu.label)}
-            <span className="transition-all duration-300 text-sm lg:text-base">
-              {menu.label}
-            </span>
+            {!mini && (
+              <span className="transition-all duration-300 text-sm lg:text-base">
+                {menu.label}
+              </span>
+            )}
           </NavLink>
         </li>
       );
@@ -1248,101 +504,119 @@ const DynamicSidebar = ({ sidebarOpen, setSidebarOpen }: SidebarProps) => {
     return null;
   };
 
+  // Sidebar width classes
+  const sidebarWidth = mini ? 'w-16' : 'w-72';
+
   return (
     <>
+      {/* ── Tooltip for mini mode ─────────────────────────────────────── */}
+      {mini && tooltip && (
+        <div
+          className="fixed z-[99999] pointer-events-none"
+          style={{ top: tooltip.y, left: mini ? 68 : 290, transform: 'translateY(-50%)' }}
+        >
+          <div className="bg-gray-900 text-white text-xs font-medium px-3 py-1.5 rounded-lg shadow-xl border border-gray-700 whitespace-nowrap">
+            {tooltip.label}
+          </div>
+        </div>
+      )}
+
+      {/* ── Sidebar ──────────────────────────────────────────────────── */}
       <aside
         ref={sidebar}
-        className={`fixed left-0 top-0 z-9999 flex h-screen w-full max-w-xs flex-col overflow-hidden bg-gradient-to-b from-gray-900 to-black duration-300 ease-linear lg:static lg:h-auto lg:w-72.5 lg:translate-x-0 ${
-          sidebarOpen ? 'translate-x-0 shadow-2xl' : '-translate-x-full'
-        }`}
-        style={{
-          maxHeight: '100dvh',
-          minHeight: '-webkit-fill-available',
-        }}
+        className={`
+          fixed left-0 top-0 z-[9999] flex flex-col overflow-hidden
+          bg-gradient-to-b from-gray-900 to-black
+          transition-all duration-300 ease-in-out
+          h-screen
+          ${sidebarWidth}
+          /* Mobile: slide in/out */
+          ${sidebarOpen ? 'translate-x-0 shadow-2xl' : '-translate-x-full'}
+          /* Desktop: always visible, just changes width */
+          lg:translate-x-0 lg:static lg:h-screen lg:flex-shrink-0
+        `}
+        style={{ maxHeight: '100dvh' }}
       >
-        <div className="flex items-center justify-between gap-2 px-4 py-6 lg:py-4 flex-shrink-0">
-          <NavLink to="/dashboard" className="flex items-center gap-3" onClick={() => setSidebarOpen(false)}>
-            <img
-              src={Logo}
-              alt="Logo"
-              className="
-                w-full
-                max-w-[230px]
-                lg:max-w-[300px]
-                h-auto
-                max-h-[60px]
-                lg:max-h-[80px]
-                object-contain
-                rounded-xl
-              "
-            />
-          </NavLink>
+        {/* ── Header: Logo + toggle ──────────────────────────────── */}
+        <div
+          className={`flex items-center justify-between gap-2 px-3 py-4 flex-shrink-0 border-b border-gray-700/50 ${
+            mini ? 'flex-col px-2' : ''
+          }`}
+        >
+          {/* Logo — hidden in mini, shown in full */}
+          {!mini && (
+            <NavLink to="/dashboard" className="flex items-center gap-2" onClick={() => setSidebarOpen(false)}>
+              <img
+                src={Logo}
+                alt="Logo"
+                className="w-full max-w-[280px] lg:max-w-[220px] h-auto max-h-[52px] object-contain rounded-xl"
+              />
+            </NavLink>
+          )}
 
+          {/* Mini mode: just show small logo mark */}
+          {mini && (
+            <NavLink to="/dashboard" onClick={() => setSidebarOpen(false)}>
+              <img
+                src={Logo}
+                alt="Logo"
+                className="w-9 h-9 object-contain rounded-lg"
+              />
+            </NavLink>
+          )}
+
+          {/* Desktop toggle (mini ↔ full) */}
+          <button
+            onClick={() => setMini(prev => !prev)}
+            className="hidden lg:flex items-center justify-center w-8 h-8 rounded-lg text-gray-400 hover:text-white hover:bg-gray-700/50 transition-colors flex-shrink-0"
+            title={mini ? 'Expand sidebar' : 'Collapse sidebar'}
+          >
+            {mini ? <PanelLeftOpen className="w-4 h-4" /> : <PanelLeftClose className="w-4 h-4" />}
+          </button>
+
+          {/* Mobile close button */}
           <button
             ref={trigger}
-            onClick={() => setSidebarOpen(!sidebarOpen)}
+            onClick={() => setSidebarOpen(false)}
             aria-controls="sidebar"
             aria-expanded={sidebarOpen}
-            className="block lg:hidden"
+            className="block lg:hidden text-gray-400 hover:text-white"
           >
-            <X className="w-6 h-6 text-white" />
+            <X className="w-6 h-6" />
           </button>
         </div>
 
+        {/* ── Scrollable nav ────────────────────────────────────── */}
         <div className="flex-1 overflow-y-auto overflow-x-hidden sidebar-scrollbar">
           <style>{`
-            .sidebar-scrollbar::-webkit-scrollbar {
-              width: 4px;
-            }
-            .sidebar-scrollbar::-webkit-scrollbar-track {
-              background: transparent;
-            }
-            .sidebar-scrollbar::-webkit-scrollbar-thumb {
-              background-color: #4B5563;
-              border-radius: 20px;
-            }
-            .sidebar-scrollbar::-webkit-scrollbar-thumb:hover {
-              background-color: #6B7280;
-            }
-            @media (max-width: 1024px) {
-              .sidebar-scrollbar::-webkit-scrollbar {
-                width: 3px;
-              }
-            }
+            .sidebar-scrollbar::-webkit-scrollbar { width: 4px; }
+            .sidebar-scrollbar::-webkit-scrollbar-track { background: transparent; }
+            .sidebar-scrollbar::-webkit-scrollbar-thumb { background-color: #4B5563; border-radius: 20px; }
+            .sidebar-scrollbar::-webkit-scrollbar-thumb:hover { background-color: #6B7280; }
           `}</style>
 
-          <nav className="py-4 px-4 lg:px-6">
-            <div>
-              <ul className="mb-6 flex flex-col gap-1.5">
-                {menus.map(menu => renderMenuItem(menu))}
-                {logoutItem && renderMenuItem(logoutItem)}
-              </ul>
-            </div>
+          <nav className={`py-4 ${mini ? 'px-1' : 'px-4 lg:px-6'}`}>
+            <ul className="mb-6 flex flex-col gap-1">
+              {menus.map(menu => renderMenuItem(menu))}
+              {logoutItem && renderMenuItem(logoutItem)}
+            </ul>
           </nav>
         </div>
       </aside>
 
+      {/* ── Logout modal ─────────────────────────────────────────── */}
       {showLogoutModal && (
-        <div className="fixed inset-0 z-99999 flex items-center justify-center bg-black/50 p-4">
+        <div className="fixed inset-0 z-[99999] flex items-center justify-center bg-black/50 p-4">
           <div className="relative w-full max-w-md rounded-lg bg-white p-6 shadow-lg dark:bg-boxdark">
             <div className="flex items-center justify-between border-b border-stroke pb-4 mb-4">
-              <h3 className="text-xl font-semibold text-black dark:text-white">
-                Confirm Logout
-              </h3>
-              <button
-                onClick={() => setShowLogoutModal(false)}
-                className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
-              >
+              <h3 className="text-xl font-semibold text-black dark:text-white">Confirm Logout</h3>
+              <button onClick={() => setShowLogoutModal(false)} className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300">
                 <X className="w-5 h-5" />
               </button>
             </div>
-
             <div className="mb-6">
-              <p className="text-gray-600 dark:text-gray-300">
-                Are you sure you want to logout from your account?
-              </p>
+              <p className="text-gray-600 dark:text-gray-300">Are you sure you want to logout from your account?</p>
             </div>
-
             <div className="flex justify-end gap-3">
               <button
                 onClick={() => setShowLogoutModal(false)}
@@ -1350,10 +624,7 @@ const DynamicSidebar = ({ sidebarOpen, setSidebarOpen }: SidebarProps) => {
               >
                 Cancel
               </button>
-              <button
-                onClick={handleLogout}
-                className="px-4 py-2 rounded bg-red-500 text-white hover:bg-red-600 transition-colors"
-              >
+              <button onClick={handleLogout} className="px-4 py-2 rounded bg-red-500 text-white hover:bg-red-600 transition-colors">
                 Yes, Logout
               </button>
             </div>

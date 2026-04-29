@@ -107,7 +107,10 @@ import WalletTransactions from './pages/Wallet/WalletTransactions';
 
 
 import ExpenseReports from './pages/Report/ExpenseReports';
+import AdditionalCharges from './pages/Master/AdditionalCharges';
+import AVCoreDocument from './pages/Report/AVCoreDocument';
 
+import AVCorePriceList from './pages/Report/AVCorePriceList';
 
 
 function App() {
@@ -1072,6 +1075,54 @@ path="/schedule/settings/:id"
                   />
                 )}
                 
+<Route
+  path="/additional-charges"
+  element={
+    <ProtectedRoute menuKey="additional_charges">
+      <DefaultLayout userRole={userRole}>
+        <PageTitle title="Additional Charges" />
+        <AdditionalCharges />
+      </DefaultLayout>
+    </ProtectedRoute>
+  }
+/>
+
+<Route
+  path="/quotation/revisions/:master_id"  // ← Note the slash after quotation
+  element={
+    <ProtectedRoute menuKey="quotationpending">
+      <DefaultLayout userRole={userRole}>
+        <PageTitle title="Quotation Revisions" />
+        <QuotationRevision />
+      </DefaultLayout>
+    </ProtectedRoute>
+  }
+/> 
+
+<Route
+  path="/av-core-document"
+  element={
+    <ProtectedRoute menuKey="av_core_document">
+      <DefaultLayout userRole={userRole}>
+        <PageTitle title="AV Core Document" />
+        <AVCoreDocument />
+      </DefaultLayout>
+    </ProtectedRoute>
+  }
+/>
+
+<Route
+  path="/avcore-pricelist"
+  element={
+    <ProtectedRoute menuKey="avcore_pricelist">
+      <DefaultLayout userRole={userRole}>
+        <PageTitle title="AVCORE PriceList" />
+        <AVCorePriceList />
+      </DefaultLayout>
+    </ProtectedRoute>
+  }
+/>
+
 
           </>
         ) : (
