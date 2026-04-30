@@ -130,6 +130,29 @@ const UpdateRawData: React.FC<UpdateDataModalProps> = ({
     }, duration);
   };
 
+  // Add this helper function at the top of UpdateRawData component
+const formatDateTime = (dateString: string | undefined): string => {
+  if (!dateString) return '—';
+  
+  try {
+    // Handle MySQL datetime format "2026-04-30 17:41:58"
+    const date = new Date(dateString);
+    if (isNaN(date.getTime())) return dateString;
+    
+    // Format as "30 Apr 2026, 05:41 PM"
+    return date.toLocaleString('en-GB', {
+      day: '2-digit',
+      month: 'short',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: true
+    });
+  } catch (error) {
+    return dateString;
+  }
+};
+
   // Fetch users with role-based filtering
   useEffect(() => {
     const fetchUsers = async () => {
@@ -1413,112 +1436,107 @@ const UpdateRawData: React.FC<UpdateDataModalProps> = ({
               </div>
             </div>
 
-            {Array.isArray(editingClient.reassignment_remarks) &&
-              editingClient.reassignment_remarks.length > 0 && (
-                <div className="mt-3">
-                  <label className="text-md font-semibold mb-2 dark:text-white border-b pb-1">
-                    Reassignment History (
-                    {editingClient.reassignment_remarks.length})
-                  </label>
+           {Array.isArray(editingClient.reassignment_remarks) &&
+  editingClient.reassignment_remarks.length > 0 && (
+    <div className="mt-3">
+      <label className="text-md font-semibold mb-2 dark:text-white border-b pb-1">
+        Reassignment History (
+        {editingClient.reassignment_remarks.length})
+      </label>
 
-                  <div className="bg-white dark:bg-boxdark border rounded-md p-2 max-h-60 overflow-y-auto space-y-1.5">
-                    {editingClient.reassignment_remarks
-                      .slice()
-                      .sort((a: any, b: any) => {
-                        const dateA = new Date(
-                          a?.reassignment_date || a?.created_at || 0,
-                        ).getTime();
-                        const dateB = new Date(
-                          b?.reassignment_date || b?.created_at || 0,
-                        ).getTime();
-                        return dateB - dateA;
-                      })
-                      .map((remarkObj: any, index: number) => {
-                        const displayNumber = index + 1;
+      <div className="bg-white dark:bg-boxdark border rounded-md p-2 max-h-60 overflow-y-auto space-y-1.5">
+        {editingClient.reassignment_remarks
+          .slice()
+          .sort((a: any, b: any) => {
+            // Sort by created_at in DESC order (newest first)
+            const dateA = new Date(a?.created_at || a?.reassignment_date || 0);
+            const dateB = new Date(b?.created_at || b?.reassignment_date || 0);
+            return dateB.getTime() - dateA.getTime();
+          })
+          .map((remarkObj: any, index: number) => {
+            const displayNumber = index + 1;
 
-                        if (remarkObj && typeof remarkObj === 'object') {
-                          return (
-                            <div
-                              key={index}
-                              className="border rounded p-2 text-[11px] bg-gray-50 dark:bg-gray-800"
-                            >
-                              <div className="flex justify-between items-center mb-0.5">
-                                <div className="flex items-center gap-1.5">
-                                  <span className="font-semibold text-blue-600">
-                                    #{displayNumber}
-                                  </span>
+            if (remarkObj && typeof remarkObj === 'object') {
+              return (
+                <div
+                  key={index}
+                  className="border rounded p-2 text-[11px] bg-gray-50 dark:bg-gray-800"
+                >
+                  <div className="flex justify-between items-center mb-0.5">
+                    <div className="flex items-center gap-1.5">
+                      <span className="font-semibold text-blue-600">
+                        #{displayNumber}
+                      </span>
 
-                                  {remarkObj.leadStage && (
-                                    <span className="px-1.5 py-0.5 text-[10px] bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300 rounded">
-                                      {remarkObj.leadStage}
-                                    </span>
-                                  )}
+                      {remarkObj.leadStage && (
+                        <span className="px-1.5 py-0.5 text-[10px] bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300 rounded">
+                          {remarkObj.leadStage}
+                        </span>
+                      )}
 
-                                  {index === 0 && (
-                                    <span className="px-1 py-0.5 text-[9px] bg-green-100 text-green-700 rounded">
-                                      Latest
-                                    </span>
-                                  )}
-                                </div>
+                      {index === 0 && (
+                        <span className="px-1 py-0.5 text-[9px] bg-green-100 text-green-700 rounded">
+                          Latest
+                        </span>
+                      )}
+                    </div>
 
-                                <span className="text-[10px] text-gray-500">
-                                  {remarkObj.reassignment_date ||
-                                    remarkObj.created_at ||
-                                    ''}
-                                </span>
-                              </div>
-
-                              {remarkObj.assignedTo && (
-                                <div className="text-gray-700 dark:text-gray-300 mb-0.5">
-                                  <span className="font-medium">
-                                    {remarkObj.name || 'Unknown'}
-                                  </span>
-                                  {remarkObj.role && (
-                                    <span className="text-gray-400">
-                                      {' '}
-                                      ({remarkObj.role})
-                                    </span>
-                                  )}
-                                  <span className="mx-1 text-gray-400">→</span>
-                                  <span className="font-medium">
-                                    {remarkObj.assignedTo}
-                                  </span>
-                                </div>
-                              )}
-
-                              {remarkObj.remark && (
-                                <div className="bg-white dark:bg-gray-900 px-3 py-2 rounded text-base text-gray-800 dark:text-gray-200">
-                                  {remarkObj.remark}
-                                </div>
-                              )}
-                            </div>
-                          );
-                        }
-
-                        if (typeof remarkObj === 'string') {
-                          return (
-                            <div
-                              key={index}
-                              className="border rounded p-2 text-[11px] bg-gray-50 dark:bg-gray-800"
-                            >
-                              <div className="flex justify-between items-center mb-0.5">
-                                <span className="font-semibold text-blue-600">
-                                  #{displayNumber}
-                                </span>
-                                <span className="text-[10px] text-gray-500">
-                                  Legacy
-                                </span>
-                              </div>
-                              {remarkObj}
-                            </div>
-                          );
-                        }
-
-                        return null;
-                      })}
+                    {/* ✅ FIXED: Show formatted created_at */}
+                    <span className="text-[10px] text-gray-500" title={remarkObj.created_at}>
+                      {formatDateTime(remarkObj.created_at)}
+                    </span>
                   </div>
+
+                  {remarkObj.assignedTo && (
+                    <div className="text-gray-700 dark:text-gray-300 mb-0.5">
+                      <span className="font-medium">
+                        {remarkObj.name || 'Unknown'}
+                      </span>
+                      {remarkObj.role && (
+                        <span className="text-gray-400">
+                          {' '}({remarkObj.role})
+                        </span>
+                      )}
+                      <span className="mx-1 text-gray-400">→</span>
+                      <span className="font-medium">
+                        {remarkObj.assignedTo}
+                      </span>
+                    </div>
+                  )}
+
+                  {remarkObj.remark && (
+                    <div className="bg-white dark:bg-gray-900 px-3 py-2 rounded text-base text-gray-800 dark:text-gray-200">
+                      {remarkObj.remark}
+                    </div>
+                  )}
                 </div>
-              )}
+              );
+            }
+
+            if (typeof remarkObj === 'string') {
+              return (
+                <div
+                  key={index}
+                  className="border rounded p-2 text-[11px] bg-gray-50 dark:bg-gray-800"
+                >
+                  <div className="flex justify-between items-center mb-0.5">
+                    <span className="font-semibold text-blue-600">
+                      #{displayNumber}
+                    </span>
+                    <span className="text-[10px] text-gray-500">
+                      Legacy
+                    </span>
+                  </div>
+                  {remarkObj}
+                </div>
+              );
+            }
+
+            return null;
+          })}
+      </div>
+    </div>
+  )}
 
             <div className="mt-3">
               <label className="block mb-1 text-sm italic font-medium text-emerald-600 dark:text-emerald-400">

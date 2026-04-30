@@ -653,25 +653,31 @@ const fetchUpcomingLeads = async () => {
         } else {
           displayCity = ''; // Empty if neither available
         }
-
-        let reassignmentRemarks: ReassignmentRemark[] = [];
-        if (item.reassignment_remarks) {
-          if (Array.isArray(item.reassignment_remarks)) {
-            reassignmentRemarks = item.reassignment_remarks.map((remark: any) => {
-              return {
-                remark: remark.remark || '',
-                created_by_user: remark.created_by_user || 0,
-                created_at: remark.created_at || '',
-                name: remark.name || '',
-                role: remark.role || '',
-                assignedTo: remark.assignedTo || '',
-                leadStage: remark.leadStage || '',
-                reassignment_date: remark.reassignment_date || ''
-              };
-            });
-          }
-        }
-
+// Inside fetchUpcomingLeads, when building reassignmentRemarks
+let reassignmentRemarks: ReassignmentRemark[] = [];
+if (item.reassignment_remarks) {
+  if (Array.isArray(item.reassignment_remarks)) {
+    reassignmentRemarks = item.reassignment_remarks
+      .map((remark: any) => {
+        return {
+          remark: remark.remark || '',
+          created_by_user: remark.created_by_user || 0,
+          created_at: remark.created_at || '',
+          name: remark.name || '',
+          role: remark.role || '',
+          assignedTo: remark.assignedTo || '',
+          leadStage: remark.leadStage || '',
+          reassignment_date: remark.reassignment_date || ''
+        };
+      })
+      // ✅ SORT IMMEDIATELY when loading data
+      .sort((a, b) => {
+        const dateA = new Date(a.created_at || a.reassignment_date || 0);
+        const dateB = new Date(b.created_at || b.reassignment_date || 0);
+        return dateB.getTime() - dateA.getTime();
+      });
+  }
+}
         return {
           master_id: item.master_id,
           name: parseValue(item.name),
@@ -1837,49 +1843,147 @@ const renderDetailsModal = () => {
                 </div>
               )}
 
-              {/* Reassignment History */}
-              {selectedLeadDetails.reassignment_remarks && 
-                Array.isArray(selectedLeadDetails.reassignment_remarks) && 
-                selectedLeadDetails.reassignment_remarks.length > 0 && (
-                <div className="mt-4">
-                  <h3 className="text-sm font-semibold mb-3 dark:text-white flex items-center gap-2">
-                    <FontAwesomeIcon icon={faUser} className="h-4 w-4 text-yellow-500" />
-                    Reassignments ({selectedLeadDetails.reassignment_remarks.length})
-                  </h3>
-                  
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                    {(() => {
-                      const remarks = selectedLeadDetails.reassignment_remarks;
-                      if (remarks.length > 0 && typeof remarks[0] === 'object' && 'remark' in remarks[0]) {
-                        return (remarks as any[]).slice(0, 4).map((remarkObj, index) => (
-                          <div key={index} className="p-3 bg-white dark:bg-gray-800 rounded-lg shadow-sm border dark:border-gray-700">
-                            <div className="flex justify-between items-start">
-                              <div>
-                                <div className="font-medium text-sm mb-1">
-                                  <span className="text-blue-600">{remarkObj.name || 'Unknown'}</span>
-                                  <span className="mx-2 text-gray-400">→</span>
-                                  <span className="text-green-600">{remarkObj.assignedTo || 'Unknown'}</span>
-                                </div>
-                                <div className="text-xs text-gray-500 mb-1">
-                                  {remarkObj.created_at} • {remarkObj.leadStage || 'Cold Lead'}
-                                </div>
-                              </div>
-                              <span className="text-xs bg-gray-100 dark:bg-gray-700 px-2 py-1 rounded">#{index + 1}</span>
-                            </div>
-                            
-                            {remarkObj.remark && (
-                              <div className="text-sm text-gray-700 dark:text-gray-300 mt-2 pt-2 border-t">
-                                {remarkObj.remark}
-                              </div>
-                            )}
-                          </div>
-                        ));
-                      }
-                      return null;
-                    })()}
+            {/* Reassignment History */}
+{selectedLeadDetails.reassignment_remarks && 
+  Array.isArray(selectedLeadDetails.reassignment_remarks) && 
+  selectedLeadDetails.reassignment_remarks.length > 0 && (
+  <div className="mt-4">
+    <h3 className="text-sm font-semibold mb-3 dark:text-white flex items-center gap-2">
+      <FontAwesomeIcon icon={faUser} className="h-4 w-4 text-yellow-500" />
+      Reassignments ({selectedLeadDetails.reassignment_remarks.length})
+    </h3>
+    
+    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+      {(() => {
+        const remarks = selectedLeadDetails.reassignment_remarks;
+        if (remarks.length > 0 && typeof remarks[0] === 'object' && 'remark' in remarks[0]) {
+          // ✅ IMPROVED SORTING: Sort by created_at in DESC order (newest first)
+          const sortedRemarks = [...(remarks as any[])].sort((a, b) => {
+            // Try multiple date fields for sorting
+            let dateA = a?.created_at || a?.reassignment_date || a?.updated_at || '';
+            let dateB = b?.created_at || b?.reassignment_date || b?.updated_at || '';
+            
+            // Parse dates
+            const parsedDateA = new Date(dateA);
+            const parsedDateB = new Date(dateB);
+            
+            // If both dates are valid, compare them
+            if (!isNaN(parsedDateA.getTime()) && !isNaN(parsedDateB.getTime())) {
+              return parsedDateB.getTime() - parsedDateA.getTime();
+            }
+            
+            // Fallback to string comparison
+            return String(dateB).localeCompare(String(dateA));
+          });
+          
+          // ✅ Improved date formatting helper
+          const formatDateSafely = (dateValue: string | undefined): string => {
+            if (!dateValue) return 'Date not available';
+            
+            try {
+              // If it's already formatted like "30/04/2026, 18:19:55"
+              if (dateValue.includes('/') && dateValue.includes(',')) {
+                return dateValue;
+              }
+              
+              // Try parsing as date
+              const date = new Date(dateValue);
+              if (!isNaN(date.getTime())) {
+                // Format: "30 Apr 2026, 05:41 PM"
+                return date.toLocaleString('en-GB', {
+                  day: '2-digit',
+                  month: 'short',
+                  year: 'numeric',
+                  hour: '2-digit',
+                  minute: '2-digit',
+                  hour12: true
+                });
+              }
+              
+              // If all else fails, return the original
+              return dateValue;
+            } catch (error) {
+              return dateValue;
+            }
+          };
+          
+          return sortedRemarks.slice(0, 4).map((remarkObj, idx) => {
+            const isLatest = idx === 0;
+            
+            return (
+              <div 
+                key={idx} 
+                className={`p-3 rounded-lg shadow-sm border transition-all ${
+                  isLatest 
+                    ? 'bg-gradient-to-r from-green-50 to-emerald-50 dark:from-green-900/20 dark:to-emerald-900/20 border-green-200 dark:border-green-800' 
+                    : 'bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700'
+                }`}
+              >
+                <div className="flex justify-between items-start">
+                  <div className="flex-1">
+                    <div className="font-medium text-sm mb-1 flex items-center flex-wrap gap-2">
+                      <span className="text-blue-600 dark:text-blue-400">
+                        {remarkObj.name || 'Unknown'}
+                      </span>
+                      <span className="text-gray-400">→</span>
+                      <span className="text-green-600 dark:text-green-400">
+                        {remarkObj.assignedTo || 'Unknown'}
+                      </span>
+                      {isLatest && (
+                        <span className="ml-2 px-2 py-0.5 text-[10px] font-bold bg-green-500 text-white rounded-full shadow-sm">
+                          LATEST
+                        </span>
+                      )}
+                    </div>
+                    <div className="text-xs text-gray-500 dark:text-gray-400 flex items-center gap-2 flex-wrap">
+                      <span className="inline-flex items-center gap-1">
+                        <Calendar className="h-3 w-3" />
+                        {formatDateSafely(remarkObj.created_at)}
+                      </span>
+                      <span className="text-gray-300 dark:text-gray-600">•</span>
+                      <span className="inline-flex items-center gap-1">
+                        <User className="h-3 w-3" />
+                        {remarkObj.leadStage || 'Cold Lead'}
+                      </span>
+                    </div>
+                  </div>
+                  <span className="text-xs bg-gray-100 dark:bg-gray-700 px-2 py-1 rounded-full font-medium">
+                    #{idx + 1}
+                  </span>
+                </div>
+                
+                {remarkObj.remark && (
+                  <div className="text-sm text-gray-700 dark:text-gray-300 mt-3 pt-2 border-t border-gray-100 dark:border-gray-700">
+                    <span className="text-xs font-medium text-gray-500 dark:text-gray-400">Remark:</span>
+                    <p className="mt-1">{remarkObj.remark}</p>
+                  </div>
+                )}
+              </div>
+            );
+          });
+        }
+        
+        // Handle string-only remarks (legacy data)
+        if (remarks.length > 0 && typeof remarks[0] === 'string') {
+          return (remarks as unknown as string[]).slice(0, 4).map((remark, idx) => (
+            <div key={idx} className="p-3 bg-white dark:bg-gray-800 rounded-lg shadow-sm border dark:border-gray-700">
+              <div className="flex justify-between items-start">
+                <div className="flex-1">
+                  <div className="text-sm text-gray-700 dark:text-gray-300">
+                    {remark}
                   </div>
                 </div>
-              )}
+                <span className="text-xs bg-gray-100 dark:bg-gray-700 px-2 py-1 rounded">#{idx + 1}</span>
+              </div>
+            </div>
+          ));
+        }
+        
+        return null;
+      })()}
+    </div>
+  </div>
+)}
             </div>
           ) : (
             // Documents Tab Content

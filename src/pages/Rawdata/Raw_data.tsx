@@ -1251,61 +1251,90 @@ const RawData = () => {
                   </div>
                 )}
 
-                {/* Reassignment History - Only show if exists */}
-                {selectedClientDetails.reassignment_remarks &&
-                  Array.isArray(selectedClientDetails.reassignment_remarks) &&
-                  selectedClientDetails.reassignment_remarks.length > 0 && (
-                    <div className="bg-gradient-to-r from-purple-50 to-pink-50 dark:from-purple-900/20 dark:to-pink-900/20 p-3 rounded-lg border border-purple-100 dark:border-purple-800/30">
-                      <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2 flex items-center gap-2">
-                        <FontAwesomeIcon
-                          icon={faHistory}
-                          className="h-4 w-4 text-purple-500"
-                        />
-                        Reassignment History (
-                        {selectedClientDetails.reassignment_remarks.length})
-                      </h3>
-                      <div className="space-y-2">
-                        {selectedClientDetails.reassignment_remarks
-                          .slice(0, 3)
-                          .map((remark, index) => (
-                            <div
-                              key={index}
-                              className="bg-white dark:bg-gray-800/50 p-3 rounded-lg border border-gray-200 dark:border-gray-700"
-                            >
-                              {typeof remark === 'object' ? (
-                                <>
-                                  <div className="flex justify-between items-start mb-2">
-                                    <div>
-                                      <span className="font-medium text-blue-600 dark:text-blue-400">
-                                        {remark.name || 'Unknown'}
-                                      </span>
-                                      <span className="mx-2 text-gray-400">
-                                        →
-                                      </span>
-                                      <span className="font-medium text-green-600 dark:text-green-400">
-                                        {remark.assignedTo || 'Unknown'}
-                                      </span>
-                                    </div>
-                                    <span className="text-xs text-gray-500">
-                                      {remark.created_at}
-                                    </span>
-                                  </div>
-                                  {remark.remark && (
-                                    <p className="text-sm text-gray-600 dark:text-gray-300 mt-2 pt-2 border-t border-gray-100 dark:border-gray-700">
-                                      {remark.remark}
-                                    </p>
-                                  )}
-                                </>
-                              ) : (
-                                <p className="text-sm text-gray-600 dark:text-gray-300">
-                                  {remark}
-                                </p>
-                              )}
-                            </div>
-                          ))}
-                      </div>
+{/* Reassignment History - Only show if exists */}
+{selectedClientDetails.reassignment_remarks &&
+  Array.isArray(selectedClientDetails.reassignment_remarks) &&
+  selectedClientDetails.reassignment_remarks.length > 0 && (
+    <div className="bg-gradient-to-r from-purple-50 to-pink-50 dark:from-purple-900/20 dark:to-pink-900/20 p-3 rounded-lg border border-purple-100 dark:border-purple-800/30">
+      <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2 flex items-center gap-2">
+        <FontAwesomeIcon icon={faHistory} className="h-4 w-4 text-purple-500" />
+        Reassignment History (
+        {selectedClientDetails.reassignment_remarks.length})
+      </h3>
+      <div className="space-y-2">
+        {/* ✅ Sort and show latest first */}
+        {selectedClientDetails.reassignment_remarks
+          .slice()
+          .sort((a: any, b: any) => {
+            // Use created_at for sorting (newest first)
+            const dateA = a?.created_at ? new Date(a.created_at) : new Date(0);
+            const dateB = b?.created_at ? new Date(b.created_at) : new Date(0);
+            return dateB.getTime() - dateA.getTime();
+          })
+          .slice(0, 3)
+          .map((remark, index) => (
+            <div
+              key={index}
+              className="bg-white dark:bg-gray-800/50 p-3 rounded-lg border border-gray-200 dark:border-gray-700"
+            >
+              {typeof remark === 'object' ? (
+                <>
+                  <div className="flex justify-between items-start mb-2 flex-wrap gap-2">
+                    <div>
+                      <span className="font-medium text-blue-600 dark:text-blue-400">
+                        {remark.name || 'Unknown'}
+                      </span>
+                      <span className="mx-2 text-gray-400">
+                        →
+                      </span>
+                      <span className="font-medium text-green-600 dark:text-green-400">
+                        {remark.assignedTo || 'Unknown'}
+                      </span>
                     </div>
+                    {/* ✅ FIXED: Handle date properly */}
+                    <span className="text-xs text-gray-500">
+                      {remark.created_at 
+                        ? (() => {
+                            try {
+                              // If it's already a formatted string, show it directly
+                              if (typeof remark.created_at === 'string' && remark.created_at.includes('/')) {
+                                return remark.created_at;
+                              }
+                              // Otherwise parse as date
+                              const date = new Date(remark.created_at);
+                              if (!isNaN(date.getTime())) {
+                                return date.toLocaleString('en-GB', {
+                                  day: '2-digit',
+                                  month: 'short',
+                                  year: 'numeric',
+                                  hour: '2-digit',
+                                  minute: '2-digit'
+                                });
+                              }
+                              return remark.reassignment_date || '—';
+                            } catch (e) {
+                              return remark.reassignment_date || '—';
+                            }
+                          })()
+                        : (remark.reassignment_date || '—')}
+                    </span>
+                  </div>
+                  {remark.remark && (
+                    <p className="text-sm text-gray-600 dark:text-gray-300 mt-2 pt-2 border-t border-gray-100 dark:border-gray-700">
+                      {remark.remark}
+                    </p>
                   )}
+                </>
+              ) : (
+                <p className="text-sm text-gray-600 dark:text-gray-300">
+                  {remark}
+                </p>
+              )}
+            </div>
+          ))}
+      </div>
+    </div>
+  )}
               </div>
             ) : (
               // Documents Tab Content

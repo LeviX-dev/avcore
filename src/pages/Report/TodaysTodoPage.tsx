@@ -40,7 +40,9 @@ import {
   faTrashAlt,
   faImage,
   faFileAlt,
+  faStar as faStarSolid ,
 } from '@fortawesome/free-solid-svg-icons';
+import { faStar as faStarRegular } from '@fortawesome/free-regular-svg-icons';
 import { BASE_URL } from '../../../public/config.js';
 import axios from 'axios';
 import EditTeleCallerForm from '../../pages/Call/EditCall.js';
@@ -158,6 +160,8 @@ const getTimeColorClass = (time: string | null, date: string | null) => {
   const now = new Date();
   const currentMinutes = now.getHours() * 60 + now.getMinutes();
   const isToday = date === new Date().toISOString().slice(0, 10);
+  
+  const hourNum = parseInt(hours); // Convert hours to number
 
   if (isToday && timeMinutes < currentMinutes) {
     return 'bg-red-100 text-red-700 border-red-200 dark:bg-red-900/30 dark:text-red-400 dark:border-red-800 animate-pulse';
@@ -167,9 +171,9 @@ const getTimeColorClass = (time: string | null, date: string | null) => {
     timeMinutes - currentMinutes > 0
   ) {
     return 'bg-orange-100 text-orange-700 border-orange-200 dark:bg-orange-900/30 dark:text-orange-400 dark:border-orange-800';
-  } else if (hours < 12) {
+  } else if (hourNum < 12) {  // Use hourNum here
     return 'bg-orange-100 text-orange-700 border-orange-200 dark:bg-orange-900/30 dark:text-orange-400 dark:border-orange-800';
-  } else if (hours < 17) {
+  } else if (hourNum < 17) {  // And here
     return 'bg-blue-100 text-blue-700 border-blue-200 dark:bg-blue-900/30 dark:text-blue-400 dark:border-blue-800';
   } else {
     return 'bg-purple-100 text-purple-700 border-purple-200 dark:bg-purple-900/30 dark:text-purple-400 dark:border-purple-800';
@@ -616,6 +620,82 @@ const TodaysTodoPage: React.FC = () => {
     overdue: 0,
     urgent: 0,
   });
+
+  // Add these with your other useState declarations
+  const [favoriteStatus, setFavoriteStatus] = useState({});
+  const [favoritesLoading, setFavoritesLoading] = useState({});
+  const lastFetchedIdsRef = useRef('');
+
+  // Fetch favorite statuses for multiple leads (batch)
+  const fetchFavoriteStatuses = async (masterIds) => {
+    if (!masterIds || masterIds.length === 0) return;
+
+    try {
+      const response = await axios.post(
+        `${BASE_URL}api/favorites/batch`,
+        { master_ids: masterIds },
+        { withCredentials: true },
+      );
+
+      if (response.data.success) {
+        setFavoriteStatus((prev) => ({
+          ...prev,
+          ...response.data.favorites,
+        }));
+      }
+    } catch (error) {
+      console.error('Error fetching favorite statuses:', error);
+    }
+  };
+
+  // Toggle favorite status for a single lead
+  const toggleFavorite = async (master_id, event) => {
+    event.stopPropagation(); // Prevent row click event
+
+    setFavoritesLoading((prev) => ({ ...prev, [master_id]: true }));
+
+    try {
+      const response = await axios.post(
+        `${BASE_URL}api/favorites/toggle/${master_id}`,
+        {},
+        { withCredentials: true },
+      );
+
+      if (response.data.success) {
+        setFavoriteStatus((prev) => ({
+          ...prev,
+          [master_id]: response.data.is_favorite,
+        }));
+      }
+    } catch (error) {
+      console.error('Error toggling favorite:', error);
+    } finally {
+      setFavoritesLoading((prev) => ({ ...prev, [master_id]: false }));
+    }
+  };
+
+  // Star Icon Component
+  const StarIcon = ({ isFavorite, isLoading, onClick }) => {
+    return (
+      <button
+        onClick={onClick}
+        disabled={isLoading}
+        className={`transition-all duration-200 transform hover:scale-110 focus:outline-none ${
+          isLoading ? 'opacity-50 cursor-wait' : 'cursor-pointer'
+        }`}
+        title={isFavorite ? 'Remove from favorites' : 'Add to favorites'}
+      >
+        <FontAwesomeIcon
+          icon={isFavorite ? faStarSolid : faStarRegular}
+          className={`text-base ${
+            isFavorite
+              ? 'text-yellow-400'
+              : 'text-gray-400 hover:text-yellow-300'
+          }`}
+        />
+      </button>
+    );
+  };
 
   const getPriorityInfo = (lead: Lead) => {
     if (!lead.followup_date)
@@ -1212,50 +1292,62 @@ const TodaysTodoPage: React.FC = () => {
                 )}
                 {hasRemarks && (
                   <div className="bg-gradient-to-r from-gray-50 to-slate-50 dark:from-gray-800/50 dark:to-slate-900/50 p-3 rounded-lg border border-gray-200 dark:border-gray-700">
-                    <h3 className="text-[13px] font-semibold text-gray-700 dark:text-gray-300 mb-2 flex items-center gap-2">
-                      <FontAwesomeIcon
-                        icon={faInfoCircle}
-                        className="h-4 w-4 text-gray-500"
-                      />{' '}
-                      Remarks
-                    </h3>
-                    <div className="text-[13px]">
-                      {hasField('quick_remark') && (
-                        <div className="mb-2">
-                          <div className="text-[12px] text-gray-500 dark:text-gray-400 mb-1">
-                            Quick Remark
-                          </div>
-                          <div className="font-medium text-black dark:text-white bg-white dark:bg-gray-800 p-2 rounded border border-gray-200 dark:border-gray-700">
-                            <span
-                              className={`px-2 py-1 rounded-full text-[12px] ${
-                                selectedLeadDetails.quick_remark ===
-                                'Interested'
-                                  ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300'
-                                  : selectedLeadDetails.quick_remark ===
-                                    'Not Interested'
-                                  ? 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300'
-                                  : selectedLeadDetails.quick_remark ===
-                                    'Not Reachable'
-                                  ? 'bg-gray-100 text-gray-800 dark:bg-gray-900/30 dark:text-gray-300'
-                                  : 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300'
-                              }`}
-                            >
-                              {formatValue(selectedLeadDetails.quick_remark)}
-                            </span>
-                          </div>
-                        </div>
-                      )}
-                      {hasField('detailed_remark') && (
-                        <div>
-                          <div className="text-[12px] text-gray-500 dark:text-gray-400 mb-1">
-                            Detailed Remark
-                          </div>
-                          <div className="text-black dark:text-white bg-white dark:bg-gray-800 p-2 rounded border border-gray-200 dark:border-gray-700 whitespace-pre-line">
-                            {formatValue(selectedLeadDetails.detailed_remark)}
-                          </div>
-                        </div>
-                      )}
-                    </div>
+                    {/* Reassignment History */}
+{/* Reassignment History - Using ONLY created_at */}
+{selectedLeadDetails.reassignment_remarks &&
+  Array.isArray(selectedLeadDetails.reassignment_remarks) &&
+  selectedLeadDetails.reassignment_remarks.length > 0 && (
+    <div className="bg-gradient-to-r from-purple-50 to-pink-50 dark:from-purple-900/20 dark:to-pink-900/20 p-3 rounded-lg border border-purple-100 dark:border-purple-800/30">
+      <h3 className="text-[13px] font-semibold text-gray-700 dark:text-gray-300 mb-2 flex items-center gap-2">
+        <FontAwesomeIcon icon={faUsers} className="h-4 w-4 text-purple-500" />
+        Remark History ({selectedLeadDetails.reassignment_remarks.length})
+      </h3>
+      <div className="space-y-2 max-h-60 overflow-y-auto">
+        {selectedLeadDetails.reassignment_remarks.map((remark, index) => (
+          <div
+            key={index}
+            className="bg-white dark:bg-gray-800/50 p-3 rounded-lg border border-gray-200 dark:border-gray-700"
+          >
+            {typeof remark === 'object' && remark !== null ? (
+              <>
+                <div className="flex justify-between items-start mb-2 flex-wrap gap-2">
+                  <div className="flex items-center flex-wrap gap-1">
+                    <span className="font-medium text-blue-600 dark:text-blue-400 text-[12px]">
+                      {remark.name || 'Unknown'}
+                    </span>
+                    <span className="mx-1 text-gray-400">→</span>
+                    <span className="font-medium text-green-600 dark:text-green-400 text-[12px]">
+                      {remark.assignedTo || 'Unknown'}
+                    </span>
+                    {remark.leadStage && (
+                      <span className="ml-1 text-[11px] bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-300 px-2 py-0.5 rounded-full">
+                        {remark.leadStage}
+                      </span>
+                    )}
+                  </div>
+                  {/* 🔥 USING ONLY created_at DATE - NO fallback to reassignment_date */}
+                  <span className="text-[11px] text-gray-500 whitespace-nowrap bg-gray-100 dark:bg-gray-700 px-2 py-1 rounded-full inline-flex items-center gap-1">
+                    <FontAwesomeIcon icon={faCalendarAlt} className="text-[10px]" />
+                    {remark.created_at || 'Date not available'}
+                  </span>
+                </div>
+                {remark.remark && (
+                  <p className="text-[12px] text-gray-600 dark:text-gray-300 mt-2 pt-2 border-t border-gray-100 dark:border-gray-700">
+                    <span className="font-medium text-gray-500">Remark:</span> {remark.remark}
+                  </p>
+                )}
+              </>
+            ) : (
+              <div className="flex justify-between items-start">
+                <p className="text-[12px] text-gray-600 dark:text-gray-300 flex-1">{remark}</p>
+                <span className="text-[11px] text-gray-500">No date</span>
+              </div>
+            )}
+          </div>
+        ))}
+      </div>
+    </div>
+  )}
                   </div>
                 )}
               </div>
@@ -1750,6 +1842,20 @@ const TodaysTodoPage: React.FC = () => {
       setLoading(false);
     }
   };
+
+  // Fetch favorites for current page
+  useEffect(() => {
+    if (leads.length > 0) {
+      const masterIds = leads.map((item) => item.master_id);
+      const idsKey = masterIds.sort().join(',');
+
+      // Only fetch if the IDs have changed
+      if (lastFetchedIdsRef.current !== idsKey) {
+        lastFetchedIdsRef.current = idsKey;
+        fetchFavoriteStatuses(masterIds);
+      }
+    }
+  }, [leads]); // Runs when leads data changes (after filtering/pagination)
 
   useEffect(() => {
     const fetchAssignUsers = async () => {
@@ -2253,36 +2359,36 @@ const TodaysTodoPage: React.FC = () => {
   };
 
   const [showUpdateLocationPopup, setShowUpdateLocationPopup] = useState(false);
-const [updateLocationClient, setUpdateLocationClient] = useState<Lead | null>(null);
-const [newLocationLink, setNewLocationLink] = useState('');
+  const [updateLocationClient, setUpdateLocationClient] = useState<Lead | null>(null);
+  const [newLocationLink, setNewLocationLink] = useState('');
 
-const handleUpdateLocation = async () => {
-  if (!updateLocationClient || !newLocationLink) {
-    alert('Please enter a location link');
-    return;
-  }
-
-  try {
-    const response = await axios.put(
-      `${BASE_URL}api/update-location/${updateLocationClient.master_id}`,
-      { location_link: newLocationLink },
-      { withCredentials: true }
-    );
-
-    if (response.data.success) {
-      alert('✅ Location link updated successfully!');
-      setShowUpdateLocationPopup(false);
-      setUpdateLocationClient(null);
-      setNewLocationLink('');
-      setRefreshTrigger((prev) => prev + 1);
-    } else {
-      alert('❌ Failed to update location link');
+  const handleUpdateLocation = async () => {
+    if (!updateLocationClient || !newLocationLink) {
+      alert('Please enter a location link');
+      return;
     }
-  } catch (error) {
-    console.error('Error updating location:', error);
-    alert('❌ Error updating location link');
-  }
-};
+
+    try {
+      const response = await axios.put(
+        `${BASE_URL}api/update-location/${updateLocationClient.master_id}`,
+        { location_link: newLocationLink },
+        { withCredentials: true }
+      );
+
+      if (response.data.success) {
+        alert('✅ Location link updated successfully!');
+        setShowUpdateLocationPopup(false);
+        setUpdateLocationClient(null);
+        setNewLocationLink('');
+        setRefreshTrigger((prev) => prev + 1);
+      } else {
+        alert('❌ Failed to update location link');
+      }
+    } catch (error) {
+      console.error('Error updating location:', error);
+      alert('❌ Error updating location link');
+    }
+  };
 
   const getFileIcon = (fileName: string) => {
     const ext = fileName.split('.').pop()?.toLowerCase() || '';
@@ -2369,54 +2475,50 @@ const handleUpdateLocation = async () => {
     return (
       <div className="fixed inset-0 bg-black/70 flex justify-center items-start z-[9999] overflow-y-auto p-4 sm:p-10">
         <div className="bg-white dark:bg-boxdark p-6 rounded-xl shadow-2xl w-full max-w-5xl max-h-[90vh] overflow-y-auto border border-gray-300 dark:border-gray-700">
-      <div className="flex justify-between items-center border-b pb-4 mb-6 dark:border-gray-700">
-  <div className="flex items-start justify-between gap-4 flex-wrap w-full">
-    {/* LEFT SIDE */}
-    <div>
-      <h2 className="text-2xl font-bold text-gray-800 dark:text-white">
-        📁 Files for {docsClient.name}
-      </h2>
-      <p className="text-[13px] text-gray-600 dark:text-gray-400">
-        Manage documents, links, and remarks in one place
-      </p>
-    </div>
-
-    {/* RIGHT SIDE BUTTON */}
-    <div className="flex flex-col items-end">
-      <button
-        onClick={() => {
-          setUpdateLocationClient(docsClient);
-          setNewLocationLink(
-            docsClient?.document_location_link || 
-            docsClient?.location_link || 
-            ''
-          );
-          setShowUpdateLocationPopup(true);
-        }}
-        className="inline-flex items-center gap-2 px-4 py-2.5 bg-gradient-to-r from-emerald-500 to-green-600 hover:from-emerald-600 hover:to-green-700 text-white rounded-lg font-medium text-[13px] transition-all shadow-md hover:shadow-lg"
-      >
-        <FontAwesomeIcon icon={faMapMarkerAlt} className="h-4 w-4" />
-        Update Location Only
-      </button>
-    </div>
-  </div>
-
-  <button
-    onClick={() => {
-      setShowDocsPopup(false);
-      setUploadFiles([]);
-      setLocationLink('');
-      setRemark('');
-      setDetailedRemark('');
-      setFollowupDate('');
-      setSelectedUsers([]);
-      setLeadStage('');
-    }}
-    className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 text-2xl p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-full transition-colors ml-4"
-  >
-    <FontAwesomeIcon icon={faTimes} />
-  </button>
-</div>
+          <div className="flex justify-between items-center border-b pb-4 mb-6 dark:border-gray-700">
+            <div className="flex items-start justify-between gap-4 flex-wrap w-full">
+              <div>
+                <h2 className="text-2xl font-bold text-gray-800 dark:text-white">
+                  📁 Files for {docsClient.name}
+                </h2>
+                <p className="text-[13px] text-gray-600 dark:text-gray-400">
+                  Manage documents, links, and remarks in one place
+                </p>
+              </div>
+              <div className="flex flex-col items-end">
+                <button
+                  onClick={() => {
+                    setUpdateLocationClient(docsClient);
+                    setNewLocationLink(
+                      docsClient?.document_location_link || 
+                      docsClient?.location_link || 
+                      ''
+                    );
+                    setShowUpdateLocationPopup(true);
+                  }}
+                  className="inline-flex items-center gap-2 px-4 py-2.5 bg-gradient-to-r from-emerald-500 to-green-600 hover:from-emerald-600 hover:to-green-700 text-white rounded-lg font-medium text-[13px] transition-all shadow-md hover:shadow-lg"
+                >
+                  <FontAwesomeIcon icon={faMapMarkerAlt} className="h-4 w-4" />
+                  Update Location Only
+                </button>
+              </div>
+            </div>
+            <button
+              onClick={() => {
+                setShowDocsPopup(false);
+                setUploadFiles([]);
+                setLocationLink('');
+                setRemark('');
+                setDetailedRemark('');
+                setFollowupDate('');
+                setSelectedUsers([]);
+                setLeadStage('');
+              }}
+              className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 text-2xl p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-full transition-colors ml-4"
+            >
+              <FontAwesomeIcon icon={faTimes} />
+            </button>
+          </div>
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
             <div className="lg:col-span-1">
               <div className="bg-gray-50 dark:bg-white/5 p-5 rounded-xl border border-gray-200 dark:border-gray-700 sticky top-0">
@@ -2453,187 +2555,185 @@ const handleUpdateLocation = async () => {
                       className="w-full p-2.5 border border-gray-300 rounded-lg text-[13px] dark:text-white dark:bg-gray-800 focus:ring-2 focus:ring-blue-500 outline-none"
                     />
                   </div>
-
                   <div>
-  <label className="block mb-1.5 text-[12px] font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400">
-    Reassign To (Multiple Users)
-  </label>
-  <div className="mb-2">
-    <div className="relative">
-      <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-        <svg
-          className="h-4 w-4 text-gray-400"
-          fill="none"
-          stroke="currentColor"
-          viewBox="0 0 24 24"
-        >
-          <path
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            strokeWidth={2}
-            d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
-          />
-        </svg>
-      </div>
-      <input
-        type="text"
-        value={searchUserTerm}
-        onChange={(e) => setSearchUserTerm(e.target.value)}
-        className="w-full pl-9 pr-8 py-2 border border-gray-300 dark:border-gray-600 rounded text-[13px] dark:bg-form-input dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-        placeholder="Search users by name or role..."
-      />
-      {searchUserTerm && (
-        <button
-          type="button"
-          onClick={() => setSearchUserTerm('')}
-          className="absolute inset-y-0 right-0 pr-2 flex items-center text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
-        >
-          <svg
-            className="h-4 w-4"
-            fill="none"
-            stroke="currentColor"
-            viewBox="0 0 24 24"
-          >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth={2}
-              d="M6 18L18 6M6 6l12 12"
-            />
-          </svg>
-        </button>
-      )}
-    </div>
-    {searchUserTerm && (
-      <p className="text-[12px] text-gray-500 dark:text-gray-400 mt-1">
-        Showing {filteredUsers.length} of {users.length} users
-      </p>
-    )}
-  </div>
-  <div className="border border-gray-300 dark:border-gray-600 rounded p-3 max-h-40 overflow-y-auto">
-    <div className="mb-2 pb-2 border-b dark:border-gray-700 flex items-center justify-between">
-      <button
-        type="button"
-        onClick={() => {
-          const allFilteredSelected = filteredUsers.every(
-            (user) =>
-              selectedUsers.includes(user.user_id || user.id),
-          );
-          if (allFilteredSelected) {
-            setSelectedUsers((prev) =>
-              prev.filter(
-                (userId) =>
-                  !filteredUsers.some(
-                    (user) =>
-                      user.user_id === userId ||
-                      user.id === userId,
-                  ),
-              ),
-            );
-          } else {
-            const filteredUserIds = filteredUsers.map(
-              (user) => user.user_id || user.id,
-            );
-            setSelectedUsers((prev) => [
-              ...new Set([...prev, ...filteredUserIds]),
-            ]);
-          }
-        }}
-        className="text-[12px] px-3 py-1.5 bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300 rounded hover:bg-blue-200 dark:hover:bg-blue-800 transition-colors"
-      >
-        {filteredUsers.length > 0 &&
-        filteredUsers.every((user) =>
-          selectedUsers.includes(user.user_id || user.id),
-        )
-          ? 'Deselect All Filtered'
-          : 'Select All Filtered'}
-      </button>
-      <span className="text-[12px] text-gray-500 dark:text-gray-400">
-        {selectedUsers.length} selected
-      </span>
-    </div>
-    {filteredUsers.length > 0 ? (
-      <div className="flex flex-col gap-2">
-        {filteredUsers.map((user) => {
-          const isSelected = selectedUsers.includes(
-            user.user_id || user.id,
-          );
-          return (
-            <div
-              key={user.user_id || user.id}
-              className={`flex items-start p-2 rounded transition-colors min-h-[60px] ${
-                isSelected
-                  ? 'bg-blue-50 dark:bg-blue-900/30 border border-blue-200 dark:border-blue-700'
-                  : 'border border-transparent hover:bg-gray-50 dark:hover:bg-gray-800 hover:border-gray-200 dark:hover:border-gray-700'
-              }`}
-            >
-              <input
-                type="checkbox"
-                id={`user-${user.user_id || user.id}`}
-                checked={isSelected}
-                onChange={() => {
-                  const userId = user.user_id || user.id;
-                  if (selectedUsers.includes(userId)) {
-                    setSelectedUsers((prev) =>
-                      prev.filter((id) => id !== userId),
-                    );
-                  } else {
-                    setSelectedUsers((prev) => [
-                      ...prev,
-                      userId,
-                    ]);
-                  }
-                }}
-                className="h-4 w-4 text-blue-600 rounded focus:ring-blue-500 focus:ring-offset-0 mt-1 flex-shrink-0"
-              />
-              <label
-                htmlFor={`user-${user.user_id || user.id}`}
-                className="ml-2 text-[13px] text-gray-700 dark:text-gray-300 cursor-pointer flex-1 min-w-0"
-              >
-                <div className="font-semibold text-[13px]">
-                  {user.name}
-                </div>
-                {user.role && (
-                  <div className="text-[11px] text-gray-500 dark:text-gray-400 mt-0.5">
-                    {user.role}
+                    <label className="block mb-1.5 text-[12px] font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400">
+                      Reassign To (Multiple Users)
+                    </label>
+                    <div className="mb-2">
+                      <div className="relative">
+                        <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                          <svg
+                            className="h-4 w-4 text-gray-400"
+                            fill="none"
+                            stroke="currentColor"
+                            viewBox="0 0 24 24"
+                          >
+                            <path
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              strokeWidth={2}
+                              d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
+                            />
+                          </svg>
+                        </div>
+                        <input
+                          type="text"
+                          value={searchUserTerm}
+                          onChange={(e) => setSearchUserTerm(e.target.value)}
+                          className="w-full pl-9 pr-8 py-2 border border-gray-300 dark:border-gray-600 rounded text-[13px] dark:bg-form-input dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                          placeholder="Search users by name or role..."
+                        />
+                        {searchUserTerm && (
+                          <button
+                            type="button"
+                            onClick={() => setSearchUserTerm('')}
+                            className="absolute inset-y-0 right-0 pr-2 flex items-center text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
+                          >
+                            <svg
+                              className="h-4 w-4"
+                              fill="none"
+                              stroke="currentColor"
+                              viewBox="0 0 24 24"
+                            >
+                              <path
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                strokeWidth={2}
+                                d="M6 18L18 6M6 6l12 12"
+                              />
+                            </svg>
+                          </button>
+                        )}
+                      </div>
+                      {searchUserTerm && (
+                        <p className="text-[12px] text-gray-500 dark:text-gray-400 mt-1">
+                          Showing {filteredUsers.length} of {users.length} users
+                        </p>
+                      )}
+                    </div>
+                    <div className="border border-gray-300 dark:border-gray-600 rounded p-3 max-h-40 overflow-y-auto">
+                      <div className="mb-2 pb-2 border-b dark:border-gray-700 flex items-center justify-between">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const allFilteredSelected = filteredUsers.every(
+                              (user) =>
+                                selectedUsers.includes(user.user_id || user.id),
+                            );
+                            if (allFilteredSelected) {
+                              setSelectedUsers((prev) =>
+                                prev.filter(
+                                  (userId) =>
+                                    !filteredUsers.some(
+                                      (user) =>
+                                        user.user_id === userId ||
+                                        user.id === userId,
+                                    ),
+                                ),
+                              );
+                            } else {
+                              const filteredUserIds = filteredUsers.map(
+                                (user) => user.user_id || user.id,
+                              );
+                              setSelectedUsers((prev) => [
+                                ...new Set([...prev, ...filteredUserIds]),
+                              ]);
+                            }
+                          }}
+                          className="text-[12px] px-3 py-1.5 bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300 rounded hover:bg-blue-200 dark:hover:bg-blue-800 transition-colors"
+                        >
+                          {filteredUsers.length > 0 &&
+                          filteredUsers.every((user) =>
+                            selectedUsers.includes(user.user_id || user.id),
+                          )
+                            ? 'Deselect All Filtered'
+                            : 'Select All Filtered'}
+                        </button>
+                        <span className="text-[12px] text-gray-500 dark:text-gray-400">
+                          {selectedUsers.length} selected
+                        </span>
+                      </div>
+                      {filteredUsers.length > 0 ? (
+                        <div className="flex flex-col gap-2">
+                          {filteredUsers.map((user) => {
+                            const isSelected = selectedUsers.includes(
+                              user.user_id || user.id,
+                            );
+                            return (
+                              <div
+                                key={user.user_id || user.id}
+                                className={`flex items-start p-2 rounded transition-colors min-h-[60px] ${
+                                  isSelected
+                                    ? 'bg-blue-50 dark:bg-blue-900/30 border border-blue-200 dark:border-blue-700'
+                                    : 'border border-transparent hover:bg-gray-50 dark:hover:bg-gray-800 hover:border-gray-200 dark:hover:border-gray-700'
+                                }`}
+                              >
+                                <input
+                                  type="checkbox"
+                                  id={`user-${user.user_id || user.id}`}
+                                  checked={isSelected}
+                                  onChange={() => {
+                                    const userId = user.user_id || user.id;
+                                    if (selectedUsers.includes(userId)) {
+                                      setSelectedUsers((prev) =>
+                                        prev.filter((id) => id !== userId),
+                                      );
+                                    } else {
+                                      setSelectedUsers((prev) => [
+                                        ...prev,
+                                        userId,
+                                      ]);
+                                    }
+                                  }}
+                                  className="h-4 w-4 text-blue-600 rounded focus:ring-blue-500 focus:ring-offset-0 mt-1 flex-shrink-0"
+                                />
+                                <label
+                                  htmlFor={`user-${user.user_id || user.id}`}
+                                  className="ml-2 text-[13px] text-gray-700 dark:text-gray-300 cursor-pointer flex-1 min-w-0"
+                                >
+                                  <div className="font-semibold text-[13px]">
+                                    {user.name}
+                                  </div>
+                                  {user.role && (
+                                    <div className="text-[11px] text-gray-500 dark:text-gray-400 mt-0.5">
+                                      {user.role}
+                                    </div>
+                                  )}
+                                </label>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      ) : (
+                        <div className="text-center py-4 text-gray-500 dark:text-gray-400">
+                          <div className="text-2xl mb-2">🔍</div>
+                          <p className="text-[13px]">No users found</p>
+                          <p className="text-[12px] mt-1">
+                            Try a different search term
+                          </p>
+                        </div>
+                      )}
+                    </div>
+                    {selectedUsers.length > 0 && (
+                      <div className="mt-2 p-2 bg-blue-50 dark:bg-blue-900/30 rounded border border-blue-200 dark:border-blue-800">
+                        <div className="text-[12px] text-blue-700 dark:text-blue-300 mb-1 font-medium">
+                          Selected Users ({selectedUsers.length}):
+                        </div>
+                        <div className="text-[12px] text-gray-600 dark:text-gray-400 break-words">
+                          {selectedUsers
+                            .map((userId) => {
+                              const user = users.find(
+                                (u) => u.user_id === userId || u.id === userId,
+                              );
+                              return user
+                                ? `${user.name}${user.role ? ` (${user.role})` : ''}`
+                                : userId;
+                            })
+                            .join(', ')}
+                        </div>
+                      </div>
+                    )}
                   </div>
-                )}
-              </label>
-            </div>
-          );
-        })}
-      </div>
-    ) : (
-      <div className="text-center py-4 text-gray-500 dark:text-gray-400">
-        <div className="text-2xl mb-2">🔍</div>
-        <p className="text-[13px]">No users found</p>
-        <p className="text-[12px] mt-1">
-          Try a different search term
-        </p>
-      </div>
-    )}
-  </div>
-  {selectedUsers.length > 0 && (
-    <div className="mt-2 p-2 bg-blue-50 dark:bg-blue-900/30 rounded border border-blue-200 dark:border-blue-800">
-      <div className="text-[12px] text-blue-700 dark:text-blue-300 mb-1 font-medium">
-        Selected Users ({selectedUsers.length}):
-      </div>
-      <div className="text-[12px] text-gray-600 dark:text-gray-400 break-words">
-        {selectedUsers
-          .map((userId) => {
-            const user = users.find(
-              (u) => u.user_id === userId || u.id === userId,
-            );
-            return user
-              ? `${user.name}${user.role ? ` (${user.role})` : ''}`
-              : userId;
-          })
-          .join(', ')}
-      </div>
-    </div>
-  )}
-</div>
-
                   <div>
                     <label className="block mb-1.5 text-[12px] font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400">
                       Lead Stage
@@ -2990,298 +3090,267 @@ const handleUpdateLocation = async () => {
     <div className="p-4">
       <div className="sticky top-0 z-50 w-full bg-white/95 dark:bg-boxdark/95 backdrop-blur-sm shadow-lg border-b border-gray-200/80 dark:border-gray-800 mb-4">
         <div className="px-4 py-3">
-         <div className="flex flex-wrap items-center justify-between gap-2 mb-2">
-  {/* Leads Badge - Inline with reduced size */}
-  <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[12px] font-medium bg-gradient-to-r from-blue-100 to-blue-200 dark:from-blue-900/30 dark:to-blue-800/30 text-blue-800 dark:text-blue-300 border border-blue-200 dark:border-blue-700/30 whitespace-nowrap">
-    <svg className="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-    </svg>
-    {totalLeads} Leads
-  </span>
-
-  {/* Controls Container - Inline with compact widths */}
-  <div className="flex flex-wrap items-center gap-2">
-    {/* Records per page - Compact */}
-    <div className="relative w-28">
-      <div className="absolute inset-y-0 left-0 pl-2 flex items-center pointer-events-none">
-        <svg className="h-3 w-3 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-        </svg>
-      </div>
-      <input
-        type="number"
-        className="w-full pl-7 pr-7 py-1.5 text-[12px] border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
-        placeholder="Rows"
-        value={customRecordCount}
-        onChange={handleCustomRecordInput}
-        min="1"
-        max="1000"
-      />
-      {customRecordCount && (
-        <button
-          onClick={clearCustomRecordCount}
-          className="absolute inset-y-0 right-0 pr-2 flex items-center text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
-        >
-          <svg className="h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-          </svg>
-        </button>
-      )}
-    </div>
-
-    {/* Search - Medium width */}
-    <div className="relative w-56">
-      <div className="absolute inset-y-0 left-0 pl-2 flex items-center pointer-events-none">
-        <svg className="h-3 w-3 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-        </svg>
-      </div>
-      <input
-        type="text"
-        className="w-full pl-7 pr-2 py-1.5 text-[12px] border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all"
-        placeholder="Search..."
-        value={searchTerm}
-        onChange={(e) => setSearchTerm(e.target.value)}
-      />
-    </div>
-
-    {/* Action Buttons Group - Compact inline */}
-    <div className="flex items-center gap-2">
-      {/* Reset Filter Button */}
-      <button
-        onClick={clearFilters}
-        className="bg-gradient-to-r from-gray-600 to-gray-700 hover:from-gray-700 hover:to-gray-800 text-white px-3 py-1.5 rounded-lg text-[12px] font-medium flex items-center gap-1.5 transition-all shadow-md hover:shadow-lg whitespace-nowrap"
-      >
-        <svg className="h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-        </svg>
-        Reset
-      </button>
-
-      {/* Reassign Button */}
-      <button
-        onClick={() => {
-          if (selectedMasterIds.length === 0) {
-            alert('Please select at least one record to assign/reassign');
-            return;
-          }
-          setShowAssignPopup(true);
-        }}
-        disabled={selectedMasterIds.length === 0}
-        className={`bg-gradient-to-r from-green-600 to-green-700 text-white px-3 py-1.5 rounded-lg text-[12px] font-medium flex items-center gap-1.5 transition-all shadow-md hover:shadow-lg whitespace-nowrap ${
-          selectedMasterIds.length === 0 ? 'opacity-50 cursor-not-allowed' : 'hover:from-green-700 hover:to-green-800'
-        }`}
-      >
-        <svg className="h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197m13.5-6a3.5 3.5 0 11-7 0 3.5 3.5 0 017 0z" />
-        </svg>
-        {selectedMasterIds.length > 1 ? `Reassign (${selectedMasterIds.length})` : 'Reassign'}
-      </button>
-
-      {/* Time Filter Button */}
-      <div className="relative" ref={timeFilterRef}>
-        <button
-          onClick={() => setShowTimeFilter(!showTimeFilter)}
-          className={`px-3 py-1.5 rounded-lg text-[12px] font-medium flex items-center gap-1.5 transition-all shadow-md hover:shadow-lg whitespace-nowrap ${
-            selectedTimeSlot || selectedSpecificTime || sortByTime
-              ? 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white'
-              : 'bg-gradient-to-r from-gray-600 to-gray-700 text-white hover:from-gray-700 hover:to-gray-800'
-          }`}
-        >
-          <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-          </svg>
-          <span>Time</span>
-          <svg className={`w-2.5 h-2.5 transition-transform duration-200 ${showTimeFilter ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-          </svg>
-        </button>
-
-        {/* Dropdown Menu - Compact */}
-        {showTimeFilter && (
-          <div className="absolute top-full right-0 mt-1 z-50 bg-white dark:bg-boxdark border border-gray-300 dark:border-gray-700 rounded-lg shadow-xl p-2 min-w-[220px]">
-            {/* Time Slots Section */}
-            <div className="mb-2">
-              <div className="text-[10px] font-semibold text-gray-500 dark:text-gray-400 mb-1 px-2">TIME SLOTS</div>
-              
-              <button
-                onClick={() => {
-                  setSelectedTimeSlot(selectedTimeSlot === 'overdue' ? '' : 'overdue');
-                  setSelectedSpecificTime('');
-                  setShowTimeFilter(false);
-                }}
-                className={`w-full flex items-center justify-between px-2 py-1.5 rounded text-[12px] transition-all ${
-                  selectedTimeSlot === 'overdue'
-                    ? 'bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400'
-                    : 'hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-700 dark:text-gray-300'
-                }`}
-              >
-                <div className="flex items-center gap-1.5">
-                  <span className="text-[12px]">🔴</span>
-                  <span>Overdue</span>
-                </div>
-                {timeStats.overdue > 0 && (
-                  <span className={`px-1.5 py-0.5 rounded-full text-[10px] font-bold ${
-                    selectedTimeSlot === 'overdue' 
-                      ? 'bg-red-200 dark:bg-red-800 text-red-800 dark:text-red-200'
-                      : 'bg-red-100 dark:bg-red-900/50 text-red-600 dark:text-red-400'
-                  }`}>
-                    {timeStats.overdue}
-                  </span>
-                )}
-              </button>
-
-              <button
-                onClick={() => {
-                  setSelectedTimeSlot(selectedTimeSlot === 'morning' ? '' : 'morning');
-                  setSelectedSpecificTime('');
-                  setShowTimeFilter(false);
-                }}
-                className={`w-full flex items-center justify-between px-2 py-1.5 rounded text-[12px] transition-all ${
-                  selectedTimeSlot === 'morning'
-                    ? 'bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-400'
-                    : 'hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-700 dark:text-gray-300'
-                }`}
-              >
-                <div className="flex items-center gap-1.5">
-                  <span className="text-[12px]">🌅</span>
-                  <span>Morning</span>
-                </div>
-                {timeStats.morning > 0 && (
-                  <span className={`px-1.5 py-0.5 rounded-full text-[10px] font-bold ${
-                    selectedTimeSlot === 'morning'
-                      ? 'bg-orange-200 dark:bg-orange-800 text-orange-800 dark:text-orange-200'
-                      : 'bg-orange-100 dark:bg-orange-900/50 text-orange-600 dark:text-orange-400'
-                  }`}>
-                    {timeStats.morning}
-                  </span>
-                )}
-              </button>
-
-              <button
-                onClick={() => {
-                  setSelectedTimeSlot(selectedTimeSlot === 'afternoon' ? '' : 'afternoon');
-                  setSelectedSpecificTime('');
-                  setShowTimeFilter(false);
-                }}
-                className={`w-full flex items-center justify-between px-2 py-1.5 rounded text-[12px] transition-all ${
-                  selectedTimeSlot === 'afternoon'
-                    ? 'bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400'
-                    : 'hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-700 dark:text-gray-300'
-                }`}
-              >
-                <div className="flex items-center gap-1.5">
-                  <span className="text-[12px]">☀️</span>
-                  <span>Afternoon</span>
-                </div>
-                {timeStats.afternoon > 0 && (
-                  <span className={`px-1.5 py-0.5 rounded-full text-[10px] font-bold ${
-                    selectedTimeSlot === 'afternoon'
-                      ? 'bg-blue-200 dark:bg-blue-800 text-blue-800 dark:text-blue-200'
-                      : 'bg-blue-100 dark:bg-blue-900/50 text-blue-600 dark:text-blue-400'
-                  }`}>
-                    {timeStats.afternoon}
-                  </span>
-                )}
-              </button>
-
-              <button
-                onClick={() => {
-                  setSelectedTimeSlot(selectedTimeSlot === 'evening' ? '' : 'evening');
-                  setSelectedSpecificTime('');
-                  setShowTimeFilter(false);
-                }}
-                className={`w-full flex items-center justify-between px-2 py-1.5 rounded text-[12px] transition-all ${
-                  selectedTimeSlot === 'evening'
-                    ? 'bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-400'
-                    : 'hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-700 dark:text-gray-300'
-                }`}
-              >
-                <div className="flex items-center gap-1.5">
-                  <span className="text-[12px]">🌙</span>
-                  <span>Evening</span>
-                </div>
-                {timeStats.evening > 0 && (
-                  <span className={`px-1.5 py-0.5 rounded-full text-[10px] font-bold ${
-                    selectedTimeSlot === 'evening'
-                      ? 'bg-purple-200 dark:bg-purple-800 text-purple-800 dark:text-purple-200'
-                      : 'bg-purple-100 dark:bg-purple-900/50 text-purple-600 dark:text-purple-400'
-                  }`}>
-                    {timeStats.evening}
-                  </span>
-                )}
-              </button>
-            </div>
-
-            <div className="border-t border-gray-200 dark:border-gray-700 my-1"></div>
-
-            {/* Specific Time */}
-            <div className="mb-2">
-              <div className="text-[10px] font-semibold text-gray-500 dark:text-gray-400 mb-1 px-2">SPECIFIC TIME</div>
-              <input
-                type="time"
-                value={selectedSpecificTime}
-                onChange={(e) => {
-                  setSelectedSpecificTime(e.target.value);
-                  setSelectedTimeSlot('');
-                  setShowTimeFilter(false);
-                }}
-                className="w-full px-2 py-1.5 border border-gray-300 dark:border-gray-600 rounded text-[12px] dark:bg-form-input dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              />
-            </div>
-
-            <div className="border-t border-gray-200 dark:border-gray-700 my-1"></div>
-
-            {/* Sort Option */}
-            <div className="mb-1">
-              <button
-                onClick={() => {
-                  setSortByTime(!sortByTime);
-                  setShowTimeFilter(false);
-                }}
-                className={`w-full flex items-center justify-between px-2 py-1.5 rounded text-[12px] transition-all ${
-                  sortByTime
-                    ? 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400'
-                    : 'hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-700 dark:text-gray-300'
-                }`}
-              >
-                <div className="flex items-center gap-1.5">
-                  <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4" />
+          <div className="flex flex-wrap items-center justify-between gap-2 mb-2">
+            <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[12px] font-medium bg-gradient-to-r from-blue-100 to-blue-200 dark:from-blue-900/30 dark:to-blue-800/30 text-blue-800 dark:text-blue-300 border border-blue-200 dark:border-blue-700/30 whitespace-nowrap">
+              <svg className="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+              {totalLeads} Leads
+            </span>
+            <div className="flex flex-wrap items-center gap-2">
+              <div className="relative w-28">
+                <div className="absolute inset-y-0 left-0 pl-2 flex items-center pointer-events-none">
+                  <svg className="h-3 w-3 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
                   </svg>
-                  <span>Sort by Time</span>
                 </div>
-                {sortByTime && <span className="text-green-600 dark:text-green-400 text-[12px]">✓</span>}
-              </button>
-            </div>
-
-            {/* Clear All */}
-            {(selectedTimeSlot || selectedSpecificTime || sortByTime) && (
-              <div className="border-t border-gray-200 dark:border-gray-700 pt-1 mt-1">
+                <input
+                  type="number"
+                  className="w-full pl-7 pr-7 py-1.5 text-[12px] border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                  placeholder="Rows"
+                  value={customRecordCount}
+                  onChange={handleCustomRecordInput}
+                  min="1"
+                  max="1000"
+                />
+                {customRecordCount && (
+                  <button
+                    onClick={clearCustomRecordCount}
+                    className="absolute inset-y-0 right-0 pr-2 flex items-center text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
+                  >
+                    <svg className="h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                  </button>
+                )}
+              </div>
+              <div className="relative w-56">
+                <div className="absolute inset-y-0 left-0 pl-2 flex items-center pointer-events-none">
+                  <svg className="h-3 w-3 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                  </svg>
+                </div>
+                <input
+                  type="text"
+                  className="w-full pl-7 pr-2 py-1.5 text-[12px] border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all"
+                  placeholder="Search..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                />
+              </div>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={clearFilters}
+                  className="bg-gradient-to-r from-gray-600 to-gray-700 hover:from-gray-700 hover:to-gray-800 text-white px-3 py-1.5 rounded-lg text-[12px] font-medium flex items-center gap-1.5 transition-all shadow-md hover:shadow-lg whitespace-nowrap"
+                >
+                  <svg className="h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                  </svg>
+                  Reset
+                </button>
                 <button
                   onClick={() => {
-                    setSelectedTimeSlot('');
-                    setSelectedSpecificTime('');
-                    setSortByTime(false);
-                    setShowTimeFilter(false);
+                    if (selectedMasterIds.length === 0) {
+                      alert('Please select at least one record to assign/reassign');
+                      return;
+                    }
+                    setShowAssignPopup(true);
                   }}
-                  className="w-full text-center px-2 py-1.5 rounded text-[12px] font-medium text-red-600 hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-900/20 transition-all"
+                  disabled={selectedMasterIds.length === 0}
+                  className={`bg-gradient-to-r from-green-600 to-green-700 text-white px-3 py-1.5 rounded-lg text-[12px] font-medium flex items-center gap-1.5 transition-all shadow-md hover:shadow-lg whitespace-nowrap ${
+                    selectedMasterIds.length === 0 ? 'opacity-50 cursor-not-allowed' : 'hover:from-green-700 hover:to-green-800'
+                  }`}
                 >
-                  Clear All
+                  <svg className="h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197m13.5-6a3.5 3.5 0 11-7 0 3.5 3.5 0 017 0z" />
+                  </svg>
+                  {selectedMasterIds.length > 1 ? `Reassign (${selectedMasterIds.length})` : 'Reassign'}
                 </button>
+                <div className="relative" ref={timeFilterRef}>
+                  <button
+                    onClick={() => setShowTimeFilter(!showTimeFilter)}
+                    className={`px-3 py-1.5 rounded-lg text-[12px] font-medium flex items-center gap-1.5 transition-all shadow-md hover:shadow-lg whitespace-nowrap ${
+                      selectedTimeSlot || selectedSpecificTime || sortByTime
+                        ? 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white'
+                        : 'bg-gradient-to-r from-gray-600 to-gray-700 text-white hover:from-gray-700 hover:to-gray-800'
+                    }`}
+                  >
+                    <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                    <span>Time</span>
+                    <svg className={`w-2.5 h-2.5 transition-transform duration-200 ${showTimeFilter ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                    </svg>
+                  </button>
+                  {showTimeFilter && (
+                    <div className="absolute top-full right-0 mt-1 z-50 bg-white dark:bg-boxdark border border-gray-300 dark:border-gray-700 rounded-lg shadow-xl p-2 min-w-[220px]">
+                      <div className="mb-2">
+                        <div className="text-[10px] font-semibold text-gray-500 dark:text-gray-400 mb-1 px-2">TIME SLOTS</div>
+                        <button
+                          onClick={() => {
+                            setSelectedTimeSlot(selectedTimeSlot === 'overdue' ? '' : 'overdue');
+                            setSelectedSpecificTime('');
+                            setShowTimeFilter(false);
+                          }}
+                          className={`w-full flex items-center justify-between px-2 py-1.5 rounded text-[12px] transition-all ${
+                            selectedTimeSlot === 'overdue'
+                              ? 'bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400'
+                              : 'hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-700 dark:text-gray-300'
+                          }`}
+                        >
+                          <div className="flex items-center gap-1.5">
+                            <span className="text-[12px]">🔴</span>
+                            <span>Overdue</span>
+                          </div>
+                          {timeStats.overdue > 0 && (
+                            <span className={`px-1.5 py-0.5 rounded-full text-[10px] font-bold ${
+                              selectedTimeSlot === 'overdue' 
+                                ? 'bg-red-200 dark:bg-red-800 text-red-800 dark:text-red-200'
+                                : 'bg-red-100 dark:bg-red-900/50 text-red-600 dark:text-red-400'
+                            }`}>
+                              {timeStats.overdue}
+                            </span>
+                          )}
+                        </button>
+                        <button
+                          onClick={() => {
+                            setSelectedTimeSlot(selectedTimeSlot === 'morning' ? '' : 'morning');
+                            setSelectedSpecificTime('');
+                            setShowTimeFilter(false);
+                          }}
+                          className={`w-full flex items-center justify-between px-2 py-1.5 rounded text-[12px] transition-all ${
+                            selectedTimeSlot === 'morning'
+                              ? 'bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-400'
+                              : 'hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-700 dark:text-gray-300'
+                          }`}
+                        >
+                          <div className="flex items-center gap-1.5">
+                            <span className="text-[12px]">🌅</span>
+                            <span>Morning</span>
+                          </div>
+                          {timeStats.morning > 0 && (
+                            <span className={`px-1.5 py-0.5 rounded-full text-[10px] font-bold ${
+                              selectedTimeSlot === 'morning'
+                                ? 'bg-orange-200 dark:bg-orange-800 text-orange-800 dark:text-orange-200'
+                                : 'bg-orange-100 dark:bg-orange-900/50 text-orange-600 dark:text-orange-400'
+                            }`}>
+                              {timeStats.morning}
+                            </span>
+                          )}
+                        </button>
+                        <button
+                          onClick={() => {
+                            setSelectedTimeSlot(selectedTimeSlot === 'afternoon' ? '' : 'afternoon');
+                            setSelectedSpecificTime('');
+                            setShowTimeFilter(false);
+                          }}
+                          className={`w-full flex items-center justify-between px-2 py-1.5 rounded text-[12px] transition-all ${
+                            selectedTimeSlot === 'afternoon'
+                              ? 'bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400'
+                              : 'hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-700 dark:text-gray-300'
+                          }`}
+                        >
+                          <div className="flex items-center gap-1.5">
+                            <span className="text-[12px]">☀️</span>
+                            <span>Afternoon</span>
+                          </div>
+                          {timeStats.afternoon > 0 && (
+                            <span className={`px-1.5 py-0.5 rounded-full text-[10px] font-bold ${
+                              selectedTimeSlot === 'afternoon'
+                                ? 'bg-blue-200 dark:bg-blue-800 text-blue-800 dark:text-blue-200'
+                                : 'bg-blue-100 dark:bg-blue-900/50 text-blue-600 dark:text-blue-400'
+                            }`}>
+                              {timeStats.afternoon}
+                            </span>
+                          )}
+                        </button>
+                        <button
+                          onClick={() => {
+                            setSelectedTimeSlot(selectedTimeSlot === 'evening' ? '' : 'evening');
+                            setSelectedSpecificTime('');
+                            setShowTimeFilter(false);
+                          }}
+                          className={`w-full flex items-center justify-between px-2 py-1.5 rounded text-[12px] transition-all ${
+                            selectedTimeSlot === 'evening'
+                              ? 'bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-400'
+                              : 'hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-700 dark:text-gray-300'
+                          }`}
+                        >
+                          <div className="flex items-center gap-1.5">
+                            <span className="text-[12px]">🌙</span>
+                            <span>Evening</span>
+                          </div>
+                          {timeStats.evening > 0 && (
+                            <span className={`px-1.5 py-0.5 rounded-full text-[10px] font-bold ${
+                              selectedTimeSlot === 'evening'
+                                ? 'bg-purple-200 dark:bg-purple-800 text-purple-800 dark:text-purple-200'
+                                : 'bg-purple-100 dark:bg-purple-900/50 text-purple-600 dark:text-purple-400'
+                            }`}>
+                              {timeStats.evening}
+                            </span>
+                          )}
+                        </button>
+                      </div>
+                      <div className="border-t border-gray-200 dark:border-gray-700 my-1"></div>
+                      <div className="mb-2">
+                        <div className="text-[10px] font-semibold text-gray-500 dark:text-gray-400 mb-1 px-2">SPECIFIC TIME</div>
+                        <input
+                          type="time"
+                          value={selectedSpecificTime}
+                          onChange={(e) => {
+                            setSelectedSpecificTime(e.target.value);
+                            setSelectedTimeSlot('');
+                            setShowTimeFilter(false);
+                          }}
+                          className="w-full px-2 py-1.5 border border-gray-300 dark:border-gray-600 rounded text-[12px] dark:bg-form-input dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                        />
+                      </div>
+                      <div className="border-t border-gray-200 dark:border-gray-700 my-1"></div>
+                      <div className="mb-1">
+                        <button
+                          onClick={() => {
+                            setSortByTime(!sortByTime);
+                            setShowTimeFilter(false);
+                          }}
+                          className={`w-full flex items-center justify-between px-2 py-1.5 rounded text-[12px] transition-all ${
+                            sortByTime
+                              ? 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400'
+                              : 'hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-700 dark:text-gray-300'
+                          }`}
+                        >
+                          <div className="flex items-center gap-1.5">
+                            <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4" />
+                            </svg>
+                            <span>Sort by Time</span>
+                          </div>
+                          {sortByTime && <span className="text-green-600 dark:text-green-400 text-[12px]">✓</span>}
+                        </button>
+                      </div>
+                      {(selectedTimeSlot || selectedSpecificTime || sortByTime) && (
+                        <div className="border-t border-gray-200 dark:border-gray-700 pt-1 mt-1">
+                          <button
+                            onClick={() => {
+                              setSelectedTimeSlot('');
+                              setSelectedSpecificTime('');
+                              setSortByTime(false);
+                              setShowTimeFilter(false);
+                            }}
+                            className="w-full text-center px-2 py-1.5 rounded text-[12px] font-medium text-red-600 hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-900/20 transition-all"
+                          >
+                            Clear All
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
               </div>
-            )}
+            </div>
           </div>
-        )}
-      </div>
-    </div>
-  </div>
-</div>
-
         </div>
       </div>
-
-     
 
       {(selectedEntryFromDate ||
         selectedEntryToDate ||
@@ -3444,843 +3513,818 @@ const handleUpdateLocation = async () => {
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-red-500"></div>
         </div>
       ) : (
-        <div className="max-w-full overflow-auto rounded-lg border border-stroke bg-white shadow-default dark:border-strokedark dark:bg-boxdark">
-          <div className="overflow-x-auto">
-            <table className="w-full table-auto">
-              <thead>
-                <tr className="bg-gradient-to-r from-gray-50 to-gray-100 dark:from-meta-4 dark:to-gray-800 border-b-2 border-gray-200 dark:border-gray-700">
-                  <th className="py-5 px-4">
-                    <input
-                      type="checkbox"
-                      checked={(() => {
-                        return (
-                          leads.length > 0 &&
-                          leads.every((lead) =>
-                            selectedLeads.includes(lead.master_id),
-                          )
-                        );
-                      })()}
-                      onChange={(e) => {
-                        const isChecked = e.target.checked;
-                        const currentIds = leads.map((lead) => lead.master_id);
-                        if (isChecked) {
-                          setSelectedLeads((prev) => {
-                            const combined = [...prev, ...currentIds];
-                            return combined.filter(
-                              (id, index) => combined.indexOf(id) === index,
-                            );
-                          });
-                          setSelectedMasterIds((prev) => {
-                            const combined = [...prev, ...currentIds];
-                            return combined.filter(
-                              (id, index) => combined.indexOf(id) === index,
-                            );
-                          });
-                        } else {
-                          setSelectedLeads((prev) =>
-                            prev.filter((id) => !currentIds.includes(id)),
-                          );
-                          setSelectedMasterIds((prev) =>
-                            prev.filter((id) => !currentIds.includes(id)),
-                          );
-                        }
-                      }}
-                      className="h-4.5 w-4.5 text-blue-600 rounded border-gray-300 focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-boxdark"
-                    />
-                  </th>
-                  <th className="py-5 px-4 relative">
-                    <div
-                      ref={entryDateRef}
-                      className="flex items-center justify-between gap-2"
-                    >
-                      <span className="text-[12px] font-extrabold uppercase tracking-wider text-gray-700 dark:text-gray-300">
-                        Entry Date
-                      </span>
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          e.preventDefault();
-                          closeAllDropdowns();
-                          setShowEntryDateCalendar(!showEntryDateCalendar);
-                        }}
-                        className="text-gray-500 hover:text-blue-600 dark:text-gray-400 dark:hover:text-blue-400 focus:outline-none transition-colors"
-                      >
-                        <FontAwesomeIcon
-                          icon={faChevronDown}
-                          className={`h-3 w-3 transition-transform duration-200 ${
-                            showEntryDateCalendar ? 'rotate-180' : ''
-                          }`}
-                        />
-                      </button>
-                    </div>
-                    {showEntryDateCalendar && (
-                      <div className="absolute top-full left-0 mt-1 z-50 bg-white dark:bg-boxdark border border-gray-300 dark:border-gray-700 rounded-lg shadow-lg p-4 min-w-[250px]">
-                        <div className="flex justify-between items-center mb-3">
-                          <span className="font-semibold text-[13px] dark:text-white">
-                            Select Entry Date Range
-                          </span>
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setSelectedEntryFromDate('');
-                              setSelectedEntryToDate('');
-                              applyFilters();
-                              setShowEntryDateCalendar(false);
-                            }}
-                            className="text-[12px] font-medium text-blue-600 hover:text-blue-800 dark:text-blue-400 transition-colors"
-                          >
-                            Clear
-                          </button>
-                        </div>
-                        <div className="space-y-3">
-                          <div>
-                            <label className="block text-[12px] font-medium text-gray-600 dark:text-gray-400 mb-1">
-                              From Date
-                            </label>
-                            <input
-                              type="date"
-                              value={selectedEntryFromDate}
-                              onChange={(e) => {
-                                e.stopPropagation();
-                                setSelectedEntryFromDate(e.target.value);
-                              }}
-                              onClick={(e) => e.stopPropagation()}
-                              className="w-full p-2 border border-gray-300 dark:border-gray-600 rounded-lg text-[13px] font-medium dark:bg-form-input dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                            />
-                          </div>
-                          <div>
-                            <label className="block text-[12px] font-medium text-gray-600 dark:text-gray-400 mb-1">
-                              To Date
-                            </label>
-                            <input
-                              type="date"
-                              value={selectedEntryToDate}
-                              onChange={(e) => {
-                                e.stopPropagation();
-                                setSelectedEntryToDate(e.target.value);
-                              }}
-                              onClick={(e) => e.stopPropagation()}
-                              className="w-full p-2 border border-gray-300 dark:border-gray-600 rounded-lg text-[13px] font-medium dark:bg-form-input dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                            />
-                          </div>
-                        </div>
-                        <div className="mt-4">
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              applyFilters();
-                              setShowEntryDateCalendar(false);
-                            }}
-                            className="w-full py-2.5 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white text-[13px] font-semibold rounded-lg transition-all duration-200 shadow-md hover:shadow-lg"
-                          >
-                            Apply Filter
-                          </button>
-                        </div>
-                      </div>
-                    )}
-                  </th>
-                  <th className="py-5 px-4 relative">
-                    <div
-                      ref={followupDateRef}
-                      className="flex items-center justify-between gap-2"
-                    >
-                      <span className="text-[12px] font-extrabold uppercase tracking-wider text-gray-700 dark:text-gray-300">
-                        FollowUp Date
-                      </span>
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          closeAllDropdowns();
-                          setShowFollowupDateCalendar(
-                            !showFollowupDateCalendar,
-                          );
-                        }}
-                        className="text-gray-500 hover:text-blue-600 dark:text-gray-400 dark:hover:text-blue-400 focus:outline-none transition-colors"
-                      >
-                        <FontAwesomeIcon
-                          icon={faChevronDown}
-                          className={`h-3 w-3 transition-transform duration-200 ${
-                            showFollowupDateCalendar ? 'rotate-180' : ''
-                          }`}
-                        />
-                      </button>
-                    </div>
-                    {showFollowupDateCalendar && (
-                      <div className="absolute top-full left-0 mt-1 z-50 bg-white dark:bg-boxdark border border-gray-300 dark:border-gray-700 rounded-lg shadow-lg p-4 min-w-[250px]">
-                        <div className="flex justify-between items-center mb-3">
-                          <span className="font-semibold text-[13px] dark:text-white">
-                            Select Followup Date Range
-                          </span>
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setSelectedFollowupFromDate('');
-                              setSelectedFollowupToDate('');
-                              applyFilters();
-                              setShowFollowupDateCalendar(false);
-                            }}
-                            className="text-[12px] font-medium text-blue-600 hover:text-blue-800 dark:text-blue-400 transition-colors"
-                          >
-                            Clear
-                          </button>
-                        </div>
-                        <div className="space-y-3">
-                          <div>
-                            <label className="block text-[12px] font-medium text-gray-600 dark:text-gray-400 mb-1">
-                              From Date
-                            </label>
-                            <input
-                              type="date"
-                              value={selectedFollowupFromDate}
-                              onChange={(e) => {
-                                e.stopPropagation();
-                                setSelectedFollowupFromDate(e.target.value);
-                              }}
-                              onClick={(e) => e.stopPropagation()}
-                              className="w-full p-2 border border-gray-300 dark:border-gray-600 rounded-lg text-[13px] font-medium dark:bg-form-input dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                            />
-                          </div>
-                          <div>
-                            <label className="block text-[12px] font-medium text-gray-600 dark:text-gray-400 mb-1">
-                              To Date
-                            </label>
-                            <input
-                              type="date"
-                              value={selectedFollowupToDate}
-                              onChange={(e) => {
-                                e.stopPropagation();
-                                setSelectedFollowupToDate(e.target.value);
-                              }}
-                              onClick={(e) => e.stopPropagation()}
-                              className="w-full p-2 border border-gray-300 dark:border-gray-600 rounded-lg text-[13px] font-medium dark:bg-form-input dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                            />
-                          </div>
-                        </div>
-                        <div className="mt-4">
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              applyFilters();
-                              setShowFollowupDateCalendar(false);
-                            }}
-                            className="w-full py-2.5 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white text-[13px] font-semibold rounded-lg transition-all duration-200 shadow-md hover:shadow-lg"
-                          >
-                            Apply Filter
-                          </button>
-                        </div>
-                      </div>
-                    )}
-                  </th>
-                  
-                  <th className="py-5 px-4">
-                    <div className="text-[12px] font-extrabold uppercase tracking-wider text-gray-700 dark:text-gray-300">
-                      Client Name
-                    </div>
-                  </th>
-                  <th className="py-5 px-4">
-                    <div className="text-[12px] font-extrabold uppercase tracking-wider text-gray-700 dark:text-gray-300">
-                      Contact
-                    </div>
-                  </th>
-                  <th className="py-5 px-4 relative">
-                    <div
-                      ref={cityFilterRef}
-                      className="flex items-center justify-between gap-2"
-                    >
-                      <span className="text-[12px] font-extrabold uppercase tracking-wider text-gray-700 dark:text-gray-300">
-                        City
-                      </span>
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          closeAllDropdowns();
-                          setShowCityFilter(!showCityFilter);
-                        }}
-                        className="text-gray-500 hover:text-blue-600 dark:text-gray-400 dark:hover:text-blue-400 focus:outline-none transition-colors"
-                      >
-                        <FontAwesomeIcon
-                          icon={faFilter}
-                          className={`h-3 w-3 transition-colors duration-200 ${
-                            selectedCities.length > 0 ? 'text-blue-600' : ''
-                          } ${showCityFilter ? 'text-blue-600' : ''}`}
-                        />
-                      </button>
-                    </div>
-                    {showCityFilter && (
-                      <div className="absolute top-full left-0 mt-1 z-50 bg-white dark:bg-boxdark border border-gray-300 dark:border-gray-700 rounded-lg shadow-lg p-4 min-w-[200px] max-h-[300px] overflow-y-auto">
-                        <div className="flex justify-between items-center mb-3">
-                          <span className="font-semibold text-[13px] dark:text-white">
-                            Filter Cities
-                          </span>
-                          <div className="flex gap-2">
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                setSelectedCities([]);
-                                setShowCityFilter(false);
-                              }}
-                              className="text-[12px] font-medium text-blue-600 hover:text-blue-800 dark:text-blue-400 transition-colors"
-                            >
-                              Clear All
-                            </button>
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                setShowCityFilter(false);
-                              }}
-                              className="text-[12px] font-medium text-gray-500 hover:text-gray-700 dark:text-gray-400 transition-colors"
-                            >
-                              ×
-                            </button>
-                          </div>
-                        </div>
-                        {availableCities.length > 0 ? (
-                          <>
-                            {availableCities.map((city) => (
-                              <div
-                                key={city}
-                                className="flex items-center mb-2"
-                              >
-                                <input
-                                  type="checkbox"
-                                  id={`city-${city}`}
-                                  checked={selectedCities.includes(city)}
-                                  onChange={(e) => {
-                                    e.stopPropagation();
-                                    handleCitySelect(city);
-                                  }}
-                                  onClick={(e) => e.stopPropagation()}
-                                  className="h-3.5 w-3.5 mr-2.5 text-blue-600 rounded border-gray-300 focus:ring-2 focus:ring-blue-500"
-                                />
-                                <label
-                                  htmlFor={`city-${city}`}
-                                  className="text-[13px] font-medium dark:text-white cursor-pointer truncate hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
-                                >
-                                  {city}
-                                </label>
-                              </div>
-                            ))}
-                          </>
-                        ) : (
-                          <div className="text-[13px] font-medium text-gray-500 dark:text-gray-400 italic py-3 text-center">
-                            No cities available
-                          </div>
-                        )}
-                        {selectedCities.length > 0 && (
-                          <div className="mt-4 pt-3 border-t border-gray-200 dark:border-gray-700">
-                            <div className="text-[12px] font-semibold text-gray-600 dark:text-gray-400 mb-2">
-                              Selected ({selectedCities.length}):
-                            </div>
-                            <div className="flex flex-wrap gap-1.5">
-                              {selectedCities.map((city) => (
-                                <span
-                                  key={city}
-                                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[12px] font-semibold bg-gradient-to-r from-teal-50 to-teal-100 dark:from-teal-900/30 dark:to-teal-800/20 text-teal-800 dark:text-teal-300 border border-teal-200 dark:border-teal-700/30 shadow-sm"
-                                >
-                                  City: {city}
-                                  <button
-                                    onClick={() => handleCitySelect(city)}
-                                    className="ml-1 text-teal-600 hover:text-teal-800 dark:text-teal-400 transition-colors"
-                                  >
-                                    ×
-                                  </button>
-                                </span>
-                              ))}
-                            </div>
-                          </div>
-                        )}
-                      </div>
-                    )}
-                  </th>
-                  <th className="py-5 px-2">
-                    <div className="text-[12px] font-extrabold uppercase tracking-wider text-gray-700 dark:text-gray-300">
-                      Status
-                    </div>
-                  </th>
-                  <th className="py-5 px-4 relative">
-                    <div
-                      ref={userFilterRef}
-                      className="flex items-center justify-between gap-2"
-                    >
-                      <span className="text-[12px] font-extrabold uppercase tracking-wider text-gray-700 dark:text-gray-300">
-                        User Assign
-                      </span>
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          closeAllDropdowns();
-                          setShowUserFilter(!showUserFilter);
-                        }}
-                        className="text-gray-500 hover:text-blue-600 dark:text-gray-400 dark:hover:text-blue-400 focus:outline-none transition-colors"
-                      >
-                        <FontAwesomeIcon
-                          icon={faFilter}
-                          className={`h-3 w-3 transition-colors duration-200 ${
-                            selectedUsersFilter.length > 0
-                              ? 'text-blue-600'
-                              : ''
-                          } ${showUserFilter ? 'text-blue-600' : ''}`}
-                        />
-                      </button>
-                    </div>
-                    {showUserFilter && (
-                      <div className="absolute top-full right-0 mt-1 z-50 bg-white dark:bg-boxdark border border-gray-300 dark:border-gray-700 rounded-lg shadow-lg p-4 min-w-[220px] max-h-[300px] overflow-y-auto">
-                        <div className="flex justify-between items-center mb-3">
-                          <span className="font-semibold text-[13px] dark:text-white">
-                            Filter Users
-                          </span>
-                          <div className="flex gap-2">
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                setSelectedUsersFilter([]);
-                                setShowUserFilter(false);
-                              }}
-                              className="text-[12px] font-medium text-blue-600 hover:text-blue-800 dark:text-blue-400 transition-colors"
-                            >
-                              Clear All
-                            </button>
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                setShowUserFilter(false);
-                              }}
-                              className="text-[12px] font-medium text-gray-500 hover:text-gray-700 dark:text-gray-400 transition-colors"
-                            >
-                              ×
-                            </button>
-                          </div>
-                        </div>
-                        {users.length > 0 ? (
-                          <>
-                            {users.map((user) => (
-                              <div
-                                key={user.id}
-                                className="flex items-center mb-2"
-                              >
-                                <input
-                                  type="checkbox"
-                                  id={`user-${user.id}`}
-                                  checked={selectedUsersFilter.includes(
-                                    user.name,
-                                  )}
-                                  onChange={(e) => {
-                                    e.stopPropagation();
-                                    handleUserSelect(user.name);
-                                  }}
-                                  onClick={(e) => e.stopPropagation()}
-                                  className="h-3.5 w-3.5 mr-2.5 text-blue-600 rounded border-gray-300 focus:ring-2 focus:ring-blue-500"
-                                />
-                                <label
-                                  htmlFor={`user-${user.id}`}
-                                  className="text-[13px] font-medium dark:text-white cursor-pointer truncate hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
-                                >
-                                  {user.name} ({user.role})
-                                </label>
-                              </div>
-                            ))}
-                          </>
-                        ) : (
-                          <div className="text-[13px] font-medium text-gray-500 dark:text-gray-400 italic py-3 text-center">
-                            Loading users...
-                          </div>
-                        )}
-                        {selectedUsersFilter.length > 0 && (
-                          <div className="mt-4 pt-3 border-t border-gray-200 dark:border-gray-700">
-                            <div className="text-[12px] font-semibold text-gray-600 dark:text-gray-400 mb-2">
-                              Selected ({selectedUsersFilter.length}):
-                            </div>
-                            <div className="flex flex-wrap gap-1.5">
-                              {selectedUsersFilter.map((user) => (
-                                <span
-                                  key={user}
-                                  className="inline-flex items-center px-3 py-1.5 rounded-full text-[12px] font-semibold bg-gradient-to-r from-purple-50 to-purple-100 dark:from-purple-900/30 dark:to-purple-800/20 text-purple-800 dark:text-purple-300 border border-purple-200 dark:border-purple-700/30 shadow-sm truncate max-w-[100px]"
-                                >
-                                  {user}
-                                </span>
-                              ))}
-                            </div>
-                          </div>
-                        )}
-                      </div>
-                    )}
-                  </th>
-                  <th className="py-5 px-4 relative">
-                    <div
-                      ref={stageFilterRef}
-                      className="flex items-center justify-between gap-2"
-                    >
-                      <span className="text-[12px] font-extrabold uppercase tracking-wider text-gray-700 dark:text-gray-300">
-                        Stage
-                      </span>
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          closeAllDropdowns();
-                          setShowStageFilter(!showStageFilter);
-                        }}
-                        className="text-gray-500 hover:text-blue-600 dark:text-gray-400 dark:hover:text-blue-400 focus:outline-none transition-colors"
-                      >
-                        <FontAwesomeIcon
-                          icon={faFilter}
-                          className={`h-3 w-3 transition-colors duration-200 ${
-                            selectedStages.length > 0 ? 'text-blue-600' : ''
-                          } ${showStageFilter ? 'text-blue-600' : ''}`}
-                        />
-                      </button>
-                    </div>
-                    {showStageFilter && (
-                      <div className="absolute top-full right-0 mt-1 z-50 bg-white dark:bg-boxdark border border-gray-300 dark:border-gray-700 rounded-lg shadow-lg p-4 min-w-[220px] max-h-[300px] overflow-y-auto">
-                        <div className="flex justify-between items-center mb-3">
-                          <span className="font-semibold text-[13px] dark:text-white">
-                            Filter Stages
-                          </span>
-                          <div className="flex gap-2">
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                setSelectedStages([]);
-                                setShowStageFilter(false);
-                              }}
-                              className="text-[12px] font-medium text-blue-600 hover:text-blue-800 dark:text-blue-400 transition-colors"
-                            >
-                              Clear All
-                            </button>
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                setShowStageFilter(false);
-                              }}
-                              className="text-[12px] font-medium text-gray-500 hover:text-gray-700 dark:text-gray-400 transition-colors"
-                            >
-                              ×
-                            </button>
-                          </div>
-                        </div>
-                        {leadStages.length > 0 ? (
-                          <>
-                            {leadStages.map((stage) => (
-                              <div
-                                key={stage}
-                                className="flex items-center mb-2"
-                              >
-                                <input
-                                  type="checkbox"
-                                  id={`stage-${stage}`}
-                                  checked={selectedStages.includes(stage)}
-                                  onChange={(e) => {
-                                    e.stopPropagation();
-                                    handleStageSelect(stage);
-                                  }}
-                                  onClick={(e) => e.stopPropagation()}
-                                  className="h-3.5 w-3.5 mr-2.5 text-blue-600 rounded border-gray-300 focus:ring-2 focus:ring-blue-500"
-                                />
-                                <label
-                                  htmlFor={`stage-${stage}`}
-                                  className="text-[13px] font-medium dark:text-white cursor-pointer truncate hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
-                                >
-                                  {stage || 'Unknown'}
-                                </label>
-                              </div>
-                            ))}
-                          </>
-                        ) : (
-                          <div className="text-[13px] font-medium text-gray-500 dark:text-gray-400 italic py-3 text-center">
-                            Loading stages...
-                          </div>
-                        )}
-                        {selectedStages.length > 0 && (
-                          <div className="mt-4 pt-3 border-t border-gray-200 dark:border-gray-700">
-                            <div className="text-[12px] font-semibold text-gray-600 dark:text-gray-400 mb-2">
-                              Selected ({selectedStages.length}):
-                            </div>
-                            <div className="flex flex-wrap gap-1.5">
-                              {selectedStages.map((stage) => (
-                                <span
-                                  key={stage}
-                                  className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-[12px] bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-300"
-                                >
-                                  Stage: {stage}
-                                  <button
-                                    onClick={() => {
-                                      handleStageSelect(stage);
-                                      setShowStageFilter(false);
-                                    }}
-                                    className="ml-1 text-purple-600 hover:text-purple-800 dark:text-purple-400"
-                                  >
-                                    ×
-                                  </button>
-                                </span>
-                              ))}
-                              {selectedUsersFilter.map((user) => (
-                                <span
-                                  key={user}
-                                  className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-[12px] bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-300"
-                                >
-                                  User: {user}
-                                  <button
-                                    onClick={() => {
-                                      handleUserSelect(user);
-                                      setShowUserFilter(false);
-                                    }}
-                                    className="ml-1 text-orange-600 hover:text-orange-800 dark:text-orange-400"
-                                  >
-                                    ×
-                                  </button>
-                                </span>
-                              ))}
-                              {selectedCities.map((city) => (
-                                <span
-                                  key={city}
-                                  className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-[12px] bg-teal-100 text-teal-800 dark:bg-teal-900 dark:text-teal-300"
-                                >
-                                  City: {city}
-                                  <button
-                                    onClick={() => {
-                                      handleCitySelect(city);
-                                      setShowCityFilter(false);
-                                    }}
-                                    className="ml-1 text-teal-600 hover:text-teal-800 dark:text-teal-400"
-                                  >
-                                    ×
-                                  </button>
-                                </span>
-                              ))}
-                            </div>
-                          </div>
-                        )}
-                      </div>
-                    )}
-                  </th>
-                  <th className="py-5 px-4">
-                    <div className="text-[12px] font-extrabold uppercase tracking-wider text-gray-700 dark:text-gray-300">
-                      Remark
-                    </div>
-                  </th>
-                  <th className="py-5 px-4">
-                    <div className="text-[12px] font-extrabold uppercase tracking-wider text-gray-700 dark:text-gray-300">
-                      Actions
-                    </div>
-                  </th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
-                {leads.map((lead, index) => (
-                  <tr
-                    key={index}
-                    className="border-b border-gray-100 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors duration-150 last:border-b-0"
+
+        // Replace the entire table section (from the table opening to closing) with this corrected version:
+
+<div className="max-w-full overflow-auto rounded-lg border border-stroke bg-white shadow-default dark:border-strokedark dark:bg-boxdark">
+  <div className="overflow-x-auto">
+    <table className="w-full table-auto">
+      <thead>
+        <tr className="bg-gradient-to-r from-gray-50 to-gray-100 dark:from-meta-4 dark:to-gray-800 border-b-2 border-gray-200 dark:border-gray-700">
+          <th className="py-5 px-4">
+            <input
+              type="checkbox"
+              checked={(() => {
+                return (
+                  leads.length > 0 &&
+                  leads.every((lead) =>
+                    selectedLeads.includes(lead.master_id),
+                  )
+                );
+              })()}
+              onChange={(e) => {
+                const isChecked = e.target.checked;
+                const currentIds = leads.map((lead) => lead.master_id);
+                if (isChecked) {
+                  setSelectedLeads((prev) => {
+                    const combined = [...prev, ...currentIds];
+                    return combined.filter(
+                      (id, index) => combined.indexOf(id) === index,
+                    );
+                  });
+                  setSelectedMasterIds((prev) => {
+                    const combined = [...prev, ...currentIds];
+                    return combined.filter(
+                      (id, index) => combined.indexOf(id) === index,
+                    );
+                  });
+                } else {
+                  setSelectedLeads((prev) =>
+                    prev.filter((id) => !currentIds.includes(id)),
+                  );
+                  setSelectedMasterIds((prev) =>
+                    prev.filter((id) => !currentIds.includes(id)),
+                  );
+                }
+              }}
+              className="h-4.5 w-4.5 text-blue-600 rounded border-gray-300 focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-boxdark"
+            />
+          </th>
+          <th className="py-5 px-4 relative">
+            <div
+              ref={entryDateRef}
+              className="flex items-center justify-between gap-2"
+            >
+              <span className="text-[12px] font-extrabold uppercase tracking-wider text-gray-700 dark:text-gray-300">
+                Entry Date
+              </span>
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  e.preventDefault();
+                  closeAllDropdowns();
+                  setShowEntryDateCalendar(!showEntryDateCalendar);
+                }}
+                className="text-gray-500 hover:text-blue-600 dark:text-gray-400 dark:hover:text-blue-400 focus:outline-none transition-colors"
+              >
+                <FontAwesomeIcon
+                  icon={faChevronDown}
+                  className={`h-3 w-3 transition-transform duration-200 ${
+                    showEntryDateCalendar ? 'rotate-180' : ''
+                  }`}
+                />
+              </button>
+            </div>
+            {showEntryDateCalendar && (
+              <div className="absolute top-full left-0 mt-1 z-50 bg-white dark:bg-boxdark border border-gray-300 dark:border-gray-700 rounded-lg shadow-lg p-4 min-w-[250px]">
+                <div className="flex justify-between items-center mb-3">
+                  <span className="font-semibold text-[13px] dark:text-white">
+                    Select Entry Date Range
+                  </span>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setSelectedEntryFromDate('');
+                      setSelectedEntryToDate('');
+                      applyFilters();
+                      setShowEntryDateCalendar(false);
+                    }}
+                    className="text-[12px] font-medium text-blue-600 hover:text-blue-800 dark:text-blue-400 transition-colors"
                   >
-                    <td className="py-4 px-4">
-                      <input
-                        type="checkbox"
-                        checked={selectedLeads.includes(lead.master_id)}
-                        onChange={() => {
-                          const leadId = lead.master_id;
-                          setSelectedLeads((prev) =>
-                            prev.includes(leadId)
-                              ? prev.filter((id) => id !== leadId)
-                              : [...prev, leadId],
-                          );
-                          setSelectedMasterIds((prev) =>
-                            prev.includes(leadId)
-                              ? prev.filter((id) => id !== leadId)
-                              : [...prev, leadId],
-                          );
-                        }}
-                        className="h-4.5 w-4.5 text-blue-600 rounded border-gray-300 focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-boxdark"
-                      />
-                    </td>
-                    <td className="py-4 px-4">
-                      <div className="font-semibold text-[13px] bg-gradient-to-r from-blue-50 to-blue-100 dark:from-blue-900/20 dark:to-blue-800/10 text-blue-800 dark:text-blue-300 px-3 py-1.5 rounded-lg border border-blue-100 dark:border-blue-800/30 shadow-sm">
-                        {lead.assign_date
-                          ? new Date(lead.assign_date).toLocaleDateString(
-                              'en-GB',
-                            )
-                          : '—'}
-                      </div>
-                    </td>
-                    <td className="py-4 px-4">
+                    Clear
+                  </button>
+                </div>
+                <div className="space-y-3">
+                  <div>
+                    <label className="block text-[12px] font-medium text-gray-600 dark:text-gray-400 mb-1">
+                      From Date
+                    </label>
+                    <input
+                      type="date"
+                      value={selectedEntryFromDate}
+                      onChange={(e) => {
+                        e.stopPropagation();
+                        setSelectedEntryFromDate(e.target.value);
+                      }}
+                      onClick={(e) => e.stopPropagation()}
+                      className="w-full p-2 border border-gray-300 dark:border-gray-600 rounded-lg text-[13px] font-medium dark:bg-form-input dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[12px] font-medium text-gray-600 dark:text-gray-400 mb-1">
+                      To Date
+                    </label>
+                    <input
+                      type="date"
+                      value={selectedEntryToDate}
+                      onChange={(e) => {
+                        e.stopPropagation();
+                        setSelectedEntryToDate(e.target.value);
+                      }}
+                      onClick={(e) => e.stopPropagation()}
+                      className="w-full p-2 border border-gray-300 dark:border-gray-600 rounded-lg text-[13px] font-medium dark:bg-form-input dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    />
+                  </div>
+                </div>
+                <div className="mt-4">
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      applyFilters();
+                      setShowEntryDateCalendar(false);
+                    }}
+                    className="w-full py-2.5 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white text-[13px] font-semibold rounded-lg transition-all duration-200 shadow-md hover:shadow-lg"
+                  >
+                    Apply Filter
+                  </button>
+                </div>
+              </div>
+            )}
+          </th>
+          <th className="py-5 px-4 relative">
+            <div
+              ref={followupDateRef}
+              className="flex items-center justify-between gap-2"
+            >
+              <span className="text-[12px] font-extrabold uppercase tracking-wider text-gray-700 dark:text-gray-300">
+                FollowUp Date
+              </span>
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  closeAllDropdowns();
+                  setShowFollowupDateCalendar(
+                    !showFollowupDateCalendar,
+                  );
+                }}
+                className="text-gray-500 hover:text-blue-600 dark:text-gray-400 dark:hover:text-blue-400 focus:outline-none transition-colors"
+              >
+                <FontAwesomeIcon
+                  icon={faChevronDown}
+                  className={`h-3 w-3 transition-transform duration-200 ${
+                    showFollowupDateCalendar ? 'rotate-180' : ''
+                  }`}
+                />
+              </button>
+            </div>
+            {showFollowupDateCalendar && (
+              <div className="absolute top-full left-0 mt-1 z-50 bg-white dark:bg-boxdark border border-gray-300 dark:border-gray-700 rounded-lg shadow-lg p-4 min-w-[250px]">
+                <div className="flex justify-between items-center mb-3">
+                  <span className="font-semibold text-[13px] dark:text-white">
+                    Select Followup Date Range
+                  </span>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setSelectedFollowupFromDate('');
+                      setSelectedFollowupToDate('');
+                      applyFilters();
+                      setShowFollowupDateCalendar(false);
+                    }}
+                    className="text-[12px] font-medium text-blue-600 hover:text-blue-800 dark:text-blue-400 transition-colors"
+                  >
+                    Clear
+                  </button>
+                </div>
+                <div className="space-y-3">
+                  <div>
+                    <label className="block text-[12px] font-medium text-gray-600 dark:text-gray-400 mb-1">
+                      From Date
+                    </label>
+                    <input
+                      type="date"
+                      value={selectedFollowupFromDate}
+                      onChange={(e) => {
+                        e.stopPropagation();
+                        setSelectedFollowupFromDate(e.target.value);
+                      }}
+                      onClick={(e) => e.stopPropagation()}
+                      className="w-full p-2 border border-gray-300 dark:border-gray-600 rounded-lg text-[13px] font-medium dark:bg-form-input dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[12px] font-medium text-gray-600 dark:text-gray-400 mb-1">
+                      To Date
+                    </label>
+                    <input
+                      type="date"
+                      value={selectedFollowupToDate}
+                      onChange={(e) => {
+                        e.stopPropagation();
+                        setSelectedFollowupToDate(e.target.value);
+                      }}
+                      onClick={(e) => e.stopPropagation()}
+                      className="w-full p-2 border border-gray-300 dark:border-gray-600 rounded-lg text-[13px] font-medium dark:bg-form-input dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    />
+                  </div>
+                </div>
+                <div className="mt-4">
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      applyFilters();
+                      setShowFollowupDateCalendar(false);
+                    }}
+                    className="w-full py-2.5 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white text-[13px] font-semibold rounded-lg transition-all duration-200 shadow-md hover:shadow-lg"
+                  >
+                    Apply Filter
+                  </button>
+                </div>
+              </div>
+            )}
+          </th>
+          <th className="py-5 px-4">
+            <div className="text-[12px] font-extrabold uppercase tracking-wider text-gray-700 dark:text-gray-300">
+              Client Name
+            </div>
+          </th>
+          <th className="py-5 px-4">
+            <div className="text-[12px] font-extrabold uppercase tracking-wider text-gray-700 dark:text-gray-300">
+              Contact
+            </div>
+          </th>
+          <th className="py-5 px-4 relative">
+            <div
+              ref={cityFilterRef}
+              className="flex items-center justify-between gap-2"
+            >
+              <span className="text-[12px] font-extrabold uppercase tracking-wider text-gray-700 dark:text-gray-300">
+                City
+              </span>
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  closeAllDropdowns();
+                  setShowCityFilter(!showCityFilter);
+                }}
+                className="text-gray-500 hover:text-blue-600 dark:text-gray-400 dark:hover:text-blue-400 focus:outline-none transition-colors"
+              >
+                <FontAwesomeIcon
+                  icon={faFilter}
+                  className={`h-3 w-3 transition-colors duration-200 ${
+                    selectedCities.length > 0 ? 'text-blue-600' : ''
+                  } ${showCityFilter ? 'text-blue-600' : ''}`}
+                />
+              </button>
+            </div>
+            {showCityFilter && (
+              <div className="absolute top-full left-0 mt-1 z-50 bg-white dark:bg-boxdark border border-gray-300 dark:border-gray-700 rounded-lg shadow-lg p-4 min-w-[200px] max-h-[300px] overflow-y-auto">
+                <div className="flex justify-between items-center mb-3">
+                  <span className="font-semibold text-[13px] dark:text-white">
+                    Filter Cities
+                  </span>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setSelectedCities([]);
+                        setShowCityFilter(false);
+                      }}
+                      className="text-[12px] font-medium text-blue-600 hover:text-blue-800 dark:text-blue-400 transition-colors"
+                    >
+                      Clear All
+                    </button>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setShowCityFilter(false);
+                      }}
+                      className="text-[12px] font-medium text-gray-500 hover:text-gray-700 dark:text-gray-400 transition-colors"
+                    >
+                      ×
+                    </button>
+                  </div>
+                </div>
+                {availableCities.length > 0 ? (
+                  <>
+                    {availableCities.map((city) => (
                       <div
-                        className={`inline-flex items-center px-3 py-1.5 rounded-lg font-semibold text-[13px] border shadow-sm ${
-                          lead.followup_date &&
-                          new Date(lead.followup_date) < new Date()
-                            ? 'bg-gradient-to-r from-red-50 to-red-100 dark:from-red-900/20 dark:to-red-800/10 text-red-800 dark:text-red-300 border-red-200 dark:border-red-800/30'
-                            : 'bg-gradient-to-r from-green-50 to-green-100 dark:from-green-900/20 dark:to-green-800/10 text-green-800 dark:text-green-300 border-green-200 dark:border-green-800/30'
-                        }`}
+                        key={city}
+                        className="flex items-center mb-2"
                       >
-                        {lead.followup_date
-                          ? new Date(lead.followup_date).toLocaleDateString(
-                              'en-GB',
-                            )
-                          : '—'}
+                        <input
+                          type="checkbox"
+                          id={`city-${city}`}
+                          checked={selectedCities.includes(city)}
+                          onChange={(e) => {
+                            e.stopPropagation();
+                            handleCitySelect(city);
+                          }}
+                          onClick={(e) => e.stopPropagation()}
+                          className="h-3.5 w-3.5 mr-2.5 text-blue-600 rounded border-gray-300 focus:ring-2 focus:ring-blue-500"
+                        />
+                        <label
+                          htmlFor={`city-${city}`}
+                          className="text-[13px] font-medium dark:text-white cursor-pointer truncate hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
+                        >
+                          {city}
+                        </label>
                       </div>
-                      {lead.followup_time &&
-                        lead.followup_time !== 'Not Available' && (
-                          <div className="mt-1.5 relative group">
-                            <span
-                              className={`inline-flex items-center gap-1 px-2 py-1 rounded-md text-[12px] font-medium border shadow-sm transition-all ${getTimeColorClass(
-                                lead.followup_time,
-                                lead.followup_date,
-                              )}`}
-                            >
-                              <svg
-                                className="w-3 h-3"
-                                fill="none"
-                                stroke="currentColor"
-                                viewBox="0 0 24 24"
-                              >
-                                <path
-                                  strokeLinecap="round"
-                                  strokeLinejoin="round"
-                                  strokeWidth={2}
-                                  d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"
-                                />
-                              </svg>
-                              {lead.followup_time.slice(0, 5)}
-                              {isTimeOverdue(
-                                lead.followup_time,
-                                lead.followup_date,
-                              ) && (
-                                <span className="absolute -top-1 -right-1 flex h-2 w-2">
-                                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
-                                  <span className="relative inline-flex rounded-full h-2 w-2 bg-red-500"></span>
-                                </span>
-                              )}
-                            </span>
-                            <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-2 py-1 bg-gray-900 text-white text-[12px] rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none z-10">
-                              {getRemainingTimeText(
-                                lead.followup_time,
-                                lead.followup_date,
-                              )}
-                            </div>
-                          </div>
-                        )}
-                    </td>
-                    <td className="py-4 px-4">
+                    ))}
+                  </>
+                ) : (
+                  <div className="text-[13px] font-medium text-gray-500 dark:text-gray-400 italic py-3 text-center">
+                    No cities available
+                  </div>
+                )}
+                {selectedCities.length > 0 && (
+                  <div className="mt-4 pt-3 border-t border-gray-200 dark:border-gray-700">
+                    <div className="text-[12px] font-semibold text-gray-600 dark:text-gray-400 mb-2">
+                      Selected ({selectedCities.length}):
+                    </div>
+                    <div className="flex flex-wrap gap-1.5">
+                      {selectedCities.map((city) => (
+                        <span
+                          key={city}
+                          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[12px] font-semibold bg-gradient-to-r from-teal-50 to-teal-100 dark:from-teal-900/30 dark:to-teal-800/20 text-teal-800 dark:text-teal-300 border border-teal-200 dark:border-teal-700/30 shadow-sm"
+                        >
+                          City: {city}
+                          <button
+                            onClick={() => handleCitySelect(city)}
+                            className="ml-1 text-teal-600 hover:text-teal-800 dark:text-teal-400 transition-colors"
+                          >
+                            ×
+                          </button>
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+          </th>
+          <th className="py-5 px-2">
+            <div className="text-[12px] font-extrabold uppercase tracking-wider text-gray-700 dark:text-gray-300">
+              Status
+            </div>
+          </th>
+          <th className="py-5 px-4 relative">
+            <div
+              ref={userFilterRef}
+              className="flex items-center justify-between gap-2"
+            >
+              <span className="text-[12px] font-extrabold uppercase tracking-wider text-gray-700 dark:text-gray-300">
+                User Assign
+              </span>
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  closeAllDropdowns();
+                  setShowUserFilter(!showUserFilter);
+                }}
+                className="text-gray-500 hover:text-blue-600 dark:text-gray-400 dark:hover:text-blue-400 focus:outline-none transition-colors"
+              >
+                <FontAwesomeIcon
+                  icon={faFilter}
+                  className={`h-3 w-3 transition-colors duration-200 ${
+                    selectedUsersFilter.length > 0
+                      ? 'text-blue-600'
+                      : ''
+                  } ${showUserFilter ? 'text-blue-600' : ''}`}
+                />
+              </button>
+            </div>
+            {showUserFilter && (
+              <div className="absolute top-full right-0 mt-1 z-50 bg-white dark:bg-boxdark border border-gray-300 dark:border-gray-700 rounded-lg shadow-lg p-4 min-w-[220px] max-h-[300px] overflow-y-auto">
+                <div className="flex justify-between items-center mb-3">
+                  <span className="font-semibold text-[13px] dark:text-white">
+                    Filter Users
+                  </span>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setSelectedUsersFilter([]);
+                        setShowUserFilter(false);
+                      }}
+                      className="text-[12px] font-medium text-blue-600 hover:text-blue-800 dark:text-blue-400 transition-colors"
+                    >
+                      Clear All
+                    </button>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setShowUserFilter(false);
+                      }}
+                      className="text-[12px] font-medium text-gray-500 hover:text-gray-700 dark:text-gray-400 transition-colors"
+                    >
+                      ×
+                    </button>
+                  </div>
+                </div>
+                {users.length > 0 ? (
+                  <>
+                    {users.map((user) => (
                       <div
-                        onClick={() => {
-                          setSelectedLeadDetails(lead);
-                          setShowDetailsModal(true);
-                        }}
-                        className="group cursor-pointer"
+                        key={user.id}
+                        className="flex items-center mb-2"
                       >
-                        <div className="text-[13px] font-bold text-gray-900 dark:text-gray-100 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors duration-200">
-                          {lead.name}
-                        </div>
-                        <div className="mt-1 flex items-center">
-                          <div className="w-full h-px bg-gradient-to-r from-gray-300 to-gray-100 dark:from-gray-600 dark:to-gray-800 group-hover:from-blue-400 group-hover:to-blue-200 dark:group-hover:from-blue-500 dark:group-hover:to-blue-300 transition-all duration-300"></div>
-                          <div className="ml-2 opacity-0 group-hover:opacity-100 transform translate-x-2 group-hover:translate-x-0 transition-all duration-300">
-                            <FontAwesomeIcon
-                              icon={faEye}
-                              className="text-[12px] text-gray-400 group-hover:text-blue-500 dark:group-hover:text-blue-400"
-                            />
-                          </div>
-                        </div>
+                        <input
+                          type="checkbox"
+                          id={`user-${user.id}`}
+                          checked={selectedUsersFilter.includes(
+                            user.name,
+                          )}
+                          onChange={(e) => {
+                            e.stopPropagation();
+                            handleUserSelect(user.name);
+                          }}
+                          onClick={(e) => e.stopPropagation()}
+                          className="h-3.5 w-3.5 mr-2.5 text-blue-600 rounded border-gray-300 focus:ring-2 focus:ring-blue-500"
+                        />
+                        <label
+                          htmlFor={`user-${user.id}`}
+                          className="text-[13px] font-medium dark:text-white cursor-pointer truncate hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
+                        >
+                          {user.name} ({user.role})
+                        </label>
                       </div>
-                    </td>
-                    <td className="py-4 px-4">
-                      <div className="text-[13px] font-medium bg-gradient-to-r from-gray-50 to-gray-100 dark:from-gray-700 dark:to-gray-800 text-gray-900 dark:text-white px-3 py-1.5 rounded-lg border border-gray-200 dark:border-gray-600 shadow-sm">
-                        {lead.number || '—'}
+                    ))}
+                  </>
+                ) : (
+                  <div className="text-[13px] font-medium text-gray-500 dark:text-gray-400 italic py-3 text-center">
+                    Loading users...
+                  </div>
+                )}
+                {selectedUsersFilter.length > 0 && (
+                  <div className="mt-4 pt-3 border-t border-gray-200 dark:border-gray-700">
+                    <div className="text-[12px] font-semibold text-gray-600 dark:text-gray-400 mb-2">
+                      Selected ({selectedUsersFilter.length}):
+                    </div>
+                    <div className="flex flex-wrap gap-1.5">
+                      {selectedUsersFilter.map((user) => (
+                        <span
+                          key={user}
+                          className="inline-flex items-center px-3 py-1.5 rounded-full text-[12px] font-semibold bg-gradient-to-r from-purple-50 to-purple-100 dark:from-purple-900/30 dark:to-purple-800/20 text-purple-800 dark:text-purple-300 border border-purple-200 dark:border-purple-700/30 shadow-sm truncate max-w-[100px]"
+                        >
+                          {user}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+          </th>
+          <th className="py-5 px-4 relative">
+            <div
+              ref={stageFilterRef}
+              className="flex items-center justify-between gap-2"
+            >
+              <span className="text-[12px] font-extrabold uppercase tracking-wider text-gray-700 dark:text-gray-300">
+                Stage
+              </span>
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  closeAllDropdowns();
+                  setShowStageFilter(!showStageFilter);
+                }}
+                className="text-gray-500 hover:text-blue-600 dark:text-gray-400 dark:hover:text-blue-400 focus:outline-none transition-colors"
+              >
+                <FontAwesomeIcon
+                  icon={faFilter}
+                  className={`h-3 w-3 transition-colors duration-200 ${
+                    selectedStages.length > 0 ? 'text-blue-600' : ''
+                  } ${showStageFilter ? 'text-blue-600' : ''}`}
+                />
+              </button>
+            </div>
+            {showStageFilter && (
+              <div className="absolute top-full right-0 mt-1 z-50 bg-white dark:bg-boxdark border border-gray-300 dark:border-gray-700 rounded-lg shadow-lg p-4 min-w-[220px] max-h-[300px] overflow-y-auto">
+                <div className="flex justify-between items-center mb-3">
+                  <span className="font-semibold text-[13px] dark:text-white">
+                    Filter Stages
+                  </span>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setSelectedStages([]);
+                        setShowStageFilter(false);
+                      }}
+                      className="text-[12px] font-medium text-blue-600 hover:text-blue-800 dark:text-blue-400 transition-colors"
+                    >
+                      Clear All
+                    </button>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setShowStageFilter(false);
+                      }}
+                      className="text-[12px] font-medium text-gray-500 hover:text-gray-700 dark:text-gray-400 transition-colors"
+                    >
+                      ×
+                    </button>
+                  </div>
+                </div>
+                {leadStages.length > 0 ? (
+                  <>
+                    {leadStages.map((stage) => (
+                      <div
+                        key={stage}
+                        className="flex items-center mb-2"
+                      >
+                        <input
+                          type="checkbox"
+                          id={`stage-${stage}`}
+                          checked={selectedStages.includes(stage)}
+                          onChange={(e) => {
+                            e.stopPropagation();
+                            handleStageSelect(stage);
+                          }}
+                          onClick={(e) => e.stopPropagation()}
+                          className="h-3.5 w-3.5 mr-2.5 text-blue-600 rounded border-gray-300 focus:ring-2 focus:ring-blue-500"
+                        />
+                        <label
+                          htmlFor={`stage-${stage}`}
+                          className="text-[13px] font-medium dark:text-white cursor-pointer truncate hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
+                        >
+                          {stage || 'Unknown'}
+                        </label>
                       </div>
-                    </td>
-                    <td className="py-4 px-4">
-                      <div className="flex flex-col gap-1.5">
-                        <div className="text-[13px] font-bold text-gray-900 dark:text-white">
-                          {lead.city || '—'}
-                        </div>
-                        {lead.document_location_link && (
-                          <div>
-                            <a
-                              href={lead.document_location_link}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-[12px] font-semibold bg-gradient-to-r from-blue-50 to-blue-100 dark:from-blue-900/30 dark:to-blue-800/20 text-blue-700 dark:text-blue-300 rounded-lg hover:from-blue-100 hover:to-blue-200 dark:hover:from-blue-800/40 dark:hover:to-blue-700/30 transition-all duration-200 border border-blue-200 dark:border-blue-700/30 shadow-sm"
-                              title="Open location in Google Meet"
-                            >
-                              <FontAwesomeIcon
-                                icon={faMapMarkerAlt}
-                                className="w-3 h-3"
-                              />
-                              <span>Location</span>
-                            </a>
-                          </div>
-                        )}
-                      </div>
-                    </td>
-                    <td className="py-4 px-2">
-                      <ProgressStatus
-                        stage={lead.lead_stage || lead.latest_leadStage}
-                        status_percentage={lead.status_percentage}
-                        is_drop_stage={lead.is_drop_stage}
-                        previous_stage={lead.previous_stage}
+                    ))}
+                  </>
+                ) : (
+                  <div className="text-[13px] font-medium text-gray-500 dark:text-gray-400 italic py-3 text-center">
+                    Loading stages...
+                  </div>
+                )}
+                {selectedStages.length > 0 && (
+                  <div className="mt-4 pt-3 border-t border-gray-200 dark:border-gray-700">
+                    <div className="text-[12px] font-semibold text-gray-600 dark:text-gray-400 mb-2">
+                      Selected ({selectedStages.length}):
+                    </div>
+                    <div className="flex flex-wrap gap-1.5">
+                      {selectedStages.map((stage) => (
+                        <span
+                          key={stage}
+                          className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-[12px] bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-300"
+                        >
+                          Stage: {stage}
+                          <button
+                            onClick={() => {
+                              handleStageSelect(stage);
+                              setShowStageFilter(false);
+                            }}
+                            className="ml-1 text-purple-600 hover:text-purple-800 dark:text-purple-400"
+                          >
+                            ×
+                          </button>
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+          </th>
+          <th className="py-5 px-4">
+            <div className="text-[12px] font-extrabold uppercase tracking-wider text-gray-700 dark:text-gray-300">
+              Remark
+            </div>
+          </th>
+          <th className="py-5 px-4">
+            <div className="text-[12px] font-extrabold uppercase tracking-wider text-gray-700 dark:text-gray-300">
+              Actions
+            </div>
+          </th>
+        </tr>
+      </thead>
+      <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
+        {leads.map((lead, index) => (
+          <tr
+            key={index}
+            className="border-b border-gray-100 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors duration-150 last:border-b-0"
+          >
+            <td className="py-4 px-4">
+              <input
+                type="checkbox"
+                checked={selectedLeads.includes(lead.master_id)}
+                onChange={() => {
+                  const leadId = lead.master_id;
+                  setSelectedLeads((prev) =>
+                    prev.includes(leadId)
+                      ? prev.filter((id) => id !== leadId)
+                      : [...prev, leadId],
+                  );
+                  setSelectedMasterIds((prev) =>
+                    prev.includes(leadId)
+                      ? prev.filter((id) => id !== leadId)
+                      : [...prev, leadId],
+                  );
+                }}
+                className="h-4.5 w-4.5 text-blue-600 rounded border-gray-300 focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-boxdark"
+              />
+            </td>
+            <td className="py-4 px-4">
+              <div className="font-semibold text-[13px] bg-gradient-to-r from-blue-50 to-blue-100 dark:from-blue-900/20 dark:to-blue-800/10 text-blue-800 dark:text-blue-300 px-3 py-1.5 rounded-lg border border-blue-100 dark:border-blue-800/30 shadow-sm">
+                {lead.assign_date
+                  ? new Date(lead.assign_date).toLocaleDateString(
+                      'en-GB',
+                    )
+                  : '—'}
+              </div>
+            </td>
+            <td className="py-4 px-4">
+              <div
+                className={`inline-flex items-center px-3 py-1.5 rounded-lg font-semibold text-[13px] border shadow-sm ${
+                  lead.followup_date &&
+                  new Date(lead.followup_date) < new Date()
+                    ? 'bg-gradient-to-r from-red-50 to-red-100 dark:from-red-900/20 dark:to-red-800/10 text-red-800 dark:text-red-300 border-red-200 dark:border-red-800/30'
+                    : 'bg-gradient-to-r from-green-50 to-green-100 dark:from-green-900/20 dark:to-green-800/10 text-green-800 dark:text-green-300 border-green-200 dark:border-green-800/30'
+                }`}
+              >
+                {lead.followup_date
+                  ? new Date(lead.followup_date).toLocaleDateString(
+                      'en-GB',
+                    )
+                  : '—'}
+              </div>
+              {lead.followup_time &&
+                lead.followup_time !== 'Not Available' && (
+                  <div className="mt-1.5 relative group">
+                    <span
+                      className={`inline-flex items-center gap-1 px-2 py-1 rounded-md text-[12px] font-medium border shadow-sm transition-all ${getTimeColorClass(
+                        lead.followup_time,
+                        lead.followup_date,
+                      )}`}
+                    >
+                      <svg
+                        className="w-3 h-3"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"
+                        />
+                      </svg>
+                      {lead.followup_time.slice(0, 5)}
+                      {isTimeOverdue(
+                        lead.followup_time,
+                        lead.followup_date,
+                      ) && (
+                        <span className="absolute -top-1 -right-1 flex h-2 w-2">
+                          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
+                          <span className="relative inline-flex rounded-full h-2 w-2 bg-red-500"></span>
+                        </span>
+                      )}
+                    </span>
+                    <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-2 py-1 bg-gray-900 text-white text-[12px] rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none z-10">
+                      {getRemainingTimeText(
+                        lead.followup_time,
+                        lead.followup_date,
+                      )}
+                    </div>
+                  </div>
+                )}
+            </td>
+            <td className="py-4 px-4">
+              <div className="flex items-center gap-2 group">
+                <StarIcon
+                  isFavorite={favoriteStatus[lead.master_id] || false}
+                  isLoading={favoritesLoading[lead.master_id]}
+                  onClick={(e) => toggleFavorite(lead.master_id, e)}
+                />
+                <div
+                  onClick={() => {
+                    setSelectedLeadDetails(lead);
+                    setShowDetailsModal(true);
+                  }}
+                  className="group cursor-pointer flex-1"
+                >
+                  <div className="text-[13px] font-bold text-gray-900 dark:text-gray-100 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors duration-200">
+                    {lead.name}
+                  </div>
+                  <div className="mt-1 flex items-center">
+                    <div className="w-full h-px bg-gradient-to-r from-gray-300 to-gray-100 dark:from-gray-600 dark:to-gray-800 group-hover:from-blue-400 group-hover:to-blue-200 dark:group-hover:from-blue-500 dark:group-hover:to-blue-300 transition-all duration-300"></div>
+                    <div className="ml-2 opacity-0 group-hover:opacity-100 transform translate-x-2 group-hover:translate-x-0 transition-all duration-300">
+                      <FontAwesomeIcon
+                        icon={faEye}
+                        className="text-[12px] text-gray-400 group-hover:text-blue-500 dark:group-hover:text-blue-400"
                       />
-                    </td>
-                    <td className="py-4 px-4">
-                      <div className="text-[13px] font-semibold bg-gradient-to-r from-purple-50 to-purple-100 dark:from-purple-900/30 dark:to-purple-800/20 text-purple-800 dark:text-purple-300 px-3 py-1.5 rounded-lg border border-purple-200 dark:border-purple-700/30 shadow-sm text-center">
-                        {lead.telecaller_name || '—'}
-                      </div>
-                    </td>
-                    <td className="py-4 px-4">
-                      <div className="text-[12px] font-semibold bg-gradient-to-r from-orange-50 to-orange-100 dark:from-orange-900/30 dark:to-orange-800/20 text-orange-800 dark:text-orange-300 px-3 py-1.5 rounded-lg border border-orange-200 dark:border-orange-700/30 shadow-sm text-center">
-                        {lead.lead_stage || 'N/A'}
-                      </div>
-                    </td>
-                    <td className="py-4 px-4">
-                      <span
-                        onClick={() => handleShowRemark(lead.detailed_remark)}
-                        title="Click to view full remark"
-                        className={`inline-flex cursor-pointer rounded-full py-1.5 px-3.5 text-[13px] font-semibold border shadow-sm truncate max-w-[220px] ${
-                          lead.quick_remark === 'Interested'
-                            ? 'bg-gradient-to-r from-green-50 to-green-100 dark:from-green-900/30 dark:to-green-800/20 text-green-800 dark:text-green-300 border-green-200 dark:border-green-700/30'
-                            : lead.quick_remark === 'Not Interested'
-                            ? 'bg-gradient-to-r from-red-50 to-red-100 dark:from-red-900/30 dark:to-red-800/20 text-red-800 dark:text-red-300 border-red-200 dark:border-red-700/30'
-                            : lead.quick_remark === 'Not Received'
-                            ? 'bg-gradient-to-r from-yellow-50 to-yellow-100 dark:from-yellow-900/30 dark:to-yellow-800/20 text-yellow-800 dark:text-yellow-300 border-yellow-200 dark:border-yellow-700/30'
-                            : lead.quick_remark === 'Call Cut'
-                            ? 'bg-gradient-to-r from-orange-50 to-orange-100 dark:from-orange-900/30 dark:to-orange-800/20 text-orange-800 dark:text-orange-300 border-orange-200 dark:border-orange-700/30'
-                            : lead.quick_remark === 'Not Reachable'
-                            ? 'bg-gradient-to-r from-gray-50 to-gray-100 dark:from-gray-800/30 dark:to-gray-700/20 text-gray-800 dark:text-gray-300 border-gray-200 dark:border-gray-600/30'
-                            : lead.quick_remark === 'Busy'
-                            ? 'bg-gradient-to-r from-purple-50 to-purple-100 dark:from-purple-900/30 dark:to-purple-800/20 text-purple-800 dark:text-purple-300 border-purple-200 dark:border-purple-700/30'
-                            : 'bg-gradient-to-r from-slate-50 to-slate-100 dark:from-slate-800/30 dark:to-slate-700/20 text-slate-800 dark:text-slate-300 border-slate-200 dark:border-slate-600/30'
-                        }`}
-                      >
-                        {lead.detailed_remark?.substring(0, 20) || '—'}
-                        {lead.detailed_remark &&
-                          lead.detailed_remark.length > 20 &&
-                          '...'}
-                      </span>
-                    </td>
-                    <td className="py-4 px-4">
-                      <div className="flex justify-center gap-1">
-                        <ActionButton
-                          onClick={() => handleEditClick(lead)}
-                          title="Edit"
-                          variant="edit"
-                          className="w-8 h-8 hover:scale-105 transition-transform"
-                        >
-                          <FontAwesomeIcon icon={faEdit} className="text-[12px]" />
-                        </ActionButton>
-                        <ActionButton
-                          onClick={() => handleFileIconClick(lead)}
-                          title="Upload/View Files"
-                          variant="document"
-                          badgeCount={lead.document_count}
-                          className="w-8 h-8 hover:scale-105 transition-transform relative"
-                        >
-                          <FontAwesomeIcon
-                            icon={faFileUpload}
-                            className="text-[12px]"
-                          />
-                        </ActionButton>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </td>
+            <td className="py-4 px-4">
+              <div className="text-[13px] font-medium bg-gradient-to-r from-gray-50 to-gray-100 dark:from-gray-700 dark:to-gray-800 text-gray-900 dark:text-white px-3 py-1.5 rounded-lg border border-gray-200 dark:border-gray-600 shadow-sm">
+                {lead.number || '—'}
+              </div>
+            </td>
+            <td className="py-4 px-4">
+              <div className="flex flex-col gap-1.5">
+                <div className="text-[13px] font-bold text-gray-900 dark:text-white">
+                  {lead.city || '—'}
+                </div>
+                {lead.document_location_link && (
+                  <div>
+                    <a
+                      href={lead.document_location_link}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 text-[12px] font-semibold bg-gradient-to-r from-blue-50 to-blue-100 dark:from-blue-900/30 dark:to-blue-800/20 text-blue-700 dark:text-blue-300 rounded-lg hover:from-blue-100 hover:to-blue-200 dark:hover:from-blue-800/40 dark:hover:to-blue-700/30 transition-all duration-200 border border-blue-200 dark:border-blue-700/30 shadow-sm"
+                      title="Open location in Google Meet"
+                    >
+                      <FontAwesomeIcon
+                        icon={faMapMarkerAlt}
+                        className="w-3 h-3"
+                      />
+                      <span>Location</span>
+                    </a>
+                  </div>
+                )}
+              </div>
+            </td>
+            <td className="py-4 px-2">
+              <ProgressStatus
+                stage={lead.lead_stage || lead.latest_leadStage}
+                status_percentage={lead.status_percentage}
+                is_drop_stage={lead.is_drop_stage}
+                previous_stage={lead.previous_stage}
+              />
+            </td>
+            <td className="py-4 px-4">
+              <div className="text-[13px] font-semibold bg-gradient-to-r from-purple-50 to-purple-100 dark:from-purple-900/30 dark:to-purple-800/20 text-purple-800 dark:text-purple-300 px-3 py-1.5 rounded-lg border border-purple-200 dark:border-purple-700/30 shadow-sm text-center">
+                {lead.telecaller_name || '—'}
+              </div>
+            </td>
+            <td className="py-4 px-4">
+              <div className="text-[12px] font-semibold bg-gradient-to-r from-orange-50 to-orange-100 dark:from-orange-900/30 dark:to-orange-800/20 text-orange-800 dark:text-orange-300 px-3 py-1.5 rounded-lg border border-orange-200 dark:border-orange-700/30 shadow-sm text-center">
+                {lead.lead_stage || 'N/A'}
+              </div>
+            </td>
+            <td className="py-4 px-4">
+              <span
+                onClick={() => handleShowRemark(lead.detailed_remark)}
+                title="Click to view full remark"
+                className={`inline-flex cursor-pointer rounded-full py-1.5 px-3.5 text-[13px] font-semibold border shadow-sm truncate max-w-[220px] ${
+                  lead.quick_remark === 'Interested'
+                    ? 'bg-gradient-to-r from-green-50 to-green-100 dark:from-green-900/30 dark:to-green-800/20 text-green-800 dark:text-green-300 border-green-200 dark:border-green-700/30'
+                    : lead.quick_remark === 'Not Interested'
+                    ? 'bg-gradient-to-r from-red-50 to-red-100 dark:from-red-900/30 dark:to-red-800/20 text-red-800 dark:text-red-300 border-red-200 dark:border-red-700/30'
+                    : lead.quick_remark === 'Not Received'
+                    ? 'bg-gradient-to-r from-yellow-50 to-yellow-100 dark:from-yellow-900/30 dark:to-yellow-800/20 text-yellow-800 dark:text-yellow-300 border-yellow-200 dark:border-yellow-700/30'
+                    : lead.quick_remark === 'Call Cut'
+                    ? 'bg-gradient-to-r from-orange-50 to-orange-100 dark:from-orange-900/30 dark:to-orange-800/20 text-orange-800 dark:text-orange-300 border-orange-200 dark:border-orange-700/30'
+                    : lead.quick_remark === 'Not Reachable'
+                    ? 'bg-gradient-to-r from-gray-50 to-gray-100 dark:from-gray-800/30 dark:to-gray-700/20 text-gray-800 dark:text-gray-300 border-gray-200 dark:border-gray-600/30'
+                    : lead.quick_remark === 'Busy'
+                    ? 'bg-gradient-to-r from-purple-50 to-purple-100 dark:from-purple-900/30 dark:to-purple-800/20 text-purple-800 dark:text-purple-300 border-purple-200 dark:border-purple-700/30'
+                    : 'bg-gradient-to-r from-slate-50 to-slate-100 dark:from-slate-800/30 dark:to-slate-700/20 text-slate-800 dark:text-slate-300 border-slate-200 dark:border-slate-600/30'
+                }`}
+              >
+                {lead.detailed_remark?.substring(0, 20) || '—'}
+                {lead.detailed_remark &&
+                  lead.detailed_remark.length > 20 &&
+                  '...'}
+              </span>
+            </td>
+            <td className="py-4 px-4">
+              <div className="flex justify-center gap-1">
+                <ActionButton
+                  onClick={() => handleEditClick(lead)}
+                  title="Edit"
+                  variant="edit"
+                  className="w-8 h-8 hover:scale-105 transition-transform"
+                >
+                  <FontAwesomeIcon icon={faEdit} className="text-[12px]" />
+                </ActionButton>
+                <ActionButton
+                  onClick={() => handleFileIconClick(lead)}
+                  title="Upload/View Files"
+                  variant="document"
+                  badgeCount={lead.document_count}
+                  className="w-8 h-8 hover:scale-105 transition-transform relative"
+                >
+                  <FontAwesomeIcon
+                    icon={faFileUpload}
+                    className="text-[12px]"
+                  />
+                </ActionButton>
+              </div>
+            </td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
+  </div>
+</div>
       )}
 
       {showDetailsModal && renderDetailsModal()}
@@ -4610,96 +4654,87 @@ const handleUpdateLocation = async () => {
           </div>
         </div>
       )}
-
-
-      {/* Update Location Only Popup */}
-{showUpdateLocationPopup && updateLocationClient && (
-  <div className="fixed inset-0 bg-black/70 flex justify-center items-center z-[10000] p-4">
-    <div className="bg-white dark:bg-boxdark p-6 rounded-xl shadow-2xl w-full max-w-md border border-gray-300 dark:border-gray-700">
-      <div className="flex justify-between items-center border-b pb-4 mb-4 dark:border-gray-700">
-        <div>
-          <h2 className="text-xl font-bold text-gray-800 dark:text-white">
-            Update Location Link
-          </h2>
-          <p className="text-[13px] text-gray-600 dark:text-gray-400">
-            For: {updateLocationClient.name}
-          </p>
-        </div>
-        <button
-          onClick={() => {
-            setShowUpdateLocationPopup(false);
-            setUpdateLocationClient(null);
-            setNewLocationLink('');
-          }}
-          className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 text-2xl p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-full transition-colors"
-        >
-          <FontAwesomeIcon icon={faTimes} />
-        </button>
-      </div>
-
-      <div className="space-y-4">
-        <div>
-          <label className="block mb-2 text-[13px] font-bold text-gray-700 dark:text-gray-300">
-            Location Link (Google Maps URL)
-          </label>
-          <input
-            type="text"
-            placeholder="https://maps.google.com/..."
-            value={newLocationLink}
-            onChange={(e) => setNewLocationLink(e.target.value)}
-            className="w-full p-3 border border-gray-300 dark:border-gray-600 rounded-lg text-[13px] dark:text-white dark:bg-gray-800 focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
-          />
-          <p className="text-[12px] text-gray-500 dark:text-gray-400 mt-1">
-            Enter a Google Maps or location URL
-          </p>
-        </div>
-
-        {/* Current Location Preview */}
-        {(updateLocationClient.document_location_link || updateLocationClient.location_link) && (
-          <div className="p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
-            <p className="text-[12px] font-medium text-gray-600 dark:text-gray-400 mb-1">
-              Current Location:
-            </p>
-            <a
-              href={updateLocationClient.document_location_link || updateLocationClient.location_link || ''}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-[12px] text-blue-600 dark:text-blue-400 hover:underline break-all"
-            >
-              {updateLocationClient.document_location_link || updateLocationClient.location_link}
-            </a>
+      {showUpdateLocationPopup && updateLocationClient && (
+        <div className="fixed inset-0 bg-black/70 flex justify-center items-center z-[10000] p-4">
+          <div className="bg-white dark:bg-boxdark p-6 rounded-xl shadow-2xl w-full max-w-md border border-gray-300 dark:border-gray-700">
+            <div className="flex justify-between items-center border-b pb-4 mb-4 dark:border-gray-700">
+              <div>
+                <h2 className="text-xl font-bold text-gray-800 dark:text-white">
+                  Update Location Link
+                </h2>
+                <p className="text-[13px] text-gray-600 dark:text-gray-400">
+                  For: {updateLocationClient.name}
+                </p>
+              </div>
+              <button
+                onClick={() => {
+                  setShowUpdateLocationPopup(false);
+                  setUpdateLocationClient(null);
+                  setNewLocationLink('');
+                }}
+                className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 text-2xl p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-full transition-colors"
+              >
+                <FontAwesomeIcon icon={faTimes} />
+              </button>
+            </div>
+            <div className="space-y-4">
+              <div>
+                <label className="block mb-2 text-[13px] font-bold text-gray-700 dark:text-gray-300">
+                  Location Link (Google Maps URL)
+                </label>
+                <input
+                  type="text"
+                  placeholder="https://maps.google.com/..."
+                  value={newLocationLink}
+                  onChange={(e) => setNewLocationLink(e.target.value)}
+                  className="w-full p-3 border border-gray-300 dark:border-gray-600 rounded-lg text-[13px] dark:text-white dark:bg-gray-800 focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
+                />
+                <p className="text-[12px] text-gray-500 dark:text-gray-400 mt-1">
+                  Enter a Google Maps or location URL
+                </p>
+              </div>
+              {(updateLocationClient.document_location_link || updateLocationClient.location_link) && (
+                <div className="p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
+                  <p className="text-[12px] font-medium text-gray-600 dark:text-gray-400 mb-1">
+                    Current Location:
+                  </p>
+                  <a
+                    href={updateLocationClient.document_location_link || updateLocationClient.location_link || ''}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-[12px] text-blue-600 dark:text-blue-400 hover:underline break-all"
+                  >
+                    {updateLocationClient.document_location_link || updateLocationClient.location_link}
+                  </a>
+                </div>
+              )}
+              <div className="flex gap-3 pt-4">
+                <button
+                  onClick={() => {
+                    setShowUpdateLocationPopup(false);
+                    setUpdateLocationClient(null);
+                    setNewLocationLink('');
+                  }}
+                  className="flex-1 px-4 py-2 bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-gray-200 rounded-lg font-medium hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleUpdateLocation}
+                  disabled={!newLocationLink}
+                  className={`flex-1 px-4 py-2 rounded-lg font-medium transition-all ${
+                    newLocationLink
+                      ? 'bg-gradient-to-r from-emerald-600 to-green-600 hover:from-emerald-700 hover:to-green-700 text-white'
+                      : 'bg-gray-300 dark:bg-gray-600 text-gray-500 dark:text-gray-400 cursor-not-allowed'
+                  }`}
+                >
+                  Update Location
+                </button>
+              </div>
+            </div>
           </div>
-        )}
-
-        <div className="flex gap-3 pt-4">
-          <button
-            onClick={() => {
-              setShowUpdateLocationPopup(false);
-              setUpdateLocationClient(null);
-              setNewLocationLink('');
-            }}
-            className="flex-1 px-4 py-2 bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-gray-200 rounded-lg font-medium hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors"
-          >
-            Cancel
-          </button>
-          <button
-            onClick={handleUpdateLocation}
-            disabled={!newLocationLink}
-            className={`flex-1 px-4 py-2 rounded-lg font-medium transition-all ${
-              newLocationLink
-                ? 'bg-gradient-to-r from-emerald-600 to-green-600 hover:from-emerald-700 hover:to-green-700 text-white'
-                : 'bg-gray-300 dark:bg-gray-600 text-gray-500 dark:text-gray-400 cursor-not-allowed'
-            }`}
-          >
-            Update Location
-          </button>
         </div>
-      </div>
-    </div>
-  </div>
-)}
-
-
+      )}
     </div>
   );
 };
