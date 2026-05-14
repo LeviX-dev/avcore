@@ -430,6 +430,12 @@ const CallList = () => {
 
   const [refreshTrigger, setRefreshTrigger] = useState(0);
 
+  // Add this with your other state declarations
+const [showQuotationModal, setShowQuotationModal] = useState(false);
+const [selectedQuotationClient, setSelectedQuotationClient] = useState<Client | null>(null);
+const [quotationVersions, setQuotationVersions] = useState<any>(null);
+
+
   const [docsClient, setDocsClient] = useState<Client | null>(null);
   const [docsData, setDocsData] = useState<DocumentData>({
     images: [],
@@ -1457,6 +1463,33 @@ useEffect(() => {
       fetchDocumentsForModal();
     }
   }, [activeTab, selectedClientDetails?.master_id]);
+
+  // Fetch quotation versions for modal
+const fetchClientQuotationVersionsForModal = async (master_id: number) => {
+  setLoadingVersions((prev) => ({ ...prev, [master_id]: true }));
+
+  try {
+    const response = await axios.get(
+      `${BASE_URL}api/revisions/${master_id}`,
+      {
+        withCredentials: true,
+      },
+    );
+
+    // Find the client object
+    const client = clients.find(c => c.master_id === master_id);
+    
+    setSelectedQuotationClient(client || null);
+    setQuotationVersions(response.data);
+    setShowQuotationModal(true);
+  } catch (error) {
+    console.error('Error fetching quotation versions:', error);
+    alert('Failed to fetch quotation details');
+  } finally {
+    setLoadingVersions((prev) => ({ ...prev, [master_id]: false }));
+  }
+};
+
 
   const fetchDocumentsForModal = async () => {
     if (!selectedClientDetails?.master_id || docsFetched) return;
@@ -4202,195 +4235,26 @@ useEffect(() => {
                           />
                         </ActionButton>
 
-                       {/* NEW: Quotation Versions Button - Beside Client Name */}
-                        <div className="relative">
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              fetchClientQuotationVersions(client.master_id);
-                            }}
-                            className="relative inline-flex items-center justify-center w-8 h-8 rounded-lg transition-all duration-300 hover:scale-105 bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700 text-white shadow-md"
-                            title="View Quotation Versions"
-                          >
-                            <FontAwesomeIcon
-                              icon={faFileInvoiceDollar}
-                              className="text-xs"
-                            />
-                            {loadingVersions[client.master_id] && (
-                              <div className="absolute -top-1 -right-1 w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                            )}
-                          </button>
-
-                          {/* Version Dropdown */}
-                          {showVersionDropdown === client.master_id &&
-                            quotationVersionsCache[client.master_id] && (
-                              <div className="absolute right-0 mt-2 z-50 bg-white dark:bg-boxdark rounded-lg shadow-2xl border border-gray-200 dark:border-gray-700 min-w-[320px] max-w-[400px] overflow-hidden">
-                                {/* Dropdown Header */}
-                                <div className="bg-gradient-to-r from-indigo-50 to-purple-50 dark:from-gray-800 dark:to-gray-900 p-3 border-b border-gray-200 dark:border-gray-700">
-                                  <div className="flex justify-between items-center">
-                                    <span className="text-sm font-bold text-gray-800 dark:text-white">
-                                      Quotation Versions
-                                    </span>
-                                    <button
-                                      onClick={(e) => {
-                                        e.stopPropagation();
-                                        setShowVersionDropdown(null);
-                                      }}
-                                      className="text-gray-500 hover:text-gray-700 dark:text-gray-400"
-                                    >
-                                      ×
-                                    </button>
-                                  </div>
-                                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                                    {
-                                      quotationVersionsCache[client.master_id]
-                                        ?.lead?.name
-                                    }
-                                  </p>
-                                </div>
-
-                                {/* Versions List */}
-                                <div className="max-h-80 overflow-y-auto">
-                                  {quotationVersionsCache[client.master_id]
-                                    ?.quotations?.length > 0 ? (
-                                    <table className="w-full text-sm">
-                                      <thead className="bg-gray-50 dark:bg-gray-800 sticky top-0">
-                                        <tr className="border-b border-gray-200 dark:border-gray-700">
-                                          <th className="py-2 px-3 text-left text-xs font-semibold text-gray-600 dark:text-gray-400">
-                                            Version
-                                          </th>
-                                          <th className="py-2 px-3 text-left text-xs font-semibold text-gray-600 dark:text-gray-400">
-                                            Amount
-                                          </th>
-                                          <th className="py-2 px-3 text-left text-xs font-semibold text-gray-600 dark:text-gray-400">
-                                            Date
-                                          </th>
-                                          <th className="py-2 px-3 text-center text-xs font-semibold text-gray-600 dark:text-gray-400">
-                                            Action
-                                          </th>
-                                        </tr>
-                                      </thead>
-                                      <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
-                                        {quotationVersionsCache[
-                                          client.master_id
-                                        ].quotations.map((quotation: any) =>
-                                          quotation.revisions.map(
-                                            (rev: any, idx: number) => {
-                                              const isLatest = rev.is_latest;
-                                              return (
-                                                <tr
-                                                  key={`${quotation.qt_id}-${rev.revision}`}
-                                                  className="hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors"
-                                                >
-                                                  <td className="py-2 px-3">
-                                                    <div className="flex items-center gap-1">
-                                                      <span
-                                                        className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-bold ${
-                                                          isLatest
-                                                            ? 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400'
-                                                            : 'bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400'
-                                                        }`}
-                                                      >
-                                                        V{rev.revision}
-                                                      </span>
-                                                      {isLatest && (
-                                                        <span className="text-[10px] px-1 py-0.5 bg-green-200 dark:bg-green-800 text-green-800 dark:text-green-300 rounded-full">
-                                                          Latest
-                                                        </span>
-                                                      )}
-                                                    </div>
-                                                  </td>
-                                                  <td className="py-2 px-3">
-                                                    <span className="font-semibold text-green-600 dark:text-green-400 text-sm">
-                                                      ₹
-                                                      {rev.totals?.with_gst &&
-                                                      rev.totals.with_gst !==
-                                                        '0.00'
-                                                        ? Number(
-                                                            rev.totals.with_gst,
-                                                          ).toLocaleString(
-                                                            'en-IN',
-                                                          )
-                                                        : Number(
-                                                            rev.totals
-                                                              ?.without_gst ||
-                                                              0,
-                                                          ).toLocaleString(
-                                                            'en-IN',
-                                                          )}
-                                                    </span>
-                                                  </td>
-                                                  <td className="py-2 px-3">
-                                                    <span className="text-xs text-gray-500 dark:text-gray-400">
-                                                      {rev.created_at
-                                                        ? new Date(
-                                                            rev.created_at,
-                                                          ).toLocaleDateString(
-                                                            'en-GB',
-                                                          )
-                                                        : '-'}
-                                                    </span>
-                                                  </td>
-                                                  <td className="py-2 px-3 text-center">
-                                                    <button
-                                                      onClick={(e) => {
-                                                        e.stopPropagation();
-                                                        handleViewQuotationRedirect(
-                                                          client.master_id,
-                                                          rev.revision,
-                                                        );
-                                                      }}
-                                                      className="inline-flex items-center gap-1 px-2 py-1 rounded-md bg-blue-500 hover:bg-blue-600 text-white text-xs transition-colors"
-                                                      title="View Quotation"
-                                                    >
-                                                      <FontAwesomeIcon
-                                                        icon={faEye}
-                                                        className="text-[10px]"
-                                                      />
-                                                      <span>View</span>
-                                                    </button>
-                                                  </td>
-                                                </tr>
-                                              );
-                                            },
-                                          ),
-                                        )}
-                                      </tbody>
-                                    </table>
-                                  ) : (
-                                    <div className="text-center py-8">
-                                      <FontAwesomeIcon
-                                        icon={faFileInvoiceDollar}
-                                        className="text-3xl text-gray-300 mb-2"
-                                      />
-                                      <p className="text-sm text-gray-500 dark:text-gray-400">
-                                        No quotations found
-                                      </p>
-                                    </div>
-                                  )}
-                                </div>
-
-                                {/* Footer with View All link */}
-                                {quotationVersionsCache[client.master_id]
-                                  ?.quotations?.length > 0 && (
-                                  <div className="border-t border-gray-200 dark:border-gray-700 p-2 bg-gray-50 dark:bg-gray-800/50">
-                                    <button
-                                      onClick={(e) => {
-                                        e.stopPropagation();
-                                        // Use the correct route path: /quotation/revisions/:master_id
-                                        navigate(
-                                          `/quotation/revisions/${client.master_id}`,
-                                        );
-                                      }}
-                                      className="w-full text-center text-xs text-blue-600 dark:text-blue-400 hover:underline py-1"
-                                    >
-                                      View All Versions →
-                                    </button>
-                                  </div>
-                                )}
-                              </div>
-                            )}
-                        </div>
+                      {/* NEW: Quotation Versions Button - Opens Modal */}
+<div className="relative">
+  <button
+    onClick={(e) => {
+      e.stopPropagation();
+      // Fetch versions and open modal instead of dropdown
+      fetchClientQuotationVersionsForModal(client.master_id);
+    }}
+    className="relative inline-flex items-center justify-center w-8 h-8 rounded-lg transition-all duration-300 hover:scale-105 bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700 text-white shadow-md"
+    title="View Quotation Versions"
+  >
+    <FontAwesomeIcon
+      icon={faFileInvoiceDollar}
+      className="text-xs"
+    />
+    {loadingVersions[client.master_id] && (
+      <div className="absolute -top-1 -right-1 w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+    )}
+  </button>
+</div>
                       </div>
                     </td>
                   </tr>
@@ -5763,6 +5627,151 @@ useEffect(() => {
           </div>
         </div>
       )}
+
+      {/* Quotation Versions Modal */}
+{showQuotationModal && selectedQuotationClient && quotationVersions && (
+  <div className="fixed inset-0 bg-black/70 flex justify-center items-center z-[9999] p-4">
+    <div className="bg-white dark:bg-boxdark rounded-xl shadow-2xl w-full max-w-4xl max-h-[85vh] overflow-hidden border border-gray-200 dark:border-gray-700">
+      
+      {/* Modal Header */}
+      <div className="bg-gradient-to-r from-indigo-50 to-purple-50 dark:from-gray-800 dark:to-gray-900 p-4 border-b border-gray-200 dark:border-gray-700">
+        <div className="flex justify-between items-start">
+          <div>
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-lg flex items-center justify-center shadow-lg">
+                <FontAwesomeIcon icon={faFileInvoiceDollar} className="text-white text-lg" />
+              </div>
+              <div>
+                <h2 className="text-xl font-bold text-gray-800 dark:text-white">
+                  Quotation Versions
+                </h2>
+                <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
+                  {selectedQuotationClient.name}
+                </p>
+              </div>
+            </div>
+          </div>
+          <button
+            onClick={() => {
+              setShowQuotationModal(false);
+              setSelectedQuotationClient(null);
+              setQuotationVersions(null);
+            }}
+            className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 text-2xl p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors"
+          >
+            ×
+          </button>
+        </div>
+      </div>
+
+      {/* Modal Body */}
+      <div className="overflow-y-auto max-h-[calc(80vh-120px)] p-4">
+        {quotationVersions?.quotations?.length > 0 ? (
+          <div className="space-y-6">
+            {quotationVersions.quotations.map((quotation: any, qIndex: number) => (
+              <div key={qIndex} className="border border-gray-200 dark:border-gray-700 rounded-xl overflow-hidden">
+
+
+                {/* Revisions Table */}
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead className="bg-gray-100 dark:bg-gray-800">
+                      <tr>
+                        <th className="py-3 px-4 text-left text-xs font-semibold text-gray-600 dark:text-gray-400">
+                          Version
+                        </th>
+                        <th className="py-3 px-4 text-left text-xs font-semibold text-gray-600 dark:text-gray-400">
+                          Amount (₹)
+                        </th>
+                        <th className="py-3 px-4 text-left text-xs font-semibold text-gray-600 dark:text-gray-400">
+                          Created Date
+                        </th>
+                        <th className="py-3 px-4 text-center text-xs font-semibold text-gray-600 dark:text-gray-400">
+                          Action
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
+                      {quotation.revisions.map((rev: any, idx: number) => {
+                        const isLatest = rev.is_latest;
+                        const amount = rev.totals?.with_gst && rev.totals.with_gst !== '0.00'
+                          ? rev.totals.with_gst
+                          : rev.totals?.without_gst || 0;
+                        
+                        return (
+                          <tr key={idx} className="hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors">
+                            <td className="py-3 px-4">
+                              <div className="flex items-center gap-2">
+                                <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-bold ${
+                                  isLatest
+                                    ? 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400'
+                                    : 'bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400'
+                                }`}>
+                                  V{rev.revision}
+                                </span>
+                                {isLatest && (
+                                  <span className="text-[10px] px-2 py-0.5 bg-green-200 dark:bg-green-800 text-green-800 dark:text-green-300 rounded-full">
+                                    Latest
+                                  </span>
+                                )}
+                              </div>
+                            </td>
+                            <td className="py-3 px-4">
+                              <span className="font-semibold text-green-600 dark:text-green-400">
+                                ₹{Number(amount).toLocaleString('en-IN')}
+                              </span>
+                            </td>
+                            <td className="py-3 px-4">
+                              <span className="text-xs text-gray-500 dark:text-gray-400">
+                                {rev.created_at
+                                  ? new Date(rev.created_at).toLocaleDateString('en-GB', {
+                                      day: '2-digit',
+                                      month: 'short',
+                                      year: 'numeric'
+                                    })
+                                  : '-'}
+                              </span>
+                            </td>
+                            <td className="py-3 px-4 text-center">
+                           <button
+  onClick={() => {
+    setShowQuotationModal(false);
+    // Open in new tab
+    window.open(`/lead/view/${selectedQuotationClient.master_id}/${rev.revision}`, '_blank');
+  }}
+  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-blue-500 hover:bg-blue-600 text-white text-xs font-medium transition-all shadow-sm hover:shadow-md"
+>
+  <FontAwesomeIcon icon={faEye} className="text-[10px]" />
+  View Quotation
+</button>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div className="text-center py-12">
+            <FontAwesomeIcon icon={faFileInvoiceDollar} className="text-5xl text-gray-300 dark:text-gray-600 mb-4" />
+            <p className="text-gray-500 dark:text-gray-400 font-medium">
+              No quotations found for this client
+            </p>
+            <p className="text-sm text-gray-400 dark:text-gray-500 mt-1">
+              Quotations will appear here once created
+            </p>
+          </div>
+        )}
+      </div>
+
+  
+    </div>
+  </div>
+)}
+
     </div>
   );
 };

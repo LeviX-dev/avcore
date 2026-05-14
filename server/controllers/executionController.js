@@ -1675,7 +1675,7 @@ export const getProcessesByLead1 = async (req, res) => {
 };
 
 
-export const getProcessesByLead = async (req, res) => {
+export const getProcessesByLead2 = async (req, res) => {
   try {
     const { leadId } = req.params;
 
@@ -1782,6 +1782,129 @@ export const getProcessesByLead = async (req, res) => {
   }
 };
 
+
+export const getProcessesByLead = async (req, res) => {
+  try {
+    const { leadId } = req.params;
+
+    /* =========================
+       GET ORDERED TYPE NAMES FIRST
+    ========================= */
+    const [orderedTypes] = await db.query(`
+      SELECT type_name 
+      FROM execution_type 
+      ORDER BY created_at ASC
+    `);
+    
+    const typeNameOrder = orderedTypes.map(t => t.type_name);
+    
+    /* =========================
+       FIND EXECUTION ID
+    ========================= */
+    const [execution] = await db.query(
+      `
+      SELECT es.execution_id
+      FROM execution_start es
+      WHERE FIND_IN_SET(?, es.lead_ids)
+      LIMIT 1
+      `,
+      [leadId]
+    );
+
+    if (execution.length === 0) {
+      return res.json({
+        success: true,
+        data: [],
+      });
+    }
+
+    const execution_id = execution[0].execution_id;
+
+    /* =========================
+       GET PROCESSES + ASSIGNED USERS (ID TABLE)
+    ========================= */
+    let query = `
+      SELECT 
+        epm.process_id,
+        pe.process_name,
+        pe.description,
+
+        MAX(epl.start_date) AS start_date,
+        MAX(epl.end_date) AS end_date,
+        MAX(epl.status) AS status,
+        MAX(epl.remark) AS remark,
+
+        GROUP_CONCAT(DISTINCT u.user_id) AS assigned_user_ids,
+        GROUP_CONCAT(DISTINCT u.name) AS assigned_user_names
+
+      FROM execution_process_map epm
+
+      JOIN process_execution pe
+        ON pe.process_id = epm.process_id
+
+      LEFT JOIN execution_process_logs epl
+        ON epl.process_id = epm.process_id
+        AND epl.lead_id = ?
+
+      LEFT JOIN execution_process_user_map epum
+        ON epum.process_id = epm.process_id
+        AND epum.lead_id = ?
+
+      LEFT JOIN users u
+        ON u.user_id = epum.user_id
+
+      WHERE epm.execution_id = ?
+
+      GROUP BY 
+        epm.process_id,
+        pe.process_name,
+        pe.description
+    `;
+    
+    // Add dynamic ORDER BY if we have type names
+    if (typeNameOrder.length > 0) {
+      const fieldParams = typeNameOrder.map(name => `'${name}'`).join(', ');
+      query += ` ORDER BY FIELD(pe.process_name, ${fieldParams})`;
+    } else {
+      query += ` ORDER BY pe.process_name ASC`;
+    }
+    
+    const [rows] = await db.query(query, [leadId, leadId, execution_id]);
+
+    /* =========================
+       FORMAT USERS ARRAY
+    ========================= */
+    const formattedRows = rows.map(row => ({
+      process_id: row.process_id,
+      process_name: row.process_name,
+      description: row.description,
+      start_date: row.start_date,
+      end_date: row.end_date,
+      status: row.status,
+      remark: row.remark,
+
+      assigned_user_ids: row.assigned_user_ids
+        ? row.assigned_user_ids.split(",").map(id => Number(id))
+        : [],
+
+      assigned_user_names: row.assigned_user_names
+        ? row.assigned_user_names.split(",")
+        : []
+    }));
+
+    res.json({
+      success: true,
+      data: formattedRows,
+    });
+
+  } catch (err) {
+    console.error("Error fetching processes:", err);
+    res.status(500).json({
+      success: false,
+      error: err.message,
+    });
+  }
+};
 
 
 

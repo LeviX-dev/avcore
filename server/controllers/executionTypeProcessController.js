@@ -69,7 +69,7 @@ export const getExecutionTypes1 = async (req, res) => {
 };
 
 
-export const getExecutionTypes = async (req, res) => {
+export const getExecutionTypes2 = async (req, res) => {
   try {
 
     const [rows] = await db.query(`
@@ -86,6 +86,32 @@ export const getExecutionTypes = async (req, res) => {
       ORDER BY 
         (et.type_id = 1) DESC,
         et.created_at DESC
+    `);
+
+    res.json(rows);
+
+  } catch (error) {
+    console.error("Get Execution Types Error:", error);
+    res.status(500).json({ error: "Server error" });
+  }
+};
+
+export const getExecutionTypes = async (req, res) => {
+  try {
+
+    const [rows] = await db.query(`
+      SELECT 
+        et.*,
+        u.name AS created_by_name,
+        COUNT(ptm.process_id) AS process_count
+      FROM execution_type et
+      LEFT JOIN users u 
+        ON u.user_id = et.created_by
+      LEFT JOIN process_type_mapping ptm 
+        ON ptm.type_id = et.type_id
+      GROUP BY et.type_id
+      ORDER BY 
+        et.created_at ASC
     `);
 
     res.json(rows);
@@ -251,7 +277,7 @@ export const getProcessesByType1 = async (req, res) => {
 };
 
 
-export const getProcessesByType = async (req, res) => {
+export const getProcessesByType2 = async (req, res) => {
   try {
 
     const { typeId } = req.params;
@@ -278,6 +304,35 @@ export const getProcessesByType = async (req, res) => {
     res.status(500).json({ error: "Server error" });
   }
 };
+
+
+export const getProcessesByType = async (req, res) => {
+  try {
+
+    const { typeId } = req.params;
+
+    const [rows] = await db.query(`
+      SELECT 
+        pe.*,
+        u.name AS created_by_name
+      FROM process_execution pe
+      JOIN process_type_mapping ptm 
+        ON ptm.process_id = pe.process_id
+      LEFT JOIN users u 
+        ON u.user_id = pe.created_by
+      WHERE ptm.type_id = ?
+      ORDER BY 
+        pe.created_at ASC
+    `, [typeId]);
+
+    res.json(rows);
+
+  } catch (error) {
+    console.error("Get Processes By Type Error:", error);
+    res.status(500).json({ error: "Server error" });
+  }
+};
+
 
 /**
  ✅ Update Process Details

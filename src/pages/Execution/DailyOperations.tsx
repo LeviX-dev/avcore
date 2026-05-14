@@ -1310,6 +1310,8 @@
 
 // export default ManagerReport;
 
+
+
 import React, { useState, useEffect, useRef } from "react";
 import axios from "axios";
 import { BASE_URL } from "../../../public/config.js";
@@ -1344,7 +1346,13 @@ interface Document {
   schedule_id?: number;
   start_date?: string | null;
   start_time?: string | null;
-  end_time?: string | null;
+  end_time?: string | null; 
+
+    process_status?: string | null;  // This is the process execution status
+  process_remark?: string | null;   // Process remark
+  execution_id?: number;         
+
+
 } 
 
 interface UserInfo {
@@ -2087,6 +2095,386 @@ const UpdateImageModal = ({
 };
 
 
+
+// Add this component before the ManagerReport component
+const ManagerProcessStatusUpdateModal = ({ 
+  document, 
+  onClose, 
+  onUpdate 
+}: { 
+  document: Document | null;
+  onClose: () => void;
+  onUpdate: () => void;
+}) => {
+  const [status, setStatus] = useState(document?.manager_status || 'pending');
+  const [remark, setRemark] = useState(document?.manager_remark || '');
+  const [loading, setLoading] = useState(false);
+
+  const handleSubmit = async () => {
+    if (!document) return;
+    
+    try {
+      setLoading(true);
+      
+      await axios.put(
+        `${BASE_URL}api/daily-execution/document/${document.document_id || document.id}/status`,
+        {
+          manager_status: status,
+          manager_remark: remark
+        },
+        { withCredentials: true }
+      );
+
+      alert("Process status updated successfully ✅");
+      onUpdate();
+      onClose();
+    } catch (err) {
+      console.error("Error updating status:", err);
+      alert("Failed to update status");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  if (!document) return null;
+
+  const getStatusColor = (statusValue: string) => {
+    const colors = {
+      'approved': 'bg-green-100 text-green-700',
+      'pending': 'bg-yellow-100 text-yellow-700',
+      'rejected': 'bg-red-100 text-red-700',
+      'needs_revision': 'bg-orange-100 text-orange-700'
+    };
+    return colors[statusValue as keyof typeof colors] || 'bg-gray-100 text-gray-700';
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-[10004] p-4">
+      <div className="bg-white dark:bg-boxdark w-full max-w-md rounded-lg shadow-lg">
+        <div className="flex justify-between items-center border-b px-4 py-3">
+          <h3 className="font-medium text-gray-800 dark:text-white text-sm">
+            Update Manager Status
+          </h3>
+          <button
+            onClick={onClose}
+            className="text-xl hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg px-2 py-1"
+          >
+            ×
+          </button>
+        </div>
+
+        <div className="p-4 space-y-4">
+          <div>
+            <p className="text-xs text-gray-600 dark:text-gray-400 mb-2">
+              Client: <span className="font-semibold text-gray-900 dark:text-white">{document.client_name}</span>
+            </p>
+            <p className="text-xs text-gray-600 dark:text-gray-400 mb-3">
+              Process: <span className="font-semibold text-gray-900 dark:text-white">{document.process_name}</span>
+            </p>
+          </div>
+
+          <div>
+            <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+              Status
+            </label>
+            <select
+              value={status}
+              onChange={(e) => setStatus(e.target.value)}
+              className="w-full p-2 text-xs border border-gray-300 dark:border-gray-700 rounded focus:ring-1 focus:ring-indigo-500 dark:bg-gray-800 dark:text-white"
+            >
+              <option value="pending">Pending</option>
+              <option value="approved">Approved</option>
+              <option value="rejected">Rejected</option>
+              <option value="needs_revision">Needs Revision</option>
+            </select>
+            <div className="mt-2 flex items-center gap-2">
+              <span className="text-[10px] text-gray-500">Preview:</span>
+              <span className={`px-2 py-0.5 rounded-full text-[10px] font-semibold ${getStatusColor(status)}`}>
+                {status.replace('_', ' ')}
+              </span>
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+              Manager Remark
+            </label>
+            <textarea
+              value={remark}
+              onChange={(e) => setRemark(e.target.value)}
+              rows={3}
+              className="w-full p-2 text-xs border border-gray-300 dark:border-gray-700 rounded focus:ring-1 focus:ring-indigo-500 dark:bg-gray-800 dark:text-white"
+              placeholder="Enter your feedback..."
+            />
+          </div>
+        </div>
+
+        <div className="flex justify-end gap-2 border-t px-4 py-3">
+          <button
+            onClick={onClose}
+            className="px-3 py-1 text-xs border border-gray-300 rounded text-gray-700 hover:bg-gray-50"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={handleSubmit}
+            disabled={loading}
+            className="px-3 py-1 text-xs bg-amber-600 text-white rounded hover:bg-amber-700 disabled:bg-gray-400 flex items-center gap-1"
+          >
+            {loading ? (
+              <>
+                <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-white"></div>
+                <span>Updating...</span>
+              </>
+            ) : (
+              <>
+                <FaEdit className="h-3 w-3" />
+                <span>Update Status</span>
+              </>
+            )}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+
+// Process Status Details Modal - Shows process status and allows updates
+const ProcessStatusModal = ({ 
+  document, 
+  onClose, 
+  onUpdate 
+}: { 
+  document: Document | null;
+  onClose: () => void;
+  onUpdate: () => void;
+}) => {
+  const [status, setStatus] = useState(document?.process_status || 'pending');
+  const [remark, setRemark] = useState(document?.process_remark || '');
+  const [loading, setLoading] = useState(false);
+  const [processDetails, setProcessDetails] = useState<any>(null);
+  const [documents, setDocuments] = useState<any[]>([]);
+
+  useEffect(() => {
+    if (document?.execution_id && document?.process_id) {
+      fetchProcessDetails();
+      fetchDocuments();
+    }
+  }, [document]);
+
+  const fetchProcessDetails = async () => {
+    if (!document?.execution_id) return;
+    try {
+      const response = await axios.get(
+        `${BASE_URL}api/execution/process/${document.execution_id}`,
+        { withCredentials: true }
+      );
+      if (response.data?.success) {
+        setProcessDetails(response.data.data);
+        setStatus(response.data.data?.status || 'pending');
+        setRemark(response.data.data?.remark || '');
+      }
+    } catch (err) {
+      console.error("Error fetching process details:", err);
+    }
+  };
+
+  const fetchDocuments = async () => {
+    if (!document?.execution_id || !document?.process_id) return;
+    try {
+      const res = await axios.get(
+        `${BASE_URL}api/daily-execution/upload/${document.execution_id}/${document.process_id}`,
+        { withCredentials: true }
+      );
+      if (res.data?.success) {
+        setDocuments(res.data.data || []);
+      }
+    } catch (err) {
+      console.error("Error fetching documents:", err);
+    }
+  };
+
+  const handleUpdateProcessStatus = async () => {
+    if (!document) return;
+    
+    try {
+      setLoading(true);
+      
+      await axios.post(
+        `${BASE_URL}api/execution/save-process`,
+        {
+          lead_id: document.lead_id,
+          process_id: document.process_id,
+          process_name: document.process_name,
+          start_date: processDetails?.start_date || null,
+          end_date: processDetails?.end_date || null,
+          status: status,
+          assigned_user_ids: processDetails?.assigned_to || [],
+          remark: remark,
+        },
+        { withCredentials: true }
+      );
+
+      alert("Process status updated successfully ✅");
+      onUpdate();
+      onClose();
+    } catch (err) {
+      console.error("Error updating process status:", err);
+      alert("Failed to update process status");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  if (!document) return null;
+
+  const getStatusColor = (statusValue: string) => {
+    const colors = {
+      'completed': 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300',
+      'in_progress': 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300',
+      'hold_by_client': 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-300',
+      'hold_by_avcore': 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300',
+      'pending': 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-300'
+    };
+    return colors[statusValue as keyof typeof colors] || 'bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300';
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black/60 flex items-start justify-center z-[10005] pt-20 p-4">
+      <div className="bg-white dark:bg-boxdark w-full max-w-2xl rounded-lg shadow-lg max-h-[90vh] overflow-y-auto">
+        {/* Header */}
+        <div className="flex justify-between items-center border-b px-4 py-3 sticky top-0 bg-white dark:bg-boxdark z-10">
+          <div>
+            <h3 className="font-medium text-gray-800 dark:text-white text-sm">
+              Process Status Details
+            </h3>
+            <p className="text-xs text-gray-500">
+              {document.process_name} - {document.client_name}
+            </p>
+          </div>
+          <button
+            onClick={onClose}
+            className="text-xl hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg px-2 py-1"
+          >
+            ×
+          </button>
+        </div>
+
+        {/* Body */}
+        <div className="p-4 space-y-4">
+          {/* Current Process Status */}
+          <div className="bg-gray-50 dark:bg-gray-800/50 p-3 rounded-lg">
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-xs font-medium text-gray-600 dark:text-gray-400">Current Process Status:</span>
+              <span className={`px-2 py-1 rounded-full text-xs font-semibold ${getStatusColor(processDetails?.status || 'pending')}`}>
+                {(processDetails?.status || 'pending')?.replace(/_/g, ' ')}
+              </span>
+            </div>
+            {processDetails?.remark && (
+              <div className="text-xs text-gray-600 dark:text-gray-400 mt-1">
+                <span className="font-medium">Remark:</span> {processDetails.remark}
+              </div>
+            )}
+          </div>
+
+          {/* Update Process Status Form */}
+          <div>
+            <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+              Update Process Status
+            </label>
+            <select
+              value={status}
+              onChange={(e) => setStatus(e.target.value)}
+              className="w-full p-2 text-xs border border-gray-300 dark:border-gray-700 rounded focus:ring-1 focus:ring-indigo-500 dark:bg-gray-800 dark:text-white"
+            >
+              <option value="pending">Pending</option>
+              <option value="in_progress">In Progress</option>
+              <option value="hold_by_client">Hold by Client</option>
+              <option value="hold_by_avcore">Hold by Avcore</option>
+              <option value="completed">Completed</option>
+            </select>
+          </div>
+
+          <div>
+            <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+              Process Remark
+            </label>
+            <textarea
+              value={remark}
+              onChange={(e) => setRemark(e.target.value)}
+              rows={3}
+              className="w-full p-2 text-xs border border-gray-300 dark:border-gray-700 rounded focus:ring-1 focus:ring-indigo-500 dark:bg-gray-800 dark:text-white"
+              placeholder="Enter process remark..."
+            />
+          </div>
+
+          {/* Uploaded Documents Section */}
+          {documents.length > 0 && (
+            <div>
+              <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-2">
+                Uploaded Documents ({documents.length})
+              </label>
+              <div className="space-y-2 max-h-60 overflow-y-auto">
+                {documents.map((doc) => (
+                  <div key={doc.id} className="border border-gray-200 dark:border-gray-700 rounded-lg p-2">
+                    <div className="flex items-center gap-2">
+                      {doc.file_path.match(/\.(jpg|jpeg|png|gif|webp)$/i) ? (
+                        <img
+                          src={`${BASE_URL}uploads/${doc.file_path}`}
+                          alt="document"
+                          className="h-10 w-10 object-cover rounded"
+                        />
+                      ) : (
+                        <FaFileAlt className="h-6 w-6 text-gray-400" />
+                      )}
+                      <div className="flex-1 min-w-0">
+                        <p className="text-xs text-gray-600 dark:text-gray-400 truncate">
+                          {doc.file_path.split('/').pop()}
+                        </p>
+                        {doc.remark && (
+                          <p className="text-[10px] text-gray-500 mt-0.5">Remark: {doc.remark}</p>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Footer */}
+        <div className="flex justify-end gap-2 border-t px-4 py-3 sticky bottom-0 bg-white dark:bg-boxdark">
+          <button
+            onClick={onClose}
+            className="px-3 py-1 text-xs border border-gray-300 rounded text-gray-700 hover:bg-gray-50 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-800"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={handleUpdateProcessStatus}
+            disabled={loading}
+            className="px-3 py-1 text-xs bg-indigo-600 text-white rounded hover:bg-indigo-700 disabled:bg-gray-400 disabled:cursor-not-allowed flex items-center gap-1"
+          >
+            {loading ? (
+              <>
+                <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-white"></div>
+                <span>Updating...</span>
+              </>
+            ) : (
+              <>
+                <FaEdit className="h-3 w-3" />
+                <span>Update Process Status</span>
+              </>
+            )}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 const ManagerReport = () => {
   const [documents, setDocuments] = useState<Document[]>([]);
   const [filteredDocuments, setFilteredDocuments] = useState<Document[]>([]);
@@ -2112,6 +2500,16 @@ const ManagerReport = () => {
   // Refs
   const employeeDropdownRef = useRef<HTMLDivElement>(null);
 
+
+  // Add this with other state declarations
+const [updatingProcessStatus, setUpdatingProcessStatus] = useState<Document | null>(null);
+
+
+// Add this with other state declarations
+const [viewingProcessStatus, setViewingProcessStatus] = useState<Document | null>(null);
+
+
+
   // Format date and time helper functions
   const formatDate = (dateString: string) => {
     if (!dateString) return '-';
@@ -2132,39 +2530,94 @@ const ManagerReport = () => {
     return `${hour12}:${minutes} ${ampm}`;
   };
 
-  // Fetch manager documents
-  const fetchManagerDocuments = async () => {
-    try {
-      setLoading(true);
-      const response = await axios.get(
-        `${BASE_URL}api/daily-execution/manager-processes`,
-        {
-          params: {
-            page: currentPage,
-            limit: itemsPerPage,
-          },
-          withCredentials: true,
-        }
-      );
-
-      if (response.data.success) {
-        const data = response.data.data;
-        setDocuments(data);
-        setFilteredDocuments(data);
-        setTotalDocuments(response.data.pagination?.total || data.length);
-        
-        // Set user info from response
-        if (response.data.user) {
-          setUserInfo(response.data.user);
-          console.log("User info from API:", response.data.user);
-        }
-      }
-    } catch (error) {
-      console.error('Error fetching manager documents:', error);
-    } finally {
-      setLoading(false);
-    }
+  const getProcessStatusColor = (status: string) => {
+  const colors = {
+    'completed': 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300',
+    'in_progress': 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300',
+    'hold_by_client': 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-300',
+    'hold_by_avcore': 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300',
+    'pending': 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-300'
   };
+  return colors[status as keyof typeof colors] || 'bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300';
+};
+
+
+const fetchManagerDocuments = async () => {
+  try {
+    setLoading(true);
+    
+    // Fetch documents (uploads)
+    const documentsResponse = await axios.get(
+      `${BASE_URL}api/daily-execution/manager-processes`,
+      {
+        params: {
+          page: currentPage,
+          limit: itemsPerPage,
+        },
+        withCredentials: true,
+      }
+    );
+
+    // Fetch process statuses from my-processes endpoint
+    const processStatusResponse = await axios.get(
+      `${BASE_URL}api/daily-execution/my-processes`,
+      {
+        params: {
+          page: 1,
+          limit: 1000, // Get all processes to build the map
+        },
+        withCredentials: true,
+      }
+    );
+
+    if (documentsResponse.data.success) {
+      let data = documentsResponse.data.data;
+      
+      // Build a map of process status by lead_id and process_id
+      const processStatusMap = new Map();
+      if (processStatusResponse.data?.success) {
+        const processes = processStatusResponse.data.data;
+        processes.forEach((process: any) => {
+          const key = `${process.lead_id}-${process.process_id}`;
+          processStatusMap.set(key, {
+            process_status: process.status || 'pending',
+            process_remark: process.remark || null,
+            execution_id: process.execution_id || null,
+            start_date: process.start_date,
+            end_date: process.end_date
+          });
+        });
+      }
+      
+      // Merge process status into documents
+      const enrichedData = data.map((doc: Document) => {
+        const key = `${doc.lead_id}-${doc.process_id}`;
+        const processInfo = processStatusMap.get(key);
+        return {
+          ...doc,
+          process_status: processInfo?.process_status || 'pending',
+          process_remark: processInfo?.process_remark || null,
+          execution_id: processInfo?.execution_id || null,
+          process_start_date: processInfo?.start_date || null,
+          process_end_date: processInfo?.end_date || null
+        };
+      });
+      
+      setDocuments(enrichedData);
+      setFilteredDocuments(enrichedData);
+      setTotalDocuments(documentsResponse.data.pagination?.total || enrichedData.length);
+      
+      if (documentsResponse.data.user) {
+        setUserInfo(documentsResponse.data.user);
+      }
+    }
+  } catch (error) {
+    console.error('Error fetching manager documents:', error);
+  } finally {
+    setLoading(false);
+  }
+};
+
 
   // Handle delete document
   const handleDeleteDocument = async () => {
@@ -2270,7 +2723,10 @@ const ManagerReport = () => {
   const showingEnd = Math.min(currentPage * itemsPerPage, totalDocuments);
 
   // Check if user is admin
-  const isAdmin = userInfo?.role === 'admin';
+const isAdminOrProjectManager = userInfo?.role === 'admin' || userInfo?.role === 'project_manager';
+
+const isAdmin = userInfo?.role === 'admin';
+
 
   // Get unique employees for filter (only for admin)
   const uniqueEmployees = isAdmin 
@@ -2287,10 +2743,10 @@ const ManagerReport = () => {
               {/* User Info Badge */}
               {userInfo && (
                 <>
-                  <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-gradient-to-r from-purple-100 to-indigo-200 dark:from-purple-900/30 dark:to-indigo-800/30 text-purple-800 dark:text-purple-300 border border-purple-200 dark:border-purple-700/30">
-                    <FaClock className="w-3 h-3 mr-1" />
-                    {totalDocuments} {isAdmin ? 'Total Documents' : 'Total Documents'}
-                  </span>
+                <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-gradient-to-r from-purple-100 to-indigo-200 dark:from-purple-900/30 dark:to-indigo-800/30 text-purple-800 dark:text-purple-300 border border-purple-200 dark:border-purple-700/30">
+  <FaClock className="w-3 h-3 mr-1" />
+  {totalDocuments} {(isAdmin || userInfo?.role === 'project_manager') ? 'Total Documents' : 'Your Documents'}
+</span>
                   
                  
                 </>
@@ -2298,47 +2754,47 @@ const ManagerReport = () => {
             </div>
 
             <div className="flex flex-col sm:flex-row gap-3 w-full sm:w-auto">
-              {/* Employee Dropdown Filter - Only for Admin */}
-              {isAdmin && (
-                <div className="w-full sm:w-48 relative" ref={employeeDropdownRef}>
-                  <button
-                    onClick={() => setShowEmployeeDropdown(!showEmployeeDropdown)}
-                    className="w-full flex items-center justify-between px-3 py-1.5 text-xs border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 hover:bg-gray-50 dark:hover:bg-gray-700"
-                  >
-                    <span className="flex items-center gap-2">
-                      <FaUser className="h-3 w-3 text-gray-400" />
-                      <span className="truncate">{selectedEmployee || 'All Employees'}</span>
-                    </span>
-                    <FaChevronDown className={`h-3 w-3 transition-transform ${showEmployeeDropdown ? 'rotate-180' : ''}`} />
-                  </button>
+             {/* Employee Dropdown Filter - Only for Admin or Project Manager */}
+{(isAdmin || userInfo?.role === 'project_manager') && (
+  <div className="w-full sm:w-48 relative" ref={employeeDropdownRef}>
+    <button
+      onClick={() => setShowEmployeeDropdown(!showEmployeeDropdown)}
+      className="w-full flex items-center justify-between px-3 py-1.5 text-xs border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 hover:bg-gray-50 dark:hover:bg-gray-700"
+    >
+      <span className="flex items-center gap-2">
+        <FaUser className="h-3 w-3 text-gray-400" />
+        <span className="truncate">{selectedEmployee || 'All Employees'}</span>
+      </span>
+      <FaChevronDown className={`h-3 w-3 transition-transform ${showEmployeeDropdown ? 'rotate-180' : ''}`} />
+    </button>
 
-                  {showEmployeeDropdown && (
-                    <div className="absolute z-10 mt-1 w-full bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-700 rounded-lg shadow-lg max-h-60 overflow-y-auto text-xs">
-                      <div
-                        onClick={() => {
-                          setSelectedEmployee('');
-                          setShowEmployeeDropdown(false);
-                        }}
-                        className="px-3 py-2 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 cursor-pointer"
-                      >
-                        All Employees
-                      </div>
-                      {uniqueEmployees.map((empName) => (
-                        <div
-                          key={empName}
-                          onClick={() => {
-                            setSelectedEmployee(empName);
-                            setShowEmployeeDropdown(false);
-                          }}
-                          className="px-3 py-2 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 cursor-pointer"
-                        >
-                          {empName}
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              )}
+    {showEmployeeDropdown && (
+      <div className="absolute z-10 mt-1 w-full bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-700 rounded-lg shadow-lg max-h-60 overflow-y-auto text-xs">
+        <div
+          onClick={() => {
+            setSelectedEmployee('');
+            setShowEmployeeDropdown(false);
+          }}
+          className="px-3 py-2 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 cursor-pointer"
+        >
+          All Employees
+        </div>
+        {uniqueEmployees.map((empName) => (
+          <div
+            key={empName}
+            onClick={() => {
+              setSelectedEmployee(empName);
+              setShowEmployeeDropdown(false);
+            }}
+            className="px-3 py-2 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 cursor-pointer"
+          >
+            {empName}
+          </div>
+        ))}
+      </div>
+    )}
+  </div>
+)}
 
               {/* Search Input */}
               <div className="w-full sm:w-64">
@@ -2444,14 +2900,22 @@ const ManagerReport = () => {
                     </span>
                   </th>
 
-                  {/* Action Column - Only for Admin */}
-                  {isAdmin && (
-                    <th className="py-2 px-3 text-center whitespace-nowrap">
-                      <span className="text-[10px] font-extrabold uppercase tracking-wider text-gray-700 dark:text-gray-300">
-                        Actions
-                      </span>
-                    </th>
-                  )}
+                  <th className="py-2 px-3 text-center whitespace-nowrap">
+  <span className="text-[10px] font-extrabold uppercase tracking-wider text-gray-700 dark:text-gray-300">
+    Process Status
+  </span>
+</th>
+
+
+
+                  {/* Action Column - Only for Admin or Project Manager */}
+{(isAdmin || userInfo?.role === 'project_manager') && (
+  <th className="py-2 px-3 text-center whitespace-nowrap">
+    <span className="text-[10px] font-extrabold uppercase tracking-wider text-gray-700 dark:text-gray-300">
+      Actions
+    </span>
+  </th>
+)}
                 </tr>
               </thead>
 
@@ -2572,40 +3036,59 @@ const ManagerReport = () => {
                         </div>
                       </td>
 
+{/* Process Status */}
+<td className="py-2 px-3 text-center">
+  <div className="flex items-center justify-center gap-2">
+    <span className={`px-2 py-0.5 rounded-full text-[9px] font-semibold ${getProcessStatusColor(document.process_status || 'pending')}`}>
+      {(document.process_status || 'pending')?.replace(/_/g, ' ')}
+    </span>
+    {(isAdmin || userInfo?.role === 'project_manager') && (
+      <button
+        onClick={() => setViewingProcessStatus(document)}
+        className="p-1 bg-indigo-50 hover:bg-indigo-100 text-indigo-600 rounded transition-all"
+        title="View/Update Process Status"
+      >
+        <FaEdit className="h-3 w-3" />
+      </button>
+    )}
+  </div>
+</td>
 
-                      {/* Action Buttons - Only for Admin */}
-                      {isAdmin && (
-                        <td className="py-2 px-3">
-                          <div className="flex items-center justify-center gap-1.5">
-                            {/* Upload Document Button - enabled only when manager_status is pending */}
-                            <button
-                              onClick={() => setUpdatingDocument(document)}
-                              disabled={document.manager_status !== 'pending' && document.manager_status !== null || (document.manager_status !== null && document.manager_status !== 'pending')}
-                              className={`p-1.5 rounded-lg transition-all duration-200 ${
-                                !document.manager_status || document.manager_status === 'pending'
-                                  ? 'bg-blue-50 hover:bg-blue-100 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400 dark:hover:bg-blue-900/50 cursor-pointer'
-                                  : 'bg-gray-100 text-gray-400 dark:bg-gray-800 dark:text-gray-600 cursor-not-allowed opacity-50'
-                              }`}
-                              title={
-                                !document.manager_status || document.manager_status === 'pending'
-                                  ? 'Upload Document'
-                                  : `Upload disabled (Status: ${document.manager_status})`
-                              }
-                            >
-                              <FaFileUpload className="h-3.5 w-3.5" />
-                            </button>
 
-                            {/* Edit Status Button */}
-                            <button
-                              onClick={() => setEditingDocument(document)}
-                              className="p-1.5 bg-amber-50 hover:bg-amber-100 text-amber-600 rounded-lg transition-all duration-200 dark:bg-amber-900/30 dark:text-amber-400 dark:hover:bg-amber-900/50"
-                              title="Update Status & Remark"
-                            >
-                              <FaEdit className="h-3.5 w-3.5" />
-                            </button>                         
-                          </div>
-                        </td>
-                      )}
+
+                     {/* Action Buttons - Only for Admin or Project Manager */}
+{(isAdmin || userInfo?.role === 'project_manager') && (
+  <td className="py-2 px-3">
+    <div className="flex items-center justify-center gap-1.5">
+      {/* Update Process Status Button */}
+      <button
+        onClick={() => setUpdatingProcessStatus(document)}
+        className="p-1.5 bg-amber-50 hover:bg-amber-100 text-amber-600 rounded-lg transition-all duration-200 dark:bg-amber-900/30 dark:text-amber-400 dark:hover:bg-amber-900/50"
+        title="Update Manager Status & Remark"
+      >
+        <FaEdit className="h-3.5 w-3.5" />
+      </button>
+
+      {/* Upload Document Button - enabled only when manager_status is pending */}
+      <button
+        onClick={() => setUpdatingDocument(document)}
+        disabled={document.manager_status !== 'pending' && document.manager_status !== null || (document.manager_status !== null && document.manager_status !== 'pending')}
+        className={`p-1.5 rounded-lg transition-all duration-200 ${
+          !document.manager_status || document.manager_status === 'pending'
+            ? 'bg-blue-50 hover:bg-blue-100 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400 dark:hover:bg-blue-900/50 cursor-pointer'
+            : 'bg-gray-100 text-gray-400 dark:bg-gray-800 dark:text-gray-600 cursor-not-allowed opacity-50'
+        }`}
+        title={
+          !document.manager_status || document.manager_status === 'pending'
+            ? 'Upload Document'
+            : `Upload disabled (Status: ${document.manager_status})`
+        }
+      >
+        <FaFileUpload className="h-3.5 w-3.5" />
+      </button>
+    </div>
+  </td>
+)}
                     </tr>
                   ))
                 )}
@@ -2628,31 +3111,51 @@ const ManagerReport = () => {
         </>
       )}
 
-      {/* Modals - Only accessible by admin */}
-      {isAdmin && editingDocument && (
-        <ManagerStatusEditModal
-          document={editingDocument}
-          onClose={() => setEditingDocument(null)}
-          onUpdate={fetchManagerDocuments}
-        />
-      )}
+     {/* Modals - Accessible by admin or project manager */}
+{(isAdmin || userInfo?.role === 'project_manager') && editingDocument && (
+  <ManagerStatusEditModal
+    document={editingDocument}
+    onClose={() => setEditingDocument(null)}
+    onUpdate={fetchManagerDocuments}
+  />
+)}
 
-      {isAdmin && deletingDocument && (
-        <DeleteConfirmationModal
-          document={deletingDocument}
-          onClose={() => setDeletingDocument(null)}
-          onConfirm={handleDeleteDocument}
-          isDeleting={isDeleting}
-        />
-      )}
+{(isAdmin || userInfo?.role === 'project_manager') && deletingDocument && (
+  <DeleteConfirmationModal
+    document={deletingDocument}
+    onClose={() => setDeletingDocument(null)}
+    onConfirm={handleDeleteDocument}
+    isDeleting={isDeleting}
+  />
+)}
 
-      {isAdmin && updatingDocument && (
-        <UpdateImageModal
-          document={updatingDocument}
-          onClose={() => setUpdatingDocument(null)}
-          onUpdate={fetchManagerDocuments}
-        />
-      )}
+{(isAdmin || userInfo?.role === 'project_manager') && updatingDocument && (
+  <UpdateImageModal
+    document={updatingDocument}
+    onClose={() => setUpdatingDocument(null)}
+    onUpdate={fetchManagerDocuments}
+  />
+)}
+
+{(isAdmin || userInfo?.role === 'project_manager') && updatingProcessStatus && (
+  <ManagerProcessStatusUpdateModal
+    document={updatingProcessStatus}
+    onClose={() => setUpdatingProcessStatus(null)}
+    onUpdate={fetchManagerDocuments}
+  />
+)} 
+
+{/* Process Status Modal */}
+{viewingProcessStatus && (
+  <ProcessStatusModal
+    document={viewingProcessStatus}
+    onClose={() => setViewingProcessStatus(null)}
+    onUpdate={fetchManagerDocuments}
+  />
+)}
+
+
+
     </div>
   );
 };

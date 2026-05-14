@@ -4566,7 +4566,7 @@ export const addBulkReassignment = async (req, res) => {
 
 
 
-export const deleteClient = async (req, res) => {
+export const deleteClient1 = async (req, res) => {
   const { ids } = req.body; // array of master_id
 
   if (!Array.isArray(ids) || ids.length === 0) {
@@ -4633,10 +4633,101 @@ export const deleteClient = async (req, res) => {
   } finally {
     connection.release();
   }
+}; 
+
+export const deleteClient = async (req, res) => {
+  const { master_id } = req.params;  // Get from URL params, not body
+
+  if (!master_id) {
+    return res.status(400).json({ message: 'No client ID provided' });
+  }
+
+  const connection = await db.getConnection();
+
+  try {
+    await connection.beginTransaction();
+
+    // 1️⃣ Get assign_id
+    const [[lead]] = await connection.query(
+      'SELECT assign_id FROM raw_data WHERE master_id = ?',
+      [master_id]
+    );
+
+    if (!lead) {
+      await connection.rollback();
+      return res.status(404).json({ message: 'Record not found' });
+    }
+
+    const assign_id = lead.assign_id;
+
+    // 2️⃣ Delete from child tables first (including quotation related tables if needed)
+    await connection.query(
+      'DELETE FROM raw_data_other_inputs WHERE master_id = ?',
+      [master_id]
+    );
+
+    await connection.query(
+      'DELETE FROM reassignment WHERE master_id = ?',
+      [master_id]
+    );
+
+    // ⚠️ IMPORTANT: Check if there are quotation records linked to this master_id
+    // If quotation has raw_data foreign key, you need to handle that too
+    const [quotationRows] = await connection.query(
+      'SELECT qt_id FROM quotation WHERE master_id = ?',
+      [master_id]
+    );
+    
+    for (const quotation of quotationRows) {
+      // Delete quotation_revision first (child of quotation)
+      await connection.query(
+        'DELETE FROM quotation_revision WHERE qt_id = ?',
+        [quotation.qt_id]
+      );
+      // Then delete quotation
+      await connection.query(
+        'DELETE FROM quotation WHERE qt_id = ?',
+        [quotation.qt_id]
+      );
+    }
+
+    // 3️⃣ Delete main lead
+    await connection.query(
+      'DELETE FROM raw_data WHERE master_id = ?',
+      [master_id]
+    );
+
+    // 4️⃣ Delete assignment ONLY if unused
+    if (assign_id) {
+      const [[count]] = await connection.query(
+        'SELECT COUNT(*) AS total FROM raw_data WHERE assign_id = ?',
+        [assign_id]
+      );
+
+      if (count.total === 0) {
+        await connection.query(
+          'DELETE FROM assignments WHERE assign_id = ?',
+          [assign_id]
+        );
+      }
+    }
+
+    await connection.commit();
+    res.json({ message: 'Lead deleted successfully' });
+
+  } catch (err) {
+    await connection.rollback();
+    console.error(err);
+    res.status(500).json({ message: 'Error deleting lead', error: err.message });
+  } finally {
+    connection.release();
+  }
 };
 
 
-export const deleteMultipleClients = async (req, res) => {
+
+
+export const deleteMultipleClients1 = async (req, res) => {
   const { ids } = req.body; // array of master_id
 
   if (!Array.isArray(ids) || ids.length === 0) {
@@ -4706,6 +4797,108 @@ export const deleteMultipleClients = async (req, res) => {
   }
 };
 
+
+export const deleteMultipleClients = async (req, res) => {
+  const { ids, master_ids } = req.body;
+  
+  // Accept both formats
+  const deleteIds = master_ids || ids;
+
+  if (!Array.isArray(deleteIds) || deleteIds.length === 0) {
+    return res.status(400).json({ message: 'No client IDs provided' });
+  }
+
+  const connection = await db.getConnection();
+
+  try {
+    await connection.beginTransaction();
+
+    // 1. Get all assign_ids
+    const [rows] = await connection.query(
+      `SELECT DISTINCT assign_id 
+       FROM raw_data 
+       WHERE master_id IN (${deleteIds.map(() => '?').join(',')})
+       AND assign_id IS NOT NULL`,
+      deleteIds
+    );
+
+    const assignIds = rows.map(r => r.assign_id);
+
+    // 2. Delete quotation and quotation_revision records for all master_ids
+    for (const master_id of deleteIds) {
+      // Get all quotations for this master_id
+      const [quotations] = await connection.query(
+        'SELECT qt_id FROM quotation WHERE master_id = ?',
+        [master_id]
+      );
+      
+      for (const quotation of quotations) {
+        // Delete quotation_revision first (child)
+        await connection.query(
+          'DELETE FROM quotation_revision WHERE qt_id = ?',
+          [quotation.qt_id]
+        );
+        // Delete quotation
+        await connection.query(
+          'DELETE FROM quotation WHERE qt_id = ?',
+          [quotation.qt_id]
+        );
+      }
+    }
+
+    // 3. Delete child table records
+    await connection.query(
+      `DELETE FROM raw_data_other_inputs 
+       WHERE master_id IN (${deleteIds.map(() => '?').join(',')})`,
+      deleteIds
+    );
+
+    await connection.query(
+      `DELETE FROM reassignment 
+       WHERE master_id IN (${deleteIds.map(() => '?').join(',')})`,
+      deleteIds
+    );
+
+    // 4. Delete main raw data
+    await connection.query(
+      `DELETE FROM raw_data 
+       WHERE master_id IN (${deleteIds.map(() => '?').join(',')})`,
+      deleteIds
+    );
+
+    // 5. Cleanup assignments
+    for (const assign_id of assignIds) {
+      const [[count]] = await connection.query(
+        'SELECT COUNT(*) AS total FROM raw_data WHERE assign_id = ?',
+        [assign_id]
+      );
+
+      if (count.total === 0) {
+        await connection.query(
+          'DELETE FROM assignments WHERE assign_id = ?',
+          [assign_id]
+        );
+      }
+    }
+
+    await connection.commit();
+    res.json({ 
+      success: true,
+      message: `${deleteIds.length} selected leads deleted successfully` 
+    });
+
+  } catch (err) {
+    await connection.rollback();
+    console.error(err);
+    res.status(500).json({ 
+      success: false,
+      message: 'Error deleting selected leads',
+      error: err.message 
+    });
+  } finally {
+    connection.release();
+  }
+};
 
 
 
@@ -10354,73 +10547,72 @@ export const getQuotationPendingLeads = async (req, res) => {
 
   try {
     /* ================= MAIN LEADS ================= */
-    const [rows] = await connection.query(`
-      SELECT 
-        rd.master_id,
-        rd.name,
-        rd.number,
-        rd.email,
-        rd.address,
-        rd.city,
-        rd.status,
-        rd.lead_status,
-        rd.lead_stage,
-        rd.current_stage,
-        rd.created_by_user,
-        rd.assign_id,
-        rd.followup_date,
-        rd.cat_id,
-        rd.reference_id,
-        rd.area_id,
-        rd.room_length,
-        rd.room_width,
-        rd.room_height,
-        rd.location_link,
-        rd.p_type,
-        rd.budget_range,
-        rd.time_to_complete,
-        rd.site_visit_date,
-        rd.demo_date,
-        rd.lead_activity,
-        rd.ar_number,
-        rd.ca_number,
-        rd.e_number,
-        rd.sm_number,
-        rd.pop_number,
-        rd.other_number,
-        rd.quick_remark,
-        rd.detailed_remark,
+  const [rows] = await connection.query(`
+  SELECT 
+    rd.master_id,
+    rd.name,
+    rd.number,
+    rd.email,
+    rd.address,
+    rd.city,
+    rd.status,
+    rd.lead_status,
+    rd.lead_stage,
+    rd.current_stage,
+    rd.created_by_user,
+    rd.assign_id,
+    rd.followup_date,
+    rd.cat_id,
+    rd.reference_id,
+    rd.area_id,
+    rd.room_length,
+    rd.room_width,
+    rd.room_height,
+    rd.location_link,
+    rd.p_type,
+    rd.budget_range,
+    rd.time_to_complete,
+    rd.site_visit_date,
+    rd.demo_date,
+    rd.lead_activity,
+    rd.ar_number,
+    rd.ca_number,
+    rd.e_number,
+    rd.sm_number,
+    rd.pop_number,
+    rd.other_number,
+    rd.quick_remark,
+    rd.detailed_remark,
 
-        a.area_name,
-        c.cat_name,
-        r.reference_name,
+    a.area_name,
+    c.cat_name,
+    r.reference_name,
 
-        asg.assign_date,
-        asg.target_date,
-        asg.mode,
-        asg.remark AS assignment_remark,
-        asg.assigned_to,
-        asg.assigned_to_user_id,
-        asg.assign_type,
+    asg.assign_date,
+    asg.target_date,
+    asg.mode,
+    asg.remark AS assignment_remark,
+    asg.assigned_to,
+    asg.assigned_to_user_id,
+    asg.assign_type,
 
-        CASE WHEN q.qt_id IS NOT NULL THEN 1 ELSE 0 END AS created_flag,
-        q.created_at AS quotation_created_date
+    CASE WHEN q.qt_id IS NOT NULL THEN 1 ELSE 0 END AS created_flag,
+    q.created_at AS quotation_created_date
 
-      FROM raw_data rd
-      LEFT JOIN area a ON rd.area_id = a.area_id
-      LEFT JOIN category c ON rd.cat_id = c.cat_id
-      LEFT JOIN reference r ON rd.reference_id = r.reference_id
-      LEFT JOIN assignments asg ON rd.assign_id = asg.assign_id
-      LEFT JOIN quotation q ON rd.master_id = q.master_id
+  FROM raw_data rd
+  LEFT JOIN area a ON rd.area_id = a.area_id
+  LEFT JOIN category c ON rd.cat_id = c.cat_id
+  LEFT JOIN reference r ON rd.reference_id = r.reference_id
+  LEFT JOIN assignments asg ON rd.assign_id = asg.assign_id
+  LEFT JOIN quotation q ON rd.master_id = q.master_id
 
-      WHERE rd.lead_stage IN ('Quotation Pending', 'Quotation Created')
-
-      ORDER BY 
-        q.created_at DESC,
-        CASE WHEN q.qt_id IS NOT NULL THEN 1 ELSE 0 END DESC,
-        rd.master_id DESC
-    `);
-
+  WHERE rd.lead_stage IN ('Quotation Pending', 'Quotation Created', 'Execution', 'Pre Execution', 'Quotation Follow-up')
+  
+  ORDER BY 
+    q.created_at DESC,
+    CASE WHEN q.qt_id IS NOT NULL THEN 1 ELSE 0 END DESC,
+    rd.master_id DESC
+`);
     /* ================= REASSIGNMENTS ================= */
     const masterIds = rows.map((r) => r.master_id);
     let reassignmentRows = [];

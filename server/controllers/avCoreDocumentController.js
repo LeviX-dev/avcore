@@ -1,3 +1,4 @@
+// controllers/avCoreDocumentController.js
 import db from '../database/db.js';
 import path from 'path';
 import fs from 'fs';
@@ -8,18 +9,42 @@ const __dirname = path.dirname(__filename);
 
 // Ensure upload directories exist
 const ensureDirectories = () => {
-  const uploadDir = path.join('uploads', 'av_core');
+  const uploadDir = path.join(process.cwd(), 'uploads', 'av_core');
   if (!fs.existsSync(uploadDir)) {
     fs.mkdirSync(uploadDir, { recursive: true });
   }
   return uploadDir;
 };
 
-// Get all AV Core documents with better error handling
+// Get all AV Core documents with pagination and status filter
 export const getAVCoreDocuments = async (req, res) => {
   try {
-    console.log('Fetching AV Core documents...');
+    console.log('=== getAVCoreDocuments called ===');
+    console.log('Query params:', req.query);
+    console.log('URL:', req.originalUrl);
     
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 10;
+    const offset = (page - 1) * limit;
+    const status = req.query.status || 'all';
+
+    let statusCondition = '';
+    let queryParams = [];
+
+    if (status !== 'all') {
+      statusCondition = 'WHERE acd.status = ?';
+      queryParams.push(status);
+    }
+
+    // Get total count
+    const [countResult] = await db.query(
+      `SELECT COUNT(*) as total FROM av_core_documents acd ${statusCondition}`,
+      queryParams
+    );
+    const total = countResult[0].total;
+    const totalPages = Math.ceil(total / limit);
+
+    // Get paginated data
     const [documents] = await db.query(`
       SELECT 
         acd.id,
@@ -30,12 +55,15 @@ export const getAVCoreDocuments = async (req, res) => {
         acd.remark,
         acd.uploaded_by,
         acd.created_at,
+        acd.status,
         u.name as uploaded_by_name,
         u.role as uploaded_by_role
       FROM av_core_documents acd
       LEFT JOIN users u ON acd.uploaded_by = u.user_id
+      ${statusCondition}
       ORDER BY acd.created_at DESC
-    `);
+      LIMIT ? OFFSET ?
+    `, [...queryParams, limit, offset]);
 
     console.log(`Found ${documents.length} documents`);
 
@@ -44,11 +72,9 @@ export const getAVCoreDocuments = async (req, res) => {
     
     // Process file paths to full URLs
     const processedDocs = documents.map(doc => {
-      // Normalize file path
       let filePath = doc.file_path || '';
       filePath = filePath.replace(/\\/g, '/');
       
-      // Ensure path starts correctly
       if (!filePath.startsWith('uploads/') && !filePath.startsWith('/uploads/')) {
         filePath = `uploads/${filePath}`;
       }
@@ -59,14 +85,21 @@ export const getAVCoreDocuments = async (req, res) => {
         ...doc,
         file_url: fullUrl,
         preview_url: doc.file_type === 'image' ? fullUrl : null,
-        file_size: doc.file_size || 0
+        file_size: doc.file_size || 0,
+        status: doc.status || 'active',
+        remark: doc.remark || null
       };
     });
 
     res.json({
       success: true,
       documents: processedDocs,
-      total: processedDocs.length
+      pagination: {
+        currentPage: page,
+        totalPages: totalPages,
+        totalItems: total,
+        itemsPerPage: limit
+      }
     });
     
   } catch (error) {
@@ -79,14 +112,16 @@ export const getAVCoreDocuments = async (req, res) => {
   }
 };
 
-// Upload AV Core document
+// Upload AV Core document with status
 export const uploadAVCoreDocument = async (req, res) => {
   try {
-    console.log('Upload request received');
-    const { remark } = req.body;
+    console.log('=== uploadAVCoreDocument called ===');
+    const { remark, status } = req.body;
     const userId = req.session?.user?.id;
 
     console.log('User ID from session:', userId);
+    console.log('Request body:', req.body);
+    console.log('Files:', req.files);
 
     if (!userId) {
       return res.status(401).json({
@@ -120,13 +155,14 @@ export const uploadAVCoreDocument = async (req, res) => {
     await file.mv(savePath);
     
     const dbPath = `uploads/av_core/${safeName}`;
+    const documentStatus = status || 'active';
     
     // Insert into database
     const [result] = await db.query(
       `INSERT INTO av_core_documents 
-       (file_name, file_path, file_type, file_size, remark, uploaded_by) 
-       VALUES (?, ?, ?, ?, ?, ?)`,
-      [originalName, dbPath, fileType, file.size, remark || null, userId]
+       (file_name, file_path, file_type, file_size, remark, uploaded_by, status) 
+       VALUES (?, ?, ?, ?, ?, ?, ?)`,
+      [originalName, dbPath, fileType, file.size, remark || null, userId, documentStatus]
     );
 
     console.log('Document inserted with ID:', result.insertId);
@@ -142,6 +178,7 @@ export const uploadAVCoreDocument = async (req, res) => {
         acd.remark,
         acd.uploaded_by,
         acd.created_at,
+        acd.status,
         u.name as uploaded_by_name,
         u.role as uploaded_by_role
       FROM av_core_documents acd
@@ -162,7 +199,8 @@ export const uploadAVCoreDocument = async (req, res) => {
       document: {
         ...newDoc[0],
         file_url: fullUrl,
-        preview_url: fileType === 'image' ? fullUrl : null
+        preview_url: fileType === 'image' ? fullUrl : null,
+        status: documentStatus
       }
     });
 
@@ -176,9 +214,43 @@ export const uploadAVCoreDocument = async (req, res) => {
   }
 };
 
+// Update document status
+export const updateDocumentStatus = async (req, res) => {
+  try {
+    console.log('=== updateDocumentStatus called ===');
+    const { id } = req.params;
+    const { status } = req.body;
+    const userId = req.session?.user?.id;
+
+    if (!userId) {
+      return res.status(401).json({
+        success: false,
+        message: 'User not authenticated'
+      });
+    }
+
+    await db.query(
+      'UPDATE av_core_documents SET status = ? WHERE id = ?',
+      [status, id]
+    );
+
+    res.json({
+      success: true,
+      message: 'Status updated successfully'
+    });
+  } catch (error) {
+    console.error('Status update error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to update status'
+    });
+  }
+};
+
 // Delete AV Core document
 export const deleteAVCoreDocument = async (req, res) => {
   try {
+    console.log('=== deleteAVCoreDocument called ===');
     const { id } = req.params;
     const userId = req.session?.user?.id;
 

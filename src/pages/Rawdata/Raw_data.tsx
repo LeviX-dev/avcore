@@ -378,6 +378,7 @@ const RawData = () => {
     cat_id: number;
     reference_name: string;
     assign_id?: string | number;
+    
   };
 
   interface Category {
@@ -3324,82 +3325,79 @@ if (areaName && areaName !== '' && areaName !== 'Not Available') {
     }
   };
 
-  const handleSingleDelete = async (master_id) => {
-    if (window.confirm('Are you sure you want to delete this entry?')) {
-      try {
-        const res = await axios.post(
-          `${BASE_URL}api/master-data/delete-multiple`,
-          {
-            ids: [master_id],
+// Single delete - use DELETE method
+const handleSingleDelete = async (master_id) => {
+  if (window.confirm('Are you sure you want to delete this entry?')) {
+    try {
+      const res = await axios.delete(
+        `${BASE_URL}api/master-data/${master_id}`,
+        {
+          withCredentials: true,
+          headers: {
+            'Content-Type': 'application/json',
           },
-          {
-            withCredentials: true,
-            headers: {
-              'Content-Type': 'application/json',
-            },
-          },
-        );
-
-        alert(res.data.message || 'Entry deleted successfully');
-        setSelectedClients((prev) => prev.filter((id) => id !== master_id));
-        setSelectedMasterIds((prev) => prev.filter((id) => id !== master_id));
-        refreshDataWithPagePreservation();
-      } catch (error) {
-        console.error('Delete error details:', error);
-        alert(
-          error.response?.data?.message ||
-            'Failed to delete entry. Please try again.',
-        );
-      }
-    }
-  };
-
-
- const handleBulkDelete = async () => {
-    if (selectedMasterIds.length === 0) {
-      alert('Please select entries to delete');
-      return;
-    }
-
-    if (
-      window.confirm(
-        `Are you sure you want to delete ${selectedMasterIds.length} selected entries?`,
-      )
-    ) {
-      try {
-        const res = await axios.post(
-          `${BASE_URL}api/master-data/delete-multiple`,
-          {
-            master_ids: selectedMasterIds,
-            ids: selectedMasterIds,
-          },
-          {
-            withCredentials: true,
-            headers: { 'Content-Type': 'application/json' },
-          },
-        );
-
-        if (res.data.success) {
-          alert(
-            res.data.message ||
-              `${selectedMasterIds.length} entries deleted successfully.`,
-          );
-        } else {
-          alert(res.data.message || 'Failed to delete selected entries.');
         }
+      );
 
-        setSelectedClients([]);
-        setSelectedMasterIds([]);
-        refreshDataWithPagePreservation();
-      } catch (error) {
-        console.error('Bulk delete error:', error);
-        alert(
-          error.response?.data?.message ||
-            'Failed to delete selected entries. Please try again.',
-        );
-      }
+      alert(res.data.message || 'Entry deleted successfully');
+      setSelectedClients((prev) => prev.filter((id) => id !== master_id));
+      setSelectedMasterIds((prev) => prev.filter((id) => id !== master_id));
+      refreshDataWithPagePreservation();
+    } catch (error) {
+      console.error('Delete error details:', error);
+      alert(
+        error.response?.data?.message ||
+          'Failed to delete entry. Please try again.',
+      );
     }
-  };
+  }
+};
+
+// Bulk delete - keep as POST
+const handleBulkDelete = async () => {
+  if (selectedMasterIds.length === 0) {
+    alert('Please select entries to delete');
+    return;
+  }
+
+  if (
+    window.confirm(
+      `Are you sure you want to delete ${selectedMasterIds.length} selected entries?`,
+    )
+  ) {
+    try {
+      const res = await axios.post(
+        `${BASE_URL}api/master-data/delete-multiple`,
+        {
+          master_ids: selectedMasterIds,
+        },
+        {
+          withCredentials: true,
+          headers: { 'Content-Type': 'application/json' },
+        },
+      );
+
+      if (res.data.success) {
+        alert(
+          res.data.message ||
+            `${selectedMasterIds.length} entries deleted successfully.`,
+        );
+      } else {
+        alert(res.data.message || 'Failed to delete selected entries.');
+      }
+
+      setSelectedClients([]);
+      setSelectedMasterIds([]);
+      refreshDataWithPagePreservation();
+    } catch (error) {
+      console.error('Bulk delete error:', error);
+      alert(
+        error.response?.data?.message ||
+          'Failed to delete selected entries. Please try again.',
+      );
+    }
+  }
+};
 
 
 

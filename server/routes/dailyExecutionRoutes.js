@@ -5,6 +5,7 @@ import {
   getExecutionDocuments,
   updateDocumentManagerStatus , getManagerDocumentDashboard , getDocumentDetails ,
   getManagerProcesses ,deleteExecutionDocument ,updateExecutionDocument , 
+  getManagerProcessesByMasterId , 
 } from "../controllers/dailyExecutionController.js";
 import uploadMiddleware from '../middleware/upload.js';
 
@@ -38,6 +39,10 @@ router.get("/dashboard", getManagerDocumentDashboard);
 
 // GET: Single document details
 router.get("/document/:document_id", getDocumentDetails);
+
+// in ezxcution eye on click showes this routes 
+router.get("/manager-processes/:masterId", getManagerProcessesByMasterId);
+
 
 router.get("/manager-processes", getManagerProcesses);
 

@@ -6,7 +6,7 @@ import fs from "fs";
    GET DAILY EXECUTION PROCESSES (ONLY ASSIGNED USER)
 ===================================================== */
 
-export const getDailyExecutionProcesses = async (req, res) => {
+export const getDailyExecutionProcesses1 = async (req, res) => {
   try {
     const user = req.session.user;
 
@@ -68,7 +68,82 @@ export const getDailyExecutionProcesses = async (req, res) => {
       message: "Server error",
     });
   }
+}; 
+
+export const getDailyExecutionProcesses = async (req, res) => {
+  try {
+    const user = req.session.user;
+
+    if (!user) {
+      return res.status(401).json({
+        success: false,
+        message: "Unauthorized",
+      });
+    }
+
+    const userId = user.id;
+
+    // ✅ Admin + Project Manager can see all processes
+    const canSeeAll =
+      user.role === "admin" ||
+      user.role === "project_manager";
+
+    let query = `
+      SELECT 
+        epum.lead_id,
+        rd.name AS lead_name,
+
+        epum.process_id,
+        pe.process_name,
+        pe.description,
+
+        epl.id AS execution_id,
+
+        epl.start_date,
+        epl.end_date,
+        epl.status,
+        epl.remark,
+        epl.assigned_to
+
+      FROM execution_process_user_map epum
+
+      JOIN process_execution pe
+        ON pe.process_id = epum.process_id
+
+      LEFT JOIN execution_process_logs epl
+        ON epl.process_id = epum.process_id
+       AND epl.lead_id = epum.lead_id
+
+      LEFT JOIN raw_data rd
+        ON rd.master_id = epum.lead_id
+    `;
+
+    let queryParams = [];
+
+    // ✅ Only normal users see their own processes
+    if (!canSeeAll) {
+      query += ` WHERE epum.user_id = ?`;
+      queryParams.push(userId);
+    }
+
+    query += ` ORDER BY epum.lead_id ASC, pe.process_name ASC`;
+
+    const [rows] = await db.query(query, queryParams);
+
+    res.json({
+      success: true,
+      data: rows,
+    });
+
+  } catch (error) {
+    console.error("DailyExecution error:", error);
+    res.status(500).json({
+      success: false,
+      message: "Server error",
+    });
+  }
 };
+
 
 export const uploadExecutionDocuments1 = async (req, res) => {
   try {
@@ -319,7 +394,7 @@ export const getExecutionDocuments = async (req, res) => {
 };
 
 
-export const updateDocumentManagerStatus = async (req, res) => {
+export const updateDocumentManagerStatus1 = async (req, res) => {
   try {
     const { document_id } = req.params;
     const { manager_status, manager_remark } = req.body;
@@ -330,6 +405,46 @@ export const updateDocumentManagerStatus = async (req, res) => {
       return res.status(403).json({
         success: false,
         message: "Unauthorized - Admin access required"
+      });
+    }
+
+    await db.query(
+      `UPDATE execution_documents 
+       SET manager_status = ?, manager_remark = ?
+       WHERE id = ?`,
+      [manager_status, manager_remark, document_id]
+    );
+
+    res.json({
+      success: true,
+      message: "Document status updated successfully"
+    });
+
+  } catch (err) {
+    console.error("UPDATE DOCUMENT STATUS ERROR:", err);
+    res.status(500).json({
+      success: false,
+      message: "Failed to update document status"
+    });
+  }
+};
+
+
+export const updateDocumentManagerStatus = async (req, res) => {
+  try {
+    const { document_id } = req.params;
+    const { manager_status, manager_remark } = req.body;
+    const user = req.session.user;
+
+    // ✅ Allow admin + manager + project_manager
+    if (
+      user.role !== 'admin' &&
+      user.role !== 'project_manager' &&
+      user.role !== 'manager'
+    ) {
+      return res.status(403).json({
+        success: false,
+        message: "Unauthorized - Access denied"
       });
     }
 
@@ -761,6 +876,96 @@ export const getDocumentDetails = async (req, res) => {
   }
 };
 
+export const getManagerProcessesByMasterId = async (req, res) => {
+  try {
+    const user = req.session.user;
+    const { masterId } = req.params;
+
+    if (!user) {
+      return res.status(401).json({
+        success: false,
+        message: "Unauthorized",
+      });
+    }
+
+    let query = `
+      SELECT 
+        ed.lead_id,
+        ed.process_id,
+        ed.id AS document_id,
+        ed.file_path,
+        ed.file_type,
+        ed.remark,
+        ed.manager_status,
+        ed.manager_remark,
+        ed.uploaded_by,
+        u.name AS uploaded_by_name,
+        u.role AS uploaded_by_role,
+        ed.created_at AS document_created_at,
+        ed.start_date,
+        ed.start_time,
+        ed.end_time,
+        pe.process_name,
+        pe.description,
+        rd.name AS client_name,
+        rd.city,
+        rd.master_id,
+        rd.address,
+        rd.number AS mobile,  -- Changed from rd.mobile to rd.number and aliased as mobile
+        rd.email
+      FROM execution_documents ed
+      LEFT JOIN process_execution pe ON pe.process_id = ed.process_id
+      LEFT JOIN raw_data rd ON rd.master_id = ed.lead_id
+      LEFT JOIN users u ON u.user_id = ed.uploaded_by
+      WHERE ed.lead_id = ?
+    `;
+
+    let queryParams = [masterId];
+
+    // Role-based filter
+    if (user.role !== 'admin' && user.role !== 'project_manager') {
+      query += ` AND ed.uploaded_by = ?`;
+      queryParams.push(user.id);
+    }
+
+    query += ` ORDER BY ed.created_at DESC`;
+
+    const [rows] = await db.query(query, queryParams);
+
+    // Get unique process names for this lead
+    const processNames = [...new Set(rows.map(row => row.process_name))];
+
+    // Get client info from first row (has all client details)
+    const clientInfo = rows.length > 0 ? {
+      master_id: rows[0].master_id,
+      client_name: rows[0].client_name,
+      city: rows[0].city,
+      address: rows[0].address,
+      mobile: rows[0].mobile,  // This will now work since we aliased number as mobile
+      email: rows[0].email
+    } : null;
+
+    res.json({
+      success: true,
+      data: rows,
+      clientInfo: clientInfo,
+      processNames: processNames,
+      totalDocuments: rows.length,
+      user: {
+        id: user.id,
+        name: user.username,
+        role: user.role,
+      },
+    });
+
+  } catch (error) {
+    console.error("getManagerProcessesByMasterId error:", error);
+    res.status(500).json({
+      success: false,
+      message: "Server error",
+    });
+  }
+};
 
 export const getManagerProcesses1 = async (req, res) => {
   try {
@@ -1094,10 +1299,10 @@ export const getManagerProcesses = async (req, res) => {
     let queryParams = [];
 
     // Role-based filter
-    if (user.role !== 'admin') {
-      query += ` WHERE ed.uploaded_by = ?`;
-      queryParams.push(user.id);
-    }
+if (user.role !== 'admin' && user.role !== 'project_manager') {
+  query += ` WHERE ed.uploaded_by = ?`;
+  queryParams.push(user.id);
+}
 
     query += ` ORDER BY ed.created_at DESC`;
 

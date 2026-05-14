@@ -135,13 +135,13 @@ const ActionButton = ({
       </button>
 
       {/* LOGS BUTTON */}
-      <button
+      {/* <button
         onClick={onLogs}
         className="p-1.5 bg-indigo-500 hover:bg-indigo-600 text-white rounded-lg transition-all duration-200 shadow-sm hover:shadow-md"
         title="View Document History"
       >
         <FontAwesomeIcon icon={faHistory} className="h-3.5 w-3.5" />
-      </button>
+      </button> */}
     </div>
   );
 };
@@ -550,7 +550,11 @@ const [endTime, setEndTime] = useState('');
   };
 
   // Check if user is admin or manager (based on your role values)
-  const canManageProcess = userRole === 'admin' || userRole === 'manager';
+const canManageProcess =
+  userRole === 'admin' ||
+  userRole === 'manager' ||
+  userRole === 'project_manager'; 
+
 
   // For debugging
   useEffect(() => {
@@ -683,8 +687,8 @@ const [endTime, setEndTime] = useState('');
                               )}
                               
                               {/* Admin Only Edit Button */}
-                              {userRole === 'admin' && (
-                                <button
+{canManageProcess && (
+                                  <button
                                   onClick={() => {
                                     setEditingDocument(doc);
                                     setManagerStatus(doc.manager_status);
@@ -720,13 +724,13 @@ const [endTime, setEndTime] = useState('');
       </div>
 
       {/* Manager Status Edit Modal - Only accessible by admin */}
-      {editingDocument && userRole === 'admin' && (
+{editingDocument && canManageProcess && (
         <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-[10001] p-4">
           <div className="bg-white dark:bg-boxdark w-full max-w-md rounded-lg shadow-lg">
             <div className="flex justify-between items-center border-b px-4 py-3">
-              <h3 className="font-medium text-gray-800 dark:text-white text-sm">
-                Update Document Status (Admin)
-              </h3>
+       <h3 className="font-medium text-gray-800 dark:text-white text-sm">
+  Update Document Status ({userRole})
+</h3>
               <button
                 onClick={() => setEditingDocument(null)}
                 className="text-xl hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg px-2 py-1"

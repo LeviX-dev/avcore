@@ -40,9 +40,14 @@ router.get('/master-data', getAllRawData);
 
 router.post('/master-data/import', upload.single('file'), importRawData);
 router.put('/master-data/:master_id', updateRawData);
-router.post('/master-data/:master_id', deleteClient);
 
+// DELETE single - use DELETE method with URL parameter
+router.delete('/master-data/:master_id', deleteClient);
+
+// DELETE multiple - use POST with body
 router.post('/master-data/delete-multiple', deleteMultipleClients);
+
+
 
 router.post('/sujit-master-data/add-single', addSingleRawData);
 

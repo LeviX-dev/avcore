@@ -384,22 +384,59 @@ if (fs.existsSync(uploadsDir)) {
 // ✅ UPDATED CORS configuration
 const allowedOrigins = ['https://react3.myospaz.in', 'http://localhost:3000', 'http://localhost:5173'];
 
+// app.use(cors({
+//   origin: function(origin, callback) {
+//     // Allow requests with no origin (like mobile apps or curl requests)
+//     if (!origin) return callback(null, true);
+//     if (allowedOrigins.indexOf(origin) === -1) {
+//       const msg = 'The CORS policy for this site does not allow access from the specified Origin.';
+//       return callback(new Error(msg), false);
+//     }
+//     return callback(null, true);
+//   },
+//   credentials: true,
+//   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+//   allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept', 'Origin'],
+// }));
+
+// ✅ Add CORS headers middleware for static files
+
+
+
+
+// new added 
+
 app.use(cors({
   origin: function(origin, callback) {
-    // Allow requests with no origin (like mobile apps or curl requests)
     if (!origin) return callback(null, true);
+
     if (allowedOrigins.indexOf(origin) === -1) {
       const msg = 'The CORS policy for this site does not allow access from the specified Origin.';
       return callback(new Error(msg), false);
     }
+
     return callback(null, true);
   },
+
   credentials: true,
+
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept', 'Origin'],
+
+  allowedHeaders: [
+    'Content-Type',
+    'Authorization',
+    'X-Requested-With',
+    'Accept',
+    'Origin',
+    'Cache-Control',
+    'Pragma',
+    'Expires'
+  ],
 }));
 
-// ✅ Add CORS headers middleware for static files
+app.options('*', cors());
+
+
 app.use('/uploads', (req, res, next) => {
   res.header('Access-Control-Allow-Origin', req.headers.origin || '*');
   res.header('Access-Control-Allow-Credentials', 'true');

@@ -15,7 +15,7 @@ getAdditionalChargesController ,
 updateAdditionalChargeController ,
 deleteAdditionalChargeController ,
 updateAdditionalChargeStatusController ,
-
+getLatestQuotationByMasterId , 
 
 
 } from '../controllers/masterController.js';
@@ -98,6 +98,10 @@ router.get('/quotation/latest/:master_id', getLatestQuotation);
 router.post('/quotation', createQuotation);
 
 // router.get('/quotation/:master_id', getQuotationByMasterId);
+
+router.get('/quotation/latest/:master_id', getLatestQuotationByMasterId);
+
+
 router.get('/quotation/:master_id/:revision', getQuotationByMasterId);
 
 router.get('/revisions/:master_id', getQuotationRevisionsByMasterId);
@@ -105,6 +109,7 @@ router.get('/revisions/:master_id', getQuotationRevisionsByMasterId);
 router.put('/quotation/:qt_id', updateQuotationWithRevision);
 
 router.get('/quotation/:qt_id/revision/:revision', getQuotationForEdit);
+
 
 
 

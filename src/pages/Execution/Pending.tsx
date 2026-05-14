@@ -135,12 +135,22 @@ const ActionButton = ({
   onSettings,
   onLogs,
   onViewQuotation,
+  onViewDocuments,  // ADD THIS LINE - FIXES THE ERROR
   viewCount = 0,
   title = "Actions",
   className = ""
 }) => {
   return (
     <div className={`flex items-center gap-1 ${className}`}>
+
+            {/* SETTINGS */}
+      <button
+        onClick={onSettings}
+        className="p-1.5 bg-gray-500 hover:bg-gray-600 text-white rounded-lg"
+        title="Process Settings"
+      >
+        <FontAwesomeIcon icon={faCog} className="h-3.5 w-3.5" />
+      </button>
       
       {/* EDIT EXECUTION BUTTON - NEW */}
       <button
@@ -151,6 +161,14 @@ const ActionButton = ({
         <FontAwesomeIcon icon={faEdit} className="h-3.5 w-3.5" />
       </button>
       
+<button
+  onClick={onViewDocuments}
+  className="p-1.5 bg-green-500 hover:bg-green-600 text-white rounded-lg"
+  title="View Execution Documents"
+>
+  <FontAwesomeIcon icon={faFileText} className="h-3.5 w-3.5" />
+</button>
+
       {/* VIEW QUOTATION BUTTON */}
       <button
         onClick={onViewQuotation}
@@ -183,23 +201,14 @@ const ActionButton = ({
         <FontAwesomeIcon icon={faList} className="h-3.5 w-3.5" />
       </button>
 
-      {/* SETTINGS */}
-      <button
-        onClick={onSettings}
-        className="p-1.5 bg-gray-500 hover:bg-gray-600 text-white rounded-lg"
-        title="Process Settings"
-      >
-        <FontAwesomeIcon icon={faCog} className="h-3.5 w-3.5" />
-      </button>
-
       {/* LOGS BUTTON */}
-      <button
+      {/* <button
         onClick={onLogs}
         className="p-1.5 bg-indigo-500 hover:bg-indigo-600 text-white rounded-lg"
         title="Execution Logs"
       >
         <FontAwesomeIcon icon={faHistory} className="h-3.5 w-3.5" />
-      </button>
+      </button> */}
     </div>
   );
 };
@@ -356,7 +365,7 @@ const ChecklistEditModal = ({
           <div>
             <h2 className="text-lg font-semibold dark:text-white flex items-center gap-2">
               <FontAwesomeIcon icon={faEdit} className="text-green-500" />
-              Edit Checklist Items
+              Edit Checklist Items 
             </h2>
             <p className="text-sm text-gray-500">
               {lead.name} • #{lead.master_id}
@@ -468,8 +477,6 @@ const ChecklistEditModal = ({
   );
 };
 
-
-
 const QuotationViewModal: React.FC<QuotationViewModalProps> = ({
   show,
   onClose,
@@ -479,32 +486,37 @@ const QuotationViewModal: React.FC<QuotationViewModalProps> = ({
   const [data, setData] = useState<any>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [selectedRevision, setSelectedRevision] = useState<number>(1);
-  const [availableRevisions, setAvailableRevisions] = useState<number[]>([1]);
+  const [currentRevision, setCurrentRevision] = useState<number | null>(null);
 
   useEffect(() => {
     if (show && master_id) {
-      fetchQuotation();
+      fetchLatestQuotation();
     }
-  }, [show, master_id, selectedRevision]);
+  }, [show, master_id]);
 
-  const fetchQuotation = async () => {
+  const fetchLatestQuotation = async () => {
     setLoading(true);
     setError(null);
     try {
-      const response = await axios.get(
-        `${BASE_URL}api/quotation/${master_id}/${selectedRevision}`
-      );
-      console.log('API Response:', response.data); // Debug log
-      setData(response.data);
+      const url = `${BASE_URL}api/quotation/latest/${master_id}`;
+      console.log('Fetching latest quotation from:', url);
       
-      // You might need to fetch available revisions separately
-      // or the API should return them. For now, we'll just use revision 1
-      setAvailableRevisions([selectedRevision]);
+      const response = await axios.get(url, {
+        withCredentials: true
+      });
       
-    } catch (err) {
+      console.log('API Response:', response.data);
+      
+      if (response.data) {
+        setData(response.data);
+        setCurrentRevision(response.data.revision);
+      } else {
+        setError('No quotation data found');
+      }
+      
+    } catch (err: any) {
       console.error('Error fetching quotation:', err);
-      setError('Failed to load quotation data');
+      setError(err.response?.data?.message || 'Failed to load quotation');
     } finally {
       setLoading(false);
     }
@@ -512,187 +524,127 @@ const QuotationViewModal: React.FC<QuotationViewModalProps> = ({
 
   if (!show) return null;
 
-  // FIXED: Access data.quotation directly, not data.quotations[0]
-  const quotationData = data?.quotation || {};
+  // Get quotation data
+  const quotationsArray = data?.quotations || [];
+  const quotationData = quotationsArray[0] || {};
   const leadInfo = data?.lead || lead || {};
+  const items = quotationData.items || [];
 
-  // Calculate totals
-  const isGST = quotationData.type === 'with_gst';
-  
-  // Get revision details
-  const revisionDetails = quotationData.revision_details || {};
-  const totalWithoutGST = Number(revisionDetails.total_without_gst || 0);
-  const totalWithGST = Number(revisionDetails.total_with_gst || 0);
-  
-  // Additional prices
-  const additionalPrices = quotationData.additional_prices || [];
-  let additionalTotal = 0;
-  additionalPrices.forEach((additional: any) => {
-    additionalTotal += Number(additional.price) || 0;
-  });
-
-  // Calculate project total
-  let projectTotal = totalWithGST > 0 ? totalWithGST : totalWithoutGST;
-  projectTotal += additionalTotal;
+  // Group items by option/subject from your data structure
+  // Since your data doesn't have explicit options, we'll treat each kit as an option
+  const options = items.map((kit: any, index: number) => ({
+    option_number: index + 1,
+    option_name: kit.kit_name,
+    items: kit.items || []
+  }));
 
   return (
-    <div className="fixed inset-0 z-[9999] bg-black/60 flex justify-center items-start pt-32 px-3 overflow-y-auto">
-      <div className="bg-white dark:bg-boxdark w-full max-w-3xl rounded-lg shadow-lg border border-gray-200 dark:border-gray-700 text-xs">
-
+    <div className="fixed inset-0 z-[9999] bg-black/60 flex justify-center items-center px-4 overflow-y-auto">
+  <div className="bg-white dark:bg-boxdark w-full max-w-4xl my-8 max-h-[calc(100vh-4rem)] rounded-lg shadow-lg border border-gray-200 dark:border-gray-700 flex flex-col">
+    
         {/* Header */}
-        <div className="flex justify-between items-center px-4 py-2 border-b dark:border-gray-700">
+        <div className="flex justify-between items-center px-6 py-4 border-b dark:border-gray-700 bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-gray-800 dark:to-gray-900 rounded-t-lg">
           <div>
-            <div className="font-semibold">Quotation</div>
-            {leadInfo.name && (
-              <div className="text-xs text-gray-500">
-                {leadInfo.name} • {leadInfo.city || ''} • #{master_id}
+            <div className="font-bold text-xl text-gray-800 dark:text-white">
+              Quotation {quotationData.qt_number || 'N/A'}
+            </div>
+            <div className="text-sm text-gray-600 dark:text-gray-400 mt-1">
+              {leadInfo.name} • {leadInfo.city || ''} • #{master_id}
+            </div>
+            {currentRevision && (
+              <div className="text-xs text-green-600 dark:text-green-400 mt-1">
+                Revision: v{currentRevision}
               </div>
             )}
           </div>
-
-          <div className="flex items-center gap-2">
-            {/* Revision selector - you'll need to modify your API to return available revisions */}
-            {availableRevisions.length > 1 && (
-              <select
-                value={selectedRevision}
-                onChange={(e) => setSelectedRevision(Number(e.target.value))}
-                className="border px-2 py-1 rounded text-xs dark:bg-gray-700"
-              >
-                {availableRevisions.map((rev) => (
-                  <option key={rev} value={rev}>
-                    V{rev}
-                  </option>
-                ))}
-              </select>
-            )}
-
-            <button onClick={onClose} className="text-lg px-2">×</button>
-          </div>
+          <button 
+            onClick={onClose} 
+            className="text-2xl px-3 py-1 hover:bg-gray-200 dark:hover:bg-gray-700 rounded-lg transition-colors"
+          >
+            ×
+          </button>
         </div>
 
         {/* Body */}
-        <div className="p-4 space-y-4">
-
+        <div className="p-6 max-h-[70vh] overflow-y-auto">
           {loading ? (
-            <div className="text-center py-6">Loading...</div>
+            <div className="text-center py-12">
+              <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-blue-500 mx-auto"></div>
+              <p className="mt-3 text-gray-500">Loading quotation...</p>
+            </div>
           ) : error ? (
-            <div className="text-center text-red-500 py-6">{error}</div>
-          ) : !quotationData.qt_number ? (
-            <div className="text-center py-6 text-gray-500">
-              No quotation found for revision {selectedRevision}
+            <div className="text-center py-12">
+              <div className="text-red-500 mb-4 text-lg">{error}</div>
+              <button
+                onClick={() => fetchLatestQuotation()}
+                className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg"
+              >
+                Try Again
+              </button>
+            </div>
+          ) : options.length === 0 ? (
+            <div className="text-center py-12">
+              <p className="text-gray-500 dark:text-gray-400">No options found in this quotation</p>
             </div>
           ) : (
-            <>
-              {/* QT Number */}
-              <div className="flex justify-between items-center border p-2 rounded">
-                <div>
-                  <div className="text-xs text-gray-500">QT No</div>
-                  <div className="font-semibold">{quotationData.qt_number}</div>
-                </div>
-                <div className="text-xs font-medium">
-                  {isGST ? "GST Included" : "GST Extra"}
-                </div>
-              </div>
-
-              {/* Items */}
-              <table className="w-full text-xs border">
-                <thead className="bg-gray-100 dark:bg-gray-800">
-                  <tr>
-                    <th className="px-2 py-1 text-left">Model</th>
-                    <th className="px-2 py-1 text-right">Qty</th>
-                    <th className="px-2 py-1 text-right">Rate</th>
-                    <th className="px-2 py-1 text-right">Amt</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {quotationData.items?.flatMap((kit: any) =>
-                    kit.items?.map((item: any, idx: number) => (
-                      <tr key={idx} className="border-t">
-                        <td className="px-2 py-1">
-                          <div className="font-medium">{item.model}</div>
-                          <div className="text-[10px] text-gray-500">{item.brand_name}</div>
-                        </td>
-                        <td className="px-2 py-1 text-right">{item.qty}</td>
-                        <td className="px-2 py-1 text-right">
-                          ₹{Number(item.price / (parseInt(item.qty) || 1)).toLocaleString('en-IN')}
-                        </td>
-                        <td className="px-2 py-1 text-right font-medium">
-                          ₹{Number(item.price).toLocaleString('en-IN')}
-                        </td>
-                      </tr>
-                    ))
-                  )}
-                </tbody>
-              </table>
-
-              {/* Summary */}
-              <div className="border rounded p-2 space-y-1 text-xs">
-                <div className="flex justify-between">
-                  <span>Subtotal</span>
-                  <span>₹{totalWithoutGST.toLocaleString('en-IN')}</span>
-                </div>
-
-                {additionalPrices.map((add: any, i: number) => (
-                  <div key={i} className="flex justify-between">
-                    <span>{add.add_price_name}</span>
-                    <span>₹{Number(add.price).toLocaleString('en-IN')}</span>
+            <div className="space-y-8">
+              {options.map((option, optIdx) => (
+                <div key={optIdx} className="border rounded-lg overflow-hidden">
+                  {/* Subject/Option Header */}
+                  <div className="bg-gradient-to-r from-gray-100 to-gray-200 dark:from-gray-800 dark:to-gray-700 px-6 py-3 border-b">
+                    <div className="text-center">
+                     
+                      <div className="text-lg font-bold text-gray-800 dark:text-white mt-1">
+                        {option.option_name}
+                      </div>
+                    </div>
                   </div>
-                ))}
 
-                {!isGST && revisionDetails.gst_calculated_amount > 0 && (
-                  <div className="flex justify-between">
-                    <span>GST {revisionDetails.gst_percent || 18}%</span>
-                    <span>₹{Number(revisionDetails.gst_calculated_amount).toLocaleString('en-IN')}</span>
-                  </div>
-                )}
-
-                <div className="flex justify-between font-semibold border-t pt-1 mt-1">
-                  <span>Total</span>
-                  <span>₹{projectTotal.toLocaleString('en-IN')}</span>
-                </div>
-              </div>
-
-              {/* Installments */}
-              {quotationData.installments && quotationData.installments.length > 0 && (
-                <div className="border rounded p-2 text-xs">
-                  <div className="font-medium mb-1">Payment Installments</div>
-                  <table className="w-full">
-                    <thead>
-                      <tr className="border-b">
-                        <th className="text-left py-1">Description</th>
-                        <th className="text-right py-1">Percentage</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {quotationData.installments.map((inst: any, i: number) => (
-                        <tr key={i}>
-                          <td className="py-1">{inst.description || '-'}</td>
-                          <td className="text-right py-1">{inst.percentage}%</td>
+                  {/* Products Table */}
+                  <div className="overflow-x-auto">
+                    <table className="w-full border-collapse">
+                      <thead className="bg-blue-50 dark:bg-blue-900/20">
+                        <tr>
+                          <th className="border px-4 py-2 text-left text-sm font-semibold">#</th>
+                          <th className="border px-4 py-2 text-left text-sm font-semibold">Product</th>
+                          <th className="border px-4 py-2 text-left text-sm font-semibold">Model</th>
+                          <th className="border px-4 py-2 text-center text-sm font-semibold w-20">Qty</th>
                         </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              )}
-
-              {/* Terms */}
-              {quotationData.acoustic_terms && (
-                <div className="border rounded p-2 text-xs">
-                  <div className="font-medium mb-1">Terms</div>
-                  <div className="text-gray-600 dark:text-gray-300 whitespace-pre-line">
-                    {quotationData.acoustic_terms}
+                      </thead>
+                      <tbody>
+                        {option.items.map((item: any, itemIdx: number) => (
+                          <tr key={itemIdx} className="hover:bg-gray-50 dark:hover:bg-gray-800/50">
+                            <td className="border px-4 py-2 text-center text-sm">
+                              {itemIdx + 1}
+                            </td>
+                            <td className="border px-4 py-2 text-sm">
+                              {item.product_type_name || item.cat_name || 'Product'}
+                              {item.brand_name && (
+                                <div className="text-xs text-gray-500 mt-0.5">{item.brand_name}</div>
+                              )}
+                            </td>
+                            <td className="border px-4 py-2 text-sm font-mono">
+                              {item.model || '—'}
+                            </td>
+                            <td className="border px-4 py-2 text-center text-sm">
+                              {item.qty || 0}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
                   </div>
                 </div>
-              )}
-            </>
+              ))}
+            </div>
           )}
         </div>
 
         {/* Footer */}
-        <div className="flex justify-end border-t px-4 py-2">
+        <div className="flex justify-end px-6 py-4 border-t dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50 rounded-b-lg">
           <button
             onClick={onClose}
-            className="px-4 py-1.5 bg-indigo-600 text-white rounded text-sm"
+            className="px-6 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg font-medium transition-colors"
           >
             Close
           </button>
@@ -701,7 +653,6 @@ const QuotationViewModal: React.FC<QuotationViewModalProps> = ({
     </div>
   );
 };
-
 
 // Pagination Component
 const Pagination: React.FC<{
@@ -1923,6 +1874,167 @@ const ExecutionLogsModal = ({
 };
 
 
+// Execution Documents Modal Component
+const ExecutionDocumentsModal = ({ lead, documents, loading, onClose }: { 
+  lead: any; 
+  documents: any[]; 
+  loading: boolean; 
+  onClose: () => void;
+}) => {
+  if (!lead) return null;
+
+  const formatDate = (dateString: string) => {
+    if (!dateString) return '—';
+    try {
+      return new Date(dateString).toLocaleDateString('en-GB', {
+        day: '2-digit',
+        month: '2-digit',
+        year: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit'
+      });
+    } catch {
+      return dateString;
+    }
+  };
+
+  const getStatusColor = (status: string | null) => {
+    if (!status) return 'bg-gray-100 text-gray-700';
+    const colors: Record<string, string> = {
+      'approved': 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300',
+      'pending': 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-300',
+      'rejected': 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300',
+      'needs_revision': 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-300'
+    };
+    return colors[status] || 'bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300';
+  };
+
+  // Get unique process names
+const processNames = Array.from(new Set(documents.map((doc: any) => doc.process_name).filter(Boolean))); 
+
+
+  // Get client info from first document
+  const clientInfo = documents.length > 0 ? {
+    client_name: documents[0].client_name,
+    city: documents[0].city,
+    master_id: lead.master_id
+  } : null;
+
+  const getImageUrl = (filePath: string) => {
+    if (!filePath) return null;
+    return `${BASE_URL}uploads/${filePath}`;
+  };
+
+  return (
+<div className="fixed inset-0 bg-black/60 flex items-center justify-center z-[9999] p-4">
+  <div className="bg-white dark:bg-boxdark w-full max-w-5xl rounded-lg shadow-lg flex flex-col" 
+       style={{ height: '85vh', marginTop: '22' }}>
+
+        {/* Header */}
+        <div className="flex justify-between items-center px-6 py-4 border-b dark:border-gray-700 bg-gradient-to-r from-purple-50 to-indigo-50 dark:from-gray-800 dark:to-gray-900 rounded-t-lg">
+          <div>
+            <h2 className="text-lg font-semibold text-gray-800 dark:text-white flex items-center gap-2">
+              <FontAwesomeIcon icon={faFileText} className="text-purple-500" />
+              Current Projects 
+            </h2>
+            <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
+              {lead.name} • #{lead.master_id}
+            </p>
+          </div>
+          <button 
+            onClick={onClose} 
+            className="text-2xl px-3 py-1 hover:bg-gray-200 dark:hover:bg-gray-700 rounded-lg transition-colors"
+          >
+            ×
+          </button>
+        </div>
+
+        {/* Body */}
+        <div className="flex-1 overflow-y-auto p-6">
+          {loading ? (
+            <div className="flex justify-center items-center h-64">
+              <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-purple-500"></div>
+              <span className="ml-3 text-gray-600 dark:text-gray-400">Loading documents...</span>
+            </div>
+          ) : documents.length === 0 ? (
+            <div className="text-center py-12">
+              <FontAwesomeIcon icon={faFileText} className="h-16 w-16 mx-auto mb-4 text-gray-400 opacity-50" />
+              <p className="text-lg font-medium text-gray-600 dark:text-gray-400">No documents found</p>
+              <p className="text-sm text-gray-500 dark:text-gray-500 mt-1">
+                No execution documents have been uploaded for this client.
+              </p>
+            </div>
+          ) : (
+            <div>
+          
+
+           
+
+              {/* Documents Table */}
+              <div>
+                <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3 flex items-center gap-2">
+                  <FontAwesomeIcon icon={faFileText} className="h-4 w-4 text-green-500" />
+                  Process History({documents.length})
+                </h3>
+                <div className="overflow-x-auto">
+                  <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+                    <thead className="bg-gray-100 dark:bg-gray-800">
+                      <tr>
+                        <th className="px-3 py-2 text-left text-xs font-semibold text-gray-700 dark:text-gray-300">Date</th>
+                        <th className="px-3 py-2 text-left text-xs font-semibold text-gray-700 dark:text-gray-300">Process</th>
+                        <th className="px-3 py-2 text-left text-xs font-semibold text-gray-700 dark:text-gray-300">Remark</th>
+                        <th className="px-3 py-2 text-left text-xs font-semibold text-gray-700 dark:text-gray-300">Manager Status</th>
+                        <th className="px-3 py-2 text-left text-xs font-semibold text-gray-700 dark:text-gray-300">Manager Remark</th>
+                        <th className="px-3 py-2 text-left text-xs font-semibold text-gray-700 dark:text-gray-300">Image</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
+                      {documents.map((doc: any, idx: number) => (
+                        <tr key={idx} className="hover:bg-gray-50 dark:hover:bg-gray-800/50">
+                          <td className="px-3 py-2 text-xs text-gray-600 dark:text-gray-400">
+                            {formatDate(doc.document_created_at)}
+                          </td>
+                          <td className="px-3 py-2 text-xs font-medium text-indigo-600 dark:text-indigo-400">
+                            {doc.process_name || '-'}
+                          </td>
+                          <td className="px-3 py-2 text-xs text-gray-600 dark:text-gray-400 max-w-[150px] truncate" title={doc.remark}>
+                            {doc.remark || '-'}
+                          </td>
+                          <td className="px-3 py-2">
+                            <span className={`px-2 py-0.5 rounded-full text-xs font-semibold ${getStatusColor(doc.manager_status)}`}>
+                              {doc.manager_status || 'pending'}
+                            </span>
+                          </td>
+                          <td className="px-3 py-2 text-xs text-gray-600 dark:text-gray-400 max-w-[150px] truncate" title={doc.manager_remark}>
+                            {doc.manager_remark || '-'}
+                          </td>
+                          <td className="px-3 py-2">
+                            {doc.file_path ? (
+                              <button
+                                onClick={() => window.open(getImageUrl(doc.file_path), '_blank')}
+                                className="px-2 py-1 bg-blue-500 hover:bg-blue-600 text-white text-xs rounded transition-colors"
+                              >
+                                View
+                              </button>
+                            ) : (
+                              <span className="text-xs text-gray-400">No file</span>
+                            )}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+
+      
+      </div>
+    </div>
+  );
+};
 
 
 // Main ExecutionPending Component
@@ -1991,6 +2103,13 @@ const EMPTY_POSTER = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNDAwIiBoZWlnaHQ9
 const EMPTY_IMAGE = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTUwIiBoZWlnaHQ9IjE1MCIgdmlld0JveD0iMCAwIDE1MCAxNTAiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+PHJlY3Qgd2lkdGg9IjE1MCIgaGVpZ2h0PSIxNTAiIGZpbGw9IiNlNWU3ZWIvPjx0ZXh0IHg9Ijc1IiB5PSI3NSIgZm9udC1zaXplPSIxNCIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZmlsbD0iIzY2NiI+SW1hZ2U8L3RleHQ+PC9zdmc+';
 
 
+// Add this with your other state declarations
+const [showExecutionDocumentsModal, setShowExecutionDocumentsModal] = useState(false);
+const [selectedExecutionDocumentsLead, setSelectedExecutionDocumentsLead] = useState(null);
+const [executionDocuments, setExecutionDocuments] = useState([]);
+const [loadingExecutionDocs, setLoadingExecutionDocs] = useState(false);
+
+
 // Document fetching function - exactly like in RawData
 const fetchDocuments = async (master_id: number) => {
   if (!master_id || docsFetched) return;
@@ -2037,6 +2156,40 @@ const fetchDocuments = async (master_id: number) => {
     setLoadingDocs(false);
   }
 };
+
+
+// Fetch execution documents by master_id
+const fetchExecutionDocuments = async (master_id) => {
+  if (!master_id) return;
+  
+  setLoadingExecutionDocs(true);
+  try {
+    const response = await axios.get(
+      `${BASE_URL}api/daily-execution/manager-processes/${master_id}`,
+      { withCredentials: true }
+    );
+    
+    if (response.data.success) {
+      setExecutionDocuments(response.data.data);
+    } else {
+      setExecutionDocuments([]);
+    }
+  } catch (error) {
+    console.error("Error fetching execution documents:", error);
+    setExecutionDocuments([]);
+  } finally {
+    setLoadingExecutionDocs(false);
+  }
+}; 
+
+
+const handleViewExecutionDocuments = async (lead) => {
+  setSelectedExecutionDocumentsLead(lead);
+  await fetchExecutionDocuments(lead.master_id);
+  setShowExecutionDocumentsModal(true);
+};
+
+
 
 // Add state for item counts
 const [itemCounts, setItemCounts] = useState({});
@@ -2899,6 +3052,7 @@ const renderDetailsModal = () => {
     </div>
   );
 };
+
 
 
 
@@ -3799,6 +3953,7 @@ const handleSettingsClick = (lead) => {
     <ActionButton
       onView={() => handleViewChecklist(lead)}
       onEdit={() => handleEditChecklist(lead)}
+        onViewDocuments={() => handleViewExecutionDocuments(lead)}  // ADD THIS LINE
       onEditExecution={() => handleEditExecution(lead)}  // NEW
       onSettings={() => handleSettingsClick(lead)}
       onLogs={() => handleLogsClick(lead)}
@@ -3943,7 +4098,24 @@ const handleSettingsClick = (lead) => {
       <span className="text-sm dark:text-white">Loading checklist...</span>
     </div>
   </div>
+)} 
+
+
+{/* Execution Documents Modal */}
+{showExecutionDocumentsModal && selectedExecutionDocumentsLead && (
+  <ExecutionDocumentsModal
+    lead={selectedExecutionDocumentsLead}
+    documents={executionDocuments}
+    loading={loadingExecutionDocs}
+    onClose={() => {
+      setShowExecutionDocumentsModal(false);
+      setSelectedExecutionDocumentsLead(null);
+      setExecutionDocuments([]);
+    }}
+  />
 )}
+
+
 
     </div>
   );

@@ -41,6 +41,11 @@ const EditQuotation = () => {
   const navigate = useNavigate();
   const revision = location.state?.revision;
 
+  // ── option subject states ──
+  const [optionSubjects, setOptionSubjects] = useState({});
+  const [optionSubjectTypes, setOptionSubjectTypes] = useState({});
+  const [selectedCategoryForOption, setSelectedCategoryForOption] = useState('');
+
   // ── global ──
   const [quoteType, setQuoteType]         = useState('with_gst');
   const [qtNumber, setQtNumber]           = useState('');
@@ -49,6 +54,7 @@ const EditQuotation = () => {
   const [fabricBy, setFabricBy]           = useState('THE CLIENT');
   const [ceilingBy, setCeilingBy]         = useState('THE CLIENT');
   const [isEditLoaded, setIsEditLoaded]   = useState(false);
+  const [selectedOptionsForSummary, setSelectedOptionsForSummary] = useState([]);
 
   // ── options ──
   const [options, setOptions]                 = useState([emptyOption(0)]);
@@ -93,8 +99,7 @@ const EditQuotation = () => {
   const [masterAdditionalCharges, setMasterAdditionalCharges] = useState([]);
   const [selectedMasterCharges, setSelectedMasterCharges]     = useState({});
 
-  const [subject, setSubject] = useState('');
-
+  const [globalSubject, setGlobalSubject] = useState('');
 
   // ── fetch on mount ──
   useEffect(() => {
@@ -111,6 +116,60 @@ const EditQuotation = () => {
     });
   }, [selectedCategory]);
 
+  // Subject handler functions
+  const handleMasterSubjectSelect = (optionIdx, catId) => {
+    if (catId) {
+      const category = categories.find(c => c.cat_id === Number(catId));
+      if (category) {
+        setOptionSubjects(prev => ({ ...prev, [optionIdx]: category.cat_name }));
+        setOptionSubjectTypes(prev => ({ ...prev, [optionIdx]: 'master' }));
+        setSelectedCategoryForOption(catId);
+      }
+    } else {
+      setOptionSubjects(prev => ({ ...prev, [optionIdx]: '' }));
+      setOptionSubjectTypes(prev => ({ ...prev, [optionIdx]: 'master' }));
+      setSelectedCategoryForOption('');
+    }
+  };
+
+  const handleCustomSubjectChange = (optionIdx, value) => {
+    setOptionSubjects(prev => ({ ...prev, [optionIdx]: value }));
+    setOptionSubjectTypes(prev => ({ ...prev, [optionIdx]: 'custom' }));
+    if (value !== '') {
+      setSelectedCategoryForOption('');
+    }
+  };
+
+  const toggleOptionForSummary = (optionIndex) => {
+    setSelectedOptionsForSummary(prev => {
+      if (prev.includes(optionIndex)) {
+        return prev.filter(idx => idx !== optionIndex);
+      } else {
+        return [...prev, optionIndex];
+      }
+    });
+  };
+
+  const selectAllOptionsForSummary = () => {
+    setSelectedOptionsForSummary(options.map((_, idx) => idx));
+  };
+
+  const deselectAllOptionsForSummary = () => {
+    setSelectedOptionsForSummary([]);
+  };
+
+  // pre-select master charges when both loaded
+  useEffect(() => {
+    if (!isEditLoaded || masterAdditionalCharges.length === 0) return;
+    const preSelected = {};
+    options.forEach((opt, idx) => {
+      preSelected[`${idx}`] = masterAdditionalCharges.filter(charge =>
+        opt.additional_prices.some(ap => ap.add_price_name === charge.charge_name)
+      );
+    });
+    setSelectedMasterCharges(preSelected);
+  }, [isEditLoaded, masterAdditionalCharges]);
+  
   useEffect(() => {
     if (!selectedKit) { setSelectedKitData(null); return; }
     const kit = kits.find(k => k.kit_id === Number(selectedKit));
@@ -137,31 +196,46 @@ const EditQuotation = () => {
       setQtNumber(q.qt_number || '');
       setQuoteType(q.type || 'with_gst');
       setAcousticTerms(q.acoustic_terms || ''); 
-        setSubject(q.subject || '');  // Add this line
+      setGlobalSubject(q.subject || '');
+
+      // Load selected_options_for_summary
+      if (q.selected_options_for_summary && Array.isArray(q.selected_options_for_summary)) {
+        setSelectedOptionsForSummary(q.selected_options_for_summary);
+      } else if (q.selected_options_for_summary && typeof q.selected_options_for_summary === 'string') {
+        try {
+          const parsed = JSON.parse(q.selected_options_for_summary);
+          if (Array.isArray(parsed)) {
+            setSelectedOptionsForSummary(parsed);
+          }
+        } catch (e) {
+          console.error('Error parsing selected_options_for_summary:', e);
+        }
+      }
 
       // Load installments config from API response
       if (q.installments_config && q.installments_config.length > 0) {
         const hasAnyInstallments = q.installments_config.some(cfg => cfg.installments && cfg.installments.length > 0);
         if (hasAnyInstallments) {
-          // Get the first non-empty installments as global template
-          const firstWithInstallments = q.installments_config.find(cfg => cfg.installments && cfg.installments.length > 0);
-          if (firstWithInstallments && firstWithInstallments.installments) {
-            setGlobalInstallmentRows(firstWithInstallments.installments.map(i => ({
-              description: i.description || '',
-              percentage: Number(i.percentage || 0),
-              amount: Number(i.amount || 0),
-            })));
-          }
-          setInstallmentsConfig(q.installments_config.map(cfg => ({
-            option_index: cfg.option_index,
-            option_name: cfg.option_name,
-            selected: cfg.selected !== undefined ? cfg.selected : (cfg.installments && cfg.installments.length > 0),
-            installments: cfg.installments && cfg.installments.length > 0 ? cfg.installments.map(i => ({
-              description: i.description,
-              percentage: Number(i.percentage),
-              amount: Number(i.amount),
-            })) : [],
-          })));
+const firstWithInstallments = q.installments_config.find(cfg => cfg.installments && cfg.installments.length > 0);
+if (firstWithInstallments && firstWithInstallments.installments) {
+  setGlobalInstallmentRows(firstWithInstallments.installments.map(i => ({
+    description: i.description || '',
+    percentage: Number(i.percentage || 0),
+    amount: Number(i.amount || 0),
+    payment_mode: i.payment_mode || 'Online',  // Add payment mode
+  })));
+}
+setInstallmentsConfig(q.installments_config.map(cfg => ({
+  option_index: cfg.option_index,
+  option_name: cfg.option_name,
+  selected: cfg.selected !== undefined ? cfg.selected : (cfg.installments && cfg.installments.length > 0),
+  installments: cfg.installments && cfg.installments.length > 0 ? cfg.installments.map(i => ({
+    description: i.description,
+    percentage: Number(i.percentage),
+    amount: Number(i.amount),
+    payment_mode: i.payment_mode || 'Online',  // Add payment mode
+  })) : [],
+})));
           setShowInstallmentsPanel(true);
         }
       }
@@ -171,8 +245,13 @@ const EditQuotation = () => {
       if (!revData) return;
 
       if (revData.options?.length > 0) {
-        // new multi-option format
         const loadedOptions = revData.options.map((opt, idx) => {
+          // Store subject for this option
+          if (opt.subject) {
+            setOptionSubjects(prev => ({ ...prev, [idx]: opt.subject }));
+            setOptionSubjectTypes(prev => ({ ...prev, [idx]: opt.subject_type || 'master' }));
+          }
+          
           const prefilled = [];
           (opt.kits || []).forEach(kit => {
             prefilled.push({
@@ -251,18 +330,6 @@ const EditQuotation = () => {
     }
   };
 
-  // pre-select master charges when both loaded
-  useEffect(() => {
-    if (!isEditLoaded || masterAdditionalCharges.length === 0) return;
-    const preSelected = {};
-    options.forEach((opt, idx) => {
-      preSelected[`${idx}`] = masterAdditionalCharges.filter(charge =>
-        opt.additional_prices.some(ap => ap.add_price_name === charge.charge_name)
-      );
-    });
-    setSelectedMasterCharges(preSelected);
-  }, [isEditLoaded, masterAdditionalCharges]);
-
   // ── option helpers ──
   const updateOption = (idx, updater) => {
     setOptions(prev => {
@@ -277,6 +344,10 @@ const EditQuotation = () => {
     setOptions(prev => [...prev, newOption]);
     setActiveOptionIdx(options.length);
     resetKitState();
+    
+    // Initialize subject for new option as empty
+    setOptionSubjects(prev => ({ ...prev, [options.length]: '' }));
+    setOptionSubjectTypes(prev => ({ ...prev, [options.length]: 'master' }));
     
     // Update installments config for new option
     if (showInstallmentsPanel) {
@@ -295,6 +366,10 @@ const EditQuotation = () => {
     clone.option_id = null;
     setOptions(prev => [...prev, clone]);
     setActiveOptionIdx(options.length);
+    
+    // Copy the subject from the duplicated option
+    setOptionSubjects(prev => ({ ...prev, [options.length]: optionSubjects[idx] || '' }));
+    setOptionSubjectTypes(prev => ({ ...prev, [options.length]: optionSubjectTypes[idx] || 'master' }));
     
     // Update installments config for duplicated option
     if (showInstallmentsPanel) {
@@ -437,21 +512,24 @@ const EditQuotation = () => {
     });
   };
 
-  // ── INSTALLMENTS with option selection ──
-  const initializeInstallments = () => {
-    const baseInstallmentRows = [{ description: 'Full Payment', percentage: 100, amount: 0 }];
-    setGlobalInstallmentRows(baseInstallmentRows);
-    
-    // Initialize config for all options
-    const config = options.map((opt, idx) => ({
-      option_index: idx,
-      option_name: opt.option_name,
-      selected: idx === 0, // Default select first option
-      installments: JSON.parse(JSON.stringify(baseInstallmentRows))
-    }));
-    setInstallmentsConfig(config);
-    setShowInstallmentsPanel(true);
-  };
+const initializeInstallments = () => {
+  const baseInstallmentRows = [{ 
+    description: 'Full Payment', 
+    percentage: 100, 
+    amount: 0,
+    payment_mode: 'Online'  // Add payment mode
+  }];
+  setGlobalInstallmentRows(baseInstallmentRows);
+  
+  const config = options.map((opt, idx) => ({
+    option_index: idx,
+    option_name: opt.option_name,
+    selected: idx === 0,
+    installments: JSON.parse(JSON.stringify(baseInstallmentRows))
+  }));
+  setInstallmentsConfig(config);
+  setShowInstallmentsPanel(true);
+};
 
   const updateGlobalInstallmentRow = (idx, field, value) => {
     const updatedRows = [...globalInstallmentRows];
@@ -468,7 +546,6 @@ const EditQuotation = () => {
       updatedRows[idx] = { ...updatedRows[idx], [field]: value };
     }
     
-    // Validate total percentage
     const totalPercent = updatedRows.reduce((s, i) => s + Number(i.percentage || 0), 0);
     if (totalPercent > 100) {
       alert('Total percentage cannot exceed 100%');
@@ -476,29 +553,30 @@ const EditQuotation = () => {
     }
     
     setGlobalInstallmentRows(updatedRows);
-    
-    // Update all selected options with the new installment structure
     setInstallmentsConfig(prev => prev.map(cfg => ({
       ...cfg,
       installments: cfg.selected ? updatedRows.map(row => ({ ...row })) : cfg.installments
     })));
   };
 
-  const addGlobalInstallmentRow = () => {
-    if (globalInstallmentRows.reduce((s, i) => s + Number(i.percentage || 0), 0) >= 100) {
-      alert('Already reached 100%');
-      return;
-    }
-    const newRow = { description: '', percentage: 0, amount: 0 };
-    const updatedRows = [...globalInstallmentRows, newRow];
-    setGlobalInstallmentRows(updatedRows);
-    
-    // Update all selected options
-    setInstallmentsConfig(prev => prev.map(cfg => ({
-      ...cfg,
-      installments: cfg.selected ? updatedRows.map(row => ({ ...row })) : cfg.installments
-    })));
+const addGlobalInstallmentRow = () => {
+  if (globalInstallmentRows.reduce((s, i) => s + Number(i.percentage || 0), 0) >= 100) {
+    alert('Already reached 100%');
+    return;
+  }
+  const newRow = { 
+    description: '', 
+    percentage: 0, 
+    amount: 0,
+    payment_mode: 'Online'  // Add default payment mode
   };
+  const updatedRows = [...globalInstallmentRows, newRow];
+  setGlobalInstallmentRows(updatedRows);
+  setInstallmentsConfig(prev => prev.map(cfg => ({
+    ...cfg,
+    installments: cfg.selected ? updatedRows.map(row => ({ ...row })) : cfg.installments
+  })));
+};
 
   const removeGlobalInstallmentRow = (idx) => {
     if (globalInstallmentRows.length <= 1) {
@@ -507,7 +585,6 @@ const EditQuotation = () => {
     }
     const updatedRows = globalInstallmentRows.filter((_, i) => i !== idx);
     setGlobalInstallmentRows(updatedRows);
-    
     setInstallmentsConfig(prev => prev.map(cfg => ({
       ...cfg,
       installments: cfg.selected ? updatedRows.map(row => ({ ...row })) : cfg.installments
@@ -587,15 +664,12 @@ const EditQuotation = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     
-    // Validate installments if enabled
     if (showInstallmentsPanel && installmentsConfig.length > 0) {
       const selectedOptions = installmentsConfig.filter(cfg => cfg.selected);
       if (selectedOptions.length === 0) {
         alert('Please select at least one option for payment installments');
         return;
       }
-      
-      // Validate each selected option's installments
       for (const cfg of selectedOptions) {
         const total = cfg.installments.reduce((s, i) => s + Number(i.percentage || 0), 0);
         if (Math.abs(total - 100) > 0.01) {
@@ -614,18 +688,26 @@ const EditQuotation = () => {
       ? `ALL FRAMING WILL BE DONE BY ${framingBy}.\n• FABRIC & FLOOR CARPET WILL BE PROVIDED BY ${fabricBy}.\n• ALL CEILING-RELATED WORK WILL BE PROVIDED BY ${ceilingBy}.\n• FABRIC STITCHING CHARGES WILL BE EXTRA AS PER THE DESIGN`
       : null;
 
-    const payload = {
-      type: quoteType,
-      acoustic_terms: finalAcousticTerms,
-        subject: subject,  // Add this line
-      installments_config: showInstallmentsPanel ? installmentsConfig.map(cfg => ({
-        option_index: cfg.option_index,
-        option_name: cfg.option_name,
-        selected: cfg.selected,
-        installments: cfg.selected ? cfg.installments : []
-      })) : [],
-      options: options.map(opt => ({
+  const payload = {
+    type: quoteType,
+    acoustic_terms: finalAcousticTerms,
+    subject: globalSubject,
+    selected_options_for_summary: selectedOptionsForSummary,
+    installments_config: showInstallmentsPanel ? installmentsConfig.map(cfg => ({
+      option_index: cfg.option_index,
+      option_name: cfg.option_name,
+      selected: cfg.selected,
+      installments: cfg.selected ? cfg.installments.map(inst => ({
+        description: inst.description,
+        percentage: inst.percentage,
+        amount: inst.amount,
+        payment_mode: inst.payment_mode || 'Online'  // Include payment mode
+      })) : []
+    })) : [],
+    options: options.map((opt, idx) => ({ 
         option_name: opt.option_name,
+        subject: optionSubjects[idx] || null,
+        subject_type: optionSubjectTypes[idx] || 'master',
         items: opt.items.map(item => ({
           cat_id: item.cat_id, kit_id: item.kit_id || null,
           kit_qty: item.kit_id ? Number(item.kit_qty || 1) : 1,
@@ -668,6 +750,8 @@ const EditQuotation = () => {
     return {
       option_index: idx,
       option_name: opt.option_name,
+      subject: optionSubjects[idx] || '',
+      subject_type: optionSubjectTypes[idx] || 'master',
       kit_names: kitNames,
       original_total: totals.totalWithGST,
       discount_amount: totals.discountAmount,
@@ -675,8 +759,6 @@ const EditQuotation = () => {
       has_installments: showInstallmentsPanel && installmentsConfig.find(c => c.option_index === idx)?.selected || false
     };
   });
-
-  const overallFinalizedTotal = optionsSummary.reduce((sum, opt) => sum + opt.finalized_total, 0);
 
   return (
     <div>
@@ -705,9 +787,7 @@ const EditQuotation = () => {
 
         <form onSubmit={handleSubmit} autoComplete="off" className="space-y-6 mt-6">
 
-          {/* ═══════════════════════════════════════════
-              QUOTATION TYPE & GST APPLICABLE AMOUNT IN ONE LINE
-          ═══════════════════════════════════════════ */}
+          {/* QUOTATION TYPE & GST */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
               <label className="font-medium block mb-1">Quotation Type</label>
@@ -716,6 +796,7 @@ const EditQuotation = () => {
                 <option value="without_gst">Without GST</option>
               </select>
             </div>
+        
             {quoteType === 'with_gst' && (
               <div>
                 <label className="font-medium block mb-1">GST Applicable Amount (for {activeOption.option_name})</label>
@@ -727,9 +808,7 @@ const EditQuotation = () => {
             )}
           </div>
 
-          {/* ══════════════════════════════════════
-              OPTION TABS
-          ══════════════════════════════════════ */}
+          {/* OPTION TABS */}
           <div>
             <div className="flex items-center gap-2 border-b-2 border-gray-200 mb-4 flex-wrap">
               {options.map((opt, idx) => (
@@ -771,6 +850,52 @@ const EditQuotation = () => {
                 </div>
               </div>
 
+              {/* Subject Selection for this option */}
+              <div className="bg-white border rounded p-4 mb-4">
+                <h4 className="font-semibold mb-3 text-gray-700">Subject for {activeOption.option_name}</h4>
+                
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-3">
+                  <div>
+                    <label className="block mb-1 font-medium text-sm">Select from Master</label>
+                    <select 
+                      className="w-full border px-3 py-2 rounded" 
+                      value={selectedCategoryForOption}
+                      onChange={e => handleMasterSubjectSelect(activeOptionIdx, e.target.value)}
+                    >
+                      <option value="">Select Subject</option>
+                      {categories.map(c => (
+                        <option key={c.cat_id} value={c.cat_id}>{c.cat_name}</option>
+                      ))}
+                    </select>
+                  </div>
+                  
+                  <div>
+                    <label className="block mb-1 font-medium text-sm">OR Custom Subject</label>
+                    <input 
+                      type="text" 
+                      className="w-full border px-3 py-2 rounded" 
+                      placeholder="Enter custom subject"
+                      value={optionSubjects[activeOptionIdx] || ''}
+                      onChange={e => handleCustomSubjectChange(activeOptionIdx, e.target.value)}
+                    />
+                  </div>
+                </div>
+                
+                {/* Display current subject for this option */}
+                {optionSubjects[activeOptionIdx] && (
+                  <div className="mt-2 p-2 bg-blue-50 rounded border border-blue-200">
+                    <span className="text-sm font-medium text-gray-700">Subject for {activeOption.option_name}: </span>
+                    <span className="text-sm font-semibold text-blue-700">{optionSubjects[activeOptionIdx]}</span>
+                    {optionSubjectTypes[activeOptionIdx] === 'master' && (
+                      <span className="text-xs text-gray-500 ml-2"></span>
+                    )}
+                    {optionSubjectTypes[activeOptionIdx] === 'custom' && (
+                      <span className="text-xs text-purple-500 ml-2"></span>
+                    )}
+                  </div>
+                )}
+              </div>
+
               {/* add kit / product buttons */}
               <div className="flex gap-3 mb-4">
                 <button type="button" className="bg-blue-600 text-white px-4 py-2 rounded text-sm"
@@ -785,43 +910,32 @@ const EditQuotation = () => {
                   <h4 className="font-semibold text-sm">Add Kit to {activeOption.option_name}</h4>
                   <select className="w-full border px-3 py-2 rounded text-sm" value={selectedCategory}
                     onChange={e => setSelectedCategory(e.target.value)}>
-                    <option value="">Select Subject</option>
+                    <option value="">Select Category</option>
                     {categories.map(c => <option key={c.cat_id} value={c.cat_id}>{c.cat_name}</option>)}
                   </select>
-                
-                <div className="mb-4">
-  <label className="block mb-1 font-medium text-sm">Subject</label>
-  <input 
-    type="text" 
-    className="w-full border px-4 py-2 rounded" 
-    placeholder="Enter quotation subject for view "
-    value={subject}
-    onChange={(e) => setSubject(e.target.value)}
-  />
-</div>
 
-                {selectedCategory && getCategoryName(selectedCategory) === 'Customised Acoustic Quotation' && (
-                  <div className="border rounded bg-gray-50 p-3 space-y-2">
-                    <h2 className="font-semibold text-sm text-blue-600">Acoustic Special Terms</h2>
-                    {[
-                      { label: 'Framing By', value: framingBy, setter: setFramingBy },
-                      { label: 'Fabric By', value: fabricBy, setter: setFabricBy },
-                      { label: 'Ceiling By', value: ceilingBy, setter: setCeilingBy }
-                    ].map(({ label, value, setter }) => (
-                      <div key={label}>
-                        <label className="text-xs font-semibold text-gray-500">{label}</label>
-                        <select 
-                          className="border px-2 py-1 rounded w-full mt-1 text-sm" 
-                          value={value} 
-                          onChange={e => setter(e.target.value)}
-                        >
-                          <option value="AV CORE">BY AV CORE</option>
-                          <option value="THE CLIENT">BY THE CLIENT</option>
-                        </select>
-                      </div>
-                    ))}
-                  </div>
-                )}
+                  {selectedCategory && getCategoryName(selectedCategory) === 'Customised Acoustic Quotation' && (
+                    <div className="border rounded bg-gray-50 p-3 space-y-2">
+                      <h2 className="font-semibold text-sm text-blue-600">Acoustic Special Terms</h2>
+                      {[
+                        { label: 'Framing By', value: framingBy, setter: setFramingBy },
+                        { label: 'Fabric By', value: fabricBy, setter: setFabricBy },
+                        { label: 'Ceiling By', value: ceilingBy, setter: setCeilingBy }
+                      ].map(({ label, value, setter }) => (
+                        <div key={label}>
+                          <label className="text-xs font-semibold text-gray-500">{label}</label>
+                          <select 
+                            className="border px-2 py-1 rounded w-full mt-1 text-sm" 
+                            value={value} 
+                            onChange={e => setter(e.target.value)}
+                          >
+                            <option value="AV CORE">BY AV CORE</option>
+                            <option value="THE CLIENT">BY THE CLIENT</option>
+                          </select>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                   {selectedCategory && (
                     <select className="w-full border px-3 py-2 rounded text-sm" value={selectedKit}
                       onChange={e => setSelectedKit(e.target.value)} disabled={!kits.length}>
@@ -1057,6 +1171,9 @@ const EditQuotation = () => {
                       className={`bg-white border-2 rounded-lg p-3 cursor-pointer transition-all ${activeOptionIdx === idx ? 'border-blue-400' : 'border-gray-200 hover:border-gray-300'}`}
                       onClick={() => { setActiveOptionIdx(idx); resetKitState(); setExpandedIndex(null); }}>
                       <div className="font-semibold text-sm text-blue-700 mb-1">{opt.option_name}</div>
+                      {optionSubjects[idx] && (
+                        <div className="text-xs text-gray-600 mb-1">Subject: {optionSubjects[idx]}</div>
+                      )}
                       <div className="text-xs text-gray-500">{(opt.items || []).length} item group(s)</div>
                       <div className="text-sm font-bold text-green-700 mt-1">₹{Math.round(t.totalWithGST).toLocaleString()}</div>
                       {opt.show_final_offer && opt.final_offer.percentage > 0 && (
@@ -1069,149 +1186,273 @@ const EditQuotation = () => {
             </div>
           )}
 
-          {/* ═══════════════════════════════════════════
-              OPTIONS SUMMARY TABLE (Before Bank Details & Installments)
-          ═══════════════════════════════════════════ */}
+          {/* OPTIONS SUMMARY TABLE with Subject Column */}
           <div className="border-2 border-gray-300 rounded-lg overflow-hidden mt-6">
             <div className="bg-white text-black px-4 py-3">
-              <h4 className="font-semibold">OPTIONS SUMMARY</h4>
+              <div className="flex justify-between items-center flex-wrap gap-2">
+                <h4 className="font-semibold">OPTIONS SUMMARY</h4>
+                <div className="flex gap-2">
+                  <button type="button" onClick={selectAllOptionsForSummary}
+                    className="text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded hover:bg-blue-200">
+                    Select All
+                  </button>
+                  <button type="button" onClick={deselectAllOptionsForSummary}
+                    className="text-xs bg-gray-100 text-gray-700 px-2 py-1 rounded hover:bg-gray-200">
+                    Deselect All
+                  </button>
+                </div>
+              </div>
+              <p className="text-xs text-gray-500 mt-1">✓ Check the options you want to include in the quotation summary</p>
             </div>
+
             <div className="overflow-x-auto">
               <table className="w-full text-sm border-collapse">
                 <thead className="bg-gray-100">
                   <tr>
+                    <th className="border p-2 text-center w-12">SELECT</th>
                     <th className="border p-2 text-left">Option</th>
+                    <th className="border p-2 text-left">Subject</th>
                     <th className="border p-2 text-left">Kit / Product Names</th>
                     <th className="border p-2 text-right">Original Total (₹)</th>
                     <th className="border p-2 text-right">Discount (₹)</th>
                     <th className="border p-2 text-right bg-green-50">Finalized Total (₹)</th>
-                    <th className="border p-2 text-center">Installments</th>
                   </tr>
                 </thead>
                 <tbody>
                   {optionsSummary.map((opt, idx) => (
                     <tr key={idx} className={idx % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
-                      <td className="border p-2 font-medium">{opt.option_name}</td>
-                      <td className="border p-2 text-gray-600">{opt.kit_names.substring(0, 60)}{opt.kit_names.length > 60 ? '...' : ''}</td>
-                      <td className="border p-2 text-right">₹{opt.original_total.toLocaleString()}</td>
-                      <td className="border p-2 text-right text-red-600">₹{opt.discount_amount.toLocaleString()}</td>
-                      <td className="border p-2 text-right font-bold text-green-700 bg-green-50">₹{opt.finalized_total.toLocaleString()}</td>
                       <td className="border p-2 text-center">
-                        {opt.has_installments ? (
-                          <span className="bg-green-100 text-green-700 px-2 py-1 rounded text-xs font-semibold">✓ Selected</span>
+                        <input
+                          type="checkbox"
+                          checked={selectedOptionsForSummary.includes(idx)}
+                          onChange={() => toggleOptionForSummary(idx)}
+                          className="w-4 h-4 text-blue-600 rounded cursor-pointer"
+                        />
+                      </td>
+                      <td className="border p-2 font-medium">{opt.option_name}</td>
+                      <td className="border p-2">
+                        {opt.subject ? (
+                          <div className="flex items-center gap-1 flex-wrap">
+                            <span className="text-gray-800">{opt.subject}</span>
+                            {opt.subject_type === 'master' && (
+                              <span className="text-xs text-blue-600 bg-blue-50 px-1.5 py-0.5 rounded">Master</span>
+                            )}
+                            {opt.subject_type === 'custom' && (
+                              <span className="text-xs text-purple-600 bg-purple-50 px-1.5 py-0.5 rounded">Custom</span>
+                            )}
+                          </div>
                         ) : (
-                          <span className="text-gray-400 text-xs">—</span>
+                          <span className="text-gray-400 text-xs">No subject</span>
                         )}
                       </td>
+                      <td className="border p-2 text-gray-600 text-xs">
+                        {opt.kit_names.substring(0, 60)}{opt.kit_names.length > 60 ? '...' : ''}
+                      </td>
+                      <td className="border p-2 text-right">₹{Math.round(opt.original_total).toLocaleString()}</td>
+                      <td className="border p-2 text-right text-red-600">₹{Math.round(opt.discount_amount).toLocaleString()}</td>
+                      <td className="border p-2 text-right font-bold text-green-700 bg-green-50">₹{Math.round(opt.finalized_total).toLocaleString()}</td>
                     </tr>
                   ))}
                 </tbody>
                 <tfoot className="bg-gray-200 font-bold">
                   <tr>
-                    <td colSpan={4} className="border p-2 text-right text-lg">OVERALL TOTAL:</td>
-                    <td className="border p-2 text-right text-lg text-green-800">₹{overallFinalizedTotal.toLocaleString()}</td>
-                    <td className="border p-2"></td>
+                    <td className="border p-2 text-center"></td>
+                    <td colSpan={5} className="border p-2 text-right text-lg">OVERALL TOTAL (Selected Only):</td>
+                    <td className="border p-2 text-right text-lg text-green-800">
+                      ₹{optionsSummary
+                        .filter((_, idx) => selectedOptionsForSummary.includes(idx))
+                        .reduce((sum, opt) => sum + opt.finalized_total, 0)
+                        .toLocaleString()}
+                    </td>
                   </tr>
                 </tfoot>
               </table>
             </div>
           </div>
 
-          {/* ═══════════════════════════════════════════
-              PAYMENT INSTALLMENTS (with Option Selection Checkboxes)
-          ═══════════════════════════════════════════ */}
-          <div className="bg-yellow-50 p-4 rounded mt-4">
-            <div className="flex justify-between items-center mb-3">
-              <div>
-                <h4 className="font-semibold">Payment Installments</h4>
-                <p className="text-xs text-gray-500">Select which options this installment plan applies to</p>
+          {/* Selected Options Preview */}
+          {selectedOptionsForSummary.length > 0 && (
+            <div className="border-2 border-blue-300 rounded-lg overflow-hidden mt-4">
+              <div className="bg-blue-100 text-blue-900 px-4 py-2 text-center">
+                <h4 className="font-semibold">SELECTED OPTIONS SUMMARY ({selectedOptionsForSummary.length} Option{selectedOptionsForSummary.length > 1 ? 's' : ''})</h4>
+                <p className="text-xs text-blue-700">These options will appear in the quotation summary</p>
               </div>
-              {!showInstallmentsPanel && (
-                <button type="button" onClick={initializeInstallments}
-                  className="bg-blue-600 text-white px-4 py-2 rounded text-sm hover:bg-blue-700">
-                  + Add Installment Details
-                </button>
-              )}
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm border-collapse">
+                  <thead className="bg-blue-50">
+                    <tr>
+                      <th className="border p-2 text-left">Option</th>
+                      <th className="border p-2 text-left">Subject</th>
+                      <th className="border p-2 text-left">Kit / Product Names</th>
+                      <th className="border p-2 text-right">Finalized Total (₹)</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {optionsSummary
+                      .filter((_, idx) => selectedOptionsForSummary.includes(idx))
+                      .map((opt, idx) => (
+                        <tr key={idx} className={idx % 2 === 0 ? 'bg-white' : 'bg-blue-50/30'}>
+                          <td className="border p-2 font-medium">{opt.option_name}</td>
+                          <td className="border p-2">
+                            {opt.subject ? (
+                              <div className="flex items-center gap-1 flex-wrap">
+                                <span className="text-gray-800 text-xs">{opt.subject}</span>
+                                {opt.subject_type === 'master' && (
+                                  <span className="text-xs text-blue-600 bg-blue-50 px-1.5 py-0.5 rounded">Master</span>
+                                )}
+                                {opt.subject_type === 'custom' && (
+                                  <span className="text-xs text-purple-600 bg-purple-50 px-1.5 py-0.5 rounded">Custom</span>
+                                )}
+                              </div>
+                            ) : (
+                              <span className="text-gray-400 text-xs">No subject</span>
+                            )}
+                          </td>
+                          <td className="border p-2 text-gray-600 text-xs">{opt.kit_names.substring(0, 60)}</td>
+                          <td className="border p-2 text-right font-bold text-green-700">₹{Math.round(opt.finalized_total).toLocaleString()}</td>
+                        </tr>
+                      ))}
+                  </tbody>
+                  <tfoot className="bg-blue-100 font-bold">
+                    <tr>
+                      <td colSpan={3} className="border p-2 text-right">TOTAL FOR SELECTED OPTIONS:</td>
+                      <td className="border p-2 text-right text-green-800">
+                        ₹{optionsSummary
+                          .filter((_, idx) => selectedOptionsForSummary.includes(idx))
+                          .reduce((sum, opt) => sum + opt.finalized_total, 0)
+                          .toLocaleString()}
+                      </td>
+                    </tr>
+                  </tfoot>
+                </table>
+              </div>
             </div>
-            
-            {showInstallmentsPanel && (
-              <>
-                {/* Option Selection Checkboxes */}
-                <div className="mb-4 p-3 bg-white rounded border border-yellow-200">
-                  <div className="flex justify-between items-center mb-2">
-                    <label className="font-semibold text-sm text-gray-700">Apply Installments To:</label>
-                    <div className="flex gap-2">
-                      <button type="button" onClick={selectAllOptionsForInstallments}
-                        className="text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded hover:bg-blue-200">
-                        Select All
-                      </button>
-                      <button type="button" onClick={deselectAllOptionsForInstallments}
-                        className="text-xs bg-gray-100 text-gray-700 px-2 py-1 rounded hover:bg-gray-200">
-                        Deselect All
-                      </button>
-                    </div>
-                  </div>
-                  <div className="flex flex-wrap gap-4">
-                    {installmentsConfig.map((cfg) => (
-                      <label key={cfg.option_index} className="flex items-center gap-2 cursor-pointer">
-                        <input
-                          type="checkbox"
-                          checked={cfg.selected}
-                          onChange={() => toggleOptionInstallment(cfg.option_index)}
-                          className="w-4 h-4 text-blue-600 rounded"
-                        />
-                        <span className="text-sm font-medium text-gray-700">{cfg.option_name}</span>
-                        <span className="text-xs text-gray-500">
-                          (₹{optionsSummary.find(o => o.option_index === cfg.option_index)?.finalized_total.toLocaleString()})
-                        </span>
-                      </label>
-                    ))}
-                  </div>
-                </div>
+          )}
 
-                {/* Installment Rows */}
-                <div className="grid grid-cols-[2fr_1fr_1fr_auto] gap-2 mb-2 font-semibold text-gray-700 text-sm">
-                  <div>Description</div><div>Percent (%)</div><div>Amount (₹)</div><div></div>
-                </div>
-                {globalInstallmentRows.map((row, idx) => (
-                  <div key={idx} className="grid grid-cols-[2fr_1fr_1fr_auto] gap-2 mb-2 items-center">
-                    <input className="border px-2 py-1 rounded text-sm" placeholder="e.g., Advance Payment / Final Payment"
-                      value={row.description} onChange={e => updateGlobalInstallmentRow(idx, 'description', e.target.value)} />
-                    <input type="number" className="border px-2 py-1 rounded text-sm" placeholder="%"
-                      value={row.percentage === 0 ? '' : row.percentage}
-                      onChange={e => updateGlobalInstallmentRow(idx, 'percentage', e.target.value)} />
-                    <input type="number" className="border px-2 py-1 rounded text-sm" placeholder="₹"
-                      value={row.amount === 0 ? '' : row.amount}
-                      onChange={e => updateGlobalInstallmentRow(idx, 'amount', e.target.value)} />
-                    <div className="flex gap-1">
-                      {idx === globalInstallmentRows.length - 1 && (
-                        <button type="button" onClick={addGlobalInstallmentRow} className="bg-green-500 text-white px-2 rounded text-sm">+</button>
-                      )}
-                      {globalInstallmentRows.length > 1 && (
-                        <button type="button" onClick={() => removeGlobalInstallmentRow(idx)}
-                          className="bg-red-500 text-white px-2 rounded text-sm">✕</button>
-                      )}
-                    </div>
-                  </div>
-                ))}
-                <div className="text-right text-sm text-gray-600 mt-2">
-                  Total: {globalInstallmentRows.reduce((s, i) => s + Number(i.percentage || 0), 0).toFixed(0)}%
-                </div>
-                <div className="text-right mt-2">
-                  <button type="button" onClick={() => { setShowInstallmentsPanel(false); setInstallmentsConfig([]); setGlobalInstallmentRows([]); }}
-                    className="text-red-500 text-sm hover:text-red-700">Remove All Installments</button>
-                </div>
+         {/* PAYMENT INSTALLMENTS - Updated with Payment Mode */}
+<div className="bg-yellow-50 p-4 rounded mt-4">
+  <div className="flex justify-between items-center mb-3">
+    <div>
+      <h4 className="font-semibold">Payment Installments</h4>
+      <p className="text-xs text-gray-500">Select which options this installment plan applies to</p>
+    </div>
+    {!showInstallmentsPanel && (
+      <button type="button" onClick={initializeInstallments}
+        className="bg-blue-600 text-white px-4 py-2 rounded text-sm hover:bg-blue-700">
+        + Add Installment Details
+      </button>
+    )}
+  </div>
+  
+  {showInstallmentsPanel && (
+    <>
+      <div className="mb-4 p-3 bg-white rounded border border-yellow-200">
+        <div className="flex justify-between items-center mb-2">
+          <label className="font-semibold text-sm text-gray-700">Apply Installments To:</label>
+          <div className="flex gap-2">
+            <button type="button" onClick={selectAllOptionsForInstallments}
+              className="text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded hover:bg-blue-200">
+              Select All
+            </button>
+            <button type="button" onClick={deselectAllOptionsForInstallments}
+              className="text-xs bg-gray-100 text-gray-700 px-2 py-1 rounded hover:bg-gray-200">
+              Deselect All
+            </button>
+          </div>
+        </div>
+        <div className="flex flex-wrap gap-4">
+          {installmentsConfig.map((cfg) => (
+            <label key={cfg.option_index} className="flex items-center gap-2 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={cfg.selected}
+                onChange={() => toggleOptionInstallment(cfg.option_index)}
+                className="w-4 h-4 text-blue-600 rounded"
+              />
+              <span className="text-sm font-medium text-gray-700">{cfg.option_name}</span>
+              <span className="text-xs text-gray-500">
+                (₹{optionsSummary.find(o => o.option_index === cfg.option_index)?.finalized_total.toLocaleString()})
+              </span>
+            </label>
+          ))}
+        </div>
+      </div>
 
-                {/* Selected Options Preview */}
-                {installmentsConfig.filter(c => c.selected).length > 0 && (
-                  <div className="mt-3 p-2 bg-green-50 rounded text-xs text-green-700">
-                    <span className="font-semibold">✓ Installments will be applied to: </span>
-                    {installmentsConfig.filter(c => c.selected).map(c => c.option_name).join(', ')}
-                  </div>
-                )}
-              </>
+      {/* Updated grid with Payment Mode column */}
+      <div className="grid grid-cols-[2fr_1fr_1fr_1.5fr_auto] gap-2 mb-2 font-semibold text-gray-700 text-sm">
+        <div>Description</div>
+        <div>Percent (%)</div>
+        <div>Amount (₹)</div>
+        <div>Payment Mode</div>
+        <div></div>
+      </div>
+
+      {globalInstallmentRows.map((row, idx) => (
+        <div key={idx} className="grid grid-cols-[2fr_1fr_1fr_1.5fr_auto] gap-2 mb-2 items-center">
+          <input 
+            className="border px-2 py-1 rounded text-sm" 
+            placeholder="e.g., Advance Payment / Final Payment"
+            value={row.description} 
+            onChange={e => updateGlobalInstallmentRow(idx, 'description', e.target.value)} 
+          />
+          
+          <input 
+            type="number" 
+            className="border px-2 py-1 rounded text-sm" 
+            placeholder="%"
+            value={row.percentage === 0 ? '' : row.percentage}
+            onChange={e => updateGlobalInstallmentRow(idx, 'percentage', e.target.value)} 
+          />
+          
+          <input 
+            type="number" 
+            className="border px-2 py-1 rounded text-sm" 
+            placeholder="₹"
+            value={row.amount === 0 ? '' : row.amount}
+            onChange={e => updateGlobalInstallmentRow(idx, 'amount', e.target.value)} 
+          />
+          
+          {/* Payment Mode Dropdown - DD or Online */}
+          <select 
+            className="border px-2 py-1 rounded text-sm bg-white"
+            value={row.payment_mode || 'Online'}
+            onChange={e => updateGlobalInstallmentRow(idx, 'payment_mode', e.target.value)}
+          >
+            <option value="Online">Online</option>
+            <option value="DD">DD</option>
+          </select>
+          
+          <div className="flex gap-1">
+            {idx === globalInstallmentRows.length - 1 && (
+              <button type="button" onClick={addGlobalInstallmentRow} 
+                className="bg-green-500 text-white px-2 rounded text-sm">+</button>
+            )}
+            {globalInstallmentRows.length > 1 && (
+              <button type="button" onClick={() => removeGlobalInstallmentRow(idx)}
+                className="bg-red-500 text-white px-2 rounded text-sm">✕</button>
             )}
           </div>
+        </div>
+      ))}
+      
+      <div className="text-right text-sm text-gray-600 mt-2">
+        Total: {globalInstallmentRows.reduce((s, i) => s + Number(i.percentage || 0), 0).toFixed(0)}%
+      </div>
+      
+      <div className="text-right mt-2">
+        <button type="button" onClick={() => { setShowInstallmentsPanel(false); setInstallmentsConfig([]); setGlobalInstallmentRows([]); }}
+          className="text-red-500 text-sm hover:text-red-700">Remove All Installments</button>
+      </div>
+
+      {installmentsConfig.filter(c => c.selected).length > 0 && (
+        <div className="mt-3 p-2 bg-green-50 rounded text-xs text-green-700">
+          <span className="font-semibold">✓ Installments will be applied to: </span>
+          {installmentsConfig.filter(c => c.selected).map(c => c.option_name).join(', ')}
+        </div>
+      )}
+    </>
+  )}
+</div>
 
           {/* submit */}
           <div className="flex justify-end gap-3 border-t pt-4">
@@ -1229,22 +1470,12 @@ const EditQuotation = () => {
             <div className="bg-white p-6 rounded shadow-lg w-[600px] max-w-full max-h-[90vh] overflow-y-auto">
               <h3 className="font-semibold text-lg mb-4">{isReplaceMode ? 'Replace Product in Kit' : `Add Single Product to ${activeOption.option_name}`}</h3>
               <div className="mb-3">
-                <label className="block mb-1 font-medium text-sm">Subject</label>
+                <label className="block mb-1 font-medium text-sm">Category</label>
                 <select className="border px-3 py-2 rounded w-full" value={spCategory}
                   onChange={e => { setSpCategory(e.target.value); fetchProductsByCategory(e.target.value); }}>
-                  <option value="">Select Subject</option>
+                  <option value="">Select Category</option>
                   {categories.map(c => <option key={c.cat_id} value={c.cat_id}>{c.cat_name}</option>)}
                 </select>
-                <div className="mb-4">
-  <label className="block mb-1 font-medium text-sm">Subject From Master</label>
-  <input 
-    type="text" 
-    className="w-full border px-4 py-2 rounded" 
-    placeholder="Enter quotation subject for view "
-    value={subject}
-    onChange={(e) => setSubject(e.target.value)}
-  />
-</div>
               </div>
               <div className="mb-3">
                 <label className="block mb-1 font-medium text-sm">Product Type</label>

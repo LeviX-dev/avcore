@@ -65,6 +65,7 @@ interface Client {
   category_other?: string;
   reference_other?: string;
   reassignment_remarks?: ReassignmentRemark[];
+
 }
 
 interface ReassignmentRemark {
@@ -130,24 +131,28 @@ const UpdateRawData: React.FC<UpdateDataModalProps> = ({
     }, duration);
   };
 
-  // Add this helper function at the top of UpdateRawData component
 const formatDateTime = (dateString: string | undefined): string => {
   if (!dateString) return '—';
   
+  // Debug log to see what's coming from API
+  console.log('formatDateTime received:', dateString, 'type:', typeof dateString);
+  
   try {
-    // Handle MySQL datetime format "2026-04-30 17:41:58"
+    // If the string is already in DD/MM/YYYY format, return as-is
+    if (typeof dateString === 'string' && dateString.match(/^\d{2}\/\d{2}\/\d{4}/)) {
+      return dateString;
+    }
+    
     const date = new Date(dateString);
     if (isNaN(date.getTime())) return dateString;
     
-    // Format as "30 Apr 2026, 05:41 PM"
-    return date.toLocaleString('en-GB', {
-      day: '2-digit',
-      month: 'short',
-      year: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit',
-      hour12: true
-    });
+    const day = date.getUTCDate().toString().padStart(2, '0');
+    const month = (date.getUTCMonth() + 1).toString().padStart(2, '0');
+    const year = date.getUTCFullYear();
+    const hours = date.getUTCHours().toString().padStart(2, '0');
+    const minutes = date.getUTCMinutes().toString().padStart(2, '0');
+    
+    return `${day}/${month}/${year} ${hours}:${minutes}`;
   } catch (error) {
     return dateString;
   }

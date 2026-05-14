@@ -38,8 +38,11 @@ const QuotationRevisionPage = () => {
   if (!data) return null;
 
   const quotation = data.quotations[0];
-  const latestRevisionNumber =
-    quotation.revisions[quotation.revisions.length - 1]?.revision;
+  
+  // ✅ Sort revisions in descending order (newest first)
+  const sortedRevisions = [...quotation.revisions].sort((a, b) => b.revision - a.revision);
+  
+  const latestRevisionNumber = sortedRevisions[0]?.revision;
 
   const calculateRevisionTotal = (rev) => {
     let total = 0;
@@ -65,7 +68,7 @@ const QuotationRevisionPage = () => {
 
   return (
     <div className="p-4 md:p-6 bg-gray-50 dark:bg-boxdark min-h-screen">
-      {/* TOP BAR */}
+      {/* TOP BAR - Same as before */}
       <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4 mb-6">
         <button
           onClick={() => navigate('/quatation-pending')}
@@ -163,7 +166,8 @@ const QuotationRevisionPage = () => {
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
-              {quotation.revisions.map((rev) => (
+              {/* ✅ Use sortedRevisions instead of quotation.revisions */}
+              {sortedRevisions.map((rev) => (
                 <tr
                   key={rev.revision}
                   className="hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors duration-150"
@@ -223,39 +227,37 @@ const QuotationRevisionPage = () => {
                     </div>
                   </td>
 
-                {/* Total - shows finalized total like ViewQuotation */}
-<td className="py-3 px-4">
-  <div className="flex flex-col items-start">
+                  {/* Total - shows finalized total like ViewQuotation */}
+                  <td className="py-3 px-4">
+                    <div className="flex flex-col items-start">
+                      {/* ✅ Show finalized total (after discount) if available */}
+                      <div className="text-lg font-bold text-green-600 dark:text-green-400 mb-0.5">
+                        ₹{' '}
+                        {rev.finalized_total != null && rev.finalized_total > 0
+                          ? Number(rev.finalized_total).toLocaleString('en-IN', { minimumFractionDigits: 2 })
+                          : rev.totals
+                            ? Number(
+                                rev.totals.with_gst && rev.totals.with_gst !== '0.00'
+                                  ? rev.totals.with_gst
+                                  : rev.totals.without_gst
+                              ).toLocaleString('en-IN', { minimumFractionDigits: 2 })
+                            : calculateRevisionTotal(rev)}
+                      </div>
 
-    {/* ✅ Show finalized total (after discount) if available */}
-    <div className="text-lg font-bold text-green-600 dark:text-green-400 mb-0.5">
-      ₹{' '}
-      {rev.finalized_total != null && rev.finalized_total > 0
-        ? Number(rev.finalized_total).toLocaleString('en-IN', { minimumFractionDigits: 2 })
-        : rev.totals
-          ? Number(
-              rev.totals.with_gst && rev.totals.with_gst !== '0.00'
-                ? rev.totals.with_gst
-                : rev.totals.without_gst
-            ).toLocaleString('en-IN', { minimumFractionDigits: 2 })
-          : calculateRevisionTotal(rev)}
-    </div>
+                      {/* ✅ Show discount badge if final offer was applied */}
+                      {rev.final_offer_amount > 0 && (
+                        <div className="text-[11px] text-orange-600 dark:text-orange-400 font-semibold">
+                          Discount: ₹{Number(rev.final_offer_amount).toLocaleString('en-IN')}
+                        </div>
+                      )}
 
-    {/* ✅ Show discount badge if final offer was applied */}
-    {rev.final_offer_amount > 0 && (
-      <div className="text-[11px] text-orange-600 dark:text-orange-400 font-semibold">
-        Discount: ₹{Number(rev.final_offer_amount).toLocaleString('en-IN')}
-      </div>
-    )}
-
-    <div className="text-[11px] text-gray-600 dark:text-gray-400">
-      {rev.totals?.with_gst && rev.totals.with_gst !== '0.00'
-        ? 'Incl. GST'
-        : 'Excl. GST'}
-    </div>
-
-  </div>
-</td>
+                      <div className="text-[11px] text-gray-600 dark:text-gray-400">
+                        {rev.totals?.with_gst && rev.totals.with_gst !== '0.00'
+                          ? 'Incl. GST'
+                          : 'Excl. GST'}
+                      </div>
+                    </div>
+                  </td>
 
                   {/* Created Info */}
                   <td className="py-3 px-4">
@@ -306,7 +308,6 @@ const QuotationRevisionPage = () => {
                         title="View Lead"
                         onClick={() =>
                           navigate(`/lead/view/${master_id}/${rev.revision}`)
-                          
                         }
                       >
                         <FaEye className="text-sm" />
@@ -325,7 +326,7 @@ const QuotationRevisionPage = () => {
             <div className="text-sm text-gray-600 dark:text-gray-400">
               Showing{' '}
               <span className="font-semibold">
-                {quotation.revisions.length}
+                {sortedRevisions.length}
               </span>{' '}
               versions
             </div>
