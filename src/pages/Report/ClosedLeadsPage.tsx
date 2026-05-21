@@ -538,7 +538,7 @@ const [modalDocsFetched, setModalDocsFetched] = useState(false);
   const [selectedEntryToDate, setSelectedEntryToDate] = useState('');
   const [selectedFollowupFromDate, setSelectedFollowupFromDate] = useState('');
   const [selectedFollowupToDate, setSelectedFollowupToDate] = useState('');
-  const [selectedStages, setSelectedStages] = useState<string[]>(['Closed Deal']);
+  const [selectedStages, setSelectedStages] = useState<string[]>([]);
   const [selectedUsersFilter, setSelectedUsersFilter] = useState<string[]>([]);
   const [selectedCities, setSelectedCities] = useState<string[]>([]);
   
@@ -665,7 +665,11 @@ const fetchClosedLeads = async (): Promise<void> => {
 
     const processedData = closedLeads.map((item: any) => {
       // For closed leads, the lead_stage should be "Closed Deal"
-      const lead_stage = "Closed Deal";
+      const lead_stage = parseStringValue(
+  item.latest_leadStage ||
+  item.lead_stage ||
+  item.current_stage
+);
       
       // For closed deals, always show 100% battery
       const status_percentage = 100;
@@ -1127,7 +1131,7 @@ const fetchDocumentsForModal = async () => {
     setSelectedFollowupToDate('');
 
     // Clear all selection filters but keep 'Closed Deal' stage
-    setSelectedStages(['Closed Deal']);
+    setSelectedStages([]);
     setSelectedUsersFilter([]);
     setSelectedCities([]);
 

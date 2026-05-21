@@ -51,7 +51,8 @@ import {
   faHistory,
   faArrowRight,
   faMinus,
-  faFileText
+  faFileText,
+  faUpload
 } from '@fortawesome/free-solid-svg-icons';
 
 // Types and Interfaces
@@ -126,13 +127,15 @@ const ActionButton = ({
   return (
     <div className={`flex items-center gap-1 ${className}`}>
       {/* PLUS BUTTON */}
-      <button
-        onClick={onUpload}
-        className="p-1.5 bg-green-500 hover:bg-green-600 text-white rounded-lg transition-all duration-200 shadow-sm hover:shadow-md"
-        title="Upload Images & Add Remark"
-      >
-        <FontAwesomeIcon icon={faPlus} className="h-3.5 w-3.5" />
-      </button>
+
+  <button
+  onClick={onUpload}
+  className="p-1.5 bg-green-500 hover:bg-green-600 text-white rounded-lg transition-all duration-200 shadow-sm hover:shadow-md"
+  title="Upload Images & Add Remark"
+>
+  <FontAwesomeIcon icon={faUpload} className="h-3.2 w-5.3" />
+</button>
+
 
       {/* LOGS BUTTON */}
       {/* <button

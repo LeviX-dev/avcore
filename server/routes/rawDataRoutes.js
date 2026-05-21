@@ -24,6 +24,7 @@ getEmployeeLeadList ,getEmployeeDetailedReport  ,getQuotationClosedLeads ,
     checkFavorite,
     getFavoritesBatch ,
   updateLocationLink ,
+updateContactNumbersOnly , 
 
 } from '../controllers/rawDataController.js';
 import uploadMiddleware from '../middleware/upload.js';
@@ -39,7 +40,11 @@ router.get('/master-data', getAllRawData);
 // router.get('/other-inputs/:master_id', getOtherInputs);
 
 router.post('/master-data/import', upload.single('file'), importRawData);
-router.put('/master-data/:master_id', updateRawData);
+router.put('/master-data/:master_id', updateRawData); 
+
+router.put('/master-data/:master_id/contact-numbers', updateContactNumbersOnly);
+
+
 
 // DELETE single - use DELETE method with URL parameter
 router.delete('/master-data/:master_id', deleteClient);

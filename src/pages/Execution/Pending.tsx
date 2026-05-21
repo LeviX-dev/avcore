@@ -78,6 +78,7 @@ import {
 import { BASE_URL } from '../../../public/config.js';
 import StartExecutionModal from "./StartExecutionModal";
 import { useNavigate } from "react-router-dom";
+import EditContactNumbersModal from './EditContactNumbersModal.js'; // Adjust path as needed
 
 
 
@@ -127,11 +128,13 @@ interface LogsData {
 }
 
 
+
 // Update ActionButton component definition
 const ActionButton = ({ 
   onView, 
   onEdit,
   onEditExecution,  // NEW
+    onEditContact,  // NEW - for editing contact numbers
   onSettings,
   onLogs,
   onViewQuotation,
@@ -199,7 +202,16 @@ const ActionButton = ({
         title="Edit Checklist Items"
       >
         <FontAwesomeIcon icon={faList} className="h-3.5 w-3.5" />
+      </button> 
+
+   <button
+        onClick={onEditContact}
+        className="p-1.5 bg-purple-500 hover:bg-purple-600 text-white rounded-lg"
+        title="Edit Contact Numbers"
+      >
+        <FontAwesomeIcon icon={faEdit} className="h-3.5 w-3.5" />
       </button>
+
 
       {/* LOGS BUTTON */}
       {/* <button
@@ -975,166 +987,14 @@ const formatDate = (dateString) => {
               </div>
             </div>
 
-            {/* Project Details */}
-            <div className="space-y-4">
-              <div className="bg-gradient-to-r from-purple-50 to-pink-50 dark:from-purple-900/20 dark:to-pink-900/20 p-4 rounded-lg border border-purple-100 dark:border-purple-800/30">
-                <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3 flex items-center gap-2">
-                  <FontAwesomeIcon icon={faBuilding} className="h-4 w-4 text-purple-500" />
-                  Project Details
-                </h3>
-                <div className="space-y-3">
-                  {(hasField('room_length') || hasField('room_width')) && (
-                    <div>
-                      <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">Room Size</div>
-                      <div className="font-medium text-black dark:text-white">
-                        {formatValue(lead.room_length)} × {formatValue(lead.room_width)}
-                        {hasField('room_height') && ` × ${formatValue(lead.room_height)}`}
-                      </div>
-                    </div>
-                  )}
-                  {hasField('p_type') && (
-                    <div>
-                      <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">Project Type</div>
-                      <div className="font-medium text-black dark:text-white">{formatValue(lead.p_type)}</div>
-                    </div>
-                  )}
-                  {hasField('budget_range') && (
-                    <div>
-                      <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">Budget Range</div>
-                      <div className="font-medium text-black dark:text-white">{formatValue(lead.budget_range)}</div>
-                    </div>
-                  )}
-                  {hasField('time_to_complete') && (
-                    <div>
-                      <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">Time to Complete</div>
-                      <div className="font-medium text-black dark:text-white">{formatValue(lead.time_to_complete)}</div>
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              {/* Timeline */}
-              <div className="bg-gradient-to-r from-orange-50 to-amber-50 dark:from-orange-900/20 dark:to-amber-900/20 p-4 rounded-lg border border-orange-100 dark:border-orange-800/30">
-                <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3 flex items-center gap-2">
-                  <FontAwesomeIcon icon={faClock} className="h-4 w-4 text-orange-500" />
-                  Timeline
-                </h3>
-                <div className="space-y-3">
-                  {hasField('execution_start_date') && (
-                    <div>
-                      <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">Execution Start Date</div>
-                      <div className="font-medium text-black dark:text-white">{formatDate(lead.execution_start_date)}</div>
-                    </div>
-                  )}
-                  {hasField('execution_end_date') && (
-                    <div>
-                      <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">Execution End Date</div>
-                      <div className="font-medium text-black dark:text-white">{formatDate(lead.execution_end_date)}</div>
-                    </div>
-                  )}
-                  {hasField('created_at') && (
-                    <div>
-                      <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">Created Date</div>
-                      <div className="font-medium text-black dark:text-white">{formatDate(lead.created_at)}</div>
-                    </div>
-                  )}
-                  {hasField('assign_date') && (
-                    <div>
-                      <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">Assigned Date</div>
-                      <div className="font-medium text-black dark:text-white">{formatDate(lead.assign_date)}</div>
-                    </div>
-                  )}
-                  {hasField('latest_reassignment_date') && (
-                    <div>
-                      <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">Last Reassignment</div>
-                      <div className="font-medium text-black dark:text-white">{formatDate(lead.latest_reassignment_date)}</div>
-                    </div>
-                  )}
-                </div>
-              </div>
-            </div>
+   
           </div>
 
           {/* Remarks & Assignment Info (Moved from main table) */}
           <div className="mt-6 grid grid-cols-1 md:grid-cols-2 gap-6">
-            {/* Remarks */}
-            <div className="bg-gradient-to-r from-gray-50 to-slate-50 dark:from-gray-800/50 dark:to-slate-900/50 p-4 rounded-lg border border-gray-200 dark:border-gray-700">
-              <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3 flex items-center gap-2">
-                <FontAwesomeIcon icon={faFileAlt} className="h-4 w-4 text-gray-500" />
-                Remarks
-              </h3>
-              <div className="space-y-3">
-                {hasField('quick_remark') && (
-                  <div>
-                    <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">Quick Remark</div>
-                    <div className="text-sm text-black dark:text-white">{formatValue(lead.quick_remark)}</div>
-                  </div>
-                )}
-                {hasField('detailed_remark') && (
-                  <div>
-                    <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">Detailed Remark</div>
-                    <div className="text-sm text-black dark:text-white whitespace-pre-line">{formatValue(lead.detailed_remark)}</div>
-                  </div>
-                )}
-                {hasField('latest_remark') && (
-                  <div>
-                    <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">Latest Remark</div>
-                    <div className="text-sm text-black dark:text-white">{formatValue(lead.latest_remark)}</div>
-                  </div>
-                )}
-              </div>
-            </div>
+        
 
-            {/* Assignment Info - Previously in main table */}
-            <div className="bg-gradient-to-r from-indigo-50 to-purple-50 dark:from-indigo-900/20 dark:to-purple-900/20 p-4 rounded-lg border border-indigo-100 dark:border-indigo-800/30">
-              <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3 flex items-center gap-2">
-                <FontAwesomeIcon icon={faUsers} className="h-4 w-4 text-indigo-500" />
-                Assignment Information
-              </h3>
-              <div className="space-y-3">
-                {hasField('assigned_to') && (
-                  <div>
-                    <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">Assigned To</div>
-                    <div className="font-medium text-black dark:text-white">{formatValue(lead.assigned_to)}</div>
-                  </div>
-                )}
-                {hasField('telecaller_name') && (
-                  <div>
-                    <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">Telecaller</div>
-                    <div className="font-medium text-black dark:text-white">{formatValue(lead.telecaller_name)}</div>
-                  </div>
-                )}
-                {/* Stage moved here from main table */}
-                {hasField('lead_stage') && (
-                  <div>
-                    <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">Stage</div>
-                    <div className="font-medium text-black dark:text-white">
-                      <span className="bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-300 px-2 py-1 rounded-md">
-                        {formatValue(lead.lead_stage)}
-                      </span>
-                    </div>
-                  </div>
-                )}
-                {hasField('lead_status') && (
-                  <div>
-                    <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">Lead Status</div>
-                    <div className="font-medium text-black dark:text-white">{formatValue(lead.lead_status)}</div>
-                  </div>
-                )}
-                {hasField('cat_name') && (
-                  <div>
-                    <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">Category</div>
-                    <div className="font-medium text-black dark:text-white">{formatValue(lead.cat_name)}</div>
-                  </div>
-                )}
-                {hasField('reference_name') && (
-                  <div>
-                    <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">Reference</div>
-                    <div className="font-medium text-black dark:text-white">{formatValue(lead.reference_name)}</div>
-                  </div>
-                )}
-              </div>
-            </div>
+         
           </div>
 
           {/* Contact Numbers */}
@@ -1252,17 +1112,22 @@ const fetchProcesses = async () => {
     if (res.data.success) {
       console.log('API Response:', res.data.data); // 👈 Add this
       
-      const formatted = res.data.data.map((item) => ({
-        process_id: item.process_id,
-        process_name: item.process_name,
-        description: item.description || "",
-        start_date: item.start_date ? item.start_date.split("T")[0] : "",
-        end_date: item.end_date ? item.end_date.split("T")[0] : "",
-        status: item.status || "pending",
-        remark: item.remark || "",
-        assigned_user_ids: item.assigned_user_ids || [],
-        assigned_user_names: item.assigned_user_names || [],
-      }));
+const formatted = res.data.data.map((item) => ({
+  process_id: item.process_id,
+
+  // ✅ ADD THIS
+  type_id: item.type_id,
+
+  process_name: item.process_name,
+  execution_type: item.execution_type || "",
+  description: item.description || "",
+  start_date: item.start_date ? item.start_date.split("T")[0] : "",
+  end_date: item.end_date ? item.end_date.split("T")[0] : "",
+  status: item.status || "pending",
+  remark: item.remark || "",
+  assigned_user_ids: item.assigned_user_ids || [],
+  assigned_user_names: item.assigned_user_names || [],
+}));
 
       console.log('Formatted statuses:', formatted.map(p => p.status)); // 👈 Add this
 
@@ -1309,38 +1174,43 @@ const fetchProcesses = async () => {
   };
 
 
-  const handleSave = async (process) => {
+const handleSave = async (process) => {
   try {
     await axios.post(
       `${BASE_URL}api/execution/save-process`,
       {
         lead_id: lead.master_id,
         process_id: process.process_id,
+
+        // ✅ ADD THIS
+        type_id: process.type_id,
+
         process_name: process.process_name,
         start_date: process.start_date,
         end_date: process.end_date,
         status: process.status,
-        assigned_user_ids: process.assigned_user_ids || [], // ✅ fixed
+        assigned_user_ids: process.assigned_user_ids || [],
         remark: process.remark,
       },
       { withCredentials: true }
     );
 
     alert("Saved Successfully ✅");
+
     fetchProcesses();
+
   } catch (err) {
     console.error(err);
   }
 };
-
 
   if (!lead) return null;
 
   return (
     <>
       {/* MAIN MODAL */}
-      <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
-<div className="bg-white dark:bg-boxdark w-full max-w-4xl rounded-lg shadow-lg ml-36 mt-12">
+       <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-[9999] p-4">
+        <div className="bg-white dark:bg-boxdark w-full max-w-4xl rounded-lg shadow-lg flex flex-col" style={{ height: '85vh' }}>
           {/* HEADER */}
           <div className="flex justify-between items-center px-4 py-3 border-b dark:border-gray-700">
             <div>
@@ -1363,6 +1233,7 @@ const fetchProcesses = async () => {
                 <thead className="bg-gray-100 dark:bg-gray-800">
                   <tr>
                     <th className="px-3 py-2 text-left">Process</th>
+                        <th className="px-3 py-2 text-left">Execution Type</th> {/* ✅ ADD THIS */}
                     <th className="px-3 py-2 text-left">Start</th>
                     <th className="px-3 py-2 text-left">End</th>
                     <th className="px-3 py-2 text-left">Status</th>
@@ -1410,7 +1281,14 @@ const fetchProcesses = async () => {
             {process.description}
           </div>
         )}
-      </td>
+      </td> 
+
+      <td className="px-3 py-2">
+  <span className="px-2 py-1 text-xs font-medium bg-purple-100 text-purple-700 rounded-full">
+    {process.execution_type || "-"}
+  </span>
+</td>
+
 
       <td className="px-3 py-2">
         {process.start_date || "-"}
@@ -2110,6 +1988,10 @@ const [executionDocuments, setExecutionDocuments] = useState([]);
 const [loadingExecutionDocs, setLoadingExecutionDocs] = useState(false);
 
 
+const [showContactEditModal, setShowContactEditModal] = useState(false);
+const [selectedClientForContactEdit, setSelectedClientForContactEdit] = useState<any>(null);
+
+
 // Document fetching function - exactly like in RawData
 const fetchDocuments = async (master_id: number) => {
   if (!master_id || docsFetched) return;
@@ -2418,7 +2300,6 @@ const handleLogsClick = async (lead: any) => {
 };
 
 
-
 const renderDetailsModal = () => {
   if (!selectedClientDetails) return null;
 
@@ -2687,137 +2568,82 @@ const renderDetailsModal = () => {
                 </div>
               </div>
 
-              {/* Project Details */}
-              {hasProjectDetails && (
-                <div className="bg-gradient-to-r from-amber-50 to-yellow-50 dark:from-amber-900/20 dark:to-yellow-900/20 p-3 rounded-lg border border-amber-100 dark:border-amber-800/30">
-                  <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2 flex items-center gap-2">
-                    <FontAwesomeIcon icon={faFileAlt} className="h-4 w-4 text-amber-500" />
-                    Project Details
-                  </h3>
-                  <div className="grid grid-cols-2 gap-3 text-sm">
-                    {(hasField('room_length') || hasField('room_width')) && (
-                      <div>
-                        <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">Room Size</div>
-                        <div className="font-medium text-black dark:text-white">
-                          {formatValue(selectedClientDetails.room_length)} ×{' '}
-                          {formatValue(selectedClientDetails.room_width)}
-                          {hasField('room_height') &&
-                            ` × ${formatValue(selectedClientDetails.room_height)}`}
-                        </div>
-                      </div>
-                    )}
-                    {hasField('p_type') && (
-                      <div>
-                        <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">Type</div>
-                        <div className="font-medium text-black dark:text-white">
-                          {formatValue(selectedClientDetails.p_type)}
-                        </div>
-                      </div>
-                    )}
-                    {hasField('budget_range') && (
-                      <div>
-                        <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">Budget</div>
-                        <div className="font-medium text-black dark:text-white">
-                          {formatValue(selectedClientDetails.budget_range)}
-                        </div>
-                      </div>
-                    )}
+          {/* Contact Numbers Section - FIXED to use selectedClientDetails */}
+          <div className="mt-6">
+            <div className="bg-gradient-to-r from-teal-50 to-cyan-50 dark:from-teal-900/20 dark:to-cyan-900/20 p-4 rounded-lg border border-teal-100 dark:border-teal-800/30">
+              <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3 flex items-center gap-2">
+                <FontAwesomeIcon icon={faPhone} className="h-4 w-4 text-teal-500" />
+                Contact Numbers
+              </h3>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                {/* Architect Name */}
+                {hasField('architect_name') && (
+                  <div>
+                    <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">Architect Name</div>
+                    <div className="font-medium text-black dark:text-white">{formatValue(selectedClientDetails.architect_name)}</div>
                   </div>
+                )}
+                
+                {/* Architect Number */}
+                {hasField('ar_number') && (
+                  <div>
+                    <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">Architect Number</div>
+                    <div className="font-medium text-black dark:text-white">{formatValue(selectedClientDetails.ar_number)}</div>
+                  </div>
+                )}
+                
+                {/* Carpenter Number */}
+                {hasField('ca_number') && (
+                  <div>
+                    <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">Carpenter Number</div>
+                    <div className="font-medium text-black dark:text-white">{formatValue(selectedClientDetails.ca_number)}</div>
+                  </div>
+                )}
+                
+                {/* Electrician Number */}
+                {hasField('e_number') && (
+                  <div>
+                    <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">Electrician Number</div>
+                    <div className="font-medium text-black dark:text-white">{formatValue(selectedClientDetails.e_number)}</div>
+                  </div>
+                )}
+                
+                {/* Site Manager Number */}
+                {hasField('sm_number') && (
+                  <div>
+                    <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">Site Manager Number</div>
+                    <div className="font-medium text-black dark:text-white">{formatValue(selectedClientDetails.sm_number)}</div>
+                  </div>
+                )}
+                
+                {/* POP Number */}
+                {hasField('pop_number') && (
+                  <div>
+                    <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">POP Number</div>
+                    <div className="font-medium text-black dark:text-white">{formatValue(selectedClientDetails.pop_number)}</div>
+                  </div>
+                )}
+                
+                {/* Other Number */}
+                {hasField('other_number') && (
+                  <div>
+                    <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">Other Number</div>
+                    <div className="font-medium text-black dark:text-white">{formatValue(selectedClientDetails.other_number)}</div>
+                  </div>
+                )}
+              </div>
+              
+              {/* Show message if no contact numbers */}
+              {!hasField('architect_name') && !hasField('ar_number') && !hasField('ca_number') && 
+               !hasField('e_number') && !hasField('sm_number') && !hasField('pop_number') && !hasField('other_number') && (
+                <div className="text-center text-gray-500 dark:text-gray-400 py-2">
+                  No contact numbers available
                 </div>
               )}
-
-              {/* Dates */}
-              {hasDates && (
-                <div className="bg-gradient-to-r from-emerald-50 to-teal-50 dark:from-emerald-900/20 dark:to-teal-900/20 p-3 rounded-lg border border-emerald-100 dark:border-emerald-800/30">
-                  <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2 flex items-center gap-2">
-                    <FontAwesomeIcon icon={faCalendarAlt} className="h-4 w-4 text-emerald-500" />
-                    Timeline
-                  </h3>
-                  <div className="grid grid-cols-2 gap-3 text-sm">
-                    {hasField('execution_start_date') && (
-                      <div>
-                        <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">Start Date</div>
-                        <div className="font-medium text-black dark:text-white">
-                          {formatDate(selectedClientDetails.execution_start_date)}
-                        </div>
-                      </div>
-                    )}
-                    {hasField('execution_end_date') && (
-                      <div>
-                        <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">End Date</div>
-                        <div className="font-medium text-black dark:text-white">
-                          {formatDate(selectedClientDetails.execution_end_date)}
-                        </div>
-                      </div>
-                    )}
-                    {hasField('assign_date') && (
-                      <div>
-                        <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">Entry Date</div>
-                        <div className="font-medium text-black dark:text-white">
-                          {formatDate(selectedClientDetails.assign_date)}
-                        </div>
-                      </div>
-                    )}
-                    {hasField('followup_date') && (
-                      <div>
-                        <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">Follow-up</div>
-                        <div className="font-medium text-black dark:text-white">
-                          {formatDate(selectedClientDetails.followup_date)}
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              )}
-
-              {/* Assignment Info */}
-              {hasAssignmentInfo && (
-                <div className="bg-gradient-to-r from-teal-50 to-cyan-50 dark:from-teal-900/20 dark:to-cyan-900/20 p-3 rounded-lg border border-teal-100 dark:border-teal-800/30">
-                  <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2 flex items-center gap-2">
-                    <FontAwesomeIcon icon={faUsers} className="h-4 w-4 text-teal-500" />
-                    Assignment
-                  </h3>
-                  <div className="space-y-2">
-                    {hasField('assigned_to') && (
-                      <div>
-                        <div className="text-xs text-gray-500 dark:text-gray-400">Assigned To</div>
-                        <div className="font-medium text-black dark:text-white">
-                          {formatValue(selectedClientDetails.assigned_to)}
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              )}
-
-              {/* Remarks */}
-              {hasRemarks && (
-                <div className="bg-gradient-to-r from-gray-50 to-slate-50 dark:from-gray-800/50 dark:to-slate-900/50 p-3 rounded-lg border border-gray-200 dark:border-gray-700">
-                  <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2 flex items-center gap-2">
-                    <FontAwesomeIcon icon={faInfoCircle} className="h-4 w-4 text-gray-500" />
-                    Remarks
-                  </h3>
-                  <div className="space-y-2">
-                    {hasField('execution_remark') && (
-                      <div>
-                        <div className="text-xs text-gray-500 dark:text-gray-400">Execution Remark</div>
-                        <div className="text-sm text-black dark:text-white bg-white dark:bg-gray-800 p-2 rounded border">
-                          {formatValue(selectedClientDetails.execution_remark)}
-                        </div>
-                      </div>
-                    )}
-                    {hasField('detailed_remark') && (
-                      <div>
-                        <div className="text-xs text-gray-500 dark:text-gray-400">Detailed Remark</div>
-                        <div className="text-sm text-black dark:text-white bg-white dark:bg-gray-800 p-2 rounded border">
-                          {formatValue(selectedClientDetails.detailed_remark)}
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              )}
-
+            </div>
+          </div>
+          
+        
               {/* Links */}
               {hasLinks && (
                 <div className="bg-gradient-to-r from-blue-50 to-cyan-50 dark:from-blue-900/20 dark:to-cyan-900/20 p-3 rounded-lg border border-blue-100 dark:border-blue-800/30">
@@ -3052,7 +2878,6 @@ const renderDetailsModal = () => {
     </div>
   );
 };
-
 
 
 
@@ -3819,11 +3644,10 @@ const handleSettingsClick = (lead) => {
   </div>
 </th>
 
-<th className="py-3 px-4">
-  <div className="text-xs font-extrabold uppercase tracking-wider text-gray-700 dark:text-gray-300">
-    Created At
-  </div>
+<th className="px-4 py-3 text-left">
+  Progress
 </th>
+
 
                   
                   {/* Action Column */}
@@ -3941,26 +3765,47 @@ const handleSettingsClick = (lead) => {
   </div>
 </td>
 
-{/* Execution Created At */}
-<td className="py-4 px-4">
-  <div className="font-semibold text-sm bg-gradient-to-r from-purple-50 to-purple-100 dark:from-purple-900/20 dark:to-purple-800/10 text-purple-800 dark:text-purple-300 px-3 py-1.5 rounded-lg border border-purple-100 dark:border-purple-800/30 shadow-sm">
-    {formatDate(lead.execution_created_at)}
+
+<td className="px-4 py-3">
+  <div className="flex items-center gap-2">
+
+    {/* Progress Bar */}
+    <div className="w-24 bg-gray-200 rounded-full h-2 dark:bg-gray-700">
+      <div
+        className="bg-green-500 h-2 rounded-full transition-all duration-500"
+        style={{
+          width: `${lead.total_completion_percentage || 0}%`
+        }}
+      />
+    </div>
+
+    {/* Percentage */}
+    <span className="text-sm font-semibold text-green-600">
+      {lead.total_completion_percentage || 0}%
+    </span>
+
   </div>
 </td>
 
+
+
 <td className="py-1 px-2">
   <div className="flex justify-center">
-    <ActionButton
-      onView={() => handleViewChecklist(lead)}
-      onEdit={() => handleEditChecklist(lead)}
-        onViewDocuments={() => handleViewExecutionDocuments(lead)}  // ADD THIS LINE
-      onEditExecution={() => handleEditExecution(lead)}  // NEW
-      onSettings={() => handleSettingsClick(lead)}
-      onLogs={() => handleLogsClick(lead)}
-      onViewQuotation={() => handleViewQuotation(lead)}
-      viewCount={itemCounts[lead.master_id] || 0}
-      className="text-xs"
-    />
+  <ActionButton
+  onView={() => handleViewChecklist(lead)}
+  onEdit={() => handleEditChecklist(lead)}
+  onEditContact={() => {  // NEW
+    setSelectedClientForContactEdit(lead);
+    setShowContactEditModal(true);
+  }}
+  onViewDocuments={() => handleViewExecutionDocuments(lead)}
+  onEditExecution={() => handleEditExecution(lead)}
+  onSettings={() => handleSettingsClick(lead)}
+  onLogs={() => handleLogsClick(lead)}
+  onViewQuotation={() => handleViewQuotation(lead)}
+  viewCount={itemCounts[lead.master_id] || 0}
+  className="text-xs"
+/>
   </div>
 </td>
 
@@ -4115,6 +3960,18 @@ const handleSettingsClick = (lead) => {
   />
 )}
 
+{/* Edit Contact Numbers Modal */}
+<EditContactNumbersModal
+  show={showContactEditModal}
+  onClose={() => {
+    setShowContactEditModal(false);
+    setSelectedClientForContactEdit(null);
+  }}
+  client={selectedClientForContactEdit}
+  onSuccess={() => {
+    fetchPendingExecutionLeads(); // Refresh the leads data after edit
+  }}
+/>
 
 
     </div>

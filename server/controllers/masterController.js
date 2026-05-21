@@ -3548,6 +3548,89 @@ async function insertOptionInstallments(connection, qtId, optionId, installments
 }
  
 
+// ─────────────────────────────────────────────────────────────
+//  HELPER — insert additional prices for one option (with revision)
+// ─────────────────────────────────────────────────────────────
+async function insertOptionAdditionalWithRevision(connection, qtId, optionId, additional_prices, revision) {
+  if (!additional_prices || additional_prices.length === 0) return;
+  
+  for (const a of additional_prices) {
+    if (a.add_price_name && a.price) {
+      await connection.query(
+        `INSERT INTO additional_price (qt_id, option_id, add_price_name, price, revision, created_at)
+         VALUES (?, ?, ?, ?, ?, NOW())`,
+        [qtId, optionId, a.add_price_name, Number(a.price || 0), revision]
+      );
+    }
+  }
+}
+
+// ─────────────────────────────────────────────────────────────
+//  HELPER — insert final offer for one option (with revision)
+// ─────────────────────────────────────────────────────────────
+async function insertOptionFinalOfferWithRevision(connection, qtId, optionId, final_offer, originalFinalTotal, revision) {
+  if (
+    !final_offer ||
+    (Number(final_offer.percentage) === 0 && Number(final_offer.amount) === 0)
+  ) return;
+ 
+  if (Number(final_offer.percentage) > 100) {
+    throw new Error('Final offer percentage cannot exceed 100%');
+  }
+ 
+  let offerAmount = Number(final_offer.amount || 0);
+  let offerPercentage = Number(final_offer.percentage || 0);
+ 
+  if (offerPercentage > 0 && offerAmount === 0) {
+    offerAmount = (originalFinalTotal * offerPercentage) / 100;
+  } else if (offerAmount > 0 && offerPercentage === 0) {
+    offerPercentage =
+      originalFinalTotal > 0 ? (offerAmount / originalFinalTotal) * 100 : 0;
+  }
+ 
+  await connection.query(
+    `INSERT INTO quotation_final_offer
+       (qt_id, option_id, description, percentage, amount, is_default, revision, created_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, NOW())`,
+    [
+      qtId, optionId,
+      final_offer.description || 'FINAL BEST OFFER (OPTIONAL)',
+      Number(offerPercentage),
+      Number(offerAmount),
+      final_offer.is_default || 0,
+      revision,
+    ]
+  );
+}
+
+// ─────────────────────────────────────────────────────────────
+//  HELPER — insert installments for one option (with revision)
+// ─────────────────────────────────────────────────────────────
+async function insertOptionInstallmentsWithRevision(connection, qtId, optionId, installments, discountedTotal, revision) {
+  if (!installments || installments.length === 0) return;
+  
+  const totalPercent = installments.reduce((s, i) => s + Number(i.percentage || 0), 0);
+  if (totalPercent > 100) throw new Error('Installment percentage cannot exceed 100%');
+ 
+  for (const inst of installments) {
+    await connection.query(
+      `INSERT INTO quotation_installments
+         (qt_id, option_id, description, percentage, amount, payment_mode, revision, created_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, NOW())`,
+      [
+        qtId,
+        optionId,
+        inst.description || '',
+        Number(inst.percentage || 0),
+        (discountedTotal * Number(inst.percentage || 0)) / 100,
+        inst.payment_mode || 'Online',
+        revision,
+      ]
+    );
+  }
+}
+
+
 
 // ============================================================
 //  CREATE QUOTATION
@@ -3853,7 +3936,7 @@ export const createQuotation10 = async (req, res) => {
   }
 };
 
-export const createQuotation = async (req, res) => {
+export const createQuotation11 = async (req, res) => {
   const connection = await db.getConnection();
  
   try {
@@ -4007,6 +4090,190 @@ export const createQuotation = async (req, res) => {
       qt_number,
       revision: revNo,
       rev_id: revId,
+      options: insertedOptions,
+    });
+ 
+  } catch (err) {
+    await connection.rollback();
+    console.error('Quotation Create Error:', err);
+    return res.status(500).json({ message: err.message });
+  } finally {
+    connection.release();
+  }
+};
+
+
+export const createQuotation = async (req, res) => {
+  const connection = await db.getConnection();
+ 
+  try {
+    const user = req.session?.user;
+    if (!user) return res.status(401).json({ message: 'User not authenticated' });
+    const created_by = user.id;
+ 
+    const { 
+      type, 
+      master_id = null, 
+      acoustic_terms = null, 
+      installments_config = [], 
+      subject = null,
+      selected_options_for_summary = null,
+      quotation_type = 'demo'
+    } = req.body; 
+
+    const resolvedOptions = resolveOptions(req.body);
+ 
+    if (!type || resolvedOptions.length === 0) {
+      return res.status(400).json({
+        message: 'type and at least one option with items are required',
+      });
+    }
+ 
+    await connection.beginTransaction();
+ 
+    // generate QT number
+    const [[ai]] = await connection.query(
+      `SELECT AUTO_INCREMENT FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME = 'quotation'`
+    );
+    const qt_number = `QT${String(ai.AUTO_INCREMENT).padStart(6, '0')}`;
+ 
+    // Calculate totals for ALL options
+    let totalProductsCost = 0;
+    let totalWithGST = 0;
+    let totalDiscounted = 0;
+    let totalGSTAmount = 0;
+    let totalDiscountAmount = 0;
+    
+    for (let i = 0; i < resolvedOptions.length; i++) {
+      const option = resolvedOptions[i];
+      const optionTotals = calcOptionTotals(option, type);
+      
+      totalProductsCost += optionTotals.productsTotal;
+      totalWithGST += optionTotals.originalFinalTotal;
+      totalDiscounted += optionTotals.discountedTotal;
+      totalGSTAmount += optionTotals.gstAmount;
+      totalDiscountAmount += optionTotals.discountAmount;
+    }
+    
+    const overallDiscountPercentage = totalWithGST > 0 
+      ? (totalDiscountAmount / totalWithGST) * 100 
+      : 0;
+    
+    // Convert selected_options_for_summary to JSON string for revision storage
+    const selectedOptionsJson = selected_options_for_summary && Array.isArray(selected_options_for_summary) && selected_options_for_summary.length > 0 
+      ? JSON.stringify(selected_options_for_summary) 
+      : null;
+ 
+    // insert quotation header with quotation_type (NO COMMENTS IN SQL)
+    const [qInsert] = await connection.query(
+      `INSERT INTO quotation
+         (qt_number, type, master_id, acoustic_terms, subject,
+          total_price, without_gst_total, with_gst_total,
+          discounted_total, discount_percentage, discount_amount,
+          quotation_type,
+          created_flag, created_by, created_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())`,
+      [
+        qt_number, 
+        type, 
+        master_id, 
+        acoustic_terms, 
+        subject,
+        totalProductsCost,
+        totalProductsCost,
+        totalWithGST,
+        totalDiscounted,
+        overallDiscountPercentage,
+        totalDiscountAmount,
+        quotation_type,
+        1,
+        created_by,
+      ]
+    );
+    const qtId = qInsert.insertId;
+ 
+    // update lead stage
+    if (master_id) {
+      await connection.query(
+        `UPDATE raw_data SET lead_stage = 'Quotation Created' WHERE master_id = ?`,
+        [master_id]
+      );
+    }
+ 
+    // insert revision
+    const revNo = 1;
+    const [revInsert] = await connection.query(
+      `INSERT INTO quotation_revision
+         (qt_id, revision, total_without_gst, total_with_gst, gst_app_amt, selected_options_for_summary, created_at)
+       VALUES (?, ?, ?, ?, ?, ?, NOW())`,
+      [
+        qtId, revNo,
+        totalProductsCost,
+        totalDiscounted,
+        type === 'with_gst' ? (totalGSTAmount / 0.18) : 0,
+        selectedOptionsJson,
+      ]
+    );
+    const revId = revInsert.insertId;
+ 
+    // insert each option
+    const insertedOptions = [];
+ 
+    for (let i = 0; i < resolvedOptions.length; i++) {
+      const option = resolvedOptions[i];
+      const {
+        option_name = `OPTION ${i + 1}`,
+        subject = null,
+        subject_type = 'master',
+        floor_name = null,
+        room_name = null,
+        items = [],
+        additional_prices = [],
+        final_offer = null,
+      } = option;
+ 
+      const [optInsert] = await connection.query(
+        `INSERT INTO quotation_options 
+           (qt_id, option_name, option_order, revision, subject, subject_type, floor_name, room_name, created_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, NOW())`,
+        [qtId, option_name, i + 1, revNo, subject, subject_type, floor_name, room_name]
+      );
+      const optionId = optInsert.insertId;
+ 
+      const totals = calcOptionTotals(option, type);
+ 
+      await insertOptionProducts(connection, qtId, optionId, items, revNo, created_by);
+      await insertOptionAdditionalWithRevision(connection, qtId, optionId, additional_prices, revNo);
+      await insertOptionFinalOfferWithRevision(connection, qtId, optionId, final_offer, totals.originalFinalTotal, revNo);
+      
+      const optionInstallmentConfig = installments_config.find(cfg => cfg.option_index === i);
+      if (optionInstallmentConfig && optionInstallmentConfig.selected && optionInstallmentConfig.installments && optionInstallmentConfig.installments.length > 0) {
+        await insertOptionInstallmentsWithRevision(connection, qtId, optionId, optionInstallmentConfig.installments, totals.discountedTotal, revNo);
+      }
+ 
+      insertedOptions.push({
+        option_id: optionId,
+        option_name,
+        subject: subject,
+        subject_type: subject_type,
+        floor_name: floor_name,
+        room_name: room_name,
+        option_order: i + 1,
+        revision: revNo,
+        finalized_total: totals.discountedTotal,
+        ...totals,
+      });
+    }
+ 
+    await connection.commit();
+ 
+    return res.json({
+      message: 'Quotation Created Successfully',
+      qt_id: qtId,
+      qt_number,
+      revision: revNo,
+      rev_id: revId,
+      quotation_type: quotation_type,
       options: insertedOptions,
     });
  
@@ -5497,7 +5764,7 @@ export const getQuotationByMasterId7 = async (req, res) => {
   }
 };
 
-export const getQuotationByMasterId = async (req, res) => {
+export const getQuotationByMasterId8 = async (req, res) => {
   const { master_id, revision } = req.params;
   if (!master_id || !revision) {
     return res.status(400).json({ message: 'master_id & revision required' });
@@ -5663,8 +5930,8 @@ const [installmentRows] = await connection.query(
       builtOptions.push({
         option_id: opt.option_id,
         option_name: opt.option_name,
-        subject: opt.subject || null,           // ← ADDED: option subject
-        subject_type: opt.subject_type || 'master',  // ← ADDED: subject type
+        subject: opt.subject || null,          
+        subject_type: opt.subject_type || 'master',  
         option_order: opt.option_order,
         items: Object.values(kitsMap),
         additional_prices,
@@ -5712,7 +5979,214 @@ installments: installmentRows.map(i => ({
 };
 
 
-export const getQuotationRevisionsByMasterId = async (req, res) => {
+export const getQuotationByMasterId = async (req, res) => {
+  const { master_id, revision } = req.params;
+  if (!master_id || !revision) {
+    return res.status(400).json({ message: 'master_id & revision required' });
+  }
+ 
+  const revisionNumber = Number(revision);
+  const connection = await db.getConnection();
+ 
+  try {
+    const [[lead]] = await connection.query(
+      `SELECT name, number, city, address FROM raw_data WHERE master_id = ?`,
+      [master_id]
+    );
+ 
+    const [[quotation]] = await connection.query(
+      `SELECT qt_id, master_id, qt_number, type, quotation_type, created_at, acoustic_terms, subject
+       FROM quotation WHERE master_id = ? LIMIT 1`,
+      [master_id]
+    );
+    if (!quotation) return res.status(404).json({ message: 'No quotation found' });
+ 
+    const [[revisionData]] = await connection.query(
+      `SELECT total_without_gst, total_with_gst, gst_app_amt, selected_options_for_summary
+       FROM quotation_revision WHERE qt_id = ? AND revision = ?`,
+      [quotation.qt_id, revisionNumber]
+    );
+    if (!revisionData) {
+      return res.status(404).json({ message: `Revision ${revisionNumber} not found` });
+    }
+ 
+    let selectedOptionsForSummary = null;
+    if (revisionData.selected_options_for_summary) {
+      if (typeof revisionData.selected_options_for_summary === 'object') {
+        selectedOptionsForSummary = revisionData.selected_options_for_summary;
+      } else if (typeof revisionData.selected_options_for_summary === 'string') {
+        try {
+          selectedOptionsForSummary = JSON.parse(revisionData.selected_options_for_summary);
+        } catch (e) {
+          console.error('Error parsing selected_options_for_summary:', e);
+          selectedOptionsForSummary = null;
+        }
+      }
+    }
+ 
+    const [categories] = await connection.query(`SELECT cat_id, cat_name FROM category`);
+    const categoryMap = {};
+    categories.forEach(c => { categoryMap[c.cat_id] = c.cat_name; });
+ 
+    const [optionRows] = await connection.query(
+      `SELECT option_id, option_name, option_order, subject, subject_type, floor_name, room_name
+       FROM quotation_options 
+       WHERE qt_id = ? AND revision = ?
+       ORDER BY option_order ASC`,
+      [quotation.qt_id, revisionNumber]
+    );
+ 
+    const GST_PERCENT = 18;
+    const gstBase = Number(revisionData.gst_app_amt || 0);
+ 
+    const builtOptions = [];
+ 
+    for (const opt of optionRows) {
+      const [mapped] = await connection.query(
+        `SELECT
+            qm.qm_id, qm.cat_id, qm.kit_id, qm.model_id,
+            qm.model_qty AS qty,
+            qm.model_price AS price,
+            qm.current_revision, qm.kit_qty,
+            k.kit_name,
+            m.model_no AS model,
+            m.image_path,
+            m.description,
+            m.price AS model_original_price,
+            b.brand_name,
+            pt.product_type_name
+         FROM quotation_mapped qm
+         LEFT JOIN kit k ON k.kit_id = qm.kit_id
+         JOIN models m ON m.model_id = qm.model_id
+         LEFT JOIN brands b ON b.brand_id = m.brand_id
+         LEFT JOIN product_types pt ON pt.product_type_id = (
+           SELECT product_type_id FROM kit_mapping WHERE model_id = qm.model_id LIMIT 1
+         )
+         WHERE qm.qt_id = ? AND qm.option_id = ? AND qm.current_revision = ?
+         ORDER BY qm.kit_id`,
+        [quotation.qt_id, opt.option_id, revisionNumber]
+      );
+ 
+      mapped.forEach(row => {
+        row.cat_name = categoryMap[row.cat_id] || 'Unknown';
+        row.price = Number(row.price || 0);
+        row.model_original_price = Number(row.model_original_price || 0);
+      });
+ 
+      const kitsMap = {};
+      for (const row of mapped) {
+        const key = row.kit_id ?? 'single';
+        if (!kitsMap[key]) {
+          kitsMap[key] = { kit_id: row.kit_id, kit_name: row.kit_name, items: [] };
+        }
+        kitsMap[key].items.push(row);
+      }
+ 
+      const [additional] = await connection.query(
+        `SELECT add_price_name, price FROM additional_price
+         WHERE qt_id = ? AND option_id = ? AND revision = ?`,
+        [quotation.qt_id, opt.option_id, revisionNumber]
+      );
+      const additional_prices = additional.map(a => ({
+        add_price_name: a.add_price_name,
+        price: Number(a.price || 0),
+      }));
+ 
+      const [finalOfferRows] = await connection.query(
+        `SELECT description, percentage, amount, is_default
+         FROM quotation_final_offer 
+         WHERE qt_id = ? AND option_id = ? AND revision = ?
+         LIMIT 1`,
+        [quotation.qt_id, opt.option_id, revisionNumber]
+      );
+      
+      const [installmentRows] = await connection.query(
+        `SELECT description, percentage, amount, payment_mode 
+         FROM quotation_installments 
+         WHERE qt_id = ? AND option_id = ? AND revision = ?`,
+        [quotation.qt_id, opt.option_id, revisionNumber]
+      );
+ 
+      const optProductsTotal = mapped.reduce(
+        (sum, row) => sum + Number(row.price) * Number(row.qty),
+        0
+      );
+      const optAdditionalTotal = additional_prices.reduce((s, a) => s + a.price, 0);
+      const optGst = quotation.type === 'with_gst' ? (gstBase * GST_PERCENT) / 100 : 0;
+      const optTotalWithGST = optProductsTotal + optAdditionalTotal + optGst;
+ 
+      let finalOfferData = null;
+      let finalOfferAmount = 0;
+ 
+      if (finalOfferRows.length > 0 && Number(finalOfferRows[0].amount) > 0) {
+        finalOfferData = {
+          description: finalOfferRows[0].description || 'FINAL BEST OFFER (OPTIONAL)',
+          percentage: Number(finalOfferRows[0].percentage || 0),
+          amount: Number(finalOfferRows[0].amount || 0),
+        };
+        finalOfferAmount = Number(finalOfferRows[0].amount || 0);
+      }
+ 
+      const finalizedTotal = optTotalWithGST - finalOfferAmount;
+ 
+      builtOptions.push({
+        option_id: opt.option_id,
+        option_name: opt.option_name,
+        subject: opt.subject || null,
+        subject_type: opt.subject_type || 'master',
+        floor_name: opt.floor_name || null,
+        room_name: opt.room_name || null,
+        option_order: opt.option_order,
+        items: Object.values(kitsMap),
+        additional_prices,
+        installments: installmentRows.map(i => ({
+          description: i.description,
+          percentage: Number(i.percentage || 0),
+          amount: Number(i.amount || 0),
+          payment_mode: i.payment_mode || 'Online',
+        })),
+        revision_details: {
+          total_without_gst: optProductsTotal,
+          total_with_gst: optTotalWithGST,
+          gst_app_amt: gstBase,
+          gst_percent: GST_PERCENT,
+          gst_calculated_amount: optGst,
+        },
+        final_offer: finalOfferData,
+        final_offer_amount: finalOfferAmount,
+        finalized_total: finalizedTotal,
+      });
+    }
+ 
+    return res.status(200).json({
+      master_id,
+      revision: revisionNumber,
+      lead,
+      quotation: {
+        qt_id: quotation.qt_id,
+        qt_number: quotation.qt_number,
+        type: quotation.type,
+        quotation_type: quotation.quotation_type || 'demo',  
+        acoustic_terms: quotation.acoustic_terms,
+        subject: quotation.subject,
+        selected_options_for_summary: selectedOptionsForSummary,
+        created_at: quotation.created_at,
+        options: builtOptions,
+      },
+    });
+ 
+  } catch (error) {
+    console.error('getQuotationByMasterId Error:', error);
+    return res.status(500).json({ message: 'Failed to fetch quotation' });
+  } finally {
+    connection.release();
+  }
+};
+
+
+
+
+export const getQuotationRevisionsByMasterId1 = async (req, res) => {
   const { master_id } = req.params;
 
   if (!master_id) {
@@ -5728,7 +6202,6 @@ export const getQuotationRevisionsByMasterId = async (req, res) => {
       [master_id],
     );
 
-    // If no lead found, return empty response
     if (!lead) {
       return res.status(200).json({
         master_id,
@@ -5888,6 +6361,194 @@ export const getQuotationRevisionsByMasterId = async (req, res) => {
     return res
       .status(500)
       .json({ message: 'Failed to fetch quotation revisions' });
+  } finally {
+    connection.release();
+  }
+};
+
+
+export const getQuotationRevisionsByMasterId = async (req, res) => {
+  const { master_id } = req.params;
+
+  if (!master_id) {
+    return res.status(400).json({ message: 'master_id is required' });
+  }
+
+  const connection = await db.getConnection();
+
+  try {
+    /** LEAD DETAILS **/
+    const [[lead]] = await connection.query(
+      `SELECT name, number, city FROM raw_data WHERE master_id = ?`,
+      [master_id],
+    );
+
+    if (!lead) {
+      return res.status(200).json({
+        master_id,
+        lead: null,
+        quotations: [],
+        message: 'No data found for this master_id'
+      });
+    }
+
+    /** QUOTATIONS **/
+    const [quotations] = await connection.query(
+      `SELECT 
+         q.qt_id,
+         q.qt_number,
+         q.type,
+         q.quotation_type,  
+         q.created_at,
+         q.updated_at,
+         q.created_by,
+         q.updated_by,
+         uc.name AS created_by_name,
+         uu.name AS updated_by_name
+       FROM quotation q
+       LEFT JOIN users uc ON uc.user_id = q.created_by
+       LEFT JOIN users uu ON uu.user_id = q.updated_by
+       WHERE q.master_id = ?
+       ORDER BY q.qt_id DESC`,
+      [master_id],
+    );
+
+    if (quotations.length > 0) {
+      for (let qt of quotations) {
+        /** REVISION META **/
+        const [revisionMeta] = await connection.query(
+          `SELECT revision, total_without_gst, total_with_gst, created_at, selected_options_for_summary
+           FROM quotation_revision
+           WHERE qt_id = ?
+           ORDER BY revision ASC`,
+          [qt.qt_id],
+        );
+
+        /** DISTINCT REVISION NUMBERS FROM MAPPED **/
+        const [mappedRevisions] = await connection.query(
+          `SELECT DISTINCT current_revision
+           FROM quotation_mapped
+           WHERE qt_id = ?
+           ORDER BY current_revision ASC`,
+          [qt.qt_id],
+        );
+
+        qt.revisions = [];
+
+        for (let rev of mappedRevisions) {
+          const revisionNumber = rev.current_revision;
+          
+          const revMeta = revisionMeta.find(r => r.revision === revisionNumber);
+          
+          let selectedOptionsForSummary = null;
+          if (revMeta && revMeta.selected_options_for_summary) {
+            try {
+              selectedOptionsForSummary = typeof revMeta.selected_options_for_summary === 'string'
+                ? JSON.parse(revMeta.selected_options_for_summary)
+                : revMeta.selected_options_for_summary;
+            } catch (e) {
+              console.error('Error parsing selected_options_for_summary:', e);
+            }
+          }
+
+          const [mapped] = await connection.query(
+            `SELECT 
+               qm.qm_id,
+               qm.cat_id,
+               qm.kit_id,
+               k.kit_name,
+               qm.kit_qty,
+               qm.model_id,
+               qm.model_qty,
+               qm.model_price,
+               qm.current_revision,
+               m.model_no AS model,
+               m.image_path,
+               m.description AS model_description,
+               b.brand_id,
+               b.brand_name,
+               pt.product_type_id,
+               pt.product_type_name
+             FROM quotation_mapped qm
+             LEFT JOIN kit k ON k.kit_id = qm.kit_id
+             JOIN models m ON m.model_id = qm.model_id
+             LEFT JOIN brands b ON b.brand_id = m.brand_id
+             LEFT JOIN product_types pt ON pt.product_type_id = (
+               SELECT product_type_id 
+               FROM kit_mapping 
+               WHERE model_id = qm.model_id 
+               LIMIT 1
+             )
+             WHERE qm.qt_id = ?
+               AND qm.current_revision = ?
+             ORDER BY qm.kit_id`,
+            [qt.qt_id, revisionNumber],
+          );
+
+          const kitsMap = {};
+          for (let row of mapped) {
+            const key = row.kit_id ?? 'single';
+            if (!kitsMap[key]) {
+              kitsMap[key] = {
+                kit_id: row.kit_id,
+                kit_name: row.kit_name,
+                kit_qty: row.kit_qty,
+                items: [],
+              };
+            }
+
+            kitsMap[key].items.push({
+              model_id: row.model_id,
+              model: row.model,
+              model_qty: row.model_qty,
+              model_price: row.model_price,
+              brand_id: row.brand_id,
+              brand_name: row.brand_name,
+              product_type_id: row.product_type_id,
+              product_type_name: row.product_type_name,
+              image_path: row.image_path,
+              model_description: row.model_description,
+            });
+          }
+
+          const totals = revMeta || null;
+
+          const [additional] = await connection.query(
+            `SELECT add_id, add_price_name, price 
+             FROM additional_price 
+             WHERE qt_id = ? AND revision = ?`,
+            [qt.qt_id, revisionNumber],
+          );
+
+          qt.revisions.push({
+            revision: revisionNumber,
+            kits: Object.values(kitsMap),
+            additional_prices: additional,
+            selected_options_for_summary: selectedOptionsForSummary,
+            totals: totals
+              ? {
+                  without_gst: totals.total_without_gst,
+                  with_gst: totals.total_with_gst,
+                }
+              : null,
+            created_at: totals?.created_at || qt.created_at,
+            is_latest:
+              revisionNumber ===
+              Math.max(...mappedRevisions.map((x) => x.current_revision)),
+          });
+        }
+      }
+    }
+
+    return res.status(200).json({
+      master_id,
+      lead: lead || null,
+      quotations: quotations || [],
+      message: quotations.length === 0 ? 'No quotations found for this lead' : 'Quotations retrieved successfully'
+    });
+  } catch (error) {
+    console.error('❌ getQuotationRevisionsByMasterId Error:', error);
+    return res.status(500).json({ message: 'Failed to fetch quotation revisions' });
   } finally {
     connection.release();
   }
@@ -8580,7 +9241,7 @@ export const updateQuotationWithRevision12 = async (req, res) => {
 };
 
 
-export const updateQuotationWithRevision = async (req, res) => {
+export const updateQuotationWithRevision13 = async (req, res) => {
   const { qt_id } = req.params;
   if (!qt_id) return res.status(400).json({ message: 'qt_id is required' });
  
@@ -8769,75 +9430,195 @@ export const updateQuotationWithRevision = async (req, res) => {
 };
 
 
-// Helper functions with revision support
-async function insertOptionAdditionalWithRevision(connection, qtId, optionId, additional_prices, revision) {
-  for (const a of additional_prices) {
-    await connection.query(
-      `INSERT INTO additional_price (qt_id, option_id, add_price_name, price, revision, created_at)
-       VALUES (?, ?, ?, ?, ?, NOW())`,
-      [qtId, optionId, a.add_price_name, Number(a.price || 0), revision]
+export const updateQuotationWithRevision = async (req, res) => {
+  const { qt_id } = req.params;
+  if (!qt_id) return res.status(400).json({ message: 'qt_id is required' });
+ 
+  const connection = await db.getConnection();
+ 
+  try {
+    await connection.beginTransaction();
+ 
+    const userId = req.session?.user?.id;
+    if (!userId) return res.status(401).json({ message: 'User not authenticated' });
+ 
+    const { 
+      type, 
+      acoustic_terms = null, 
+      installments_config = [], 
+      subject = null,
+      selected_options_for_summary = null,
+      quotation_type = 'demo'  
+    } = req.body;
+    
+    const resolvedOptions = resolveOptions(req.body);
+ 
+    /* ── fetch quotation ── */
+    const [[quotation]] = await connection.query(
+      `SELECT qt_number, acoustic_terms, quotation_type FROM quotation WHERE qt_id = ?`,
+      [qt_id]
     );
-  }
-}
-
-async function insertOptionFinalOfferWithRevision(connection, qtId, optionId, final_offer, originalFinalTotal, revision) {
-  if (
-    !final_offer ||
-    (Number(final_offer.percentage) === 0 && Number(final_offer.amount) === 0)
-  ) return;
+    if (!quotation) {
+      await connection.rollback();
+      return res.status(404).json({ message: 'Quotation not found' });
+    }
  
-  if (Number(final_offer.percentage) > 100) {
-    throw new Error('Final offer percentage cannot exceed 100%');
-  }
+    const finalAcousticTerms =
+      acoustic_terms !== null ? acoustic_terms : quotation.acoustic_terms;
+    
+    const finalQuotationType = quotation_type || quotation.quotation_type || 'demo';
  
-  let offerAmount = Number(final_offer.amount || 0);
-  let offerPercentage = Number(final_offer.percentage || 0);
+    /* ── get next revision number from quotation_revision ── */
+    const [[maxRev]] = await connection.query(
+      `SELECT MAX(revision) AS lastRevision FROM quotation_revision WHERE qt_id = ?`,
+      [qt_id]
+    );
+    const newRevision = (maxRev?.lastRevision || 0) + 1;
  
-  if (offerPercentage > 0 && offerAmount === 0) {
-    offerAmount = (originalFinalTotal * offerPercentage) / 100;
-  } else if (offerAmount > 0 && offerPercentage === 0) {
-    offerPercentage =
-      originalFinalTotal > 0 ? (offerAmount / originalFinalTotal) * 100 : 0;
-  }
+    // Calculate totals for ALL options
+    let totalProductsCost = 0;
+    let totalWithGST = 0;
+    let totalDiscounted = 0;
+    let totalGSTAmount = 0;
+    let totalDiscountAmount = 0;
+    
+    for (let i = 0; i < resolvedOptions.length; i++) {
+      const option = resolvedOptions[i];
+      const optionTotals = calcOptionTotals(option, type);
+      
+      totalProductsCost += optionTotals.productsTotal;
+      totalWithGST += optionTotals.originalFinalTotal;
+      totalDiscounted += optionTotals.discountedTotal;
+      totalGSTAmount += optionTotals.gstAmount;
+      totalDiscountAmount += optionTotals.discountAmount;
+    }
+    
+    const overallDiscountPercentage = totalWithGST > 0 
+      ? (totalDiscountAmount / totalWithGST) * 100 
+      : 0;
+    
+    // Convert selected_options_for_summary to JSON string (store in revision)
+    const selectedOptionsJson = selected_options_for_summary && Array.isArray(selected_options_for_summary) && selected_options_for_summary.length > 0 
+      ? JSON.stringify(selected_options_for_summary) 
+      : null;
  
-  await connection.query(
-    `INSERT INTO quotation_final_offer
-       (qt_id, option_id, description, percentage, amount, is_default, revision, created_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, NOW())`,
-    [
-      qtId, optionId,
-      final_offer.description || 'FINAL BEST OFFER (OPTIONAL)',
-      Number(offerPercentage),
-      Number(offerAmount),
-      final_offer.is_default || 0,
-      revision,
-    ]
-  );
-}
-
-async function insertOptionInstallmentsWithRevision(connection, qtId, optionId, installments, discountedTotal, revision) {
-  if (!installments || installments.length === 0) return;
-  
-  const totalPercent = installments.reduce((s, i) => s + Number(i.percentage || 0), 0);
-  if (totalPercent > 100) throw new Error('Installment percentage cannot exceed 100%');
- 
-  for (const inst of installments) {
-    await connection.query(
-      `INSERT INTO quotation_installments
-         (qt_id, option_id, description, percentage, amount, payment_mode, revision, created_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, NOW())`,
+    /* ── insert revision record ── */
+    const [revInsert] = await connection.query(
+      `INSERT INTO quotation_revision
+         (qt_id, revision, total_without_gst, total_with_gst, gst_app_amt, selected_options_for_summary, created_at)
+       VALUES (?, ?, ?, ?, ?, ?, NOW())`,
       [
-        qtId,
-        optionId,
-        inst.description || '',
-        Number(inst.percentage || 0),
-        (discountedTotal * Number(inst.percentage || 0)) / 100,
-        inst.payment_mode || 'Online',  // Add payment mode
-        revision,
+        qt_id, newRevision,
+        totalProductsCost,
+        totalDiscounted,
+        type === 'with_gst' ? (totalGSTAmount / 0.18) : 0,
+        selectedOptionsJson,
       ]
     );
+    const rev_id = revInsert.insertId;
+ 
+    /* ── insert updated options for THIS revision only ── */
+    const insertedOptions = [];
+ 
+    for (let i = 0; i < resolvedOptions.length; i++) {
+      const option = resolvedOptions[i];
+      const {
+        option_name = `OPTION ${i + 1}`,
+        subject = null,
+        subject_type = 'master',
+        floor_name = null,
+        room_name = null,
+        items = [],
+        additional_prices = [],
+        final_offer = null,
+      } = option;
+ 
+      const [optInsert] = await connection.query(
+        `INSERT INTO quotation_options 
+           (qt_id, option_name, option_order, revision, subject, subject_type, floor_name, room_name, created_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, NOW())`,
+        [qt_id, option_name, i + 1, newRevision, subject, subject_type, floor_name, room_name]
+      );
+      const optionId = optInsert.insertId;
+ 
+      const totals = calcOptionTotals(option, type);
+ 
+      await insertOptionProducts(connection, qt_id, optionId, items, newRevision, userId);
+      await insertOptionAdditionalWithRevision(connection, qt_id, optionId, additional_prices, newRevision);
+      await insertOptionFinalOfferWithRevision(connection, qt_id, optionId, final_offer, totals.originalFinalTotal, newRevision);
+      
+      const optionInstallmentConfig = installments_config.find(cfg => cfg.option_index === i);
+      if (optionInstallmentConfig && optionInstallmentConfig.selected && optionInstallmentConfig.installments && optionInstallmentConfig.installments.length > 0) {
+        await insertOptionInstallmentsWithRevision(connection, qt_id, optionId, optionInstallmentConfig.installments, totals.discountedTotal, newRevision);
+      }
+ 
+      insertedOptions.push({
+        option_id: optionId,
+        option_name,
+        subject: subject,
+        subject_type: subject_type,
+        floor_name: floor_name,
+        room_name: room_name,
+        option_order: i + 1,
+        revision: newRevision,
+        finalized_total: totals.discountedTotal,
+        ...totals,
+      });
+    }
+ 
+    /* ── update quotation header with quotation_type ── */
+    await connection.query(
+      `UPDATE quotation SET
+         type = ?, acoustic_terms = ?, subject = ?,
+         total_price = ?, without_gst_total = ?, with_gst_total = ?,
+         discounted_total = ?, discount_percentage = ?, discount_amount = ?,
+         quotation_type = ?,  
+         current_revision = ?,
+         updated_by = ?, updated_at = NOW()
+       WHERE qt_id = ?`,
+      [
+        type, finalAcousticTerms, subject,
+        totalProductsCost,
+        totalProductsCost,
+        totalWithGST,
+        totalDiscounted,
+        overallDiscountPercentage,
+        totalDiscountAmount,
+        finalQuotationType,  
+        newRevision,
+        userId, qt_id,
+      ]
+    );
+ 
+    await connection.commit();
+ 
+    return res.status(200).json({
+      message: 'Quotation updated + revision created',
+      qt_id,
+      qt_number: quotation.qt_number,
+      revision: newRevision,
+      rev_id,
+      quotation_type: finalQuotationType, 
+      options: insertedOptions,
+      totals: {
+        products_total: totalProductsCost,
+        with_gst_total: totalWithGST,
+        discounted_total: totalDiscounted,
+        discount_amount: totalDiscountAmount,
+        discount_percentage: overallDiscountPercentage
+      }
+    });
+ 
+  } catch (err) {
+    await connection.rollback();
+    console.error('updateQuotationWithRevision ERROR:', err);
+    return res.status(500).json({ message: err.message });
+  } finally {
+    connection.release();
   }
-}
+};
+
+
 
 
 
@@ -10054,7 +10835,7 @@ export const getQuotationForEdit7 = async (req, res) => {
 };
 
 
-export const getQuotationForEdit = async (req, res) => {
+export const getQuotationForEdit8 = async (req, res) => {
   const { qt_id, revision } = req.params;
   if (!qt_id || !revision) {
     return res.status(400).json({ message: 'qt_id & revision required' });
@@ -10236,6 +11017,188 @@ installments: installmentRows.map(i => ({
     connection.release();
   }
 };
+
+
+
+export const getQuotationForEdit = async (req, res) => {
+  const { qt_id, revision } = req.params;
+  if (!qt_id || !revision) {
+    return res.status(400).json({ message: 'qt_id & revision required' });
+  }
+ 
+  const connection = await db.getConnection();
+ 
+  try {
+    /* ── quotation header with quotation_type ── */
+    const [[quotation]] = await connection.query(
+      `SELECT qt_id, qt_number, type, acoustic_terms, subject, quotation_type,
+              discounted_total, discount_percentage, discount_amount, current_revision
+       FROM quotation WHERE qt_id = ?`,
+      [qt_id]
+    );
+    if (!quotation) return res.status(404).json({ message: 'Quotation not found' });
+ 
+    /* ── revision data ── */
+    const [[revisionData]] = await connection.query(
+      `SELECT total_without_gst, total_with_gst, gst_app_amt, selected_options_for_summary
+       FROM quotation_revision WHERE qt_id = ? AND revision = ?`,
+      [qt_id, revision]
+    );
+ 
+    let selectedOptionsForSummary = revisionData?.selected_options_for_summary;
+    if (selectedOptionsForSummary && typeof selectedOptionsForSummary === 'string') {
+      try {
+        selectedOptionsForSummary = JSON.parse(selectedOptionsForSummary);
+      } catch (e) {
+        selectedOptionsForSummary = [];
+      }
+    }
+ 
+    const [optionRows] = await connection.query(
+      `SELECT option_id, option_name, option_order, subject, subject_type, floor_name, room_name
+       FROM quotation_options 
+       WHERE qt_id = ? AND revision = ?
+       ORDER BY option_order ASC`,
+      [qt_id, revision]
+    );
+ 
+    const options = [];
+ 
+    for (const opt of optionRows) {
+      const [rows] = await connection.query(
+        `SELECT
+            qm.cat_id, qm.kit_id, qm.kit_qty,
+            k.kit_name,
+            qm.model_id, qm.model_qty, qm.model_price,
+            m.model_no AS model,
+            m.description AS model_description,
+            b.brand_name,
+            pt.product_type_name
+         FROM quotation_mapped qm
+         LEFT JOIN kit k ON k.kit_id = qm.kit_id
+         JOIN models m ON m.model_id = qm.model_id
+         LEFT JOIN brands b ON b.brand_id = m.brand_id
+         LEFT JOIN product_types pt ON pt.product_type_id = (
+           SELECT product_type_id FROM kit_mapping WHERE model_id = qm.model_id LIMIT 1
+         )
+         WHERE qm.qt_id = ? AND qm.option_id = ? AND qm.current_revision = ?`,
+        [qt_id, opt.option_id, revision]
+      );
+ 
+      const kitsMap = {};
+      rows.forEach(row => {
+        const key = row.kit_id ?? 'single';
+        if (!kitsMap[key]) {
+          kitsMap[key] = {
+            cat_id: row.cat_id,
+            kit_id: row.kit_id,
+            kit_name: row.kit_name,
+            kit_qty: row.kit_qty,
+            items: [],
+          };
+        }
+        kitsMap[key].items.push({
+          model_id: row.model_id,
+          model: row.model,
+          model_qty: Number(row.model_qty),
+          model_price: Number(row.model_price),
+          brand_name: row.brand_name,
+          product_type_name: row.product_type_name,
+          model_description: row.model_description,
+        });
+      });
+ 
+      const [additionalPrices] = await connection.query(
+        `SELECT add_price_name, price FROM additional_price
+         WHERE qt_id = ? AND option_id = ? AND revision = ?`,
+        [qt_id, opt.option_id, revision]
+      );
+ 
+      const [finalOfferRows] = await connection.query(
+        `SELECT description, percentage, amount, is_default
+         FROM quotation_final_offer 
+         WHERE qt_id = ? AND option_id = ? AND revision = ?`,
+        [qt_id, opt.option_id, revision]
+      );
+      
+      const [installmentRows] = await connection.query(
+        `SELECT description, percentage, amount, payment_mode 
+         FROM quotation_installments 
+         WHERE qt_id = ? AND option_id = ? AND revision = ?`,
+        [qt_id, opt.option_id, revision]
+      ); 
+
+      options.push({
+        option_id: opt.option_id,
+        option_name: opt.option_name,
+        option_order: opt.option_order,
+        subject: opt.subject || null,
+        subject_type: opt.subject_type || 'master',
+        floor_name: opt.floor_name || null,
+        room_name: opt.room_name || null,
+        gst_app_amt: Number(revisionData?.gst_app_amt || 0),
+        kits: Object.values(kitsMap),
+        additional_prices: additionalPrices.map(a => ({
+          add_price_name: a.add_price_name,
+          price: Number(a.price),
+        })),
+        final_offer: finalOfferRows.length > 0 ? {
+          description: finalOfferRows[0].description,
+          percentage: Number(finalOfferRows[0].percentage),
+          amount: Number(finalOfferRows[0].amount),
+          is_default: finalOfferRows[0].is_default,
+        } : null,
+        installments: installmentRows.map(i => ({
+          description: i.description,
+          percentage: Number(i.percentage),
+          amount: Number(i.amount),
+          payment_mode: i.payment_mode || 'Online',
+        })),
+      });
+    }
+ 
+    return res.status(200).json({
+      qt_id: quotation.qt_id,
+      qt_number: quotation.qt_number,
+      type: quotation.type,
+      acoustic_terms: quotation.acoustic_terms,
+      subject: quotation.subject,
+      quotation_type: quotation.quotation_type || 'demo',  
+      selected_options_for_summary: selectedOptionsForSummary || [],
+      discounted_total: Number(quotation.discounted_total || 0),
+      discount_percentage: Number(quotation.discount_percentage || 0),
+      discount_amount: Number(quotation.discount_amount || 0),
+      current_revision: quotation.current_revision,
+      options_data: options,
+      installments_config: options.map((opt, idx) => ({
+        option_id: opt.option_id,
+        option_index: idx,
+        option_name: opt.option_name,
+        subject: opt.subject,
+        subject_type: opt.subject_type,
+        floor_name: opt.floor_name,
+        room_name: opt.room_name,
+        installments: opt.installments || [],
+      })),
+      revisions: [
+        {
+          revision: Number(revision),
+          gst_app_amt: Number(revisionData?.gst_app_amt || 0),
+          total_without_gst: Number(revisionData?.total_without_gst || 0),
+          total_with_gst: Number(revisionData?.total_with_gst || 0),
+          options,
+        },
+      ],
+    });
+ 
+  } catch (error) {
+    console.error('getQuotationForEdit error:', error);
+    return res.status(500).json({ message: 'Failed to fetch quotation' });
+  } finally {
+    connection.release();
+  }
+};
+
 
 
 

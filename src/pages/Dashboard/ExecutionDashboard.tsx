@@ -6,24 +6,46 @@ import {
   PlayCircle, 
   Settings, 
   ListChecks,
-  BarChart3,
-  Clock,
   CheckCircle,
-  AlertCircle
+  AlertCircle,
+  Package,
+  Trophy
 } from 'lucide-react';
 import { BASE_URL } from '../../../public/config.js';
 
 interface ExecutionCounts {
+  closedDeals: number | null;
   preExecution: number | null;
   execution: number | null;
+  completeExecution: number | null;
   assignedProcess: number | null;
   dailyOperation: number | null;
 }
 
+const TELECALLER_ROLES = [
+  'tele_caller',
+  'digital_marketing',
+  'field_marketing_executive',
+  'tech_sale_sound_engineer',
+  'junior_autocad_designer',
+  'senior_autocad_designer',
+  'av_engineer',
+  'acoustic_engineer',
+  'acoustic_designer',
+  'hr_executive',
+  'project_manager',
+  'carpenter',
+];
+
+const ADMIN_ROLES = ['admin', 'sub_admin'];
+const MANAGEMENT_ROLES = ['technical_head'];
+
 const ExecutionDashboard = () => {
   const [counts, setCounts] = useState<ExecutionCounts>({
+    closedDeals: null,
     preExecution: null,
     execution: null,
+    completeExecution: null,
     assignedProcess: null,
     dailyOperation: null
   });
@@ -32,19 +54,16 @@ const ExecutionDashboard = () => {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const navigate = useNavigate();
 
-  const ADMIN_AND_SUB_ADMIN_ROLES = ['admin', 'sub_admin'];
-  const isAdminOrSubAdmin = ADMIN_AND_SUB_ADMIN_ROLES.includes(role);
-  // const isProjectManager = role === 'project_manager';
-
-  const DASHBOARD_ROLES = [
-  'project_manager',
-  'av_engineer',
-  'acoustic_engineer',
-  'acoustic_designer' ,
-  'carpenter',
-];
-
-const isProjectManager = DASHBOARD_ROLES.includes(role);
+  // Check if user has access to all cards
+  const isAdminOrSubAdmin = ADMIN_ROLES.includes(role);
+  const isTechnicalHead = MANAGEMENT_ROLES.includes(role);
+  const isProjectManager = role === 'project_manager';
+  
+  // Users who can see all cards (admin, sub_admin, technical_head, project_manager)
+  const canSeeAllCards = isAdminOrSubAdmin || isTechnicalHead || isProjectManager;
+  
+  // Users who can only see limited cards (telecaller roles except project_manager)
+  const isLimitedRole = TELECALLER_ROLES.includes(role) && !isProjectManager;
 
   // Format display value
   const formatDisplayValue = (value: any): string => {
@@ -76,30 +95,29 @@ const isProjectManager = DASHBOARD_ROLES.includes(role);
     checkAuth();
   }, [navigate]);
 
-  // Fetch execution counts
+  // Fetch all counts from single endpoint
   useEffect(() => {
     if (!isAuthenticated) return;
 
-    const fetchExecutionCounts = async () => {
+    const fetchAllCounts = async () => {
       try {
         setIsLoading(true);
 
         const fetchWithSession = (url: string, options: RequestInit = {}) =>
           fetch(url, { ...options, credentials: 'include' });
 
-        // Only fetch for admin/sub_admin or project manager
-        if (isAdminOrSubAdmin || isProjectManager) {
-          const response = await fetchWithSession(`${BASE_URL}api/dashboard/execution-dashboard-counts`);
-          const data = await response.json();
-          
-          if (data.success) {
-            setCounts({
-              preExecution: data.pre_execution || 0,
-              execution: data.execution || 0,
-              assignedProcess: data.assigned_process || 0,
-              dailyOperation: data.daily_operation || 0
-            });
-          }
+        const response = await fetchWithSession(`${BASE_URL}api/dashboard/execution-dashboard-counts`);
+        const data = await response.json();
+        
+        if (data.success) {
+          setCounts({
+            closedDeals: data.closed_deals || 0,
+            preExecution: data.pre_execution || 0,
+            execution: data.execution || 0,
+            completeExecution: data.complete_execution || 0,
+            assignedProcess: data.assigned_process || 0,
+            dailyOperation: data.daily_operation || 0
+          });
         }
       } catch (err) {
         console.error('Error fetching execution counts:', err);
@@ -108,13 +126,27 @@ const isProjectManager = DASHBOARD_ROLES.includes(role);
       }
     };
 
-    fetchExecutionCounts();
-  }, [isAuthenticated, isAdminOrSubAdmin, isProjectManager]);
+    fetchAllCounts();
+  }, [isAuthenticated]);
 
-  // Card data configuration (copied from ECommerce adminOperationCards)
-  const operationCards = [
+  // All cards configuration
+  const allCards = [
     {
-      title: 'Pre Execution',
+      id: 'closedDeals',
+      title: 'Total Projects',
+      value: formatDisplayValue(counts.closedDeals),
+      icon: Package,
+      color: 'text-blue-600',
+      bgGradient: 'from-blue-500/10 to-blue-600/5',
+      borderColor: 'border-blue-300/50',
+      animation: { rotate: [0, 3, -3, 0], scale: [1, 1.02, 1] },
+      onClick: () => navigate('/closed-leads'),
+      clickable: true,
+      description: ''
+    },
+    {
+      id: 'preExecution',
+      title: 'Design Pipeline',
       value: formatDisplayValue(counts.preExecution),
       icon: Settings,
       color: 'text-violet-600',
@@ -125,7 +157,8 @@ const isProjectManager = DASHBOARD_ROLES.includes(role);
       clickable: true,
     },
     {
-      title: 'Execution',
+      id: 'execution',
+      title: 'Live Projects',
       value: formatDisplayValue(counts.execution),
       icon: PlayCircle,
       color: 'text-emerald-600',
@@ -135,8 +168,10 @@ const isProjectManager = DASHBOARD_ROLES.includes(role);
       onClick: () => navigate('/execution/pending'),
       clickable: true,
     },
+   
     {
-      title: 'Assigned Process',
+      id: 'assignedProcess',
+      title: 'Task Allocation',
       value: formatDisplayValue(counts.assignedProcess),
       icon: ListChecks,
       color: 'text-orange-600',
@@ -147,7 +182,8 @@ const isProjectManager = DASHBOARD_ROLES.includes(role);
       clickable: true,
     },
     {
-      title: 'Daily Operation',
+      id: 'dailyOperation',
+      title: 'Daily Updates',
       value: formatDisplayValue(counts.dailyOperation),
       icon: Activity,
       color: 'text-cyan-600',
@@ -157,10 +193,31 @@ const isProjectManager = DASHBOARD_ROLES.includes(role);
       onClick: () => navigate('/execution/manage'),
       clickable: true,
     },
+     {
+      id: 'completeExecution',
+      title: 'Complete Projects',
+      value: formatDisplayValue(counts.completeExecution),
+      icon: Trophy,
+      color: 'text-green-600',
+      bgGradient: 'from-green-500/10 to-green-600/5',
+      borderColor: 'border-green-300/50',
+      animation: { y: [0, -3, 0], scale: [1, 1.02, 1] },
+      onClick: () => navigate('/execution/completed'),
+      clickable: true,
+    },
+    
   ];
 
-  // Check if user has access
-  const hasAccess = isAdminOrSubAdmin || isProjectManager;
+  // Limited cards for telecaller roles (only Assigned Process and Daily Operation)
+  const limitedCards = allCards.filter(card => 
+    card.id === 'assignedProcess' || card.id === 'dailyOperation'
+  );
+
+  // Select cards based on user role
+  const operationCards = canSeeAllCards ? allCards : limitedCards;
+
+  // Check if user has any access
+  const hasAccess = canSeeAllCards || isLimitedRole;
 
   if (!hasAccess) {
     return (
@@ -176,8 +233,8 @@ const isProjectManager = DASHBOARD_ROLES.includes(role);
 
   if (isLoading) {
     return (
-      <div className="grid grid-cols-1 gap-6 md:grid-cols-2 xl:grid-cols-4 2xl:gap-8">
-        {Array.from({ length: 4 }).map((_, index) => (
+      <div className="grid grid-cols-1 gap-6 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-6 2xl:gap-8">
+        {Array.from({ length: canSeeAllCards ? 6 : 2 }).map((_, index) => (
           <motion.div
             key={index}
             initial={{ opacity: 0, y: 20 }}
@@ -200,10 +257,29 @@ const isProjectManager = DASHBOARD_ROLES.includes(role);
 
   return (
     <div className="space-y-8">
-     
+      {/* Role-based Access Info Banner (Optional) */}
+      {!canSeeAllCards && isLimitedRole && (
+        <motion.div 
+          initial={{ opacity: 0, y: -20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4"
+        >
+          <div className="flex items-center gap-2">
+            <AlertCircle className="w-5 h-5 text-blue-600 dark:text-blue-400" />
+            <p className="text-sm text-blue-700 dark:text-blue-300">
+              You have access to Assigned Process and Daily Operation modules only.
+              Contact your administrator for additional access.
+            </p>
+          </div>
+        </motion.div>
+      )}
 
-      {/* Operation Cards - MOVED FROM ECOMMERCE */}
-      <div className="grid grid-cols-1 gap-6 md:grid-cols-2 xl:grid-cols-4 2xl:gap-8">
+      {/* Operation Cards */}
+      <div className={`grid grid-cols-1 gap-6 ${
+        canSeeAllCards 
+          ? 'md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-6' 
+          : 'md:grid-cols-2 lg:grid-cols-2'
+      } 2xl:gap-8`}>
         <AnimatePresence>
           {operationCards.map((card, index) => (
             <motion.div
@@ -234,9 +310,16 @@ const isProjectManager = DASHBOARD_ROLES.includes(role);
 
               <div className="relative z-10">
                 <div className="flex justify-between items-start mb-4">
-                  <h3 className="text-sm font-medium text-gray-600 dark:text-gray-300 tracking-wide">
-                    {card.title}
-                  </h3>
+                  <div>
+                    <h3 className="text-sm font-medium text-gray-600 dark:text-gray-300 tracking-wide">
+                      {card.title}
+                    </h3>
+                    {card.description && (
+                      <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">
+                        {card.description}
+                      </p>
+                    )}
+                  </div>
                   <motion.div
                     animate={card.animation}
                     transition={{
@@ -301,8 +384,6 @@ const isProjectManager = DASHBOARD_ROLES.includes(role);
           ))}
         </AnimatePresence>
       </div>
-
-   
     </div>
   );
 };

@@ -25,7 +25,7 @@ export const createSchedule = async (req,res)=>{
  }
 };
 
-export const getAllSchedules = async (req,res)=>{
+export const getAllSchedules1 = async (req,res)=>{
  try{
 
   const [rows] = await db.query(`
@@ -36,6 +36,26 @@ export const getAllSchedules = async (req,res)=>{
    ON sm.schedule_id = stpm.schedule_id
    GROUP BY sm.schedule_id
    ORDER BY sm.schedule_id DESC
+  `);
+
+  res.json({ success:true, data:rows });
+
+ }catch(err){
+  res.status(500).json({ success:false, error:err.message });
+ }
+};
+
+export const getAllSchedules = async (req,res)=>{
+ try{
+
+  const [rows] = await db.query(`
+   SELECT sm.*,
+   COUNT(stpm.map_id) process_count
+   FROM schedules_master sm
+   LEFT JOIN schedule_type_process_map stpm
+   ON sm.schedule_id = stpm.schedule_id
+   GROUP BY sm.schedule_id
+   ORDER BY sm.schedule_id ASC
   `);
 
   res.json({ success:true, data:rows });
@@ -175,7 +195,7 @@ export const getScheduleMappingWithDetails = async (req,res)=>{
    MASTER DATA
 ================================ */
 
-export const getTypes = async (req,res)=>{
+export const getTypes1 = async (req,res)=>{
  const [rows] = await db.query(`
   SELECT * FROM execution_type
   WHERE status='active'
@@ -183,9 +203,20 @@ export const getTypes = async (req,res)=>{
  `);
 
  res.json({ success:true, data:rows });
+}; 
+
+export const getTypes = async (req,res)=>{
+ const [rows] = await db.query(`
+  SELECT * FROM execution_type
+  WHERE status='active'
+  ORDER BY type_id ASC  -- Changed from type_name to type_id ASC for oldest first
+ `);
+
+ res.json({ success:true, data:rows });
 };
 
-export const getProcessesByType = async (req,res)=>{
+
+export const getProcessesByType1 = async (req,res)=>{
  const { typeId } = req.params;
 
  const [rows] = await db.query(`
@@ -199,6 +230,27 @@ export const getProcessesByType = async (req,res)=>{
 
  res.json({ success:true, data:rows });
 };
+
+
+
+// Update getProcessesByType to show oldest first
+export const getProcessesByType = async (req,res)=>{
+ const { typeId } = req.params;
+
+ const [rows] = await db.query(`
+  SELECT pe.*
+  FROM process_execution pe
+  JOIN process_type_mapping ptm
+  ON ptm.process_id = pe.process_id
+  WHERE ptm.type_id=? AND pe.status='active'
+  ORDER BY pe.process_id ASC  -- Added ORDER BY for oldest first
+ `,[typeId]);
+
+ res.json({ success:true, data:rows });
+};
+
+
+
 
 
 export const updateScheduleStatus = async (req,res)=>{

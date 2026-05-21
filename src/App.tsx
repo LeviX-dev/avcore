@@ -112,6 +112,9 @@ import AVCoreDocument from './pages/Report/AVCoreDocument';
 
 import AVCorePriceList from './pages/Report/AVCorePriceList';
 
+import MRNDashboard from './pages/Dashboard/MRNDashboard';
+
+
 
 function App() {
   const [loading, setLoading] = useState<boolean>(true);
@@ -1123,6 +1126,18 @@ path="/schedule/settings/:id"
   }
 />
 
+
+<Route
+  path="/mrn-dashboard"
+  element={
+    <ProtectedRoute menuKey="mrn_dashboard">
+      <DefaultLayout userRole={userRole}>
+        <PageTitle title="MRN Dashboard" />
+        <MRNDashboard />
+      </DefaultLayout>
+    </ProtectedRoute>
+  }
+/>
 
           </>
         ) : (

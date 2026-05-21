@@ -64,6 +64,7 @@ import {
 import { BASE_URL } from '../../../public/config.js';
 import StartExecutionModal from "./StartExecutionModal";
 import { useNavigate } from "react-router-dom";
+import EditContactNumbersModal from './EditContactNumbersModal.js'; // Adjust path as needed
 
 
 
@@ -637,6 +638,10 @@ const PreExecution = () => {
   const [selectedLead, setSelectedLead] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
   
+  const [showContactEditModal, setShowContactEditModal] = useState(false);
+const [selectedClientForContactEdit, setSelectedClientForContactEdit] = useState<any>(null);
+
+
   // Filter states
   const [showEntryDateCalendar, setShowEntryDateCalendar] = useState(false);
   const [showFollowupDateCalendar, setShowFollowupDateCalendar] = useState(false);
@@ -1359,132 +1364,10 @@ const renderDetailsModal = () => {
                 </div>
               </div>
 
-              {/* Project Details */}
-              {hasProjectDetails && (
-                <div className="bg-gradient-to-r from-amber-50 to-yellow-50 dark:from-amber-900/20 dark:to-yellow-900/20 p-3 rounded-lg border border-amber-100 dark:border-amber-800/30">
-                  <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2 flex items-center gap-2">
-                    <FontAwesomeIcon icon={faBuilding} className="h-4 w-4 text-amber-500" />
-                    Project Details
-                  </h3>
-                  <div className="grid grid-cols-2 gap-3 text-sm">
-                    {(hasField('room_length') || hasField('room_width')) && (
-                      <div>
-                        <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">Room Size</div>
-                        <div className="font-medium text-black dark:text-white">
-                          {formatValue(selectedClientDetails.room_length)} ×{' '}
-                          {formatValue(selectedClientDetails.room_width)}
-                          {hasField('room_height') &&
-                            ` × ${formatValue(selectedClientDetails.room_height)}`}
-                        </div>
-                      </div>
-                    )}
-                    {hasField('p_type') && (
-                      <div>
-                        <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">Type</div>
-                        <div className="font-medium text-black dark:text-white">
-                          {formatValue(selectedClientDetails.p_type)}
-                        </div>
-                      </div>
-                    )}
-                    {hasField('budget_range') && (
-                      <div>
-                        <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">Budget</div>
-                        <div className="font-medium text-black dark:text-white">
-                          {formatValue(selectedClientDetails.budget_range)}
-                        </div>
-                      </div>
-                    )}
-                    {hasField('time_to_complete') && (
-                      <div>
-                        <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">Time to Complete</div>
-                        <div className="font-medium text-black dark:text-white">
-                          {formatValue(selectedClientDetails.time_to_complete)}
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              )}
+              
 
-              {/* Dates */}
-              {hasDates && (
-                <div className="bg-gradient-to-r from-emerald-50 to-teal-50 dark:from-emerald-900/20 dark:to-teal-900/20 p-3 rounded-lg border border-emerald-100 dark:border-emerald-800/30">
-                  <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2 flex items-center gap-2">
-                    <FontAwesomeIcon icon={faCalendarAlt} className="h-4 w-4 text-emerald-500" />
-                    Timeline
-                  </h3>
-                  <div className="grid grid-cols-2 gap-3 text-sm">
-                    {hasField('assign_date') && (
-                      <div>
-                        <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">Entry Date</div>
-                        <div className="font-medium text-black dark:text-white">
-                          {formatDate(selectedClientDetails.assign_date)}
-                        </div>
-                      </div>
-                    )}
-                    {hasField('followup_date') && (
-                      <div>
-                        <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">Follow-up</div>
-                        <div className="font-medium text-black dark:text-white">
-                          {formatDate(selectedClientDetails.followup_date)}
-                        </div>
-                      </div>
-                    )}
-                    {hasField('created_at') && (
-                      <div>
-                        <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">Created</div>
-                        <div className="font-medium text-black dark:text-white">
-                          {formatDate(selectedClientDetails.created_at)}
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              )}
 
-              {/* Assignment Info */}
-              {hasAssignmentInfo && (
-                <div className="bg-gradient-to-r from-purple-50 to-pink-50 dark:from-purple-900/20 dark:to-pink-900/20 p-3 rounded-lg border border-purple-100 dark:border-purple-800/30">
-                  <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2 flex items-center gap-2">
-                    <FontAwesomeIcon icon={faUsers} className="h-4 w-4 text-purple-500" />
-                    Assignment
-                  </h3>
-                  <div className="space-y-2">
-                    {hasField('assigned_to') && (
-                      <div>
-                        <div className="text-xs text-gray-500 dark:text-gray-400">Assigned To</div>
-                        <div className="font-medium text-black dark:text-white">
-                          {formatValue(selectedClientDetails.assigned_to)}
-                        </div>
-                      </div>
-                    )}
-                    {hasField('telecaller_name') && (
-                      <div>
-                        <div className="text-xs text-gray-500 dark:text-gray-400">Telecaller</div>
-                        <div className="font-medium text-black dark:text-white">
-                          {formatValue(selectedClientDetails.telecaller_name)}
-                        </div>
-                      </div>
-                    )}
-                    {hasField('cat_name') && (
-                      <div>
-                        <div className="text-xs text-gray-500 dark:text-gray-400">Category</div>
-                        <div className="font-medium text-black dark:text-white">
-                          {formatValue(selectedClientDetails.cat_name)}
-                        </div>
-                      </div>
-                    )}
-                    {hasField('reference_name') && (
-                      <div>
-                        <div className="text-xs text-gray-500 dark:text-gray-400">Reference</div>
-                        <div className="font-medium text-black dark:text-white">
-                          {formatValue(selectedClientDetails.reference_name)}
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              )}
+           
 
               {/* Contact Numbers */}
               {hasContactNumbers && (
@@ -1540,42 +1423,7 @@ const renderDetailsModal = () => {
                 </div>
               )}
 
-              {/* Remarks */}
-              {hasRemarks && (
-                <div className="bg-gradient-to-r from-gray-50 to-slate-50 dark:from-gray-800/50 dark:to-slate-900/50 p-3 rounded-lg border border-gray-200 dark:border-gray-700">
-                  <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2 flex items-center gap-2">
-                    <FontAwesomeIcon icon={faFileAlt} className="h-4 w-4 text-gray-500" />
-                    Remarks
-                  </h3>
-                  <div className="space-y-2">
-                    {hasField('quick_remark') && (
-                      <div>
-                        <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">Quick Remark</div>
-                        <div className="text-sm text-black dark:text-white bg-white dark:bg-gray-800 p-2 rounded border">
-                          {formatValue(selectedClientDetails.quick_remark)}
-                        </div>
-                      </div>
-                    )}
-                    {hasField('detailed_remark') && (
-                      <div>
-                        <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">Detailed Remark</div>
-                        <div className="text-sm text-black dark:text-white bg-white dark:bg-gray-800 p-2 rounded border whitespace-pre-line">
-                          {formatValue(selectedClientDetails.detailed_remark)}
-                        </div>
-                      </div>
-                    )}
-                    {hasField('latest_remark') && (
-                      <div>
-                        <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">Latest Remark</div>
-                        <div className="text-sm text-black dark:text-white bg-white dark:bg-gray-800 p-2 rounded border">
-                          {formatValue(selectedClientDetails.latest_remark)}
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              )}
-
+          
               {/* Links */}
               {hasLinks && (
                 <div className="bg-gradient-to-r from-blue-50 to-cyan-50 dark:from-blue-900/20 dark:to-cyan-900/20 p-3 rounded-lg border border-blue-100 dark:border-blue-800/30">
@@ -1852,7 +1700,7 @@ const handleExecutionSubmit = async (responseData) => {
             <div className="flex items-center gap-3">
               <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-gradient-to-r from-green-100 to-green-200 dark:from-green-900/30 dark:to-green-800/30 text-green-800 dark:text-green-300 border border-green-200 dark:border-green-700/30">
                 <FontAwesomeIcon icon={faCheckCircle} className="w-4 h-4 mr-1" />
-                {totalLeads} Pre Execution
+                {totalLeads} Design pipeline
               </span>
             </div>
 
@@ -2107,93 +1955,7 @@ const handleExecutionSubmit = async (responseData) => {
                     )}
                   </th>
 
-                  {/* FollowUp Date Column with Filter */}
-                  <th className="py-3 px-4 relative">
-                    <div ref={followupDateRef} className="flex items-center justify-between gap-2">
-                      <span className="text-xs font-extrabold uppercase tracking-wider text-gray-700 dark:text-gray-300">
-                        FollowUp Date
-                      </span>
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          closeAllDropdowns();
-                          setShowFollowupDateCalendar(!showFollowupDateCalendar);
-                        }}
-                        className="text-gray-500 hover:text-blue-600 dark:text-gray-400 dark:hover:text-blue-400 focus:outline-none transition-colors"
-                      >
-                        <FontAwesomeIcon 
-                          icon={faChevronDown} 
-                          className={`h-3 w-3 transition-transform duration-200 ${showFollowupDateCalendar ? 'rotate-180' : ''}`}
-                        />
-                      </button>
-                    </div>
-                    
-                    {/* FollowUp Date Calendar Dropdown */}
-                    {showFollowupDateCalendar && (
-                      <div className="absolute top-full left-0 mt-1 z-50 bg-white dark:bg-boxdark border border-gray-300 dark:border-gray-700 rounded-lg shadow-lg p-4 min-w-[250px]">
-                        <div className="flex justify-between items-center mb-3">
-                          <span className="font-semibold text-sm dark:text-white">Select Followup Date Range</span>
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setSelectedFollowupFromDate('');
-                              setSelectedFollowupToDate('');
-                              setShowFollowupDateCalendar(false);
-                            }}
-                            className="text-xs font-medium text-blue-600 hover:text-blue-800 dark:text-blue-400 transition-colors"
-                          >
-                            Clear
-                          </button>
-                        </div>
-                        
-                        <div className="space-y-3">
-                          <div>
-                            <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">
-                              From Date
-                            </label>
-                            <input
-                              type="date"
-                              value={selectedFollowupFromDate}
-                              onChange={(e) => {
-                                e.stopPropagation();
-                                setSelectedFollowupFromDate(e.target.value);
-                              }}
-                              onClick={(e) => e.stopPropagation()}
-                              className="w-full p-2 border border-gray-300 dark:border-gray-600 rounded-lg text-sm font-medium dark:bg-form-input dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                            />
-                          </div>
-                          
-                          <div>
-                            <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">
-                              To Date
-                            </label>
-                            <input
-                              type="date"
-                              value={selectedFollowupToDate}
-                              onChange={(e) => {
-                                e.stopPropagation();
-                                setSelectedFollowupToDate(e.target.value);
-                              }}
-                              onClick={(e) => e.stopPropagation()}
-                              className="w-full p-2 border border-gray-300 dark:border-gray-600 rounded-lg text-sm font-medium dark:bg-form-input dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                            />
-                          </div>
-                        </div>
-                        
-                        <div className="mt-4">
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setShowFollowupDateCalendar(false);
-                            }}
-                            className="w-full py-2.5 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white text-sm font-semibold rounded-lg transition-all duration-200 shadow-md hover:shadow-lg"
-                          >
-                            Apply Filter
-                          </button>
-                        </div>
-                      </div>
-                    )}
-                  </th>
+                
 
                   <th className="py-3 px-4">
                     <div className="text-xs font-extrabold uppercase tracking-wider text-gray-700 dark:text-gray-300">
@@ -2445,21 +2207,7 @@ const handleExecutionSubmit = async (responseData) => {
                         </div>
                       </td>
 
-                      {/* FollowUp Date */}
-                      <td className="py-4 px-4">
-                        <div
-                          className={`inline-flex items-center px-3 py-1.5 rounded-lg font-semibold text-sm border shadow-sm ${
-                            lead.followup_date && new Date(lead.followup_date) < new Date()
-                              ? 'bg-gradient-to-r from-red-50 to-red-100 dark:from-red-900/20 dark:to-red-800/10 text-red-800 dark:text-red-300 border-red-200 dark:border-red-800/30'
-                              : 'bg-gradient-to-r from-green-50 to-green-100 dark:from-green-900/20 dark:to-green-800/10 text-green-800 dark:text-green-300 border-green-200 dark:border-green-800/30'
-                          }`}
-                        >
-                          {lead.followup_date
-                            ? new Date(lead.followup_date).toLocaleDateString("en-GB")
-                            : "—"}
-                        </div>
-                      </td>
-
+                    
                       {/* Client Name */}
                       <td className="py-4 px-4">
                         <div 
@@ -2502,31 +2250,45 @@ const handleExecutionSubmit = async (responseData) => {
                         </div>
                       </td>
 
-  <td className="p-0.5">
-    <div className="flex gap-0.5 justify-center">
-      
-      <ActionButton
-  onClick={() => handleStartExecution(lead)}
-  title="Start Execution"
-  className="text-[9px] px-1 py-0.5"
-  disabled={!leadChecklistStatus[lead.master_id]} // Add this line
->
-  <FontAwesomeIcon icon={faPlay} className="text-[7px] mr-0.5" />
-  Run
-</ActionButton>
+                        <td className="p-0.5">
+  <div className="flex gap-0.5 justify-center">
+    
+    {/* Run Button - Teal/Cyan */}
+    <button
+      onClick={() => handleStartExecution(lead)}
+      title="Start Execution"
+      disabled={!leadChecklistStatus[lead.master_id]}
+      className="relative inline-flex items-center justify-center rounded-xl transition-all duration-300 ease-out transform hover:scale-105 active:scale-95 shadow-sm hover:shadow-md bg-gradient-to-r from-teal-400 to-cyan-400 hover:from-teal-500 hover:to-cyan-500 text-white text-[9px] px-2 py-1 font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
+    >
+      <FontAwesomeIcon icon={faPlay} className="text-[7px] mr-1" />
+      Run
+    </button>
 
-      <ActionButton
-        onClick={() => navigate(`/execution-checklist/${lead.master_id}`)}
-        title="Checklist"
-        className="text-[9px] px-1 py-0.5 bg-gradient-to-r from-blue-500 to-blue-600"
-      >
-        <FontAwesomeIcon icon={faTasks} className="text-[7px] mr-0.5" />
-        List
-      </ActionButton>
-    </div>
-  
-  </td>
-  
+    {/* List Button - Blue/Sky */}
+    <button
+      onClick={() => navigate(`/execution-checklist/${lead.master_id}`)}
+      title="Checklist"
+      className="relative inline-flex items-center justify-center rounded-xl transition-all duration-300 ease-out transform hover:scale-105 active:scale-95 shadow-sm hover:shadow-md bg-gradient-to-r from-blue-400 to-sky-400 hover:from-blue-500 hover:to-sky-500 text-white text-[9px] px-2 py-1 font-semibold"
+    >
+      <FontAwesomeIcon icon={faTasks} className="text-[7px] mr-1" />
+      List
+    </button>
+
+    {/* Edit Button - Purple/Indigo */}
+    <button
+      onClick={() => {
+        setSelectedClientForContactEdit(lead);
+        setShowContactEditModal(true);
+      }}
+      title="Edit Contact Numbers"
+      className="relative inline-flex items-center justify-center rounded-xl transition-all duration-300 ease-out transform hover:scale-105 active:scale-95 shadow-sm hover:shadow-md bg-gradient-to-r from-purple-400 to-indigo-400 hover:from-purple-500 hover:to-indigo-500 text-white text-[9px] px-2 py-1 font-semibold"
+    >
+      <FontAwesomeIcon icon={faEdit} className="text-[7px] mr-1" />
+      Edit
+    </button>
+
+  </div>
+</td>
 
                     </tr>
                   ))
@@ -2574,6 +2336,19 @@ const handleExecutionSubmit = async (responseData) => {
       
       {/* Details Modal with Documents */}
 {showDetailsModal && renderDetailsModal()}
+
+{/* Edit Contact Numbers Modal */}
+<EditContactNumbersModal
+  show={showContactEditModal}
+  onClose={() => {
+    setShowContactEditModal(false);
+    setSelectedClientForContactEdit(null);
+  }}
+  client={selectedClientForContactEdit}
+  onSuccess={() => {
+    fetchClosedLeads(); // Refresh the leads data
+  }}
+/>
 
     </div>
   );

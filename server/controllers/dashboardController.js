@@ -2176,7 +2176,7 @@ export const getExecutionDashboardCounts2 = async (req, res) => {
 };
 
 
-export const getExecutionDashboardCounts = async (req, res) => {
+export const getExecutionDashboardCounts3 = async (req, res) => {
   try {
     const user = req.session.user;
 
@@ -2280,5 +2280,392 @@ export const getExecutionDashboardCounts = async (req, res) => {
       success: false,
       message: 'Server error',
     });
+  }
+};
+
+
+export const getExecutionDashboardCounts = async (req, res) => {
+  try {
+    const user = req.session.user;
+
+    if (!user) {
+      return res.status(401).json({
+        success: false,
+        message: 'Unauthorized',
+      });
+    }
+
+    const { id: userId, role } = user;
+
+    // Get user name for assignment filtering
+    const [userResult] = await db.query(
+      "SELECT name FROM users WHERE user_id = ?",
+      [userId]
+    );
+    const currentUserName = userResult[0]?.name || "";
+
+    // Helper function to check if role should see all data
+    const canSeeAllData = () => {
+      return ['admin', 'sub_admin', 'technical_head'].includes(role);
+    };
+
+    // Helper function to check if role is project_manager
+    const isProjectManager = () => {
+      return role === 'project_manager';
+    };
+
+    // Helper function to check if role is telecaller like
+    const isTelecallerLike = () => {
+      const telecallerRoles = [
+        'tele_caller',
+        'digital_marketing',
+        'field_marketing_executive',
+        'tech_sale_sound_engineer',
+        'junior_autocad_designer',
+        'senior_autocad_designer',
+        'av_engineer',
+        'acoustic_engineer',
+        'acoustic_designer',
+        'hr_executive',
+        'carpenter',
+      ];
+      return telecallerRoles.includes(role);
+    };
+
+    // ================= CLOSED DEALS COUNT =================
+    const closedStages = ['Closed Deal', 'Execution', 'Pre Execution'];
+    
+    let closedDealsQuery = `
+      SELECT COUNT(DISTINCT rd.master_id) as total
+      FROM raw_data rd
+      LEFT JOIN (
+        SELECT r1.*, ROW_NUMBER() OVER (PARTITION BY master_id ORDER BY id DESC) rn
+        FROM reassignment r1
+      ) lr ON rd.master_id = lr.master_id AND lr.rn = 1
+      WHERE rd.lead_stage IN (${closedStages.map(() => '?').join(',')})
+         OR lr.leadStage IN (${closedStages.map(() => '?').join(',')})
+    `;
+
+    const closedDealsParams = [...closedStages, ...closedStages];
+
+    // Apply role-based filters for closed deals
+    if (isProjectManager()) {
+      // Project manager sees leads assigned to them via reassignment
+      closedDealsQuery += ` AND lr.assignedTo = ?`;
+      closedDealsParams.push(currentUserName);
+    } else if (isTelecallerLike()) {
+      // Telecaller sees leads assigned to them
+      closedDealsQuery += ` AND lr.assignedTo = ?`;
+      closedDealsParams.push(currentUserName);
+    }
+    // Admin, sub_admin, technical_head see all data (no filter)
+
+    const [closedDealsRows] = await db.query(closedDealsQuery, closedDealsParams);
+    const closedDealsCount = closedDealsRows[0]?.total || 0;
+
+    // ================= PRE EXECUTION =================
+    let preExecutionQuery = `
+      SELECT COUNT(DISTINCT rd.master_id) AS total
+      FROM raw_data rd
+      WHERE rd.lead_stage = 'Pre Execution'
+      AND NOT EXISTS (
+        SELECT 1 
+        FROM execution_start es
+        WHERE FIND_IN_SET(rd.master_id, es.lead_ids)
+      )
+    `;
+
+    const preExecutionParams = [];
+
+    // Apply role-based filters for pre-execution
+    if (isProjectManager()) {
+      // For project manager, filter by leads assigned to them in reassignment
+      preExecutionQuery = `
+        SELECT COUNT(DISTINCT rd.master_id) AS total
+        FROM raw_data rd
+        LEFT JOIN (
+          SELECT r1.*, ROW_NUMBER() OVER (PARTITION BY master_id ORDER BY id DESC) rn
+          FROM reassignment r1
+        ) lr ON rd.master_id = lr.master_id AND lr.rn = 1
+        WHERE rd.lead_stage = 'Pre Execution'
+        AND NOT EXISTS (
+          SELECT 1 
+          FROM execution_start es
+          WHERE FIND_IN_SET(rd.master_id, es.lead_ids)
+        )
+        AND lr.assignedTo = ?
+      `;
+      preExecutionParams.push(currentUserName);
+    } else if (isTelecallerLike()) {
+      preExecutionQuery += ` AND rd.assign_id = ?`;
+      preExecutionParams.push(userId);
+    }
+
+    const [preExecutionRows] = await db.query(preExecutionQuery, preExecutionParams);
+    const preExecutionCount = preExecutionRows[0]?.total || 0;
+
+    // ================= EXECUTION =================
+    let executionQuery = `
+      SELECT COUNT(DISTINCT rd.master_id) AS total
+      FROM raw_data rd
+      WHERE rd.lead_stage = 'Execution'
+      AND EXISTS (
+        SELECT 1 
+        FROM execution_start es
+        WHERE FIND_IN_SET(rd.master_id, es.lead_ids)
+        AND es.status != 'complete'
+      )
+    `;
+
+    const executionParams = [];
+
+    // Apply role-based filters for execution
+    if (isProjectManager()) {
+      executionQuery = `
+        SELECT COUNT(DISTINCT rd.master_id) AS total
+        FROM raw_data rd
+        LEFT JOIN (
+          SELECT r1.*, ROW_NUMBER() OVER (PARTITION BY master_id ORDER BY id DESC) rn
+          FROM reassignment r1
+        ) lr ON rd.master_id = lr.master_id AND lr.rn = 1
+        WHERE rd.lead_stage = 'Execution'
+        AND EXISTS (
+          SELECT 1 
+          FROM execution_start es
+          WHERE FIND_IN_SET(rd.master_id, es.lead_ids)
+          AND es.status != 'complete'
+        )
+        AND lr.assignedTo = ?
+      `;
+      executionParams.push(currentUserName);
+    } else if (isTelecallerLike()) {
+      executionQuery += ` AND rd.assign_id = ?`;
+      executionParams.push(userId);
+    }
+
+    const [executionRows] = await db.query(executionQuery, executionParams);
+    const executionCount = executionRows[0]?.total || 0;
+
+    // ================= COMPLETE EXECUTION =================
+    let completeExecutionQuery = `
+      SELECT COUNT(DISTINCT rd.master_id) AS total
+      FROM raw_data rd
+      WHERE rd.lead_stage = 'Execution'
+      AND EXISTS (
+        SELECT 1 
+        FROM execution_start es
+        WHERE FIND_IN_SET(rd.master_id, es.lead_ids)
+        AND es.status = 'complete'
+      )
+    `;
+
+    const completeExecutionParams = [];
+
+    // Apply role-based filters for complete execution
+    if (isProjectManager()) {
+      completeExecutionQuery = `
+        SELECT COUNT(DISTINCT rd.master_id) AS total
+        FROM raw_data rd
+        LEFT JOIN (
+          SELECT r1.*, ROW_NUMBER() OVER (PARTITION BY master_id ORDER BY id DESC) rn
+          FROM reassignment r1
+        ) lr ON rd.master_id = lr.master_id AND lr.rn = 1
+        WHERE rd.lead_stage = 'Execution'
+        AND EXISTS (
+          SELECT 1 
+          FROM execution_start es
+          WHERE FIND_IN_SET(rd.master_id, es.lead_ids)
+          AND es.status = 'complete'
+        )
+        AND lr.assignedTo = ?
+      `;
+      completeExecutionParams.push(currentUserName);
+    } else if (isTelecallerLike()) {
+      completeExecutionQuery += ` AND rd.assign_id = ?`;
+      completeExecutionParams.push(userId);
+    }
+
+    const [completeExecutionRows] = await db.query(completeExecutionQuery, completeExecutionParams);
+    const completeExecutionCount = completeExecutionRows[0]?.total || 0;
+
+    // ================= ASSIGNED PROCESS (Daily Process Assignments) =================
+    let assignedProcessQuery = `
+      SELECT COUNT(*) AS total
+      FROM execution_process_user_map epum
+      WHERE epum.user_id = ?
+    `;
+    
+    const assignedProcessParams = [userId];
+
+    const [assignedProcessRows] = await db.query(assignedProcessQuery, assignedProcessParams);
+    const assignedProcessCount = assignedProcessRows[0]?.total || 0;
+
+    // ================= DAILY OPERATION (Documents Uploaded by User) =================
+    let dailyOperationQuery = `
+      SELECT COUNT(*) AS total
+      FROM execution_documents ed
+    `;
+
+    const dailyOperationParams = [];
+
+    // For project manager and telecaller roles, show only their own documents
+    if (isProjectManager() || isTelecallerLike() || !canSeeAllData()) {
+      dailyOperationQuery += ` WHERE ed.uploaded_by = ?`;
+      dailyOperationParams.push(userId);
+    }
+    // Admin, sub_admin, technical_head see all documents
+
+    const [dailyOperationRows] = await db.query(dailyOperationQuery, dailyOperationParams);
+    const dailyOperationCount = dailyOperationRows[0]?.total || 0;
+
+    // ================= GET ASSIGNED LEADS FOR PROJECT MANAGER (For debugging/info) =================
+    let assignedLeadsList = [];
+    if (isProjectManager()) {
+      const [assignedLeads] = await db.query(`
+        SELECT DISTINCT rd.master_id, rd.name, rd.lead_stage
+        FROM raw_data rd
+        LEFT JOIN (
+          SELECT r1.*, ROW_NUMBER() OVER (PARTITION BY master_id ORDER BY id DESC) rn
+          FROM reassignment r1
+        ) lr ON rd.master_id = lr.master_id AND lr.rn = 1
+        WHERE lr.assignedTo = ?
+        AND rd.lead_stage IN ('Pre Execution', 'Execution', 'Closed Deal')
+        LIMIT 10
+      `, [currentUserName]);
+      assignedLeadsList = assignedLeads;
+    }
+
+    // ================= FINAL RESPONSE =================
+    return res.json({
+      success: true,
+      closed_deals: closedDealsCount,
+      pre_execution: preExecutionCount,
+      execution: executionCount,
+      complete_execution: completeExecutionCount,
+      assigned_process: assignedProcessCount,
+      daily_operation: dailyOperationCount,
+      user_info: {
+        role: role,
+        name: currentUserName,
+        user_id: userId
+      },
+      ...(isProjectManager() && {
+        assigned_leads_sample: assignedLeadsList,
+        total_assigned_leads: closedDealsCount
+      })
+    });
+
+  } catch (error) {
+    console.error('ExecutionDashboardCounts error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Server error',
+      error: error.message
+    });
+  }
+};
+
+
+
+export const getExecutionLeadsCount = async (req, res) => {
+  const connection = await db.getConnection();
+
+  try {
+    // Query for total executions count
+    const totalExecutionsQuery = `
+      SELECT COUNT(*) AS total
+      FROM execution_start
+    `;
+
+    // Query for pending executions count
+    const pendingExecutionsQuery = `
+      SELECT COUNT(*) AS total
+      FROM execution_start
+      WHERE status != 'Completed'
+    `;
+
+    // Query for verify MRN count (Verified status)
+    const verifyMRNQuery = `
+      SELECT COUNT(*) AS total
+      FROM generate_mrn
+      WHERE mrn_status = 'Verified'
+    `;
+
+    // Query for managed MRN count (Approved or Partially Issued)
+    const managedMRNQuery = `
+      SELECT COUNT(DISTINCT gm.mrn_id) AS total
+      FROM generate_mrn gm
+      WHERE gm.mrn_status IN ('Approved', 'Partially Issued')
+    `;
+
+    // Query for purchase MRN count (items with purchase_qty > 0 and purchase_status Pending/Approved)
+    const purchaseMRNQuery = `
+      SELECT COUNT(DISTINCT gm.mrn_id) AS total
+      FROM generate_mrn gm
+      JOIN mrn_prod_map mpm ON gm.mrn_id = mpm.mrn_id
+      WHERE mpm.purchase_qty > 0
+      AND mpm.purchase_status IN ('Pending', 'Approved')
+    `;
+
+    // Query for purchased MRN count (from purchase orders)
+    const purchasedMRNQuery = `
+      SELECT COUNT(DISTINCT gm.mrn_id) AS total
+      FROM purchase_order po
+      JOIN purchase_request pr ON pr.pr_id = po.pr_id
+      JOIN mrn_prod_map mpm ON mpm.mpm_id = pr.mpm_id
+      JOIN generate_mrn gm ON gm.mrn_id = pr.mrn_id
+    `;
+
+    // Query for completed MRN count
+    const completedMRNQuery = `
+      SELECT COUNT(*) AS total
+      FROM generate_mrn
+      WHERE mrn_status = 'Completed'
+    `;
+
+    // Total PR count only
+    const totalPRQuery = `
+      SELECT COUNT(*) AS total
+      FROM purchase_request
+    `;
+
+    // Total PO count only
+    const totalPOQuery = `
+      SELECT COUNT(*) AS total
+      FROM purchase_order
+    `;
+
+    const [totalExecRows] = await connection.query(totalExecutionsQuery);
+    const [pendingExecRows] = await connection.query(pendingExecutionsQuery);
+    const [verifyMRNRows] = await connection.query(verifyMRNQuery);
+    const [managedMRNRows] = await connection.query(managedMRNQuery);
+    const [purchaseMRNRows] = await connection.query(purchaseMRNQuery);
+    const [purchasedMRNRows] = await connection.query(purchasedMRNQuery);
+    const [completedMRNRows] = await connection.query(completedMRNQuery);
+    const [totalPRRows] = await connection.query(totalPRQuery);
+    const [totalPORows] = await connection.query(totalPOQuery);
+
+    return res.status(200).json({
+      success: true,
+      data: {
+        total_executions: totalExecRows[0]?.total || 0,
+        pending_executions: pendingExecRows[0]?.total || 0,
+        verify_mrn: verifyMRNRows[0]?.total || 0,
+        managed_mrn: managedMRNRows[0]?.total || 0,
+        purchase_mrn: purchaseMRNRows[0]?.total || 0,
+        purchased_mrn: purchasedMRNRows[0]?.total || 0,
+        completed_mrn: completedMRNRows[0]?.total || 0,
+        total_pr: totalPRRows[0]?.total || 0,
+        total_po: totalPORows[0]?.total || 0
+      }
+    });
+  } catch (error) {
+    console.error('getExecutionLeadsCount Error:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Failed to fetch counts'
+    });
+  } finally {
+    connection.release();
   }
 };

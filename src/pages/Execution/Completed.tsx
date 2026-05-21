@@ -911,165 +911,7 @@ const ClientDetailsModal: React.FC<ClientDetailsModalProps> = ({ lead, onClose }
               </div>
             </div>
 
-            {/* Project Details */}
-            <div className="space-y-4">
-              <div className="bg-gradient-to-r from-purple-50 to-pink-50 dark:from-purple-900/20 dark:to-pink-900/20 p-4 rounded-lg border border-purple-100 dark:border-purple-800/30">
-                <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3 flex items-center gap-2">
-                  <FontAwesomeIcon icon={faBuilding} className="h-4 w-4 text-purple-500" />
-                  Project Details
-                </h3>
-                <div className="space-y-3">
-                  {(hasField('room_length') || hasField('room_width')) && (
-                    <div>
-                      <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">Room Size</div>
-                      <div className="font-medium text-black dark:text-white">
-                        {formatValue(lead.room_length)} × {formatValue(lead.room_width)}
-                        {hasField('room_height') && ` × ${formatValue(lead.room_height)}`}
-                      </div>
-                    </div>
-                  )}
-                  {hasField('p_type') && (
-                    <div>
-                      <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">Project Type</div>
-                      <div className="font-medium text-black dark:text-white">{formatValue(lead.p_type)}</div>
-                    </div>
-                  )}
-                  {hasField('budget_range') && (
-                    <div>
-                      <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">Budget Range</div>
-                      <div className="font-medium text-black dark:text-white">{formatValue(lead.budget_range)}</div>
-                    </div>
-                  )}
-                  {hasField('time_to_complete') && (
-                    <div>
-                      <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">Time to Complete</div>
-                      <div className="font-medium text-black dark:text-white">{formatValue(lead.time_to_complete)}</div>
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              {/* Timeline */}
-              <div className="bg-gradient-to-r from-orange-50 to-amber-50 dark:from-orange-900/20 dark:to-amber-900/20 p-4 rounded-lg border border-orange-100 dark:border-orange-800/30">
-                <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3 flex items-center gap-2">
-                  <FontAwesomeIcon icon={faClock} className="h-4 w-4 text-orange-500" />
-                  Timeline
-                </h3>
-                <div className="space-y-3">
-                  {hasField('execution_start_date') && (
-                    <div>
-                      <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">Execution Start Date</div>
-                      <div className="font-medium text-black dark:text-white">{formatDate(lead.execution_start_date)}</div>
-                    </div>
-                  )}
-                  {hasField('execution_end_date') && (
-                    <div>
-                      <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">Execution End Date</div>
-                      <div className="font-medium text-black dark:text-white">{formatDate(lead.execution_end_date)}</div>
-                    </div>
-                  )}
-                  {hasField('created_at') && (
-                    <div>
-                      <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">Created Date</div>
-                      <div className="font-medium text-black dark:text-white">{formatDate(lead.created_at)}</div>
-                    </div>
-                  )}
-                  {hasField('assign_date') && (
-                    <div>
-                      <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">Assigned Date</div>
-                      <div className="font-medium text-black dark:text-white">{formatDate(lead.assign_date)}</div>
-                    </div>
-                  )}
-                  {hasField('latest_reassignment_date') && (
-                    <div>
-                      <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">Last Reassignment</div>
-                      <div className="font-medium text-black dark:text-white">{formatDate(lead.latest_reassignment_date)}</div>
-                    </div>
-                  )}
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Remarks & Assignment Info */}
-          <div className="mt-6 grid grid-cols-1 md:grid-cols-2 gap-6">
-            {/* Remarks */}
-            <div className="bg-gradient-to-r from-gray-50 to-slate-50 dark:from-gray-800/50 dark:to-slate-900/50 p-4 rounded-lg border border-gray-200 dark:border-gray-700">
-              <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3 flex items-center gap-2">
-                <FontAwesomeIcon icon={faFileAlt} className="h-4 w-4 text-gray-500" />
-                Remarks
-              </h3>
-              <div className="space-y-3">
-                {hasField('quick_remark') && (
-                  <div>
-                    <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">Quick Remark</div>
-                    <div className="text-sm text-black dark:text-white">{formatValue(lead.quick_remark)}</div>
-                  </div>
-                )}
-                {hasField('detailed_remark') && (
-                  <div>
-                    <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">Detailed Remark</div>
-                    <div className="text-sm text-black dark:text-white whitespace-pre-line">{formatValue(lead.detailed_remark)}</div>
-                  </div>
-                )}
-                {hasField('latest_remark') && (
-                  <div>
-                    <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">Latest Remark</div>
-                    <div className="text-sm text-black dark:text-white">{formatValue(lead.latest_remark)}</div>
-                  </div>
-                )}
-              </div>
-            </div>
-
-            {/* Assignment Information */}
-            <div className="bg-gradient-to-r from-indigo-50 to-purple-50 dark:from-indigo-900/20 dark:to-purple-900/20 p-4 rounded-lg border border-indigo-100 dark:border-indigo-800/30">
-              <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3 flex items-center gap-2">
-                <FontAwesomeIcon icon={faUser} className="h-4 w-4 text-indigo-500" />
-                Assignment Information
-              </h3>
-              <div className="space-y-3">
-                {hasField('assigned_to') && (
-                  <div>
-                    <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">Assigned To</div>
-                    <div className="font-medium text-black dark:text-white">{formatValue(lead.assigned_to)}</div>
-                  </div>
-                )}
-                {hasField('telecaller_name') && (
-                  <div>
-                    <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">Telecaller</div>
-                    <div className="font-medium text-black dark:text-white">{formatValue(lead.telecaller_name)}</div>
-                  </div>
-                )}
-                {hasField('lead_stage') && (
-                  <div>
-                    <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">Stage</div>
-                    <div className="font-medium text-black dark:text-white">
-                      <span className="bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-300 px-2 py-1 rounded-md">
-                        {formatValue(lead.lead_stage)}
-                      </span>
-                    </div>
-                  </div>
-                )}
-                {hasField('lead_status') && (
-                  <div>
-                    <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">Lead Status</div>
-                    <div className="font-medium text-black dark:text-white">{formatValue(lead.lead_status)}</div>
-                  </div>
-                )}
-                {hasField('cat_name') && (
-                  <div>
-                    <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">Category</div>
-                    <div className="font-medium text-black dark:text-white">{formatValue(lead.cat_name)}</div>
-                  </div>
-                )}
-                {hasField('reference_name') && (
-                  <div>
-                    <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">Reference</div>
-                    <div className="font-medium text-black dark:text-white">{formatValue(lead.reference_name)}</div>
-                  </div>
-                )}
-              </div>
-            </div>
+          
           </div>
 
           {/* Contact Numbers */}
@@ -1959,11 +1801,11 @@ const ExecutionCompleted: React.FC = () => {
                   </th>
                   
                   {/* Action Column */}
-                  <th className="py-3 px-4">
+                  {/* <th className="py-3 px-4">
                     <div className="text-xs font-extrabold uppercase tracking-wider text-gray-700 dark:text-gray-300">
                       Action
                     </div>
-                  </th>
+                  </th> */}
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-200 dark:divide-gray-800">
@@ -2048,7 +1890,7 @@ const ExecutionCompleted: React.FC = () => {
                       </td>
 
                       {/* Action Buttons */}
-                      <td className="py-4 px-4">
+                      {/* <td className="py-4 px-4">
                         <div className="flex justify-center">
                           <ActionButton
                             onViewQuotation={() => handleViewQuotation(lead)}
@@ -2056,7 +1898,7 @@ const ExecutionCompleted: React.FC = () => {
                             viewCount={itemCounts[lead.master_id] || 0}
                           />
                         </div>
-                      </td>
+                      </td> */}
                     </tr>
                   ))
                 )}

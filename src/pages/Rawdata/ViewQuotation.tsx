@@ -146,29 +146,151 @@ const handleDownloadPDF = async () => {
     const logoBase64 = await urlToBase64(logo);
     const allOptions = quotation.options || [];
 
-    // Get selected indices for summary table only
-    const selectedIndices = quotation.selected_options_for_summary || [];
-    
     // FOR MAIN CONTENT: Show ALL options
-    const optionsForContent = allOptions;
-    
-    // FOR SUMMARY TABLE: Show ONLY selected options
-    const optionsForSummary = selectedIndices.length > 0 
-      ? allOptions.filter((_, idx) => selectedIndices.includes(idx))
-      : allOptions;
+const optionsForContent = allOptions;
 
-    // ── Options summary data for SELECTED options only ──
-    const optionsSummaryData = optionsForSummary.map((opt, idx) => {
-      const kitNames = (opt.items || []).map(kit => kit.kit_name).filter(Boolean).join(', ') || 'Single Products';
-      return {
-        option_name: opt.option_name || `OPTION ${idx + 1}`,
-        subject: opt.subject || '',
-        subject_type: opt.subject_type || 'master',
-        kit_names: kitNames,
-        final_cost: getOptionTotalCost(opt),
-      };
-    });
-    const overallTotal = optionsSummaryData.reduce((sum, o) => sum + o.final_cost, 0);
+// Selected combinations
+const selectedCombinations =
+  quotation.selected_options_for_summary || [];
+
+// ══════════════════════════════════════════════════════
+// COMBINATION SUMMARY BLOCKS
+// ══════════════════════════════════════════════════════
+const combinationBlocks = [];
+
+selectedCombinations.forEach((combo, comboIdx) => {
+
+  const comboOptions = combo.map(i => allOptions[i]);
+
+  const comboRows = comboOptions.map((opt, idx) => {
+
+    const kitNames =
+      (opt.items || [])
+        .map(k => k.kit_name)
+        .filter(Boolean)
+        .join(', ') || 'Single Products';
+
+    return [
+      {
+        text: (idx + 1).toString(),
+        alignment: 'center',
+        fontSize: 8,
+      },
+
+      {
+        text: opt.option_name || '',
+        fontSize: 8,
+        bold: true,
+      },
+
+      {
+        text: kitNames,
+        fontSize: 7,
+      },
+
+      {
+        text: `₹${formatIndianNumber(
+          getOptionTotalCost(opt)
+        )}`,
+        alignment: 'right',
+        bold: true,
+        fontSize: 8,
+        color: '#15803d',
+      },
+    ];
+  });
+
+  const comboTotal = comboOptions.reduce(
+    (sum, opt) => sum + getOptionTotalCost(opt),
+    0
+  );
+
+  combinationBlocks.push({
+    margin: [0, 10, 0, 10],
+
+    stack: [
+
+      {
+        table: {
+          widths: ['*'],
+          body: [[{
+            text: `Option Summary ${comboIdx + 1}`,
+            alignment: 'center',
+            bold: true,
+            fillColor: '#dbeafe',
+            fontSize: 10,
+            margin: [0, 4, 0, 4],
+          }]],
+        },
+      },
+
+      {
+        table: {
+          widths: ['8%', '32%', '40%', '20%'],
+
+          body: [
+
+            [
+              {
+                text: 'SR',
+                bold: true,
+                fillColor: '#f3f4f6',
+                alignment: 'center',
+                fontSize: 8,
+              },
+
+              {
+                text: 'OPTION',
+                bold: true,
+                fillColor: '#f3f4f6',
+                fontSize: 8,
+              },
+
+              {
+                text: 'PRODUCTS',
+                bold: true,
+                fillColor: '#f3f4f6',
+                fontSize: 8,
+              },
+
+              {
+                text: 'COST',
+                bold: true,
+                fillColor: '#f3f4f6',
+                alignment: 'right',
+                fontSize: 8,
+              },
+            ],
+
+            ...comboRows,
+
+            [
+              {
+                text: 'Overall TOTAL',
+                colSpan: 3,
+                alignment: 'right',
+                bold: true,
+                fillColor: '#dcfce7',
+                fontSize: 9,
+              },
+              {},
+              {},
+
+              {
+                text: `₹${formatIndianNumber(comboTotal)}`,
+                alignment: 'right',
+                bold: true,
+                fillColor: '#dcfce7',
+                color: '#166534',
+                fontSize: 9,
+              },
+            ],
+          ],
+        },
+      },
+    ],
+  });
+});
 
     // ══════════════════════════════════════════════════════
     // BUILD EACH OPTION BLOCK (FOR ALL OPTIONS)
@@ -190,6 +312,8 @@ const handleDownloadPDF = async () => {
       const finalizedTotal    = opt.finalized_total || 0;
       const showFinalOffer    = finalOffer && finalOfferAmount > 0;
       const kitName           = opt.items?.[0]?.kit_name || '';
+      const floorName         = opt.floor_name || '';
+      const roomName          = opt.room_name || '';
 
       // ── SUBJECT BLOCK (shows option's individual subject) ──
       if (opt.subject) {
@@ -215,46 +339,114 @@ const handleDownloadPDF = async () => {
         });
       }
 
-const headerStack = [];
+// OPTION + KIT BOX
+const optionHeaderBody = [];
 
-if (!shouldHideOptionLabel(opt)) {
-  headerStack.push({
-    text: (opt.option_name || `OPTION ${optIdx + 1}`).toUpperCase(),
-    alignment: 'center',
-    bold: true,
-    fontSize: 13,
-    decoration: 'underline',
-    characterSpacing: 2,
-    color: '#000000',
-    margin: [0, 2, 0, kitName ? 2 : 0],
+/* OPTION + KIT */
+optionHeaderBody.push([
+  {
+    stack: [
+
+      !shouldHideOptionLabel(opt)
+        ? {
+            text: (opt.option_name || `OPTION ${optIdx + 1}`).toUpperCase(),
+            alignment: 'center',
+            bold: true,
+            fontSize: 13,
+            decoration: 'underline',
+            characterSpacing: 2,
+            margin: [0, 0, 0, 4],
+          }
+        : {},
+
+      {
+        text: (kitName || '-').toUpperCase(),
+        alignment: 'center',
+        bold: true,
+        fontSize: 11,
+        characterSpacing: 2,
+      },
+
+    ],
+    fillColor: '#dfefda',
+    margin: [0, 8, 0, 8],
+  }
+]);
+
+optionContentBlocks.push({
+  table: {
+    widths: ['*'],
+    body: optionHeaderBody,
+  },
+
+  layout: {
+    hLineWidth: () => 2,
+    vLineWidth: () => 2,
+    hLineColor: () => 'black',
+    vLineColor: () => 'black',
+  },
+
+  margin: [0, opt.subject ? 0 : (optIdx === 0 ? 0 : 20), 0, 6],
+});
+
+
+// FLOOR BOX
+if (floorName) {
+  optionContentBlocks.push({
+    table: {
+      widths: ['*'],
+      body: [[{
+        text: floorName.toUpperCase(),
+        alignment: 'center',
+        bold: true,
+        fontSize: 11,
+        margin: [0, 7, 0, 7],
+        fillColor: '#fdf2f8', // Light pink color (pink-50)
+      }]],
+    },
+
+    layout: {
+      hLineWidth: () => 2,
+      vLineWidth: () => 2,
+      hLineColor: () => 'black',
+      vLineColor: () => 'black',
+      fillColor: (rowIndex, node, columnIndex) => {
+        return '#fdf2f8'; // Light pink background for all cells
+      },
+    },
+
+    margin: [0, 0, 0, 6],
   });
 }
 
-if (kitName) {
-  headerStack.push({
-    text: kitName.toUpperCase(),
-    alignment: 'center',
-    bold: true,
-    fontSize: 11,
-    characterSpacing: 2,
-    color: '#000000',
-    margin: [0, headerStack.length > 0 ? 0 : 2, 0, 0],
+// ROOM BOX
+if (roomName) {
+  optionContentBlocks.push({
+    table: {
+      widths: ['*'],
+      body: [[{
+        text: roomName.toUpperCase(),
+        alignment: 'center',
+        bold: true,
+        fontSize: 11,
+        margin: [0, 7, 0, 7],
+        fillColor: '#fdf2f8', // Light pink color (pink-50)
+      }]],
+    },
+
+    layout: {
+      hLineWidth: () => 2,
+      vLineWidth: () => 2,
+      hLineColor: () => 'black',
+      vLineColor: () => 'black',
+      fillColor: (rowIndex, node, columnIndex) => {
+        return '#fdf2f8'; // Light pink background for all cells
+      },
+    },
+
+    margin: [0, 0, 0, 8],
   });
 }
-
-      optionContentBlocks.push({
-        table: {
-          widths: ['*'],
-          body: [[{ stack: headerStack, fillColor: '#dfefda', margin: [0, 5, 0, 5] }]],
-        },
-        layout: {
-          hLineWidth: () => 2,
-          vLineWidth: () => 2,
-          hLineColor: () => 'black',
-          vLineColor: () => 'black',
-        },
-        margin: [0, opt.subject ? 0 : (optIdx === 0 ? 0 : 20), 0, 0],
-      });
 
       // ── Products table
       const productRows = [];
@@ -266,7 +458,7 @@ if (kitName) {
           const imgBase64 = imgUrl ? await urlToBase64(imgUrl) : null;
           const qty       = Number(item.qty || 0);
           const total     = Number(item.price || 0);
-          const unit      = qty > 0 ? total / qty : 0;
+          const unit      = qty > 0 ? total * qty : 0;
           
           const descItems = item.description
             ? item.description.split(',').map(d => d.trim()).filter(Boolean)
@@ -278,14 +470,14 @@ if (kitName) {
               stack: [
                 { text: (item.model || '').toUpperCase(), bold: true, decoration: 'underline', fontSize: 11, margin: [0, 0, 0, 2] },
                 { ul: descItems, fontSize: 9, color: '#374151' },
-                { text: `• Rs.${formatIndianNumber(unit)}/- EACH`, bold: true, color: '#2563eb', fontSize: 10, margin: [0, 3, 0, 0] },
+                { text: `• Rs.${formatIndianNumber(item.price)}/- EACH`, bold: true, color: '#2563eb', fontSize: 10, margin: [0, 3, 0, 0] },
               ],
               margin: [4, 3, 4, 3],
             },
             {
               stack: [
                 { text: `${qty} NOS.`, bold: true, fontSize: 10, alignment: 'center' },
-                { text: `Rs.${formatIndianNumber(total)}/-`, bold: true, fontSize: 10, alignment: 'center' },
+                { text: `Rs.${formatIndianNumber(unit)}/-`, bold: true, fontSize: 10, alignment: 'center' },
               ],
               alignment: 'center',
               margin: [2, 6, 2, 3],
@@ -650,8 +842,7 @@ const acousticBlock = quotation.acoustic_terms
         ...acousticBlock,
 
         // 6. Options Summary table (ONLY SELECTED OPTIONS)
-        optionsSummaryBlock,
-
+...combinationBlocks,
         // 7. Bank + Installments side by side
         {
           columns: [
@@ -684,7 +875,7 @@ const acousticBlock = quotation.acoustic_terms
 };
 
 
-  // ─── HTML VIEW (100% unchanged) ───────────────────────────
+  // ─── HTML VIEW ───────────────────────────────────────────
   const options = quotation?.options || [];
 
   const optionsSummaryData = options.map((opt, idx) => {
@@ -704,6 +895,8 @@ const acousticBlock = quotation.acoustic_terms
       finalized_total: finalizedTotal,
       final_cost: getOptionTotalCost(opt),
       has_installments: opt.installments && opt.installments.length > 0,
+      floor_name: opt.floor_name || '',
+      room_name: opt.room_name || '',
     };
   });
 
@@ -789,7 +982,8 @@ const acousticBlock = quotation.acoustic_terms
         const finalOfferAmount = opt.final_offer_amount || 0;
         const finalizedTotal   = opt.finalized_total || 0;
         const showFinalOffer   = finalOffer && finalOfferAmount > 0;
-        
+        const floorName        = opt.floor_name || '';
+        const roomName         = opt.room_name || '';
 
         return (
           <div key={optIdx} className={optIdx > 0 ? 'mt-10' : ''}>
@@ -807,19 +1001,46 @@ const acousticBlock = quotation.acoustic_terms
   </div>
 )}
       
-      {/* Option header */}
-<div className="border-2 border-black bg-[#dfefda] text-center py-2 mb-0 border-b-0">
-  {!shouldHideOptionLabel(opt) && (
-    <p className="text-[16px] font-bold tracking-widest uppercase text-black underline">
-      {opt.option_name || `OPTION ${optIdx + 1}`}
+{/* Option Header Section */}
+<div className="space-y-2 mb-2">
+
+  {/* ROW 1 : OPTION + KIT NAME */}
+  <div className="border-2 border-black bg-[#dfefda] text-center py-3">
+
+    {!shouldHideOptionLabel(opt) && (
+      <p className="text-[16px] font-bold tracking-widest uppercase text-black underline">
+        {opt.option_name || `OPTION ${optIdx + 1}`}
+      </p>
+    )}
+
+    <p className="text-[14px] font-bold tracking-widest uppercase text-black mt-1">
+      {opt.items?.[0]?.kit_name || '-'}
     </p>
-  )}
-  {opt.items?.[0]?.kit_name && (
-    <p className="text-[14px] font-bold tracking-widest uppercase text-black">
-      {opt.items[0].kit_name}
+
+  </div>
+
+{/* ROW 2 : FLOOR */}
+{floorName && (
+  <div className="border-2 border-black bg-pink-50 text-center py-2">
+    <p className="text-[14px] font-bold uppercase text-black">
+      {floorName}
     </p>
-  )}
+  </div>
+)}
+
+{/* ROW 3 : ROOM */}
+{roomName && (
+  <div className="border-2 border-black bg-pink-50 text-center py-2">
+    <p className="text-[14px] font-bold uppercase text-black">
+      {roomName}
+    </p>
+  </div>
+)}
+
+
+
 </div>
+
             <table className="w-full border-collapse border-2 border-black text-[12px]">
               <thead>
                 <tr className="bg-[#daeaf6]">
@@ -844,12 +1065,12 @@ const acousticBlock = quotation.acoustic_terms
                             ))}
                           </ul>
                           <div className="font-black text-blue-600 mt-2 text-[12px]">
-                            • Rs.{formatIndianNumber(Number(item.price / (parseInt(item.qty) || 1)))}/- EACH
+                            • Rs.{formatIndianNumber(Number(item.price ))}/- EACH
                           </div>
                         </td>
                         <td className="border-2 border-black p-1.5 text-center align-middle">
                           <div className="text-black font-extrabold mb-1 uppercase">{item.qty} NOS.</div>
-                          <div className="text-black font-extrabold">Rs.{formatIndianNumber(item.price)}/-</div>
+                          <div className="text-black font-extrabold"> • Rs.{formatIndianNumber(Number(item.price * (parseInt(item.qty) || 1)))}</div>
                         </td>
                         <td className="border-2 border-black p-1.5 text-center align-middle">
                           <img
@@ -927,59 +1148,104 @@ const acousticBlock = quotation.acoustic_terms
   </div>
 )}
 
-      {/* Options Summary - Showing Only Selected Options from Creation */}
-<div className="border-2 border-gray-300 rounded-lg overflow-hidden mt-6">
-  <div className="bg-white text-black px-4 py-3 text-center">
-    <h4 className="font-semibold">OPTIONS SUMMARY</h4>
-    {quotation.selected_options_for_summary && quotation.selected_options_for_summary.length > 0 && (
-      <p className="text-xs text-gray-500 mt-1">
-        Showing {quotation.selected_options_for_summary.length} selected option{quotation.selected_options_for_summary.length > 1 ? 's' : ''}
-      </p>
-    )}
-  </div>
-  <div className="overflow-x-auto">
-    <table className="w-full text-sm border-collapse">
-      <thead className="bg-gray-100">
-        <tr>
-          <th className="border p-2 text-center w-16">SR NO</th>
-          <th className="border p-2 text-left">SUBJECT</th>
-          <th className="border p-2 text-left">PRODUCTS</th>
-          <th className="border p-2 text-right w-32">COST (₹)</th>
-        </tr>
-      </thead>
-      <tbody>
-        {(() => {
-          // Get selected option indices from saved data
-          const selectedIndices = quotation.selected_options_for_summary || [];
-          
-          // If no selections saved, show all options
-          const optionsToShow = selectedIndices.length > 0 
-            ? optionsSummaryData.filter((_, idx) => selectedIndices.includes(idx))
-            : optionsSummaryData;
-          
-          const totalToShow = optionsToShow.reduce((sum, opt) => sum + opt.final_cost, 0);
-          
-          return (
-            <>
-              {optionsToShow.map((opt, idx) => (
-                <tr key={idx} className={idx % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
-                  <td className="border p-2 text-center font-medium">{idx + 1}</td>
-                  <td className="border p-2 font-medium">{opt.option_name}</td>
-                  <td className="border p-2 text-gray-600 text-xs">{opt.kit_names.substring(0, 80)}{opt.kit_names.length > 80 ? '...' : ''}</td>
-                  <td className="border p-2 text-right font-bold text-green-700">₹{formatIndianNumber(opt.final_cost)}</td>
-                </tr>
-              ))}
-              <tr className="bg-gray-200 font-bold">
-                <td colSpan={3} className="border p-2 text-right text-base">OVERALL TOTAL:</td>
-                <td className="border p-2 text-right text-base text-green-800">₹{formatIndianNumber(totalToShow)}</td>
+
+{/* Combination Summary */}
+<div className="mt-8 space-y-6">
+
+  {(quotation.selected_options_for_summary || []).map((combo, comboIdx) => {
+
+    const comboOptions = combo.map(i => optionsSummaryData[i]);
+
+    const comboTotal = comboOptions.reduce(
+      (sum, opt) => sum + opt.final_cost,
+      0
+    );
+
+    return (
+      <div
+        key={comboIdx}
+        className="border-2 border-gray-300 rounded-lg overflow-hidden"
+      >
+
+        <div className="bg-blue-100 px-4 py-3 text-center">
+          <h4 className="font-bold text-blue-800">
+            Options Summary {comboIdx + 1}
+          </h4>
+        </div>
+
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm border-collapse">
+
+            <thead className="bg-gray-100">
+              <tr>
+                <th className="border p-2 text-center w-16">
+                  SR NO
+                </th>
+
+                <th className="border p-2 text-left">
+                  OPTION
+                </th>
+
+                <th className="border p-2 text-left">
+                  PRODUCTS
+                </th>
+
+                <th className="border p-2 text-right w-32">
+                  COST (₹)
+                </th>
               </tr>
-            </>
-          );
-        })()}
-      </tbody>
-    </table>
-  </div>
+            </thead>
+
+            <tbody>
+
+              {comboOptions.map((opt, idx) => (
+
+                <tr key={idx}>
+
+                  <td className="border p-2 text-center font-medium">
+                    {idx + 1}
+                  </td>
+
+                  <td className="border p-2 font-medium">
+                    {opt.option_name}
+                  </td>
+
+                  <td className="border p-2 text-xs text-gray-600">
+                    {opt.kit_names}
+                  </td>
+
+                  <td className="border p-2 text-right font-bold text-green-700">
+                    ₹{formatIndianNumber(opt.final_cost)}
+                  </td>
+
+                </tr>
+
+              ))}
+
+              <tr className="bg-green-100 font-bold">
+
+                <td
+                  colSpan={3}
+                  className="border p-2 text-right"
+                >
+                  Overall Total
+                </td>
+
+                <td className="border p-2 text-right text-green-800">
+                  ₹{formatIndianNumber(comboTotal)}
+                </td>
+
+              </tr>
+
+            </tbody>
+
+          </table>
+        </div>
+      </div>
+    );
+  })}
 </div>
+
 
       {/* footer */}
       <div className="mt-8">

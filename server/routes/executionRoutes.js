@@ -1,5 +1,6 @@
 import express from 'express';
 import { getClosedLeadsDataExe  ,getProcessesByLead, saveProcess , getProcessLogs , 
+  updateProcessStatusOnly ,
 } from '../controllers/executionController.js';
 
 const router = express.Router();
@@ -12,6 +13,11 @@ router.get("/execution/processes/:leadId", getProcessesByLead);
 
 // Save (Insert or Update)
 router.post("/execution/save-process", saveProcess);
+
+router.put(
+  "/execution/update-process-status",
+  updateProcessStatusOnly
+);
 
 router.get(
   "/execution/process-logs/:leadId/:processId",

@@ -1,3 +1,4 @@
+
 import { useEffect, useState } from 'react';
 import axios from 'axios';
 import Breadcrumb from '../../components/Breadcrumbs/Breadcrumb';
@@ -14,6 +15,8 @@ const emptyOption = (index = 0) => ({
   gst_app_amt: '',
   final_offer: { description: 'FINAL BEST OFFER', percentage: 0, amount: 0 },
   show_final_offer: false,
+  floor_name: '',
+  room_name: '',
 });
 
 const calcOptionTotals = (option, quoteType) => {
@@ -46,6 +49,7 @@ const AddQuotation = () => {
 
   // ── global states ──
   const [quoteType, setQuoteType] = useState('with_gst');
+  const [quotationType, setQuotationType] = useState('demo'); // ← NEW: 'demo' or 'finalized'
   
   // ── installments with option selection ──
   const [installmentsConfig, setInstallmentsConfig] = useState([]);
@@ -100,11 +104,16 @@ const AddQuotation = () => {
   const [optionSubjects, setOptionSubjects] = useState({});
   const [optionSubjectTypes, setOptionSubjectTypes] = useState({});
 
+  // Floor and Room states - one per option
+  const [optionFloorNames, setOptionFloorNames] = useState({});
+  const [optionRoomNames, setOptionRoomNames] = useState({});
+
   // Global subject for quotation header
   const [globalSubject, setGlobalSubject] = useState('');
 
   // Add this with other useState declarations
-  const [selectedOptionsForSummary, setSelectedOptionsForSummary] = useState([]);
+const [selectedOptionsForSummary, setSelectedOptionsForSummary] = useState([]);
+const [currentSummarySelection, setCurrentSummarySelection] = useState([]); 
 
   const selectAllOptionsForSummary = () => {
     setSelectedOptionsForSummary(options.map((_, idx) => idx));
@@ -112,7 +121,38 @@ const AddQuotation = () => {
 
   const deselectAllOptionsForSummary = () => {
     setSelectedOptionsForSummary([]);
-  };
+  }; 
+
+
+  const toggleCurrentSummaryOption = (idx) => {
+  setCurrentSummarySelection(prev => {
+    if (prev.includes(idx)) {
+      return prev.filter(i => i !== idx);
+    }
+    return [...prev, idx];
+  });
+};
+
+const addSummaryCombination = () => {
+  if (currentSummarySelection.length === 0) {
+    alert('Select at least one option');
+    return;
+  }
+
+  setSelectedOptionsForSummary(prev => [
+    ...prev,
+    [...currentSummarySelection]
+  ]);
+
+  setCurrentSummarySelection([]);
+};
+
+const removeSummaryCombination = (combinationIdx) => {
+  setSelectedOptionsForSummary(prev =>
+    prev.filter((_, idx) => idx !== combinationIdx)
+  );
+};
+
 
   // ── fetch data ──
   useEffect(() => {
@@ -156,6 +196,10 @@ const addOption = () => {
   // Initialize subject for new option as empty
   setOptionSubjects(prev => ({ ...prev, [options.length]: '' }));
   setOptionSubjectTypes(prev => ({ ...prev, [options.length]: 'master' }));
+  
+  // Initialize floor and room names for new option
+  setOptionFloorNames(prev => ({ ...prev, [options.length]: '' }));
+  setOptionRoomNames(prev => ({ ...prev, [options.length]: '' }));
 };
 
 const duplicateOption = (idx) => {
@@ -167,6 +211,10 @@ const duplicateOption = (idx) => {
   // Copy the subject from the duplicated option
   setOptionSubjects(prev => ({ ...prev, [options.length]: optionSubjects[idx] || '' }));
   setOptionSubjectTypes(prev => ({ ...prev, [options.length]: optionSubjectTypes[idx] || 'master' }));
+  
+  // Copy floor and room names from the duplicated option
+  setOptionFloorNames(prev => ({ ...prev, [options.length]: optionFloorNames[idx] || '' }));
+  setOptionRoomNames(prev => ({ ...prev, [options.length]: optionRoomNames[idx] || '' }));
 };
 
   const removeOption = (idx) => {
@@ -480,18 +528,23 @@ const handleSubmit = async (e) => {
     ? `ALL FRAMING WILL BE DONE BY ${framingBy}.\n• FABRIC & FLOOR CARPET WILL BE PROVIDED BY ${fabricBy}\n• ALL CEILING-RELATED WORK WILL BE PROVIDED BY ${ceilingBy}.\n• FABRIC STITCHING CHARGES WILL BE EXTRA AS PER THE DESIGN`
     : null;
 
-  // IMPORTANT: Build options array with subjects from optionSubjects state
+  // IMPORTANT: Build options array with subjects, floor_name, room_name from state
   const optionsPayload = options.map((opt, idx) => {
     // Get subject from optionSubjects state, fallback to empty string
     const optionSubject = optionSubjects[idx] || '';
     const optionSubjectType = optionSubjectTypes[idx] || 'master';
+    // Get floor and room names from state
+    const optionFloorName = optionFloorNames[idx] || '';
+    const optionRoomName = optionRoomNames[idx] || '';
     
-    console.log(`Option ${idx} (${opt.option_name}) - Subject: "${optionSubject}", Type: ${optionSubjectType}`);
+    console.log(`Option ${idx} (${opt.option_name}) - Subject: "${optionSubject}", Floor: "${optionFloorName}", Room: "${optionRoomName}"`);
     
     return {
       option_name: opt.option_name,
-      subject: optionSubject || null,  // Send null if empty, not empty string
+      subject: optionSubject || null,
       subject_type: optionSubjectType,
+      floor_name: optionFloorName || null,
+      room_name: optionRoomName || null,
       items: opt.items.map(item => ({
         cat_id: item.cat_id,
         kit_id: item.kit_id || null,
@@ -517,6 +570,7 @@ const handleSubmit = async (e) => {
 
 const payload = {
   type: quoteType,
+  quotation_type: quotationType,  // ← ADD THIS LINE
   master_id,
   subject: globalSubject,
   acoustic_terms: acousticTerms,
@@ -529,7 +583,7 @@ const payload = {
       description: inst.description,
       percentage: inst.percentage,
       amount: inst.amount,
-      payment_mode: inst.payment_mode || 'Online'  // Include payment mode
+      payment_mode: inst.payment_mode || 'Online'
     })) : []
   })) : [],
   options: optionsPayload,
@@ -552,6 +606,10 @@ const payload = {
   // Get current subject for active option
   const currentSubject = optionSubjects[activeOptionIdx] || '';
   const currentSubjectType = optionSubjectTypes[activeOptionIdx] || 'master';
+  
+  // Get current floor and room names for active option
+  const currentFloorName = optionFloorNames[activeOptionIdx] || '';
+  const currentRoomName = optionRoomNames[activeOptionIdx] || '';
 
 const handleMasterSubjectSelect = (catId) => {
   if (catId) {
@@ -574,6 +632,19 @@ const handleCustomSubjectChange = (value) => {
   console.log(`Set custom subject for option ${activeOptionIdx} to: ${value}`);
 };
 
+// ── Floor and Room name handlers ──
+const handleFloorNameChange = (value) => {
+  setOptionFloorNames(prev => ({ ...prev, [activeOptionIdx]: value }));
+  // Also update the option object for summary display
+  updateOption(activeOptionIdx, { floor_name: value });
+};
+
+const handleRoomNameChange = (value) => {
+  setOptionRoomNames(prev => ({ ...prev, [activeOptionIdx]: value }));
+  // Also update the option object for summary display
+  updateOption(activeOptionIdx, { room_name: value });
+};
+
   // Options summary for the tabular display
   const optionsSummary = options.map((opt, idx) => {
     const totals = calcOptionTotals(opt, quoteType);
@@ -586,6 +657,8 @@ const handleCustomSubjectChange = (value) => {
       option_name: opt.option_name,
       subject: optionSubjects[idx] || '',
       subject_type: optionSubjectTypes[idx] || 'master',
+      floor_name: optionFloorNames[idx] || '',
+      room_name: optionRoomNames[idx] || '',
       kit_names: kitNames,
       original_total: totals.totalWithGST,
       discount_amount: totals.discountAmount,
@@ -633,6 +706,44 @@ const handleCustomSubjectChange = (value) => {
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-5 mt-9">
+
+          {/* ── NEW: Quotation Type Selection - Demo vs Finalized ── */}
+          <div className="mb-5 border border-gray-200 rounded-lg p-4 bg-gray-50">
+            <h4 className="font-semibold mb-3 text-gray-700">Quotation Type</h4>
+            <div className="flex gap-6">
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input
+                  type="radio"
+                  name="quotationType"
+                  value="demo"
+                  checked={quotationType === 'demo'}
+                  onChange={(e) => setQuotationType(e.target.value)}
+                  className="w-4 h-4 text-blue-600"
+                />
+                <span className="text-gray-700">
+                  <span className="font-medium">Demo Quotation</span>
+                </span>
+              </label>
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input
+                  type="radio"
+                  name="quotationType"
+                  value="finalized"
+                  checked={quotationType === 'finalized'}
+                  onChange={(e) => setQuotationType(e.target.value)}
+                  className="w-4 h-4 text-green-600"
+                />
+                <span className="text-gray-700">
+                  <span className="font-medium">Finalized Quotation</span>
+                </span>
+              </label>
+            </div>
+            <p className="text-xs text-gray-500 mt-2">
+              {quotationType === 'demo' 
+                ? '📝 Demo quotations are for internal reference and client preview.' 
+                : '✅ Finalized quotations are ready for client approval and execution.'}
+            </p>
+          </div>
 
        {/* Quotation Type & GST */}
 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -752,7 +863,6 @@ const handleCustomSubjectChange = (value) => {
         type="text" 
         className="w-full border px-3 py-2 rounded" 
         placeholder="Enter custom subject"
-        // Show the current subject regardless of type (master or custom)
         value={currentSubject || ''}
         onChange={e => handleCustomSubjectChange(e.target.value)}
       />
@@ -764,16 +874,52 @@ const handleCustomSubjectChange = (value) => {
     <div className="mt-2 p-2 bg-blue-50 rounded border border-blue-200">
       <span className="text-sm font-medium text-gray-700">Subject for {activeOption.option_name}: </span>
       <span className="text-sm font-semibold text-blue-700">{currentSubject}</span>
-      {currentSubjectType === 'master' && (
-        <span className="text-xs text-gray-500 ml-2"></span>
-      )}
-      {currentSubjectType === 'custom' && (
-        <span className="text-xs text-purple-500 ml-2"></span>
-      )}
     </div>
   )}
 </div>
 
+{/* ── NEW: Floor Name and Room Name Fields ── */}
+<div className="bg-white border rounded p-4 mb-4">
+  <h4 className="font-semibold mb-3 text-gray-700">Location Details for {activeOption.option_name}</h4>
+  
+  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+    <div>
+      <label className="block mb-1 font-medium text-sm">
+        Floor Name <span className="text-gray-400 text-xs">(Optional)</span>
+      </label>
+      <input 
+        type="text" 
+        className="w-full border px-3 py-2 rounded" 
+        placeholder="e.g., Ground Floor, First Floor, Basement"
+        value={currentFloorName}
+        onChange={e => handleFloorNameChange(e.target.value)}
+      />
+    </div>
+    
+    <div>
+      <label className="block mb-1 font-medium text-sm">
+        Room Name <span className="text-gray-400 text-xs">(Optional)</span>
+      </label>
+      <input 
+        type="text" 
+        className="w-full border px-3 py-2 rounded" 
+        placeholder="e.g., Living Room, Bedroom, Home Theatre"
+        value={currentRoomName}
+        onChange={e => handleRoomNameChange(e.target.value)}
+      />
+    </div>
+  </div>
+  
+  {/* Display current location details for this option */}
+  {(currentFloorName || currentRoomName) && (
+    <div className="mt-3 p-2 bg-green-50 rounded border border-green-200">
+      <span className="text-sm font-medium text-gray-700">Location: </span>
+      {currentFloorName && <span className="text-sm font-semibold text-green-700">Floor: {currentFloorName}</span>}
+      {currentFloorName && currentRoomName && <span className="text-sm mx-1">•</span>}
+      {currentRoomName && <span className="text-sm font-semibold text-green-700">Room: {currentRoomName}</span>}
+    </div>
+  )}
+</div>
 
               {/* Kit selection */}
               <div className="bg-white border rounded p-4 mb-4">
@@ -1044,154 +1190,191 @@ const handleCustomSubjectChange = (value) => {
             </div>
           </div>
 
-          {/* OPTIONS SUMMARY TABLE with Subject Column */}
-          <div className="border-2 border-gray-300 rounded-lg overflow-hidden mt-6">
-            <div className="bg-white text-black px-4 py-3">
-              <div className="flex justify-between items-center flex-wrap gap-2">
-                <h4 className="font-semibold">OPTIONS SUMMARY</h4>
-                <div className="flex gap-2">
-                  <button type="button" onClick={selectAllOptionsForSummary}
-                    className="text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded hover:bg-blue-200">
-                    Select All
-                  </button>
-                  <button type="button" onClick={deselectAllOptionsForSummary}
-                    className="text-xs bg-gray-100 text-gray-700 px-2 py-1 rounded hover:bg-gray-200">
-                    Deselect All
-                  </button>
-                </div>
-              </div>
-              <p className="text-xs text-gray-500 mt-1">✓ Check the options you want to include in the quotation summary</p>
-            </div>
+       {/* OPTIONS SUMMARY TABLE with Subject, Floor, Room Columns */}
+<div className="border-2 border-gray-300 rounded-lg overflow-hidden mt-6">
+  <div className="bg-white text-black px-4 py-3">
+    <div className="flex justify-between items-center flex-wrap gap-2">
+      <h4 className="font-semibold">OPTIONS SUMMARY</h4>
+      <div className="flex gap-2">
+        <button type="button" onClick={selectAllOptionsForSummary}
+          className="text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded hover:bg-blue-200">
+          Select All
+        </button>
+        <button type="button" onClick={deselectAllOptionsForSummary}
+          className="text-xs bg-gray-100 text-gray-700 px-2 py-1 rounded hover:bg-gray-200">
+          Deselect All
+        </button>
+        <button
+          type="button"
+          onClick={addSummaryCombination}
+          className="bg-blue-600 text-white px-4 py-2 rounded"
+        >
+          Add Selected Combination
+        </button>
+      </div>
+    </div>
+    <p className="text-xs text-gray-500 mt-1">✓ Check the options you want to include in the quotation summary</p>
+  </div>
 
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm border-collapse">
-                <thead className="bg-gray-100">
-                  <tr>
-                    <th className="border p-2 text-center w-12">SELECT</th>
-                    <th className="border p-2 text-left">Option</th>
-                    <th className="border p-2 text-left">Subject</th>
-                    <th className="border p-2 text-left">Kit / Product Names</th>
-                    <th className="border p-2 text-right">Original Total (₹)</th>
-                    <th className="border p-2 text-right">Discount (₹)</th>
-                    <th className="border p-2 text-right bg-green-50">Finalized Total (₹)</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {optionsSummary.map((opt, idx) => (
-                    <tr key={idx} className={idx % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
-                      <td className="border p-2 text-center">
-                        <input
-                          type="checkbox"
-                          checked={selectedOptionsForSummary.includes(idx)}
-                          onChange={(e) => {
-                            if (e.target.checked) {
-                              setSelectedOptionsForSummary(prev => [...prev, idx]);
-                            } else {
-                              setSelectedOptionsForSummary(prev => prev.filter(i => i !== idx));
-                            }
-                          }}
-                          className="w-4 h-4 text-blue-600 rounded cursor-pointer"
-                        />
-                      </td>
-                      <td className="border p-2 font-medium">{opt.option_name}</td>
-                      <td className="border p-2">
-                        {opt.subject ? (
-                          <div className="flex items-center gap-1 flex-wrap">
-                            <span className="text-gray-800">{opt.subject}</span>
-                            {opt.subject_type === 'master' && (
-                              <span className="text-xs text-blue-600 bg-blue-50 px-1.5 py-0.5 rounded">Master</span>
-                            )}
-                            {opt.subject_type === 'custom' && (
-                              <span className="text-xs text-purple-600 bg-purple-50 px-1.5 py-0.5 rounded">Custom</span>
-                            )}
-                          </div>
-                        ) : (
-                          <span className="text-gray-400 text-xs">No subject</span>
-                        )}
-                      </td>
-                      <td className="border p-2 text-gray-600 text-xs">
-                        {opt.kit_names.substring(0, 60)}{opt.kit_names.length > 60 ? '...' : ''}
-                      </td>
-                      <td className="border p-2 text-right">₹{Math.round(opt.original_total).toLocaleString()}</td>
-                      <td className="border p-2 text-right text-red-600">₹{Math.round(opt.discount_amount).toLocaleString()}</td>
-                      <td className="border p-2 text-right font-bold text-green-700 bg-green-50">₹{Math.round(opt.finalized_total).toLocaleString()}</td>
-                    </tr>
-                  ))}
-                </tbody>
-                <tfoot className="bg-gray-200 font-bold">
-                  <tr>
-                    <td className="border p-2 text-center"></td>
-                    <td colSpan={5} className="border p-2 text-right text-lg">OVERALL TOTAL (Selected Only):</td>
-                    <td className="border p-2 text-right text-lg text-green-800">
-                      ₹{optionsSummary
-                        .filter((_, idx) => selectedOptionsForSummary.includes(idx))
-                        .reduce((sum, opt) => sum + opt.finalized_total, 0)
-                        .toLocaleString()}
-                    </td>
-                  </tr>
-                </tfoot>
-              </table>
-            </div>
-          </div>
+  <div className="overflow-x-auto">
+    <table className="w-full text-sm border-collapse">
+      <thead className="bg-gray-100">
+        <tr>
+          <th className="border p-2 text-center w-12">SELECT</th>
+          <th className="border p-2 text-left">Option</th>
+          <th className="border p-2 text-left">Subject</th>
+          <th className="border p-2 text-left">Floor</th>
+          <th className="border p-2 text-left">Room</th>
+          <th className="border p-2 text-left">Kit / Product Names</th>
+          <th className="border p-2 text-right">Original Total (₹)</th>
+          <th className="border p-2 text-right">Discount (₹)</th>
+          <th className="border p-2 text-right bg-green-50">Finalized Total (₹)</th>
+        </tr>
+      </thead>
+      <tbody>
+        {optionsSummary.map((opt, idx) => (
+          <tr key={idx} className={idx % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
+            <td className="border p-2 text-center">
+              <input
+                type="checkbox"
+                checked={currentSummarySelection.includes(idx)}
+                onChange={() => toggleCurrentSummaryOption(idx)}
+                className="w-4 h-4 text-blue-600 rounded cursor-pointer"
+              />
+            </td>
+            <td className="border p-2 font-medium">{opt.option_name}</td>
+            <td className="border p-2">
+              {opt.subject ? (
+                <div className="flex items-center gap-1 flex-wrap">
+                  <span className="text-gray-800">{opt.subject}</span>
+                  {opt.subject_type === 'master' && (
+                    <span className="text-xs text-blue-600 bg-blue-50 px-1.5 py-0.5 rounded">Master</span>
+                  )}
+                  {opt.subject_type === 'custom' && (
+                    <span className="text-xs text-purple-600 bg-purple-50 px-1.5 py-0.5 rounded">Custom</span>
+                  )}
+                </div>
+              ) : (
+                <span className="text-gray-400 text-xs">No subject</span>
+              )}
+            </td>
+            <td className="border p-2">
+              {opt.floor_name ? (
+                <span className="text-gray-700">{opt.floor_name}</span>
+              ) : (
+                <span className="text-gray-400 text-xs">-</span>
+              )}
+            </td>
+            <td className="border p-2">
+              {opt.room_name ? (
+                <span className="text-gray-700">{opt.room_name}</span>
+              ) : (
+                <span className="text-gray-400 text-xs">-</span>
+              )}
+            </td>
+            <td className="border p-2 text-gray-600 text-xs">
+              {opt.kit_names.substring(0, 60)}{opt.kit_names.length > 60 ? '...' : ''}
+            </td>
+            <td className="border p-2 text-right">₹{Math.round(opt.original_total).toLocaleString()}</td>
+            <td className="border p-2 text-right text-red-600">₹{Math.round(opt.discount_amount).toLocaleString()}</td>
+            <td className="border p-2 text-right font-bold text-green-700 bg-green-50">₹{Math.round(opt.finalized_total).toLocaleString()}</td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
+  </div>
+</div>
 
           {/* Selected Options Preview */}
+          {/* SUMMARY COMBINATIONS */}
           {selectedOptionsForSummary.length > 0 && (
-            <div className="border-2 border-blue-300 rounded-lg overflow-hidden mt-4">
-              <div className="bg-blue-100 text-blue-900 px-4 py-2 text-center">
-                <h4 className="font-semibold">SELECTED OPTIONS SUMMARY ({selectedOptionsForSummary.length} Option{selectedOptionsForSummary.length > 1 ? 's' : ''})</h4>
-                <p className="text-xs text-blue-700">These options will appear in the quotation summary</p>
+            <div className="mt-6 border rounded-lg overflow-hidden">
+              <div className="bg-blue-100 px-4 py-3">
+                <h3 className="font-bold text-blue-800">
+                  Selected Option Summary
+                </h3>
               </div>
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm border-collapse">
-                  <thead className="bg-blue-50">
-                    <tr>
-                      <th className="border p-2 text-left">Option</th>
-                      <th className="border p-2 text-left">Subject</th>
-                      <th className="border p-2 text-left">Kit / Product Names</th>
-                      <th className="border p-2 text-right">Finalized Total (₹)</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {optionsSummary
-                      .filter((_, idx) => selectedOptionsForSummary.includes(idx))
-                      .map((opt, idx) => (
-                        <tr key={idx} className={idx % 2 === 0 ? 'bg-white' : 'bg-blue-50/30'}>
-                          <td className="border p-2 font-medium">{opt.option_name}</td>
-                          <td className="border p-2">
-                            {opt.subject ? (
-                              <div className="flex items-center gap-1 flex-wrap">
-                                <span className="text-gray-800 text-xs">{opt.subject}</span>
-                                {opt.subject_type === 'master' && (
-                                  <span className="text-xs text-blue-600 bg-blue-50 px-1.5 py-0.5 rounded">Master</span>
-                                )}
-                                {opt.subject_type === 'custom' && (
-                                  <span className="text-xs text-purple-600 bg-purple-50 px-1.5 py-0.5 rounded">Custom</span>
-                                )}
-                              </div>
-                            ) : (
-                              <span className="text-gray-400 text-xs">No subject</span>
-                            )}
-                          </td>
-                          <td className="border p-2 text-gray-600 text-xs">{opt.kit_names.substring(0, 60)}</td>
-                          <td className="border p-2 text-right font-bold text-green-700">₹{Math.round(opt.finalized_total).toLocaleString()}</td>
-                        </tr>
-                      ))}
-                  </tbody>
-                  <tfoot className="bg-blue-100 font-bold">
-                    <tr>
-                      <td colSpan={3} className="border p-2 text-right">TOTAL FOR SELECTED OPTIONS:</td>
-                      <td className="border p-2 text-right text-green-800">
-                        ₹{optionsSummary
-                          .filter((_, idx) => selectedOptionsForSummary.includes(idx))
-                          .reduce((sum, opt) => sum + opt.finalized_total, 0)
-                          .toLocaleString()}
-                      </td>
-                    </tr>
-                  </tfoot>
-                </table>
+
+              <div className="p-4 space-y-3">
+                {selectedOptionsForSummary.map((combo, comboIdx) => {
+
+                  const comboOptions = combo.map(i => optionsSummary[i]);
+
+                  const total = comboOptions.reduce(
+                    (sum, opt) => sum + opt.finalized_total,
+                    0
+                  );
+
+                  return (
+                    <div
+                      key={comboIdx}
+                      className="border rounded p-3 bg-gray-50"
+                    >
+                      <div className="flex justify-between items-center mb-2">
+                        <h4 className="font-semibold text-blue-700">
+                          Option Summary {comboIdx + 1}
+                        </h4>
+
+                        <button
+                          type="button"
+                          onClick={() => removeSummaryCombination(comboIdx)}
+                          className="text-red-600 text-sm"
+                        >
+                          Remove
+                        </button>
+                      </div>
+
+                      <table className="w-full text-sm border">
+                        <thead className="bg-gray-100">
+                          <tr>
+                            <th className="border p-2 text-left">Option</th>
+                            <th className="border p-2 text-left">Subject</th>
+                            <th className="border p-2 text-left">Floor</th>
+                            <th className="border p-2 text-left">Room</th>
+                            <th className="border p-2 text-right">Price</th>
+                          </tr>
+                        </thead>
+
+                        <tbody>
+                          {comboOptions.map((opt, idx) => (
+                            <tr key={idx}>
+                              <td className="border p-2">
+                                {opt.option_name}
+                              </td>
+                              <td className="border p-2">
+                                {opt.subject || '-'}
+                              </td>
+                              <td className="border p-2">
+                                {opt.floor_name || '-'}
+                              </td>
+                              <td className="border p-2">
+                                {opt.room_name || '-'}
+                              </td>
+                              <td className="border p-2 text-right">
+                                ₹{Math.round(opt.finalized_total).toLocaleString()}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+
+                        <tfoot className="bg-green-50 font-bold">
+                          <tr>
+                            <td colSpan={4} className="border p-2 text-right">
+                              Overall Total
+                            </td>
+                            <td className="border p-2 text-right text-green-700">
+                              ₹{Math.round(total).toLocaleString()}
+                            </td>
+                          </tr>
+                        </tfoot>
+                      </table>
+                    </div>
+                  );
+                })}
               </div>
             </div>
           )}
+
 
         {/* PAYMENT INSTALLMENTS - UPDATED VERSION */}
 <div className="bg-yellow-50 p-4 rounded mt-4">

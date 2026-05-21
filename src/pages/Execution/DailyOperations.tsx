@@ -1326,6 +1326,7 @@ import {
 
 // Types and Interfaces based on actual API response
 interface Document {
+  type_id: any;
   id: number;
   lead_id: number;
   process_id: number;
@@ -2295,37 +2296,38 @@ const ProcessStatusModal = ({
     }
   };
 
-  const handleUpdateProcessStatus = async () => {
-    if (!document) return;
-    
-    try {
-      setLoading(true);
-      
-      await axios.post(
-        `${BASE_URL}api/execution/save-process`,
-        {
-          lead_id: document.lead_id,
-          process_id: document.process_id,
-          process_name: document.process_name,
-          start_date: processDetails?.start_date || null,
-          end_date: processDetails?.end_date || null,
-          status: status,
-          assigned_user_ids: processDetails?.assigned_to || [],
-          remark: remark,
-        },
-        { withCredentials: true }
-      );
 
-      alert("Process status updated successfully ✅");
-      onUpdate();
-      onClose();
-    } catch (err) {
-      console.error("Error updating process status:", err);
-      alert("Failed to update process status");
-    } finally {
-      setLoading(false);
-    }
-  };
+  const handleUpdateProcessStatus = async () => {
+  if (!document) return;
+
+  try {
+    setLoading(true);
+
+    await axios.put(
+      `${BASE_URL}api/execution/update-process-status`,
+      {
+        lead_id: document.lead_id,
+        process_id: document.process_id,
+        status: status,
+        remark: remark,
+      },
+      { withCredentials: true }
+    );
+
+    alert("Process status updated successfully ✅");
+
+    onUpdate();
+    onClose();
+
+  } catch (err) {
+    console.error("Error updating process status:", err);
+
+    alert("Failed to update process status");
+
+  } finally {
+    setLoading(false);
+  }
+};
 
   if (!document) return null;
 
@@ -2583,6 +2585,7 @@ const fetchManagerDocuments = async () => {
             process_status: process.status || 'pending',
             process_remark: process.remark || null,
             execution_id: process.execution_id || null,
+              type_id: process.type_id || null, // ✅ ADD
             start_date: process.start_date,
             end_date: process.end_date
           });
@@ -2599,7 +2602,8 @@ const fetchManagerDocuments = async () => {
           process_remark: processInfo?.process_remark || null,
           execution_id: processInfo?.execution_id || null,
           process_start_date: processInfo?.start_date || null,
-          process_end_date: processInfo?.end_date || null
+          process_end_date: processInfo?.end_date || null ,
+          type_id: processInfo?.type_id || null, 
         };
       });
       

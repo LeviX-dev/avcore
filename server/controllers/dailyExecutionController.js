@@ -430,7 +430,7 @@ export const updateDocumentManagerStatus1 = async (req, res) => {
 };
 
 
-export const updateDocumentManagerStatus = async (req, res) => {
+export const updateDocumentManagerStatus2 = async (req, res) => {
   try {
     const { document_id } = req.params;
     const { manager_status, manager_remark } = req.body;
@@ -465,6 +465,289 @@ export const updateDocumentManagerStatus = async (req, res) => {
     res.status(500).json({
       success: false,
       message: "Failed to update document status"
+    });
+  }
+};
+
+
+export const updateDocumentManagerStatus3 = async (req, res) => {
+  try {
+
+    const { document_id } = req.params;
+
+    const {
+      manager_status,
+      manager_remark
+    } = req.body;
+
+    const user = req.session.user;
+
+    // ============================================
+    // ROLE CHECK
+    // ============================================
+
+    if (
+      user.role !== "admin" &&
+      user.role !== "project_manager" &&
+      user.role !== "manager"
+    ) {
+      return res.status(403).json({
+        success: false,
+        message: "Unauthorized - Access denied"
+      });
+    }
+
+    // ============================================
+    // UPDATE DOCUMENT STATUS
+    // ============================================
+
+    await db.query(
+      `
+      UPDATE execution_documents
+      SET
+        manager_status = ?,
+        manager_remark = ?
+      WHERE id = ?
+      `,
+      [
+        manager_status,
+        manager_remark,
+        document_id
+      ]
+    );
+
+    // ============================================
+    // GET DOCUMENT DETAILS
+    // ============================================
+
+    const [documentRows] = await db.query(
+      `
+      SELECT
+        execution_id,
+        process_id,
+        lead_id
+      FROM execution_documents
+      WHERE id = ?
+      `,
+      [document_id]
+    );
+
+    if (documentRows.length > 0) {
+
+      const {
+        execution_id,
+        process_id,
+        lead_id
+      } = documentRows[0];
+
+      // ============================================
+      // GET TYPE ID
+      // ============================================
+
+      const [typeRows] = await db.query(
+        `
+        SELECT type_id
+        FROM process_type_mapping
+        WHERE process_id = ?
+        `,
+        [process_id]
+      );
+
+      if (typeRows.length > 0) {
+
+        const type_id = typeRows[0].type_id;
+
+        // ============================================
+        // CHECK IF CURRENT PROCESS FULLY APPROVED
+        // ============================================
+
+        const [pendingDocs] = await db.query(
+          `
+          SELECT id
+          FROM execution_documents
+          WHERE
+            execution_id = ?
+            AND process_id = ?
+            AND lead_id = ?
+            AND manager_status != 'approved'
+          `,
+          [
+            execution_id,
+            process_id,
+            lead_id
+          ]
+        );
+
+        // ============================================
+        // IF ALL DOCS APPROVED
+        // MARK PROCESS COMPLETED
+        // ============================================
+
+        if (pendingDocs.length === 0) {
+
+          await db.query(
+            `
+            UPDATE execution_process_logs
+            SET
+              process_completion_status = 'completed',
+              type_id = ?
+            WHERE id = ?
+            `,
+            [
+              type_id,
+              execution_id
+            ]
+          );
+
+          // ============================================
+          // NOW CHECK STAGE COMPLETION
+          // ============================================
+
+          // TOTAL PROCESS UNDER TYPE
+          const [totalProcessRows] = await db.query(
+            `
+            SELECT COUNT(*) AS total_process
+            FROM process_type_mapping
+            WHERE type_id = ?
+            `,
+            [type_id]
+          );
+
+          const totalProcess =
+            totalProcessRows[0].total_process;
+
+          // COMPLETED PROCESS
+          const [completedProcessRows] = await db.query(
+            `
+            SELECT COUNT(DISTINCT process_id)
+            AS completed_process
+
+            FROM execution_process_logs
+
+            WHERE
+              lead_id = ?
+              AND type_id = ?
+              AND process_completion_status = 'completed'
+            `,
+            [
+              lead_id,
+              type_id
+            ]
+          );
+
+          const completedProcess =
+            completedProcessRows[0]
+              .completed_process;
+
+          // ============================================
+          // STAGE COMPLETED
+          // ============================================
+
+          if (
+            totalProcess === completedProcess
+          ) {
+
+            console.log(
+              `Stage ${type_id} completed for lead ${lead_id}`
+            );
+
+          }
+        }
+      }
+    }
+
+    // ============================================
+    // SUCCESS RESPONSE
+    // ============================================
+
+    res.json({
+      success: true,
+      message:
+        "Document status updated successfully"
+    });
+
+  } catch (err) {
+
+    console.error(
+      "UPDATE DOCUMENT STATUS ERROR:",
+      err
+    );
+
+    res.status(500).json({
+      success: false,
+      message:
+        "Failed to update document status"
+    });
+  }
+};
+
+export const updateDocumentManagerStatus = async (req, res) => {
+  try {
+
+    const { document_id } = req.params;
+
+    const {
+      manager_status,
+      manager_remark
+    } = req.body;
+
+    const user = req.session.user;
+
+    // ============================================
+    // ROLE CHECK
+    // ============================================
+
+    if (
+      user.role !== "admin" &&
+      user.role !== "project_manager" &&
+      user.role !== "manager"
+    ) {
+      return res.status(403).json({
+        success: false,
+        message: "Unauthorized - Access denied"
+      });
+    }
+
+    // ============================================
+    // UPDATE DOCUMENT STATUS
+    // ============================================
+
+    await db.query(
+      `
+      UPDATE execution_documents
+      SET
+        manager_status = ?,
+        manager_remark = ?
+      WHERE id = ?
+      `,
+      [
+        manager_status,
+        manager_remark,
+        document_id
+      ]
+    );
+
+    // ============================================
+    // SUCCESS RESPONSE
+    // ============================================
+
+    res.json({
+      success: true,
+      message:
+        "Document status updated successfully"
+    });
+
+  } catch (err) {
+
+    console.error(
+      "UPDATE DOCUMENT STATUS ERROR:",
+      err
+    );
+
+    res.status(500).json({
+      success: false,
+      message:
+        "Failed to update document status"
     });
   }
 };

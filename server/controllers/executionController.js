@@ -1327,267 +1327,549 @@ LEFT JOIN execution_start es
 
 export const getClosedLeadsDataExe = async (req, res) => {
   try {
+
     if (!req.session.user) {
-      return res.status(401).json({ message: "Unauthorized: No session" });
+      return res.status(401).json({
+        message: "Unauthorized: No session"
+      });
     }
 
     const { id: userId, role } = req.session.user;
 
-    /* ================= PAGINATION PARAMETERS ================= */
+    /* ================= PAGINATION ================= */
+
     const page = parseInt(req.query.page) || 1;
     const limit = parseInt(req.query.limit) || 10;
     const offset = (page - 1) * limit;
 
     if (page < 1 || limit < 1 || limit > 100) {
       return res.status(400).json({
-        message: "Invalid pagination parameters. Page must be >=1, limit between 1-100"
+        message:
+          "Invalid pagination parameters. Page must be >=1, limit between 1-100"
       });
     }
 
     /* ================= CURRENT USER ================= */
+
     const [userResult] = await db.query(
-      "SELECT name FROM users WHERE user_id = ?",
+      `
+      SELECT name
+      FROM users
+      WHERE user_id = ?
+      `,
       [userId]
     );
 
-    const currentUserName = userResult[0]?.name || "";
+    const currentUserName =
+      userResult[0]?.name || "";
 
-    /* ================= TOTAL COUNT QUERY ================= */
+    /* ================= TOTAL COUNT ================= */
+
     let countQuery = `
-      SELECT COUNT(DISTINCT rd.master_id) as total
-      FROM raw_data rd
-      LEFT JOIN (
-        SELECT r1.*, ROW_NUMBER() OVER (PARTITION BY master_id ORDER BY id DESC) rn
-        FROM reassignment r1
-      ) lr ON rd.master_id = lr.master_id AND lr.rn = 1
+      SELECT COUNT(DISTINCT rd.master_id) AS total
 
-      WHERE (rd.lead_stage = 'Execution'
-         OR lr.leadStage = 'Execution')
+      FROM raw_data rd
+
+      LEFT JOIN (
+        SELECT
+          r1.*,
+          ROW_NUMBER() OVER (
+            PARTITION BY master_id
+            ORDER BY id DESC
+          ) rn
+        FROM reassignment r1
+      ) lr
+        ON rd.master_id = lr.master_id
+       AND lr.rn = 1
+
+      WHERE (
+        rd.lead_stage = 'Execution'
+        OR lr.leadStage = 'Execution'
+      )
 
       AND EXISTS (
-        SELECT 1 
+        SELECT 1
         FROM execution_start es
-        WHERE FIND_IN_SET(rd.master_id, es.lead_ids)
-       AND es.status IN ('pending','in_progress','hold_by_client','hold_by_avcore')
+
+        WHERE FIND_IN_SET(
+          rd.master_id,
+          es.lead_ids
+        )
+
+        AND es.status IN (
+          'pending',
+          'in_progress',
+          'hold_by_client',
+          'hold_by_avcore'
+        )
       )
     `;
 
     const countParams = [];
 
     if (isTelecallerLike(role)) {
-      countQuery += ` AND lr.assignedTo = ?`;
+      countQuery += `
+        AND lr.assignedTo = ?
+      `;
+
       countParams.push(currentUserName);
     }
 
-    const [countResult] = await db.query(countQuery, countParams);
-    const total = countResult[0]?.total || 0;
-    const totalPages = Math.ceil(total / limit);
+    const [countResult] = await db.query(
+      countQuery,
+      countParams
+    );
 
-    /* ================= MAIN DATA QUERY ================= */
+    const total =
+      countResult[0]?.total || 0;
+
+    const totalPages =
+      Math.ceil(total / limit);
+
+    /* ================= MAIN QUERY ================= */
+
     let query = `
-      SELECT 
+      SELECT
+
         rd.master_id,
 
-        IFNULL(rd.name, 'Not Available') AS name,
-        IFNULL(rd.number, 'Not Available') AS number,
-        IFNULL(rd.alternate_number, 'Not Available') AS alternate_number,
-        IFNULL(rd.email, 'Not Available') AS email,
-        IFNULL(rd.address, 'Not Available') AS address,
-        IFNULL(rd.city, 'Not Available') AS city,
+        IFNULL(rd.name, '') AS name,
+        IFNULL(rd.number, '') AS number,
+        IFNULL(rd.alternate_number, '') AS alternate_number,
+        IFNULL(rd.email, '') AS email,
+        IFNULL(rd.address, '') AS address,
+        IFNULL(rd.city, '') AS city,
 
-        IFNULL(rd.status, 'Not Available') AS status,
-        IFNULL(rd.lead_status, 'Not Available') AS lead_status,
-        IFNULL(rd.lead_stage, 'Not Available') AS lead_stage,
-        IFNULL(rd.current_stage, 'Not Available') AS current_stage,
+        IFNULL(rd.status, '') AS status,
+        IFNULL(rd.lead_status, '') AS lead_status,
+        IFNULL(rd.lead_stage, '') AS lead_stage,
+        IFNULL(rd.current_stage, '') AS current_stage,
 
-        IFNULL(rd.created_at, 'Not Available') AS created_at,
-        IFNULL(rd.followup_date, 'Not Available') AS followup_date,
+        IFNULL(rd.created_at, '') AS created_at,
+        IFNULL(rd.followup_date, '') AS followup_date,
 
-        IFNULL(rd.room_length, 'Not Available') AS room_length,
-        IFNULL(rd.room_width, 'Not Available') AS room_width,
-        IFNULL(rd.room_height, 'Not Available') AS room_height,
-        IFNULL(rd.p_type, 'Not Available') AS p_type,
-        IFNULL(rd.budget_range, 'Not Available') AS budget_range,
-        IFNULL(rd.time_to_complete, 'Not Available') AS time_to_complete,
-        IFNULL(rd.site_visit_date, 'Not Available') AS site_visit_date,
-        IFNULL(rd.demo_date, 'Not Available') AS demo_date,
+        IFNULL(rd.room_length, '') AS room_length,
+        IFNULL(rd.room_width, '') AS room_width,
+        IFNULL(rd.room_height, '') AS room_height,
 
-        IFNULL(rd.ar_number, 'Not Available') AS ar_number,
-        IFNULL(rd.architect_name, 'Not Available') AS architect_name,
-        IFNULL(rd.ca_number, 'Not Available') AS ca_number,
-        IFNULL(rd.e_number, 'Not Available') AS e_number,
-        IFNULL(rd.sm_number, 'Not Available') AS sm_number,
-        IFNULL(rd.pop_number, 'Not Available') AS pop_number,
-        IFNULL(rd.other_number, 'Not Available') AS other_number,
+        IFNULL(rd.p_type, '') AS p_type,
+        IFNULL(rd.budget_range, '') AS budget_range,
+        IFNULL(rd.time_to_complete, '') AS time_to_complete,
 
-        IFNULL(rd.quick_remark, 'Not Available') AS quick_remark,
-        IFNULL(rd.detailed_remark, 'Not Available') AS detailed_remark,
+        IFNULL(rd.site_visit_date, '') AS site_visit_date,
+        IFNULL(rd.demo_date, '') AS demo_date,
 
-        IFNULL(rd.location_link, 'Not Available') AS location_link,
+        IFNULL(rd.ar_number, '') AS ar_number,
+        IFNULL(rd.architect_name, '') AS architect_name,
+        IFNULL(rd.ca_number, '') AS ca_number,
+        IFNULL(rd.e_number, '') AS e_number,
+        IFNULL(rd.sm_number, '') AS sm_number,
+        IFNULL(rd.pop_number, '') AS pop_number,
+        IFNULL(rd.other_number, '') AS other_number,
 
-        IFNULL(c.cat_name, 'Not Available') AS cat_name,
-        IFNULL(ref.reference_name, 'Not Available') AS reference_name,
-        IFNULL(a.area_name, 'Not Available') AS area_name,
+        IFNULL(rd.quick_remark, '') AS quick_remark,
+        IFNULL(rd.detailed_remark, '') AS detailed_remark,
 
-        IFNULL(DATE(asg.assign_date), 'Not Available') AS assign_date,
+        IFNULL(rd.location_link, '') AS location_link,
+
+        IFNULL(c.cat_name, '') AS cat_name,
+        IFNULL(ref.reference_name, '') AS reference_name,
+        IFNULL(a.area_name, '') AS area_name,
+
+        IFNULL(DATE(asg.assign_date), '') AS assign_date,
 
         lr.assignedTo AS latest_assigned_to,
         lr.remark AS latest_remark,
-        DATE(lr.reassignment_date) AS latest_reassignment_date,
 
-        IFNULL(u.name, 'Not Available') AS telecaller_name,
+        DATE(lr.reassignment_date)
+        AS latest_reassignment_date,
+
+        IFNULL(u.name, '')
+        AS telecaller_name,
+
         u.user_id AS assigned_to_user_id,
 
         es.execution_id,
-        es.schedule_name AS execution_schedule_name,
-        es.start_date AS execution_start_date,
-        es.end_date AS execution_end_date,
-        es.status AS execution_status,
-        es.remark AS execution_remark,
-        es.created_at AS execution_created_at, 
+        es.schedule_name
+        AS execution_schedule_name,
+
+        es.start_date
+        AS execution_start_date,
+
+        es.end_date
+        AS execution_end_date,
+
+        es.status
+        AS execution_status,
+
+        es.remark
+        AS execution_remark,
+
+        es.created_at
+        AS execution_created_at,
+
+        /* ================= PROCESS COUNT ================= */
 
         (
           SELECT COUNT(*)
+
           FROM execution_process_map epm
+
           WHERE epm.execution_id = es.execution_id
-        ) AS execution_process_count
+        ) AS execution_process_count,
+
+        /* ================= TOTAL COMPLETION PERCENTAGE ================= */
+
+        (
+          SELECT
+            IFNULL(
+              SUM(
+                DISTINCT et.completion_percentage
+              ),
+              0
+            )
+
+          FROM execution_process_logs epl
+
+          JOIN execution_type et
+            ON et.type_id = epl.type_id
+
+          WHERE epl.lead_id = rd.master_id
+            AND epl.status = 'completed'
+
+        ) AS total_completion_percentage
 
       FROM raw_data rd
-      LEFT JOIN area a ON rd.area_id = a.area_id
-      LEFT JOIN category c ON rd.cat_id = c.cat_id
-      LEFT JOIN reference ref ON rd.reference_id = ref.reference_id
-      LEFT JOIN assignments asg ON rd.assign_id = asg.assign_id
+
+      LEFT JOIN area a
+        ON rd.area_id = a.area_id
+
+      LEFT JOIN category c
+        ON rd.cat_id = c.cat_id
+
+      LEFT JOIN reference ref
+        ON rd.reference_id = ref.reference_id
+
+      LEFT JOIN assignments asg
+        ON rd.assign_id = asg.assign_id
 
       LEFT JOIN (
-        SELECT r1.*, ROW_NUMBER() OVER (PARTITION BY master_id ORDER BY id DESC) rn
+        SELECT
+          r1.*,
+          ROW_NUMBER() OVER (
+            PARTITION BY master_id
+            ORDER BY id DESC
+          ) rn
         FROM reassignment r1
-      ) lr ON rd.master_id = lr.master_id AND lr.rn = 1
+      ) lr
+        ON rd.master_id = lr.master_id
+       AND lr.rn = 1
 
-      LEFT JOIN users u ON lr.assignedTo = u.name
+      LEFT JOIN users u
+        ON lr.assignedTo = u.name
 
       LEFT JOIN execution_start es
-        ON FIND_IN_SET(rd.master_id, es.lead_ids)
+        ON FIND_IN_SET(
+          rd.master_id,
+          es.lead_ids
+        )
 
-      WHERE (rd.lead_stage = 'Execution' OR lr.leadStage = 'Execution')
+      WHERE (
+        rd.lead_stage = 'Execution'
+        OR lr.leadStage = 'Execution'
+      )
 
       AND EXISTS (
-        SELECT 1 
+        SELECT 1
+
         FROM execution_start es2
-        WHERE FIND_IN_SET(rd.master_id, es2.lead_ids)
-        AND es2.status IN ('pending','in_progress','hold_by_client','hold_by_avcore')
+
+        WHERE FIND_IN_SET(
+          rd.master_id,
+          es2.lead_ids
+        )
+
+        AND es2.status IN (
+          'pending',
+          'in_progress',
+          'hold_by_client',
+          'hold_by_avcore'
+        )
       )
     `;
 
     const params = [];
 
+    /* ================= ROLE FILTER ================= */
+
     if (isTelecallerLike(role)) {
-      query += ` AND lr.assignedTo = ?`;
+
+      query += `
+        AND lr.assignedTo = ?
+      `;
+
       params.push(currentUserName);
     }
 
-    /* ✅ ORDER BY LATEST EXECUTION_ID DESC */
+    /* ================= ORDERING + PAGINATION ================= */
+
     query += `
       GROUP BY rd.master_id
-      ORDER BY MAX(es.execution_id) DESC
-      LIMIT ? OFFSET ?
+
+      ORDER BY
+        MAX(es.execution_id) DESC
+
+      LIMIT ?
+      OFFSET ?
     `;
+
     params.push(limit, offset);
 
-    const [rows] = await db.query(query, params);
+    const [rows] = await db.query(
+      query,
+      params
+    );
 
-    /* ================= FORMAT RESPONSE ================= */
-    const formattedRows = rows.map(row => {
+    /* ================= RESPONSE FORMAT ================= */
+
+    const formattedRows = rows.map((row) => {
+
       const cleanValue = (value) => {
-        if (!value || value === 'Not Available') return '';
+        if (
+          value === null ||
+          value === undefined
+        ) {
+          return "";
+        }
+
         return value;
       };
 
       const cleanNumber = (value) => {
-        if (!value || value === 'Not Available') return null;
+
+        if (
+          value === null ||
+          value === undefined ||
+          value === ""
+        ) {
+          return null;
+        }
+
         const num = Number(value);
-        return isNaN(num) ? null : num;
+
+        return isNaN(num)
+          ? null
+          : num;
       };
 
       return {
-        master_id: row.master_id || 0,
-        name: cleanValue(row.name),
-        number: cleanValue(row.number),
-        alternate_number: cleanValue(row.alternate_number),
-        email: cleanValue(row.email),
-        address: cleanValue(row.address),
-        city: cleanValue(row.city),
 
-        status: cleanValue(row.status),
-        lead_status: cleanValue(row.lead_status),
-        lead_stage: cleanValue(row.lead_stage) || 'Execution',
-        current_stage: cleanValue(row.current_stage),
+        master_id:
+          row.master_id || 0,
 
-        created_at: cleanValue(row.created_at),
-        followup_date: cleanValue(row.followup_date),
-        assign_date: cleanValue(row.assign_date),
-        latest_reassignment_date: cleanValue(row.latest_reassignment_date),
+        name:
+          cleanValue(row.name),
 
-        room_length: cleanNumber(row.room_length),
-        room_width: cleanNumber(row.room_width),
-        room_height: cleanNumber(row.room_height),
+        number:
+          cleanValue(row.number),
 
-        p_type: cleanValue(row.p_type),
-        budget_range: cleanValue(row.budget_range),
-        time_to_complete: cleanValue(row.time_to_complete),
-        site_visit_date: cleanValue(row.site_visit_date),
-        demo_date: cleanValue(row.demo_date),
+        alternate_number:
+          cleanValue(row.alternate_number),
 
-        ar_number: cleanValue(row.ar_number),
-        architect_name: cleanValue(row.architect_name),
-        ca_number: cleanValue(row.ca_number),
-        e_number: cleanValue(row.e_number),
-        sm_number: cleanValue(row.sm_number),
-        pop_number: cleanValue(row.pop_number),
-        other_number: cleanValue(row.other_number),
+        email:
+          cleanValue(row.email),
 
-        quick_remark: cleanValue(row.quick_remark),
-        detailed_remark: cleanValue(row.detailed_remark),
-        latest_remark: cleanValue(row.latest_remark),
+        address:
+          cleanValue(row.address),
 
-        location_link: cleanValue(row.location_link),
+        city:
+          cleanValue(row.city),
 
-        cat_name: cleanValue(row.cat_name),
-        reference_name: cleanValue(row.reference_name),
-        area_name: cleanValue(row.area_name),
+        status:
+          cleanValue(row.status),
 
-        assigned_to: cleanValue(row.latest_assigned_to || row.telecaller_name),
-        telecaller_name: cleanValue(row.telecaller_name),
+        lead_status:
+          cleanValue(row.lead_status),
 
-        execution_id: row.execution_id || null,
-        execution_schedule_name: cleanValue(row.execution_schedule_name),
-        execution_start_date: cleanValue(row.execution_start_date),
-        execution_end_date: cleanValue(row.execution_end_date),
-        execution_status: cleanValue(row.execution_status),
-        execution_remark: cleanValue(row.execution_remark),
-        execution_process_count: row.execution_process_count || 0 ,
-        execution_created_at: cleanValue(row.execution_created_at),
+        lead_stage:
+          cleanValue(row.lead_stage),
+
+        current_stage:
+          cleanValue(row.current_stage),
+
+        created_at:
+          cleanValue(row.created_at),
+
+        followup_date:
+          cleanValue(row.followup_date),
+
+        assign_date:
+          cleanValue(row.assign_date),
+
+        latest_reassignment_date:
+          cleanValue(
+            row.latest_reassignment_date
+          ),
+
+        room_length:
+          cleanNumber(row.room_length),
+
+        room_width:
+          cleanNumber(row.room_width),
+
+        room_height:
+          cleanNumber(row.room_height),
+
+        p_type:
+          cleanValue(row.p_type),
+
+        budget_range:
+          cleanValue(row.budget_range),
+
+        time_to_complete:
+          cleanValue(row.time_to_complete),
+
+        site_visit_date:
+          cleanValue(row.site_visit_date),
+
+        demo_date:
+          cleanValue(row.demo_date),
+
+        ar_number:
+          cleanValue(row.ar_number),
+
+        architect_name:
+          cleanValue(row.architect_name),
+
+        ca_number:
+          cleanValue(row.ca_number),
+
+        e_number:
+          cleanValue(row.e_number),
+
+        sm_number:
+          cleanValue(row.sm_number),
+
+        pop_number:
+          cleanValue(row.pop_number),
+
+        other_number:
+          cleanValue(row.other_number),
+
+        quick_remark:
+          cleanValue(row.quick_remark),
+
+        detailed_remark:
+          cleanValue(row.detailed_remark),
+
+        latest_remark:
+          cleanValue(row.latest_remark),
+
+        location_link:
+          cleanValue(row.location_link),
+
+        cat_name:
+          cleanValue(row.cat_name),
+
+        reference_name:
+          cleanValue(row.reference_name),
+
+        area_name:
+          cleanValue(row.area_name),
+
+        assigned_to:
+          cleanValue(
+            row.latest_assigned_to
+            || row.telecaller_name
+          ),
+
+        telecaller_name:
+          cleanValue(row.telecaller_name),
+
+        execution_id:
+          row.execution_id || null,
+
+        execution_schedule_name:
+          cleanValue(
+            row.execution_schedule_name
+          ),
+
+        execution_start_date:
+          cleanValue(
+            row.execution_start_date
+          ),
+
+        execution_end_date:
+          cleanValue(
+            row.execution_end_date
+          ),
+
+        execution_status:
+          cleanValue(
+            row.execution_status
+          ),
+
+        execution_remark:
+          cleanValue(
+            row.execution_remark
+          ),
+
+        execution_process_count:
+          row.execution_process_count || 0,
+
+        execution_created_at:
+          cleanValue(
+            row.execution_created_at
+          ),
+
+        /* ✅ ADD THIS */
+
+        total_completion_percentage:
+          row.total_completion_percentage || 0
       };
     });
 
+    /* ================= SUCCESS ================= */
+
     return res.status(200).json({
       success: true,
+
       data: formattedRows,
+
       pagination: {
         total,
         page,
         limit,
         totalPages,
-        hasNextPage: page < totalPages,
-        hasPrevPage: page > 1,
-        showingStart: offset + 1,
-        showingEnd: Math.min(offset + limit, total)
+
+        hasNextPage:
+          page < totalPages,
+
+        hasPrevPage:
+          page > 1,
+
+        showingStart:
+          offset + 1,
+
+        showingEnd:
+          Math.min(
+            offset + limit,
+            total
+          )
       }
     });
 
   } catch (error) {
-    console.error("❌ Error in getExecutionLeadsDataExe:", error);
+
+    console.error(
+      "❌ Error in getClosedLeadsDataExe:",
+      error
+    );
+
     res.status(500).json({
-      message: "Failed to fetch execution leads data",
+      success: false,
+      message:
+        "Failed to fetch execution leads data",
       error: error.message
     });
   }
@@ -1783,7 +2065,7 @@ export const getProcessesByLead2 = async (req, res) => {
 };
 
 
-export const getProcessesByLead = async (req, res) => {
+export const getProcessesByLead3 = async (req, res) => {
   try {
     const { leadId } = req.params;
 
@@ -1905,6 +2187,161 @@ export const getProcessesByLead = async (req, res) => {
     });
   }
 };
+
+
+export const getProcessesByLead = async (req, res) => {
+  try {
+    const { leadId } = req.params;
+
+    /* =========================
+       GET ORDERED TYPE NAMES
+    ========================= */
+    const [orderedTypes] = await db.query(`
+      SELECT type_id, type_name 
+      FROM execution_type 
+      ORDER BY created_at ASC
+    `);
+
+    const typeNameOrder = orderedTypes.map(t => t.type_name);
+
+    /* =========================
+       FIND EXECUTION ID ONLY
+    ========================= */
+    const [execution] = await db.query(
+      `
+      SELECT DISTINCT epm.execution_id
+      FROM execution_start es
+      JOIN execution_process_map epm 
+        ON epm.execution_id = es.execution_id
+      WHERE FIND_IN_SET(?, es.lead_ids)
+      LIMIT 1
+      `,
+      [leadId]
+    );
+
+    if (execution.length === 0) {
+      return res.json({
+        success: true,
+        data: [],
+      });
+    }
+
+    const execution_id = execution[0].execution_id;
+
+    /* =========================
+       GET PROCESSES + TYPE + USERS
+    ========================= */
+    let query = `
+      SELECT 
+        epm.process_id,
+        pe.process_name,
+        pe.description,
+
+        epm.type_id,
+        et.type_name AS execution_type,
+
+        MAX(epl.start_date) AS start_date,
+        MAX(epl.end_date) AS end_date,
+        MAX(epl.status) AS status,
+        MAX(epl.remark) AS remark,
+
+        GROUP_CONCAT(DISTINCT u.user_id) AS assigned_user_ids,
+        GROUP_CONCAT(DISTINCT u.name) AS assigned_user_names
+
+      FROM execution_process_map epm
+
+      JOIN process_execution pe
+        ON pe.process_id = epm.process_id
+
+      LEFT JOIN execution_type et
+        ON et.type_id = epm.type_id
+
+      LEFT JOIN execution_process_logs epl
+        ON epl.process_id = epm.process_id
+        AND epl.lead_id = ?
+
+      LEFT JOIN execution_process_user_map epum
+        ON epum.process_id = epm.process_id
+        AND epum.lead_id = ?
+
+      LEFT JOIN users u
+        ON u.user_id = epum.user_id
+
+      WHERE epm.execution_id = ?
+
+      GROUP BY 
+        epm.process_id,
+        pe.process_name,
+        pe.description,
+        epm.type_id,
+        et.type_name
+    `;
+
+    /* =========================
+       DYNAMIC ORDER BY TYPE NAME
+    ========================= */
+    if (typeNameOrder.length > 0) {
+      const fieldParams = typeNameOrder
+        .map(name => `'${name}'`)
+        .join(", ");
+
+      query += `
+        ORDER BY 
+          FIELD(et.type_name, ${fieldParams}),
+          pe.process_name ASC
+      `;
+    } else {
+      query += ` ORDER BY pe.process_name ASC`;
+    }
+
+    const [rows] = await db.query(query, [
+      leadId,
+      leadId,
+      execution_id,
+    ]);
+
+    /* =========================
+       FORMAT RESPONSE
+    ========================= */
+    const formattedRows = rows.map(row => ({
+      process_id: row.process_id,
+      process_name: row.process_name,
+      description: row.description,
+
+      type_id: row.type_id,
+      execution_type: row.execution_type,
+
+      start_date: row.start_date,
+      end_date: row.end_date,
+      status: row.status,
+      remark: row.remark,
+
+      assigned_user_ids: row.assigned_user_ids
+        ? row.assigned_user_ids
+            .split(",")
+            .map(id => Number(id))
+        : [],
+
+      assigned_user_names: row.assigned_user_names
+        ? row.assigned_user_names.split(",")
+        : [],
+    }));
+
+    res.json({
+      success: true,
+      data: formattedRows,
+    });
+
+  } catch (err) {
+    console.error("Error fetching processes:", err);
+
+    res.status(500).json({
+      success: false,
+      error: err.message,
+    });
+  }
+};
+
 
 
 
@@ -2076,7 +2513,7 @@ export const saveProcess1 = async (req, res) => {
 
 
 
-export const saveProcess = async (req, res) => {
+export const saveProcess2 = async (req, res) => {
   try {
     const {
       lead_id,
@@ -2155,8 +2592,8 @@ export const saveProcess = async (req, res) => {
       // INSERT MAIN TABLE
       const [insertMain] = await db.query(
         `INSERT INTO execution_process_logs
-         (lead_id, process_id, process_name, start_date, end_date, status, remark, assigned_to)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+         (lead_id, process_id,  type_id,process_name, start_date, end_date, status, remark, assigned_to)
+         VALUES (?, ?, ?, ?, ? ,?, ?, ?, ?)`,
         [
           lead_id,
           process_id,
@@ -2248,6 +2685,337 @@ export const saveProcess = async (req, res) => {
   }
 };
 
+export const saveProcess = async (req, res) => {
+  try {
+    const {
+      lead_id,
+      process_id,
+      type_id,
+      process_name,
+      start_date,
+      end_date,
+      status,
+      assigned_user_ids,
+      remark,
+    } = req.body;
+
+    const updated_by = req.session.user?.id || null;
+
+    if (!lead_id || !process_id) {
+      return res.status(400).json({
+        success: false,
+        message: "Lead ID and Process ID required",
+      });
+    }
+
+    // =========================================
+    // 1️⃣ GET USER NAMES FROM IDS
+    // =========================================
+
+    let assigned_to = null;
+
+    if (
+      assigned_user_ids &&
+      Array.isArray(assigned_user_ids) &&
+      assigned_user_ids.length > 0
+    ) {
+      // REMOVE DUPLICATES
+      const unique_user_ids = [...new Set(assigned_user_ids)];
+
+      const [users] = await db.query(
+        `SELECT name 
+         FROM users 
+         WHERE user_id IN (?)`,
+        [unique_user_ids]
+      );
+
+      const namesArray = users.map((u) => u.name);
+
+      assigned_to = namesArray.join(",");
+    }
+
+    let execution_process_log_id;
+
+    // =========================================
+    // 2️⃣ CHECK IF RECORD EXISTS
+    // =========================================
+
+    const [existing] = await db.query(
+      `SELECT id 
+       FROM execution_process_logs
+       WHERE lead_id = ? 
+       AND process_id = ?`,
+      [lead_id, process_id]
+    );
+
+    // =========================================
+    // 3️⃣ UPDATE EXISTING
+    // =========================================
+
+    if (existing.length > 0) {
+      execution_process_log_id = existing[0].id;
+
+      await db.query(
+        `UPDATE execution_process_logs
+         SET 
+            type_id = ?,
+            process_name = ?,
+            start_date = ?,
+            end_date = ?,
+            status = ?,
+            remark = ?,
+            assigned_to = ?,
+            updated_at = NOW()
+         WHERE id = ?`,
+        [
+          type_id || null,
+          process_name || null,
+          start_date || null,
+          end_date || null,
+          status || "pending",
+          remark || null,
+          assigned_to,
+          execution_process_log_id,
+        ]
+      );
+    }
+
+    // =========================================
+    // 4️⃣ INSERT NEW
+    // =========================================
+
+    else {
+      const [insertMain] = await db.query(
+        `INSERT INTO execution_process_logs
+        (
+          lead_id,
+          process_id,
+          type_id,
+          process_name,
+          start_date,
+          end_date,
+          status,
+          remark,
+          assigned_to
+        )
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        [
+          lead_id,
+          process_id,
+          type_id || null,
+          process_name || null,
+          start_date || null,
+          end_date || null,
+          status || "pending",
+          remark || null,
+          assigned_to,
+        ]
+      );
+
+      execution_process_log_id = insertMain.insertId;
+    }
+
+    // =========================================
+    // 5️⃣ INSERT UPDATE LOG
+    // =========================================
+
+    const [insertLog] = await db.query(
+      `INSERT INTO execution_process_update_logs
+      (
+        lead_id,
+        process_id,
+        execution_process_log_id,
+        updated_by,
+        start_date,
+        end_date,
+        status,
+        remark
+      )
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+      [
+        lead_id,
+        process_id,
+        execution_process_log_id,
+        updated_by,
+        start_date || null,
+        end_date || null,
+        status || "pending",
+        remark || null,
+      ]
+    );
+
+    const execution_process_update_log_id = insertLog.insertId;
+
+    // =========================================
+    // 6️⃣ USER MAPPING TABLE
+    // =========================================
+
+    if (
+      assigned_user_ids &&
+      Array.isArray(assigned_user_ids) &&
+      assigned_user_ids.length > 0
+    ) {
+      // REMOVE DUPLICATES
+      const unique_user_ids = [...new Set(assigned_user_ids)];
+
+      for (const user_id of unique_user_ids) {
+        // CHECK EXISTING
+        const [existingMapping] = await db.query(
+          `SELECT id 
+           FROM execution_process_user_map
+           WHERE lead_id = ?
+           AND process_id = ?
+           AND user_id = ?`,
+          [lead_id, process_id, user_id]
+        );
+
+        // INSERT ONLY IF NOT EXISTS
+        if (existingMapping.length === 0) {
+          await db.query(
+            `INSERT INTO execution_process_user_map
+            (
+              lead_id,
+              process_id,
+              execution_process_log_id,
+              execution_process_update_log_id,
+              user_id
+            )
+            VALUES (?, ?, ?, ?, ?)`,
+            [
+              lead_id,
+              process_id,
+              execution_process_log_id,
+              execution_process_update_log_id,
+              user_id,
+            ]
+          );
+        } else {
+          console.log(
+            `User ${user_id} already assigned to process ${process_id}`
+          );
+        }
+      }
+    }
+
+    // =========================================
+    // SUCCESS RESPONSE
+    // =========================================
+
+    return res.json({
+      success: true,
+      message: "Process saved successfully",
+    });
+
+  } catch (error) {
+    console.error("Error saving process:", error);
+
+    return res.status(500).json({
+      success: false,
+      error: error.message,
+    });
+  }
+};
+
+
+export const updateProcessStatusOnly = async (req, res) => {
+  try {
+    const {
+      lead_id,
+      process_id,
+      status,
+      remark,
+    } = req.body;
+
+    const updated_by = req.session.user?.id || null;
+
+    if (!lead_id || !process_id) {
+      return res.status(400).json({
+        success: false,
+        message: "lead_id and process_id required",
+      });
+    }
+
+    /* =========================================
+       UPDATE ONLY STATUS + REMARK
+    ========================================= */
+
+    await db.query(
+      `
+      UPDATE execution_process_logs
+      SET
+        status = ?,
+        remark = ?,
+        updated_at = NOW()
+      WHERE lead_id = ?
+      AND process_id = ?
+      `,
+      [
+        status || "pending",
+        remark || null,
+        lead_id,
+        process_id,
+      ]
+    );
+
+    /* =========================================
+       GET PROCESS LOG ID
+    ========================================= */
+
+    const [rows] = await db.query(
+      `
+      SELECT id
+      FROM execution_process_logs
+      WHERE lead_id = ?
+      AND process_id = ?
+      LIMIT 1
+      `,
+      [lead_id, process_id]
+    );
+
+    const execution_process_log_id =
+      rows.length > 0 ? rows[0].id : null;
+
+    /* =========================================
+       INSERT UPDATE LOG
+    ========================================= */
+
+    await db.query(
+      `
+      INSERT INTO execution_process_update_logs
+      (
+        lead_id,
+        process_id,
+        execution_process_log_id,
+        updated_by,
+        status,
+        remark
+      )
+      VALUES (?, ?, ?, ?, ?, ?)
+      `,
+      [
+        lead_id,
+        process_id,
+        execution_process_log_id,
+        updated_by,
+        status || "pending",
+        remark || null,
+      ]
+    );
+
+    return res.json({
+      success: true,
+      message: "Process status updated successfully",
+    });
+
+  } catch (error) {
+    console.error("Error updating process status:", error);
+
+    return res.status(500).json({
+      success: false,
+      error: error.message,
+    });
+  }
+};
 
 export const getProcessLogs1 = async (req, res) => {
   try {

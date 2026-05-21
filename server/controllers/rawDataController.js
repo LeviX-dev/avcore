@@ -3672,6 +3672,111 @@ export const updateRawData = async (req, res) => {
   }
 };
 
+// Add this function in your controller
+export const updateContactNumbersOnly = async (req, res) => {
+  try {
+    const { master_id } = req.params;
+
+    if (!master_id) {
+      return res.status(400).json({ message: "master_id is required" });
+    }
+
+    console.log("📥 Incoming Contact Numbers Update Payload:", req.body);
+
+    const {
+      ar_number,      // Architect Number
+      architect_name, // Architect Name
+      ca_number,      // Carpenter Number
+      e_number,       // Electrician Number
+      sm_number,      // Site Manager Number
+      pop_number,     // POP Number
+      other_number    // Other Number
+    } = req.body;
+
+    // Build update object with only contact number fields
+    const updateFields = [];
+    const values = [];
+
+    // Helper function to check if value is valid (not undefined, not null, not empty string)
+    const isValidValue = (value) => {
+      return value !== undefined && value !== null && value !== '';
+    };
+
+    // Add each field if it has a valid value
+    if (isValidValue(ar_number)) {
+      updateFields.push("ar_number = ?");
+      values.push(ar_number);
+    }
+
+    if (isValidValue(architect_name)) {
+      updateFields.push("architect_name = ?");
+      values.push(architect_name);
+    }
+
+    if (isValidValue(ca_number)) {
+      updateFields.push("ca_number = ?");
+      values.push(ca_number);
+    }
+
+    if (isValidValue(e_number)) {
+      updateFields.push("e_number = ?");
+      values.push(e_number);
+    }
+
+    if (isValidValue(sm_number)) {
+      updateFields.push("sm_number = ?");
+      values.push(sm_number);
+    }
+
+    if (isValidValue(pop_number)) {
+      updateFields.push("pop_number = ?");
+      values.push(pop_number);
+    }
+
+    if (isValidValue(other_number)) {
+      updateFields.push("other_number = ?");
+      values.push(other_number);
+    }
+
+    // If no fields to update, return early
+    if (updateFields.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: "No valid fields provided for update"
+      });
+    }
+
+    // Update only the contact number fields
+    values.push(master_id);
+    await db.execute(
+      `UPDATE raw_data SET ${updateFields.join(", ")} WHERE master_id = ?`,
+      values
+    );
+
+    // Fetch updated data to return in response
+    const [updatedData] = await db.execute(
+      `SELECT master_id, ar_number, architect_name, ca_number, e_number, sm_number, pop_number, other_number 
+       FROM raw_data WHERE master_id = ?`,
+      [master_id]
+    );
+
+    res.status(200).json({
+      success: true,
+      message: "Contact numbers updated successfully",
+      updated_fields: updateFields.map(f => f.split(' = ')[0]),
+      data: updatedData[0] || null
+    });
+
+  } catch (err) {
+    console.error("❌ updateContactNumbersOnly error:", err);
+    res.status(500).json({
+      success: false,
+      message: "Server error",
+      error: err.message
+    });
+  }
+};
+
 // ✅ MIME → EXTENSION MAP (FIXES jpeg issue)
 const mimeExtensionMap = {
   'image/jpeg': '.jpeg',

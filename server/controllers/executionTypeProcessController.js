@@ -9,7 +9,7 @@ import db from "../database/db.js";
 /**
  ✅ Add Execution Type
 */
-export const addExecutionType = async (req, res) => {
+export const addExecutionType1 = async (req, res) => {
   try {
     if (!req.session.user) {
       return res.status(401).json({ error: "Unauthorized" });
@@ -36,6 +36,64 @@ export const addExecutionType = async (req, res) => {
   } catch (error) {
     console.error("Add Execution Type Error:", error);
     res.status(500).json({ error: "Server error" });
+  }
+}; 
+
+
+export const addExecutionType = async (req, res) => {
+  try {
+
+    if (!req.session.user) {
+      return res.status(401).json({
+        error: "Unauthorized"
+      });
+    }
+
+    const {
+      type_name,
+      completion_percentage,
+      status
+    } = req.body;
+
+    if (!type_name) {
+      return res.status(400).json({
+        error: "Type name required"
+      });
+    }
+
+    const createdBy = req.session.user.id;
+
+    const [result] = await db.query(`
+      INSERT INTO execution_type
+      (
+        type_name,
+        completion_percentage,
+        status,
+        created_by
+      )
+      VALUES(?,?,?,?)
+    `, [
+      type_name,
+      completion_percentage || 0,
+      status || "active",
+      createdBy
+    ]);
+
+    res.status(201).json({
+      message: "Execution type created",
+      type_id: result.insertId
+    });
+
+  } catch (error) {
+
+    console.error(
+      "Add Execution Type Error:",
+      error
+    );
+
+    res.status(500).json({
+      error: "Server error"
+    });
   }
 };
 
@@ -126,7 +184,7 @@ export const getExecutionTypes = async (req, res) => {
 /**
  ✅ Update Execution Type
 */
-export const updateExecutionType = async (req, res) => {
+export const updateExecutionType1 = async (req, res) => {
   try {
 
     const { id } = req.params;
@@ -156,6 +214,58 @@ export const updateExecutionType = async (req, res) => {
   }
 };
 
+
+export const updateExecutionType = async (req, res) => {
+  try {
+
+    const { id } = req.params;
+
+    const {
+      type_name,
+      completion_percentage,
+      status
+    } = req.body;
+
+    const updateData = {};
+
+    if (type_name !== undefined)
+      updateData.type_name = type_name;
+
+    if (completion_percentage !== undefined)
+      updateData.completion_percentage = completion_percentage;
+
+    if (status !== undefined)
+      updateData.status = status;
+
+    updateData.updated_at = new Date();
+
+    const [result] = await db.query(
+      "UPDATE execution_type SET ? WHERE type_id = ?",
+      [updateData, id]
+    );
+
+    if (result.affectedRows === 0) {
+      return res.status(404).json({
+        error: "Type not found"
+      });
+    }
+
+    res.json({
+      message: "Execution type updated"
+    });
+
+  } catch (error) {
+
+    console.error(
+      "Update Execution Type Error:",
+      error
+    );
+
+    res.status(500).json({
+      error: "Server error"
+    });
+  }
+};
 
 /**
  ✅ Delete Execution Type (Safe Delete)
@@ -450,7 +560,7 @@ export const deleteProcess = async (req, res) => {
 };
 
 
-export const addChecklist = async (req,res)=>{
+export const addChecklist1 = async (req,res)=>{
  try{
    if(!req.session.user){
       return res.status(401).json({error:"Unauthorized"})
@@ -481,6 +591,52 @@ export const addChecklist = async (req,res)=>{
  }
 }
 
+export const addChecklist = async (req,res)=>{
+ try{
+   if(!req.session.user){
+      return res.status(401).json({error:"Unauthorized"})
+   }
+
+   const {
+     checklist_name,
+     status,
+     checklist_type
+   } = req.body
+
+   if(!checklist_name){
+      return res.status(400).json({
+        error:"Checklist name required"
+      })
+   }
+
+   const createdBy = req.session.user.id
+
+   const [result] = await db.query(`
+      INSERT INTO execution_checklist
+      (
+        checklist_name,
+        checklist_type,
+        status,
+        created_by
+      )
+      VALUES(?,?,?,?)
+   `,[
+      checklist_name,
+      checklist_type || 'pre_execution',
+      status || 'active',
+      createdBy
+   ])
+
+   res.status(201).json({
+      message:"Checklist created",
+      checklist_id: result.insertId
+   })
+
+ }catch(error){
+   console.error("Add Checklist Error:",error)
+   res.status(500).json({error:"Server error"})
+ }
+}
 export const getChecklists1 = async (req,res)=>{
  try{
    const [rows] = await db.query(`
@@ -506,7 +662,7 @@ export const getChecklists1 = async (req,res)=>{
 }
 
 
-export const getChecklists = async (req,res)=>{
+export const getChecklists2 = async (req,res)=>{
  try{
    const [rows] = await db.query(`
       SELECT
@@ -532,8 +688,32 @@ export const getChecklists = async (req,res)=>{
  }
 }
 
+export const getChecklists = async (req,res)=>{
+ try{
+   const [rows] = await db.query(`
+      SELECT
+         c.*,
+         u.name AS created_by_name,
+         COUNT(ci.item_id) AS item_count
+      FROM execution_checklist c
+      LEFT JOIN users u
+        ON u.user_id = c.created_by
+      LEFT JOIN checklist_items ci
+        ON ci.checklist_id = c.checklist_id
+      GROUP BY c.checklist_id
+      ORDER BY c.checklist_id ASC
+   `)
 
-export const updateChecklist = async (req,res)=>{
+   res.json(rows)
+
+ }catch(error){
+   console.error("Get Checklist Error:",error)
+   res.status(500).json({error:"Server error"})
+ }
+}
+
+
+export const updateChecklist1 = async (req,res)=>{
  try{
    const {id} = req.params
    const {checklist_name,status} = req.body
@@ -557,6 +737,46 @@ export const updateChecklist = async (req,res)=>{
    res.status(500).json({error:"Server error"})
  }
 }
+
+export const updateChecklist = async (req,res)=>{
+ try{
+
+   const {id} = req.params
+
+   const {
+     checklist_name,
+     checklist_type,
+     status
+   } = req.body
+
+   const updateData = {}
+
+   if(checklist_name !== undefined)
+      updateData.checklist_name = checklist_name
+
+   if(checklist_type !== undefined)
+      updateData.checklist_type = checklist_type
+
+   if(status !== undefined)
+      updateData.status = status
+
+   updateData.updated_at = new Date()
+
+   await db.query(
+     "UPDATE execution_checklist SET ? WHERE checklist_id=?",
+     [updateData,id]
+   )
+
+   res.json({
+      message:"Checklist updated successfully"
+   })
+
+ }catch(error){
+   console.error("Update Checklist Error:",error)
+   res.status(500).json({error:"Server error"})
+ }
+}
+
 
 export const addChecklistItem = async (req,res)=>{
  try{
@@ -613,7 +833,7 @@ export const getChecklistItemsByChecklist1 = async (req,res)=>{
 }
 
 
-export const getChecklistItemsByChecklist = async (req,res)=>{
+export const getChecklistItemsByChecklist2 = async (req,res)=>{
  try{
    const {checklistId} = req.params
 
@@ -637,6 +857,30 @@ export const getChecklistItemsByChecklist = async (req,res)=>{
    res.status(500).json({error:"Server error"})
  }
 }
+
+export const getChecklistItemsByChecklist = async (req,res)=>{
+ try{
+   const {checklistId} = req.params
+
+   const [rows] = await db.query(`
+      SELECT
+         ci.*,
+         u.name AS created_by_name
+      FROM checklist_items ci
+      LEFT JOIN users u
+        ON u.user_id = ci.created_by
+      WHERE ci.checklist_id = ?
+      ORDER BY ci.item_id ASC
+   `,[checklistId])
+
+   res.json(rows)
+
+ }catch(error){
+   console.error("Get Checklist Items Error:",error)
+   res.status(500).json({error:"Server error"})
+ }
+}
+
 
 
 

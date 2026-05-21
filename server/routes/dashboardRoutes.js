@@ -15,6 +15,9 @@ getTodaysMissedCombinedCount ,getClosedLeadsCount ,  getClosedLeadsExeCount , ge
 
 getDashboardLeadCounts , getExecutionDashboardCounts , getAreaSummary , 
 
+getExecutionLeadsCount , 
+
+
      } from "../controllers/dashboardController.js";
 
 const router = express.Router();
@@ -83,6 +86,11 @@ router.get("/daily-execution-processes-count", getDailyExecutionProcessesCount);
 
 
 router.get("/execution-dashboard-counts", getExecutionDashboardCounts);
+
+
+router.get('/mrn/executed/leads/count', getExecutionLeadsCount);
+
+
 
 
 export default router;
