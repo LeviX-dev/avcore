@@ -1065,11 +1065,7 @@ const latestCreatedId = latestCreatedLead?.master_id;
                                   <div className="font-medium text-gray-800 dark:text-gray-200 truncate">
                                     {doc.document_name}
                                   </div>
-                                  {doc.remark && (
-                                    <div className="text-sm text-gray-600 dark:text-gray-400 truncate">
-                                      {doc.remark}
-                                    </div>
-                                  )}
+                              
                                 </div>
                               </div>
                               <div className="flex items-center gap-2">
@@ -1123,9 +1119,7 @@ const latestCreatedId = latestCreatedLead?.master_id;
                                     Download
                                   </a>
                                 </div>
-                                {video.remark && (
-                                  <div className="mt-2 text-sm text-gray-600 dark:text-gray-400">{video.remark}</div>
-                                )}
+
                               </div>
                             </div>
                           ))}

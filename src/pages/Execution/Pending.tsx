@@ -128,25 +128,419 @@ interface LogsData {
 }
 
 
+// Unified View Modal - Shows Documents, Quotation, and Checklist in tabs
+const UnifiedViewModal = ({ 
+  show, 
+  onClose, 
+  lead, 
+  documents, 
+  loadingDocs,
+  quotationData,
+  quotationLoading,
+  checklistItems,
+  selectedChecklistItems,
+  checklistLoading
+}) => {
+  const [activeTab, setActiveTab] = useState('quotation'); // Default to quotation
 
-// Update ActionButton component definition
+  if (!show || !lead) return null;
+
+  const formatDate = (dateString) => {
+    if (!dateString) return '—';
+    try {
+      return new Date(dateString).toLocaleDateString('en-GB', {
+        day: '2-digit',
+        month: '2-digit',
+        year: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit'
+      });
+    } catch {
+      return dateString;
+    }
+  };
+
+  const getStatusColor = (status) => {
+    if (!status) return 'bg-gray-100 text-gray-700';
+    const colors = {
+      'approved': 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300',
+      'pending': 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-300',
+      'rejected': 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300',
+      'needs_revision': 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-300'
+    };
+    return colors[status] || 'bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300';
+  };
+
+  const getImageUrl = (filePath) => {
+    if (!filePath) return null;
+    return `${BASE_URL}uploads/${filePath}`;
+  };
+
+  // Get unique process names for documents
+  const processNames = documents ? Array.from(new Set(documents.map((doc) => doc.process_name).filter(Boolean))) : [];
+
+  // Quotation data
+  const quotationsArray = quotationData?.quotations || [];
+  const quotation = quotationsArray[0] || {};
+  const quotationItems = quotation.items || [];
+
+  // Group quotation items by kit/option
+  const quotationOptions = quotationItems.map((kit, index) => ({
+    option_number: index + 1,
+    option_name: kit.kit_name,
+    items: kit.items || []
+  }));
+
+  // Get selected checklist items with details
+  const getSelectedItemsWithDetails = () => {
+    const result = [];
+    if (!checklistItems || !selectedChecklistItems) return result;
+    
+    checklistItems.forEach(checklist => {
+      checklist.items.forEach(item => {
+        if (selectedChecklistItems.includes(item.item_id)) {
+          result.push({
+            ...item,
+            checklist_name: checklist.checklist_name
+          });
+        }
+      });
+    });
+    return result;
+  };
+
+  const selectedChecklistDetails = getSelectedItemsWithDetails();
+
+  return (
+    <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-[9999] p-4">
+      <div className="bg-white dark:bg-boxdark rounded-xl shadow-xl w-full max-w-5xl max-h-[90vh] overflow-hidden">
+        
+        {/* Header */}
+        <div className="flex justify-between items-center px-6 py-4 border-b dark:border-gray-700 bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-gray-800 dark:to-gray-900">
+          <div>
+            <h2 className="text-lg font-semibold dark:text-white flex items-center gap-2">
+              <FontAwesomeIcon icon={faEye} className="text-blue-500" />
+              Client Details
+            </h2>
+            <p className="text-sm text-gray-500">
+              {lead.name} • #{lead.master_id}
+            </p>
+          </div>
+          <button 
+            onClick={onClose} 
+            className="text-xl px-3 py-1 hover:bg-gray-200 dark:hover:bg-gray-700 rounded-lg transition-colors"
+          >
+            ×
+          </button>
+        </div>
+
+        {/* Tab Navigation - Separate buttons, not dropdown */}
+        <div className="flex border-b dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50 px-4">
+          <button
+            onClick={() => setActiveTab('quotation')}
+            className={`px-6 py-3 text-sm font-medium transition-all duration-200 flex items-center gap-2 ${
+              activeTab === 'quotation'
+                ? 'text-purple-600 dark:text-purple-400 border-b-2 border-purple-500 bg-white dark:bg-gray-800'
+                : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-300'
+            } rounded-t-lg`}
+          >
+            <FontAwesomeIcon icon={faFileText} className="h-4 w-4" />
+            Quotation
+            {quotationData && <span className="ml-1 text-xs">({quotationData.revision || 1})</span>}
+          </button>
+          
+          <button
+            onClick={() => setActiveTab('documents')}
+            className={`px-6 py-3 text-sm font-medium transition-all duration-200 flex items-center gap-2 ${
+              activeTab === 'documents'
+                ? 'text-green-600 dark:text-green-400 border-b-2 border-green-500 bg-white dark:bg-gray-800'
+                : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-300'
+            } rounded-t-lg`}
+          >
+            <FontAwesomeIcon icon={faFileText} className="h-4 w-4" />
+            Documents
+            {documents && documents.length > 0 && (
+              <span className="ml-1 bg-green-100 dark:bg-green-900 text-green-700 dark:text-green-300 text-xs px-2 py-0.5 rounded-full">
+                {documents.length}
+              </span>
+            )}
+          </button>
+          
+          <button
+            onClick={() => setActiveTab('checklist')}
+            className={`px-6 py-3 text-sm font-medium transition-all duration-200 flex items-center gap-2 ${
+              activeTab === 'checklist'
+                ? 'text-blue-600 dark:text-blue-400 border-b-2 border-blue-500 bg-white dark:bg-gray-800'
+                : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-300'
+            } rounded-t-lg`}
+          >
+            <FontAwesomeIcon icon={faCheckCircle} className="h-4 w-4" />
+            Checklist
+            {selectedChecklistItems && selectedChecklistItems.length > 0 && (
+              <span className="ml-1 bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300 text-xs px-2 py-0.5 rounded-full">
+                {selectedChecklistItems.length}
+              </span>
+            )}
+          </button>
+        </div>
+
+        {/* Tab Content */}
+        <div className="overflow-y-auto max-h-[calc(90vh-120px)] p-6">
+          {/* Quotation Tab */}
+          {activeTab === 'quotation' && (
+            <div>
+              {quotationLoading ? (
+                <div className="text-center py-12">
+                  <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-purple-500 mx-auto"></div>
+                  <p className="mt-3 text-gray-500">Loading quotation...</p>
+                </div>
+              ) : !quotationData ? (
+                <div className="text-center py-12">
+                  <FontAwesomeIcon icon={faFileText} className="h-16 w-16 mx-auto mb-4 text-gray-400 opacity-50" />
+                  <p className="text-lg font-medium text-gray-600">No Quotation Found</p>
+                  <p className="text-sm text-gray-500 mt-1">No quotation has been generated for this client.</p>
+                </div>
+              ) : quotationOptions.length === 0 ? (
+                <div className="text-center py-12">
+                  <p className="text-gray-500">No items found in this quotation</p>
+                </div>
+              ) : (
+                <div className="space-y-6">
+                  {/* Quotation Header */}
+                  <div className="bg-gradient-to-r from-purple-50 to-indigo-50 dark:from-purple-900/20 dark:to-indigo-900/20 p-4 rounded-lg border border-purple-200 dark:border-purple-800/30">
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                      <div>
+                        <div className="text-xs text-gray-500 dark:text-gray-400">Quotation Number</div>
+                        <div className="font-bold text-purple-600 dark:text-purple-400">{quotation.qt_number || 'N/A'}</div>
+                      </div>
+                      <div>
+                        <div className="text-xs text-gray-500 dark:text-gray-400">Revision</div>
+                        <div className="font-semibold">v{quotationData.revision || 1}</div>
+                      </div>
+                      <div>
+                        <div className="text-xs text-gray-500 dark:text-gray-400">Created Date</div>
+                        <div className="font-semibold">{formatDate(quotation.created_at)}</div>
+                      </div>
+                      <div>
+                        <div className="text-xs text-gray-500 dark:text-gray-400">Status</div>
+                        <div className="font-semibold">
+                          <span className={`px-2 py-1 rounded-full text-xs ${getStatusColor(quotation.status)}`}>
+                            {quotation.status || 'Draft'}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Quotation Options/Items */}
+                  {quotationOptions.map((option, optIdx) => (
+                    <div key={optIdx} className="border rounded-lg overflow-hidden">
+                      <div className="bg-gradient-to-r from-gray-100 to-gray-200 dark:from-gray-800 dark:to-gray-700 px-6 py-3 border-b">
+                        <div className="text-center">
+                          <div className="text-lg font-bold text-gray-800 dark:text-white">
+                            {option.option_name}
+                          </div>
+                        </div>
+                      </div>
+                      <div className="overflow-x-auto">
+                        <table className="w-full border-collapse">
+                          <thead className="bg-purple-50 dark:bg-purple-900/20">
+                            <tr>
+                              <th className="border px-4 py-2 text-left text-sm font-semibold">#</th>
+                              <th className="border px-4 py-2 text-left text-sm font-semibold">Product</th>
+                              <th className="border px-4 py-2 text-left text-sm font-semibold">Model</th>
+                              <th className="border px-4 py-2 text-center text-sm font-semibold w-20">Qty</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {option.items.map((item, itemIdx) => (
+                              <tr key={itemIdx} className="hover:bg-gray-50 dark:hover:bg-gray-800/50">
+                                <td className="border px-4 py-2 text-center text-sm">{itemIdx + 1}</td>
+                                <td className="border px-4 py-2 text-sm">
+                                  {item.product_type_name || item.cat_name || 'Product'}
+                                  {item.brand_name && (
+                                    <div className="text-xs text-gray-500 mt-0.5">{item.brand_name}</div>
+                                  )}
+                                </td>
+                                <td className="border px-4 py-2 text-sm font-mono">{item.model || '—'}</td>
+                                <td className="border px-4 py-2 text-center text-sm">{item.qty || 0}</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Documents Tab */}
+          {activeTab === 'documents' && (
+            <div>
+              {loadingDocs ? (
+                <div className="flex justify-center items-center py-12">
+                  <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-green-500"></div>
+                  <span className="ml-3 text-gray-600">Loading documents...</span>
+                </div>
+              ) : !documents || documents.length === 0 ? (
+                <div className="text-center py-12">
+                  <FontAwesomeIcon icon={faFileText} className="h-16 w-16 mx-auto mb-4 text-gray-400 opacity-50" />
+                  <p className="text-lg font-medium text-gray-600">No Documents Found</p>
+                  <p className="text-sm text-gray-500 mt-1">No execution documents have been uploaded for this client.</p>
+                </div>
+              ) : (
+                <div>
+                  {/* Documents Table */}
+                  <div className="overflow-x-auto">
+                    <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+                      <thead className="bg-gray-100 dark:bg-gray-800">
+                        <tr>
+                          <th className="px-3 py-2 text-left text-xs font-semibold text-gray-700 dark:text-gray-300">Date</th>
+                          <th className="px-3 py-2 text-left text-xs font-semibold text-gray-700 dark:text-gray-300">Process</th>
+                          <th className="px-3 py-2 text-left text-xs font-semibold text-gray-700 dark:text-gray-300">Remark</th>
+                          <th className="px-3 py-2 text-left text-xs font-semibold text-gray-700 dark:text-gray-300">Manager Status</th>
+                          <th className="px-3 py-2 text-left text-xs font-semibold text-gray-700 dark:text-gray-300">Manager Remark</th>
+                          <th className="px-3 py-2 text-left text-xs font-semibold text-gray-700 dark:text-gray-300">File</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
+                        {documents.map((doc, idx) => (
+                          <tr key={idx} className="hover:bg-gray-50 dark:hover:bg-gray-800/50">
+                            <td className="px-3 py-2 text-xs text-gray-600 dark:text-gray-400">
+                              {formatDate(doc.document_created_at)}
+                            </td>
+                            <td className="px-3 py-2 text-xs font-medium text-indigo-600 dark:text-indigo-400">
+                              {doc.process_name || '-'}
+                            </td>
+                            <td className="px-3 py-2 text-xs text-gray-600 dark:text-gray-400 max-w-[150px] truncate" title={doc.remark}>
+                              {doc.remark || '-'}
+                            </td>
+                            <td className="px-3 py-2">
+                              <span className={`px-2 py-0.5 rounded-full text-xs font-semibold ${getStatusColor(doc.manager_status)}`}>
+                                {doc.manager_status || 'pending'}
+                              </span>
+                            </td>
+                            <td className="px-3 py-2 text-xs text-gray-600 dark:text-gray-400 max-w-[150px] truncate" title={doc.manager_remark}>
+                              {doc.manager_remark || '-'}
+                            </td>
+                            <td className="px-3 py-2">
+                              {doc.file_path ? (
+                                <button
+                                  onClick={() => window.open(getImageUrl(doc.file_path), '_blank')}
+                                  className="px-2 py-1 bg-blue-500 hover:bg-blue-600 text-white text-xs rounded transition-colors"
+                                >
+                                  View
+                                </button>
+                              ) : (
+                                <span className="text-xs text-gray-400">No file</span>
+                              )}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Checklist Tab */}
+          {activeTab === 'checklist' && (
+            <div>
+              {checklistLoading ? (
+                <div className="text-center py-12">
+                  <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-blue-500 mx-auto"></div>
+                  <p className="mt-3 text-gray-500">Loading checklist...</p>
+                </div>
+              ) : selectedChecklistDetails.length === 0 ? (
+                <div className="text-center py-12">
+                  <FontAwesomeIcon icon={faCheckCircle} className="h-16 w-16 mx-auto mb-4 text-gray-400 opacity-50" />
+                  <p className="text-lg font-medium text-gray-600">No Items Selected</p>
+                  <p className="text-sm text-gray-500 mt-1">No checklist items have been selected for this client.</p>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {/* Group by checklist */}
+                  {checklistItems.map(checklist => {
+                    const checklistSelectedItems = checklist.items.filter(
+                      item => selectedChecklistItems.includes(item.item_id)
+                    );
+                    
+                    if (checklistSelectedItems.length === 0) return null;
+                    
+                    return (
+                      <div key={checklist.checklist_id} className="border rounded-lg p-4">
+                        <h3 className="font-semibold text-indigo-600 mb-3 flex items-center gap-2">
+                          <span className="w-2 h-2 bg-indigo-600 rounded-full"></span>
+                          {checklist.checklist_name}
+                          <span className="text-xs bg-indigo-100 text-indigo-700 px-2 py-1 rounded-full ml-2">
+                            {checklistSelectedItems.length} selected
+                          </span>
+                        </h3>
+                        
+                        <div className="space-y-2">
+                          {checklistSelectedItems.map(item => (
+                            <div 
+                              key={item.item_id} 
+                              className="flex items-center gap-2 p-2 bg-green-50 dark:bg-green-900/20 rounded-lg border border-green-200"
+                            >
+                              <FontAwesomeIcon icon={faCheckCircle} className="h-4 w-4 text-green-500" />
+                              <span className="text-sm">{item.item_name}</span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    );
+                  })}
+                  
+                  {/* Summary */}
+                  <div className="mt-4 p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
+                    <div className="flex justify-between items-center">
+                      <span className="font-medium">Total Selected Items:</span>
+                      <span className="text-lg font-bold text-blue-600">
+                        {selectedChecklistDetails.length}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+
+        {/* Footer */}
+        <div className="flex justify-end px-6 py-4 border-t dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50">
+          <button
+            onClick={onClose}
+            className="px-6 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg font-medium transition-colors"
+          >
+            Close
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+
 const ActionButton = ({ 
-  onView, 
+  onViewAll,  // Single handler for unified view
   onEdit,
-  onEditExecution,  // NEW
-    onEditContact,  // NEW - for editing contact numbers
+  onEditExecution,
+  onEditContact,
   onSettings,
-  onLogs,
-  onViewQuotation,
-  onViewDocuments,  // ADD THIS LINE - FIXES THE ERROR
   viewCount = 0,
   title = "Actions",
   className = ""
 }) => {
   return (
     <div className={`flex items-center gap-1 ${className}`}>
+   
 
-            {/* SETTINGS */}
+      {/* SETTINGS BUTTON */}
       <button
         onClick={onSettings}
         className="p-1.5 bg-gray-500 hover:bg-gray-600 text-white rounded-lg"
@@ -155,37 +549,19 @@ const ActionButton = ({
         <FontAwesomeIcon icon={faCog} className="h-3.5 w-3.5" />
       </button>
       
-      {/* EDIT EXECUTION BUTTON - NEW */}
+      {/* EDIT EXECUTION BUTTON */}
       <button
         onClick={onEditExecution}
-        className="p-1.5 bg-yellow-500 hover:bg-yellow-600 text-white rounded-lg transition-all duration-200 shadow-sm hover:shadow-md"
+        className="p-1.5 bg-yellow-500 hover:bg-yellow-600 text-white rounded-lg"
         title="Edit Execution"
       >
         <FontAwesomeIcon icon={faEdit} className="h-3.5 w-3.5" />
       </button>
-      
-<button
-  onClick={onViewDocuments}
-  className="p-1.5 bg-green-500 hover:bg-green-600 text-white rounded-lg"
-  title="View Execution Documents"
->
-  <FontAwesomeIcon icon={faFileText} className="h-3.5 w-3.5" />
-</button>
-
-      {/* VIEW QUOTATION BUTTON */}
+         {/* SINGLE VIEW BUTTON - Opens unified modal */}
       <button
-        onClick={onViewQuotation}
-        className="p-1.5 bg-purple-500 hover:bg-purple-600 text-white rounded-lg"
-        title="View Quotation"
-      >
-        <FontAwesomeIcon icon={faFileText} className="h-3.5 w-3.5" />
-      </button>
-
-      {/* VIEW CHECKLIST BUTTON */}
-      <button
-        onClick={onView}
-        className="p-1.5 bg-blue-500 hover:bg-blue-600 text-white rounded-lg"
-        title="View Selected Checklist Items"
+        onClick={onViewAll}
+        className="p-1.5 bg-blue-500 hover:bg-blue-600 text-white rounded-lg transition-all duration-200 shadow-sm hover:shadow-md flex items-center gap-1"
+        title="View All (Documents, Quotation, Checklist)"
       >
         <FontAwesomeIcon icon={faEye} className="h-3.5 w-3.5" />
         {viewCount > 0 && (
@@ -194,6 +570,7 @@ const ActionButton = ({
           </span>
         )}
       </button>
+      
 
       {/* EDIT CHECKLIST BUTTON */}
       <button
@@ -204,27 +581,17 @@ const ActionButton = ({
         <FontAwesomeIcon icon={faList} className="h-3.5 w-3.5" />
       </button> 
 
-   <button
+      {/* EDIT CONTACT BUTTON */}
+      <button
         onClick={onEditContact}
         className="p-1.5 bg-purple-500 hover:bg-purple-600 text-white rounded-lg"
         title="Edit Contact Numbers"
       >
         <FontAwesomeIcon icon={faEdit} className="h-3.5 w-3.5" />
       </button>
-
-
-      {/* LOGS BUTTON */}
-      {/* <button
-        onClick={onLogs}
-        className="p-1.5 bg-indigo-500 hover:bg-indigo-600 text-white rounded-lg"
-        title="Execution Logs"
-      >
-        <FontAwesomeIcon icon={faHistory} className="h-3.5 w-3.5" />
-      </button> */}
     </div>
   );
 };
-
 
 // Add this QuotationViewModal component before your main ExecutionPending component
 
@@ -354,7 +721,8 @@ const ChecklistViewModal = ({ lead, items, selectedItems, onClose }) => {
 };
 
 
-// Checklist Edit Modal - Shows all items for editing
+
+// Checklist Edit Modal - Shows all items for editing with Select All/Deselect All
 const ChecklistEditModal = ({ 
   lead, 
   items, 
@@ -367,6 +735,86 @@ const ChecklistEditModal = ({
   if (!lead) return null;
 
   const totalItems = items.reduce((acc, c) => acc + c.items.length, 0);
+  
+  // Calculate total selected items
+  const totalSelected = selectedItems.length;
+
+  // Select all items in a specific checklist
+  const selectAllInChecklist = (checklist) => {
+    const itemIds = checklist.items.map(item => item.item_id);
+    const newSelectedItems = [...selectedItems];
+    
+    // Add all items from this checklist that aren't already selected
+    itemIds.forEach(itemId => {
+      if (!newSelectedItems.includes(itemId)) {
+        newSelectedItems.push(itemId);
+      }
+    });
+    
+    // Update parent state using onToggle for each item
+    newSelectedItems.forEach(itemId => {
+      if (!selectedItems.includes(itemId)) {
+        onToggle(itemId);
+      }
+    });
+  };
+
+  // Deselect all items in a specific checklist
+  const deselectAllInChecklist = (checklist) => {
+    const itemIds = checklist.items.map(item => item.item_id);
+    
+    // Remove all items from this checklist
+    itemIds.forEach(itemId => {
+      if (selectedItems.includes(itemId)) {
+        onToggle(itemId);
+      }
+    });
+  };
+
+  // Check if all items in a checklist are selected
+  const isAllSelectedInChecklist = (checklist) => {
+    if (checklist.items.length === 0) return false;
+    const itemIds = checklist.items.map(item => item.item_id);
+    return itemIds.every(id => selectedItems.includes(id));
+  };
+
+  // Check if some items are selected in a checklist
+  const isSomeSelectedInChecklist = (checklist) => {
+    const itemIds = checklist.items.map(item => item.item_id);
+    const selectedCount = itemIds.filter(id => selectedItems.includes(id)).length;
+    return selectedCount > 0 && selectedCount < itemIds.length;
+  };
+
+  // Select all items across all checklists
+  const selectAllGlobal = () => {
+    const allItemIds = [];
+    items.forEach(checklist => {
+      checklist.items.forEach(item => {
+        allItemIds.push(item.item_id);
+      });
+    });
+    
+    // Add all items that aren't already selected
+    allItemIds.forEach(itemId => {
+      if (!selectedItems.includes(itemId)) {
+        onToggle(itemId);
+      }
+    });
+  };
+
+  // Deselect all items across all checklists
+  const deselectAllGlobal = () => {
+    // Remove all selected items
+    selectedItems.forEach(itemId => {
+      onToggle(itemId);
+    });
+  };
+
+  // Check if all items globally are selected
+  const isAllSelectedGlobal = totalSelected === totalItems && totalItems > 0;
+  
+  // Check if some items are selected globally
+  const isSomeSelectedGlobal = totalSelected > 0 && totalSelected < totalItems;
 
   return (
     <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-[9999] p-4">
@@ -391,103 +839,178 @@ const ChecklistEditModal = ({
           </button>
         </div>
 
-        {/* Progress Bar */}
-        <div className="px-4 py-2 bg-gray-50 dark:bg-gray-800 border-b">
-          <div className="flex justify-between items-center mb-1">
-            <span className="text-xs font-medium">Selection Progress</span>
-            <span className="text-xs font-bold text-green-600">
-              {selectedItems.length}/{totalItems} items
-            </span>
+        {/* Global Select All/Deselect All Buttons */}
+        <div className="px-4 py-2 bg-gray-100 dark:bg-gray-800 border-b flex justify-between items-center">
+          <div className="flex gap-2">
+            {isAllSelectedGlobal ? (
+              <button
+                onClick={deselectAllGlobal}
+                className="px-3 py-1.5 text-sm bg-red-500 hover:bg-red-600 text-white rounded-lg transition-colors flex items-center gap-2"
+              >
+                <FontAwesomeIcon icon={faTimes} className="h-3 w-3" />
+                Deselect All ({totalSelected}/{totalItems})
+              </button>
+            ) : (
+              <button
+                onClick={selectAllGlobal}
+                className="px-3 py-1.5 text-sm bg-green-500 hover:bg-green-600 text-white rounded-lg transition-colors flex items-center gap-2"
+              >
+                <FontAwesomeIcon icon={faCheckCircle} className="h-3 w-3" />
+                Select All ({totalItems - totalSelected} remaining)
+              </button>
+            )}
+            
+            {isSomeSelectedGlobal && !isAllSelectedGlobal && (
+              <button
+                onClick={deselectAllGlobal}
+                className="px-3 py-1.5 text-sm bg-gray-500 hover:bg-gray-600 text-white rounded-lg transition-colors flex items-center gap-2"
+              >
+                <FontAwesomeIcon icon={faTimes} className="h-3 w-3" />
+                Clear All ({totalSelected} selected)
+              </button>
+            )}
           </div>
-          <div className="w-full bg-gray-200 rounded-full h-2">
-            <div 
-              className="bg-green-600 h-2 rounded-full transition-all duration-300"
-              style={{ width: `${(selectedItems.length / totalItems) * 100}%` }}
-            />
+          
+          <div className="text-sm font-medium text-gray-600 dark:text-gray-400">
+            {totalSelected} of {totalItems} items selected
           </div>
         </div>
 
+   
         {/* Body */}
         <div className="p-4 overflow-y-auto max-h-[60vh]">
           <div className="space-y-6">
-            {items.map((checklist) => (
-              <div key={checklist.checklist_id} className="border rounded-lg p-4">
-                <h3 className="font-semibold text-indigo-600 mb-3 flex items-center gap-2">
-                  <span className="w-2 h-2 bg-indigo-600 rounded-full"></span>
-                  {checklist.checklist_name}
-                  <span className="text-xs bg-gray-100 text-gray-600 px-2 py-1 rounded-full ml-2">
-                    {checklist.items.length} items
-                  </span>
-                </h3>
-                
-                <div className="space-y-2">
-                  {checklist.items.map((item) => {
-                    const isSelected = selectedItems.includes(item.item_id);
-                    
-                    return (
-                      <label
-                        key={item.item_id}
-                        className={`flex items-start gap-3 p-3 rounded-lg border cursor-pointer transition-colors ${
-                          isSelected
-                            ? 'bg-green-50 border-green-200 dark:bg-green-900/20'
-                            : 'hover:bg-gray-50 border-gray-200 dark:hover:bg-gray-800/50'
-                        }`}
-                      >
-                        <input
-                          type="checkbox"
-                          checked={isSelected}
-                          onChange={() => onToggle(item.item_id)}
-                          className="mt-1 h-4 w-4 text-green-600 rounded border-gray-300 focus:ring-green-500"
-                        />
-                        <span className={`text-sm flex-1 ${
-                          isSelected ? 'font-medium text-gray-900' : 'text-gray-700'
-                        }`}>
-                          {item.item_name}
+            {items.map((checklist) => {
+              const allSelected = isAllSelectedInChecklist(checklist);
+              const someSelected = isSomeSelectedInChecklist(checklist);
+              const checklistTotal = checklist.items.length;
+              const checklistSelected = checklist.items.filter(item => selectedItems.includes(item.item_id)).length;
+              
+              return (
+                <div key={checklist.checklist_id} className="border rounded-lg p-4">
+                  {/* Checklist Header with Select All/Deselect All */}
+                  <div className="flex items-center justify-between mb-3 pb-2 border-b">
+                    <div>
+                      <h3 className="font-semibold text-indigo-600 flex items-center gap-2">
+                        <span className="w-2 h-2 bg-indigo-600 rounded-full"></span>
+                        {checklist.checklist_name}
+                        <span className="text-xs bg-gray-100 text-gray-600 px-2 py-1 rounded-full ml-2">
+                          {checklist.items.length} items
                         </span>
-                        {isSelected && (
-                          <span className="text-xs bg-green-100 text-green-700 px-2 py-1 rounded-full">
-                            Selected
+                      </h3>
+                      <p className="text-xs text-gray-500 mt-1">
+                        {checklistSelected} of {checklistTotal} selected
+                      </p>
+                    </div>
+                    
+                    <div className="flex gap-2">
+                      {allSelected ? (
+                        <button
+                          onClick={() => deselectAllInChecklist(checklist)}
+                          className="px-2 py-1 text-xs bg-red-100 text-red-600 hover:bg-red-200 rounded transition-colors flex items-center gap-1"
+                        >
+                          <FontAwesomeIcon icon={faTimes} className="h-2.5 w-2.5" />
+                          Deselect All
+                        </button>
+                      ) : (
+                        <button
+                          onClick={() => selectAllInChecklist(checklist)}
+                          className="px-2 py-1 text-xs bg-green-100 text-green-600 hover:bg-green-200 rounded transition-colors flex items-center gap-1"
+                        >
+                          <FontAwesomeIcon icon={faCheckCircle} className="h-2.5 w-2.5" />
+                          Select All
+                        </button>
+                      )}
+                      
+                      {someSelected && !allSelected && (
+                        <button
+                          onClick={() => deselectAllInChecklist(checklist)}
+                          className="px-2 py-1 text-xs bg-gray-100 text-gray-600 hover:bg-gray-200 rounded transition-colors flex items-center gap-1"
+                        >
+                          <FontAwesomeIcon icon={faTimes} className="h-2.5 w-2.5" />
+                          Clear
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                  
+         
+                  <div className="space-y-2">
+                    {checklist.items.map((item) => {
+                      const isSelected = selectedItems.includes(item.item_id);
+                      
+                      return (
+                        <label
+                          key={item.item_id}
+                          className={`flex items-start gap-3 p-3 rounded-lg border cursor-pointer transition-colors ${
+                            isSelected
+                              ? 'bg-green-50 border-green-200 dark:bg-green-900/20'
+                              : 'hover:bg-gray-50 border-gray-200 dark:hover:bg-gray-800/50'
+                          }`}
+                        >
+                          <input
+                            type="checkbox"
+                            checked={isSelected}
+                            onChange={() => onToggle(item.item_id)}
+                            className="mt-1 h-4 w-4 text-green-600 rounded border-gray-300 focus:ring-green-500"
+                          />
+                          <span className={`text-sm flex-1 ${
+                            isSelected ? 'font-medium text-gray-900' : 'text-gray-700'
+                          }`}>
+                            {item.item_name}
                           </span>
-                        )}
-                      </label>
-                    );
-                  })}
+                          {isSelected && (
+                            <span className="text-xs bg-green-100 text-green-700 px-2 py-1 rounded-full">
+                              Selected
+                            </span>
+                          )}
+                        </label>
+                      );
+                    })}
+                  </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         </div>
 
         {/* Footer */}
-        <div className="flex justify-end gap-2 px-4 py-3 border-t">
-          <button
-            onClick={onClose}
-            className="px-4 py-2 bg-gray-500 text-white rounded-lg hover:bg-gray-600"
-          >
-            Cancel
-          </button>
-          <button
-            onClick={onSave}
-            disabled={saving}
-            className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 flex items-center gap-2"
-          >
-            {saving ? (
-              <>
-                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-                Saving...
-              </>
-            ) : (
-              <>
-                <FontAwesomeIcon icon={faSave} />
-                Save Changes ({selectedItems.length} items)
-              </>
-            )}
-          </button>
+        <div className="flex justify-between items-center gap-2 px-4 py-3 border-t bg-gray-50 dark:bg-gray-800/50">
+          <div className="text-sm text-gray-500">
+            {totalSelected} item{totalSelected !== 1 ? 's' : ''} selected
+          </div>
+          <div className="flex gap-2">
+            <button
+              onClick={onClose}
+              className="px-4 py-2 bg-gray-500 text-white rounded-lg hover:bg-gray-600"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={onSave}
+              disabled={saving || totalSelected === 0}
+              className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 flex items-center gap-2"
+            >
+              {saving ? (
+                <>
+                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                  Saving...
+                </>
+              ) : (
+                <>
+                  <FontAwesomeIcon icon={faSave} />
+                  Save Changes ({totalSelected} items)
+                </>
+              )}
+            </button>
+          </div>
         </div>
       </div>
     </div>
   );
 };
+
+
 
 const QuotationViewModal: React.FC<QuotationViewModalProps> = ({
   show,
@@ -1082,13 +1605,31 @@ const formatDate = (dateString) => {
 
 const SettingsModal = ({ lead, onClose }) => {
   const [processes, setProcesses] = useState([]);
+  const [filteredProcesses, setFilteredProcesses] = useState([]);
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(false);
   const [editModal, setEditModal] = useState(null);
-
   const [logsModal, setLogsModal] = useState(null);
-const [logsData, setLogsData] = useState([]);
-
+  const [logsData, setLogsData] = useState([]);
+  
+  // Bulk selection states
+  const [selectedProcessIds, setSelectedProcessIds] = useState([]);
+  const [showBulkModal, setShowBulkModal] = useState(false);
+  const [bulkData, setBulkData] = useState({
+    start_date: '',
+    end_date: '',
+    status: '',
+    assigned_user_ids: [],
+    remark: ''
+  });
+  const [savingBulk, setSavingBulk] = useState(false);
+  
+  // Stage filter state
+  const [selectedStageFilter, setSelectedStageFilter] = useState('all');
+  const [availableStages, setAvailableStages] = useState([]);
+  
+  // Select All checkbox state
+  const [selectAll, setSelectAll] = useState(false);
 
   useEffect(() => {
     if (lead?.master_id) {
@@ -1100,61 +1641,79 @@ const [logsData, setLogsData] = useState([]);
     fetchUsers();
   }, []);
 
-const fetchProcesses = async () => {
-  try {
-    setLoading(true);
-
-    const res = await axios.get(
-      `${BASE_URL}api/execution/processes/${lead.master_id}`,
-      { withCredentials: true }
-    );
-
-    if (res.data.success) {
-      console.log('API Response:', res.data.data); // 👈 Add this
-      
-const formatted = res.data.data.map((item) => ({
-  process_id: item.process_id,
-
-  // ✅ ADD THIS
-  type_id: item.type_id,
-
-  process_name: item.process_name,
-  execution_type: item.execution_type || "",
-  description: item.description || "",
-  start_date: item.start_date ? item.start_date.split("T")[0] : "",
-  end_date: item.end_date ? item.end_date.split("T")[0] : "",
-  status: item.status || "pending",
-  remark: item.remark || "",
-  assigned_user_ids: item.assigned_user_ids || [],
-  assigned_user_names: item.assigned_user_names || [],
-}));
-
-      console.log('Formatted statuses:', formatted.map(p => p.status)); // 👈 Add this
-
-      setProcesses(formatted);
+  useEffect(() => {
+    // Extract unique stages from processes
+    if (processes.length > 0) {
+      const stages = [...new Set(processes.map(p => p.execution_type).filter(Boolean))];
+      setAvailableStages(stages);
     }
-  } catch (err) {
-    console.error(err);
-  } finally {
-    setLoading(false);
-  }
-};
+  }, [processes]);
+
+  useEffect(() => {
+    // Apply stage filter
+    if (selectedStageFilter === 'all') {
+      setFilteredProcesses(processes);
+    } else {
+      setFilteredProcesses(processes.filter(p => p.execution_type === selectedStageFilter));
+    }
+  }, [selectedStageFilter, processes]);
+
+  // Update selectAll when selections change
+  useEffect(() => {
+    if (filteredProcesses.length > 0) {
+      const allSelected = filteredProcesses.every(p => selectedProcessIds.includes(p.process_id));
+      setSelectAll(allSelected);
+    } else {
+      setSelectAll(false);
+    }
+  }, [selectedProcessIds, filteredProcesses]);
+
+  const fetchProcesses = async () => {
+    try {
+      setLoading(true);
+      const res = await axios.get(
+        `${BASE_URL}api/execution/processes/${lead.master_id}`,
+        { withCredentials: true }
+      );
+
+      if (res.data.success) {
+        const formatted = res.data.data.map((item) => ({
+          process_id: item.process_id,
+          type_id: item.type_id,
+          process_name: item.process_name,
+          execution_type: item.execution_type || "",
+          description: item.description || "",
+          start_date: item.start_date ? item.start_date.split("T")[0] : "",
+          end_date: item.end_date ? item.end_date.split("T")[0] : "",
+          status: item.status || "pending",
+          remark: item.remark || "",
+          assigned_user_ids: item.assigned_user_ids || [],
+          assigned_user_names: item.assigned_user_names || [],
+        }));
+        setProcesses(formatted);
+        setFilteredProcesses(formatted);
+      }
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const openLogs = async (process) => {
-  try {
-    const res = await axios.get(
-      `${BASE_URL}api/execution/process-logs/${lead.master_id}/${process.process_id}`,
-      { withCredentials: true }
-    );
-
-    if (res.data.success) {
-      setLogsData(res.data.data);
-      setLogsModal(process);
+    try {
+      const res = await axios.get(
+        `${BASE_URL}api/execution/process-logs/${lead.master_id}/${process.process_id}`,
+        { withCredentials: true }
+      );
+      if (res.data.success) {
+        setLogsData(res.data.data);
+        setLogsModal(process);
+      }
+    } catch (err) {
+      console.error(err);
     }
-  } catch (err) {
-    console.error(err);
-  }
-};
-
+  };
 
   const fetchUsers = async () => {
     try {
@@ -1167,50 +1726,147 @@ const formatted = res.data.data.map((item) => ({
     }
   };
 
-  const handleChange = (index, field, value) => {
-    const updated = [...processes];
-    updated[index][field] = value;
-    setProcesses(updated);
+  const handleSave = async (process) => {
+    try {
+      await axios.post(
+        `${BASE_URL}api/execution/save-process`,
+        {
+          lead_id: lead.master_id,
+          process_id: process.process_id,
+          type_id: process.type_id,
+          process_name: process.process_name,
+          start_date: process.start_date,
+          end_date: process.end_date,
+          status: process.status,
+          assigned_user_ids: process.assigned_user_ids || [],
+          remark: process.remark,
+        },
+        { withCredentials: true }
+      );
+      alert("Saved Successfully ✅");
+      fetchProcesses();
+    } catch (err) {
+      console.error(err);
+    }
   };
 
-
-const handleSave = async (process) => {
-  try {
-    await axios.post(
-      `${BASE_URL}api/execution/save-process`,
-      {
-        lead_id: lead.master_id,
-        process_id: process.process_id,
-
-        // ✅ ADD THIS
-        type_id: process.type_id,
-
-        process_name: process.process_name,
-        start_date: process.start_date,
-        end_date: process.end_date,
-        status: process.status,
-        assigned_user_ids: process.assigned_user_ids || [],
-        remark: process.remark,
-      },
-      { withCredentials: true }
+  // Handle single process selection for bulk
+  const toggleProcessSelection = (processId) => {
+    setSelectedProcessIds(prev => 
+      prev.includes(processId) 
+        ? prev.filter(id => id !== processId)
+        : [...prev, processId]
     );
+  };
 
-    alert("Saved Successfully ✅");
+  // Select/Deselect all filtered processes
+  const toggleSelectAll = () => {
+    if (selectAll) {
+      // Deselect all filtered processes
+      const filteredIds = filteredProcesses.map(p => p.process_id);
+      setSelectedProcessIds(prev => prev.filter(id => !filteredIds.includes(id)));
+    } else {
+      // Select all filtered processes
+      const filteredIds = filteredProcesses.map(p => p.process_id);
+      const newSelected = [...new Set([...selectedProcessIds, ...filteredIds])];
+      setSelectedProcessIds(newSelected);
+    }
+  };
 
-    fetchProcesses();
+  // Clear all filters and selections
+  const clearFilters = () => {
+    setSelectedStageFilter('all');
+    setSelectedProcessIds([]);
+    setSelectAll(false);
+  };
 
-  } catch (err) {
-    console.error(err);
-  }
-};
+  // Handle bulk save
+  const handleBulkSave = async () => {
+    if (selectedProcessIds.length === 0) {
+      alert("Please select at least one process to update");
+      return;
+    }
+
+    setSavingBulk(true);
+    let successCount = 0;
+    let errorCount = 0;
+
+    try {
+      for (const processId of selectedProcessIds) {
+        const process = processes.find(p => p.process_id === processId);
+        if (process) {
+          try {
+            await axios.post(
+              `${BASE_URL}api/execution/save-process`,
+              {
+                lead_id: lead.master_id,
+                process_id: process.process_id,
+                type_id: process.type_id,
+                process_name: process.process_name,
+                start_date: bulkData.start_date || process.start_date,
+                end_date: bulkData.end_date || process.end_date,
+                status: bulkData.status || process.status,
+                assigned_user_ids: bulkData.assigned_user_ids.length > 0 ? bulkData.assigned_user_ids : process.assigned_user_ids,
+                remark: bulkData.remark || process.remark,
+              },
+              { withCredentials: true }
+            );
+            successCount++;
+          } catch (err) {
+            errorCount++;
+            console.error(`Failed to save process ${process.process_name}:`, err);
+          }
+        }
+      }
+
+      alert(`Bulk update completed!\n✅ Success: ${successCount}`);
+      setShowBulkModal(false);
+      setSelectedProcessIds([]);
+      setBulkData({
+        start_date: '',
+        end_date: '',
+        status: '',
+        assigned_user_ids: [],
+        remark: ''
+      });
+      fetchProcesses();
+    } catch (err) {
+      console.error("Bulk save error:", err);
+      alert("Error during bulk update. Please try again.");
+    } finally {
+      setSavingBulk(false);
+    }
+  };
+
+  // Clear bulk form
+  const clearBulkForm = () => {
+    setBulkData({
+      start_date: '',
+      end_date: '',
+      status: '',
+      assigned_user_ids: [],
+      remark: ''
+    });
+  };
+
+  // Toggle user selection in bulk modal
+  const toggleBulkUser = (userId) => {
+    setBulkData(prev => ({
+      ...prev,
+      assigned_user_ids: prev.assigned_user_ids.includes(userId)
+        ? prev.assigned_user_ids.filter(id => id !== userId)
+        : [...prev.assigned_user_ids, userId]
+    }));
+  };
 
   if (!lead) return null;
 
   return (
     <>
       {/* MAIN MODAL */}
-       <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-[9999] p-4">
-        <div className="bg-white dark:bg-boxdark w-full max-w-4xl rounded-lg shadow-lg flex flex-col" style={{ height: '85vh' }}>
+      <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-[9999] p-4">
+        <div className="bg-white dark:bg-boxdark w-full max-w-6xl rounded-lg shadow-lg flex flex-col" style={{ height: '85vh' }}>
+          
           {/* HEADER */}
           <div className="flex justify-between items-center px-4 py-3 border-b dark:border-gray-700">
             <div>
@@ -1224,130 +1880,366 @@ const handleSave = async (process) => {
             <button onClick={onClose} className="text-xl">×</button>
           </div>
 
-          {/* TABLE */}
-          <div className="p-4 max-h-[70vh] overflow-y-auto">
-            {loading ? (
-              <div className="text-center py-6">Loading...</div>
-            ) : (
-              <table className="w-full text-sm border border-gray-200 dark:border-gray-700">
-                <thead className="bg-gray-100 dark:bg-gray-800">
-                  <tr>
-                    <th className="px-3 py-2 text-left">Process</th>
-                        <th className="px-3 py-2 text-left">Execution Type</th> {/* ✅ ADD THIS */}
-                    <th className="px-3 py-2 text-left">Start</th>
-                    <th className="px-3 py-2 text-left">End</th>
-                    <th className="px-3 py-2 text-left">Status</th>
-                    <th className="px-3 py-2 text-center">Action</th>
-                  </tr>
-                </thead>
+          {/* Filter and Bulk Action Bar */}
+          <div className="px-4 py-3 border-b dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              {/* Stage Filter Dropdown */}
+              <div className="flex items-center gap-3">
+                <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Filter by Stage:</span>
+                <select
+                  value={selectedStageFilter}
+                  onChange={(e) => setSelectedStageFilter(e.target.value)}
+                  className="px-3 py-1.5 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500"
+                >
+                  <option value="all">All Stages ({processes.length})</option>
+                  {availableStages.map(stage => (
+                    <option key={stage} value={stage}>
+                      {stage} ({processes.filter(p => p.execution_type === stage).length})
+                    </option>
+                  ))}
+                </select>
 
-            <tbody>
-  {processes.map((process, index) => (
-    <tr 
-      key={process.process_id} 
-      className="border-t"
-      style={{
-        backgroundColor: 
-          process.status === 'in_progress' ? '#e6f7ff' :    // light blue
-          process.status === 'hold_by_avcore' ? '#fff2e6' : // light orange
-          process.status === 'hold_by_client' ? '#fff0f0' : // light red
-          process.status === 'completed' ? '#e6ffe6' :      // light green
-          'transparent',
-        transition: 'background-color 0.2s'
-      }}
-      onMouseEnter={(e) => {
-        if (!process.status.includes('hold')) {
-          e.currentTarget.style.backgroundColor = 
-            process.status === 'in_progress' ? '#bae7ff' :
-            process.status === 'completed' ? '#d9f7d9' : 
-            e.currentTarget.style.backgroundColor;
-        }
-      }}
-      onMouseLeave={(e) => {
-        e.currentTarget.style.backgroundColor = 
-          process.status === 'in_progress' ? '#e6f7ff' :
-          process.status === 'hold_by_avcore' ? '#fff2e6' :
-          process.status === 'hold_by_client' ? '#fff0f0' :
-          process.status === 'completed' ? '#e6ffe6' : 
-          'transparent';
-      }}
-    >
-      <td className="px-3 py-2">
-        <div className="font-semibold">
-          {process.process_name}
-        </div>
-        {process.description && (
-          <div className="text-xs text-gray-400">
-            {process.description}
-          </div>
-        )}
-      </td> 
+                {/* Clear Filter Button */}
+                {selectedStageFilter !== 'all' && (
+                  <button
+                    onClick={clearFilters}
+                    className="px-3 py-1.5 bg-red-500 hover:bg-red-600 text-white text-sm rounded-lg transition-colors flex items-center gap-2"
+                  >
+                    <FontAwesomeIcon icon={faTimes} className="h-3 w-3" />
+                    Clear Filter
+                  </button>
+                )}
+              </div>
 
-      <td className="px-3 py-2">
-  <span className="px-2 py-1 text-xs font-medium bg-purple-100 text-purple-700 rounded-full">
-    {process.execution_type || "-"}
-  </span>
-</td>
+              {/* Bulk Action Buttons */}
+              <div className="flex items-center gap-2">
+                {selectedProcessIds.length > 0 && (
+                  <button
+                    onClick={() => setShowBulkModal(true)}
+                    className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-sm rounded-lg transition-colors flex items-center gap-2"
+                  >
+                    <FontAwesomeIcon icon={faEdit} className="h-3 w-3" />
+                    Bulk Edit ({selectedProcessIds.length})
+                  </button>
+                )}
+                <button
+                  onClick={() => {
+                    setSelectedProcessIds([]);
+                    setSelectAll(false);
+                  }}
+                  className="px-3 py-1.5 bg-gray-500 hover:bg-gray-600 text-white text-sm rounded-lg transition-colors"
+                >
+                  Clear Selection
+                </button>
+              </div>
+            </div>
 
-
-      <td className="px-3 py-2">
-        {process.start_date || "-"}
-      </td>
-
-      <td className="px-3 py-2">
-        {process.end_date || "-"}
-      </td>
-
-      <td className="px-3 py-2 font-medium">
-        {process.status.replace(/_/g, ' ')}
-      </td>
-
-      <td className="px-3 py-2">
-        <div className="flex gap-2 justify-center">
-          {/* EDIT ICON */}
-          <button
-            onClick={() =>
-              setEditModal({
-                ...process,
-                index,
-                assigned_user_ids: process.assigned_user_ids || [],
-              })
-            }
-            className="p-1.5 bg-yellow-500 hover:bg-yellow-600 text-white rounded-lg"
-          >
-            <FontAwesomeIcon icon={faEdit} className="h-3 w-3" />
-          </button>
-
-          {/* LOGS ICON */}
-          <button
-            onClick={() => openLogs(process)}
-            className="p-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg"
-          >
-            <FontAwesomeIcon icon={faHistory} className="h-3 w-3" />
-          </button>
-        </div>
-      </td>
-    </tr>
-  ))}
-</tbody>
-              </table>
+            {/* Active Filter Indicator */}
+            {selectedStageFilter !== 'all' && (
+              <div className="mt-2 flex items-center gap-2 text-xs text-gray-600 dark:text-gray-400">
+                <span className="font-medium">Active Filter:</span>
+                <span className="bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 px-2 py-0.5 rounded-full">
+                  Stage: {selectedStageFilter}
+                </span>
+                <span className="text-gray-500">
+                  ({filteredProcesses.length} of {processes.length} processes shown)
+                </span>
+              </div>
             )}
           </div>
+
+{/* TABLE */}
+<div className="p-4 max-h-[70vh] overflow-y-auto">
+  {loading ? (
+    <div className="text-center py-6">Loading...</div>
+  ) : filteredProcesses.length === 0 ? (
+    <div className="text-center py-12 text-gray-500">
+      <FontAwesomeIcon icon={faFilter} className="h-12 w-12 mx-auto mb-3 opacity-50" />
+      <p className="text-lg">No processes found for stage: {selectedStageFilter}</p>
+      <button
+        onClick={clearFilters}
+        className="mt-3 px-4 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded-lg text-sm"
+      >
+        Clear Filter
+      </button>
+    </div>
+  ) : (
+    <div className="relative overflow-x-auto">
+      <table className="w-full text-sm border border-gray-200 dark:border-gray-700">
+        <thead className="bg-gray-100 dark:bg-gray-800 sticky top-0 z-10">
+          <tr>
+            <th className="px-3 py-2 text-center w-10 bg-gray-100 dark:bg-gray-800 sticky top-0">
+              <input
+                type="checkbox"
+                checked={selectAll}
+                onChange={toggleSelectAll}
+                className="h-4 w-4 text-blue-600 rounded border-gray-300 focus:ring-blue-500"
+              />
+            </th>
+            <th className="px-3 py-2 text-left bg-gray-100 dark:bg-gray-800 sticky top-0">
+              Execution Stage
+            </th>
+            <th className="px-3 py-2 text-left bg-gray-100 dark:bg-gray-800 sticky top-0">
+              Process
+            </th>
+            <th className="px-3 py-2 text-left bg-gray-100 dark:bg-gray-800 sticky top-0">
+              Start
+            </th>
+            <th className="px-3 py-2 text-left bg-gray-100 dark:bg-gray-800 sticky top-0">
+              End
+            </th>
+            <th className="px-3 py-2 text-left bg-gray-100 dark:bg-gray-800 sticky top-0">
+              Status
+            </th>
+            <th className="px-3 py-2 text-center bg-gray-100 dark:bg-gray-800 sticky top-0">
+              Action
+            </th>
+          </tr>
+        </thead>
+        <tbody>
+          {filteredProcesses.map((process, index) => (
+            <tr 
+              key={process.process_id} 
+              className="border-t"
+              style={{
+                backgroundColor: selectedProcessIds.includes(process.process_id)
+                  ? '#e0f2fe'
+                  : process.status === 'in_progress' ? '#e6f7ff' :
+                    process.status === 'hold_by_avcore' ? '#fff2e6' :
+                    process.status === 'hold_by_client' ? '#fff0f0' :
+                    process.status === 'completed' ? '#e6ffe6' :
+                    'transparent',
+                transition: 'background-color 0.2s'
+              }}
+            >
+              <td className="px-3 py-2 text-center">
+                <input
+                  type="checkbox"
+                  checked={selectedProcessIds.includes(process.process_id)}
+                  onChange={() => toggleProcessSelection(process.process_id)}
+                  className="h-4 w-4 text-blue-600 rounded border-gray-300 focus:ring-blue-500"
+                />
+              </td>
+              <td className="px-3 py-2">
+                <span className="px-2 py-1 text-xs font-medium bg-purple-100 text-purple-700 rounded-full">
+                  {process.execution_type || "-"}
+                </span>
+              </td>
+              <td className="px-3 py-2">
+                <div className="font-semibold">
+                  {process.process_name}
+                </div>
+                {process.description && (
+                  <div className="text-xs text-gray-400">
+                    {process.description}
+                  </div>
+                )}
+              </td>
+              <td className="px-3 py-2">
+                {process.start_date || "-"}
+              </td>
+              <td className="px-3 py-2">
+                {process.end_date || "-"}
+              </td>
+              <td className="px-3 py-2 font-medium">
+                {process.status.replace(/_/g, ' ')}
+              </td>
+              <td className="px-3 py-2">
+                <div className="flex gap-2 justify-center">
+                  <button
+                    onClick={() =>
+                      setEditModal({
+                        ...process,
+                        index,
+                        assigned_user_ids: process.assigned_user_ids || [],
+                      })
+                    }
+                    className="p-1.5 bg-yellow-500 hover:bg-yellow-600 text-white rounded-lg"
+                  >
+                    <FontAwesomeIcon icon={faEdit} className="h-3 w-3" />
+                  </button>
+                  <button
+                    onClick={() => openLogs(process)}
+                    className="p-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg"
+                  >
+                    <FontAwesomeIcon icon={faHistory} className="h-3 w-3" />
+                  </button>
+                </div>
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  )}
+</div>
+
+          {/* Selection Summary */}
+          {selectedProcessIds.length > 0 && (
+            <div className="px-4 py-2 border-t dark:border-gray-700 bg-blue-50 dark:bg-blue-900/20 text-sm flex justify-between items-center">
+              <span className="font-medium text-blue-700 dark:text-blue-300">
+                {selectedProcessIds.length} process(es) selected for bulk update
+              </span>
+              <button
+                onClick={() => {
+                  setSelectedProcessIds([]);
+                  setSelectAll(false);
+                }}
+                className="text-xs text-red-600 hover:text-red-700 dark:text-red-400"
+              >
+                Clear All Selections
+              </button>
+            </div>
+          )}
         </div>
       </div>
+
+      {/* BULK EDIT MODAL */}
+      {showBulkModal && (
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-[9999]">
+          <div className="bg-white dark:bg-boxdark p-6 rounded-xl w-[700px] max-h-[85vh] overflow-y-auto shadow-xl">
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-lg font-semibold dark:text-white">
+                Bulk Edit Processes ({selectedProcessIds.length} selected)
+              </h3>
+              <button 
+                onClick={() => setShowBulkModal(false)} 
+                className="text-xl px-2 hover:bg-gray-100 rounded"
+              >
+                ×
+              </button>
+            </div>
+
+            <div className="space-y-4">
+              {/* Info Message */}
+              <div className="bg-blue-50 dark:bg-blue-900/20 p-3 rounded-lg text-sm text-blue-700 dark:text-blue-300">
+                <FontAwesomeIcon icon={faInfoCircle} className="h-4 w-4 mr-2" />
+                Leave fields empty to keep original values
+              </div>
+
+              {/* Start Date */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  Start Date
+                </label>
+                <input
+                  type="date"
+                  value={bulkData.start_date}
+                  onChange={(e) => setBulkData({ ...bulkData, start_date: e.target.value })}
+                  className="w-full p-2 border border-gray-300 dark:border-gray-600 rounded-lg dark:bg-gray-700"
+                />
+              </div>
+
+              {/* End Date */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  End Date
+                </label>
+                <input
+                  type="date"
+                  value={bulkData.end_date}
+                  onChange={(e) => setBulkData({ ...bulkData, end_date: e.target.value })}
+                  className="w-full p-2 border border-gray-300 dark:border-gray-600 rounded-lg dark:bg-gray-700"
+                />
+              </div>
+
+              {/* Status */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  Status
+                </label>
+                <select
+                  value={bulkData.status}
+                  onChange={(e) => setBulkData({ ...bulkData, status: e.target.value })}
+                  className="w-full p-2 border border-gray-300 dark:border-gray-600 rounded-lg dark:bg-gray-700"
+                >
+                  <option value="">-- Keep original --</option>
+                  <option value="in_progress">In Progress</option>
+                  <option value="hold_by_client">Hold by Client</option>
+                  <option value="hold_by_avcore">Hold by Avcore</option>
+                  <option value="completed">Completed</option>
+                </select>
+              </div>
+
+              {/* Assign Users */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  Assign Users (Overwrites existing assignments)
+                </label>
+                <div className="grid grid-cols-2 gap-2 max-h-40 overflow-y-auto border p-3 rounded-lg">
+                  {users.map((user) => (
+                    <label key={user.user_id} className="flex items-center gap-2">
+                      <input
+                        type="checkbox"
+                        checked={bulkData.assigned_user_ids.includes(user.user_id)}
+                        onChange={() => toggleBulkUser(user.user_id)}
+                        className="h-4 w-4 text-blue-600 rounded"
+                      />
+                      <span className="text-sm dark:text-white">{user.name}</span>
+                    </label>
+                  ))}
+                </div>
+              </div>
+
+              {/* Remark */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  Remark
+                </label>
+                <textarea
+                  value={bulkData.remark}
+                  onChange={(e) => setBulkData({ ...bulkData, remark: e.target.value })}
+                  rows={3}
+                  className="w-full p-2 border border-gray-300 dark:border-gray-600 rounded-lg dark:bg-gray-700"
+                  placeholder="Add a remark for all selected processes..."
+                />
+              </div>
+            </div>
+
+            <div className="flex justify-end gap-2 mt-6 pt-4 border-t">
+              <button
+                onClick={clearBulkForm}
+                className="px-4 py-2 bg-gray-500 hover:bg-gray-600 text-white rounded-lg"
+              >
+                Clear Form
+              </button>
+              <button
+                onClick={() => setShowBulkModal(false)}
+                className="px-4 py-2 bg-gray-500 hover:bg-gray-600 text-white rounded-lg"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleBulkSave}
+                disabled={savingBulk}
+                className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg flex items-center gap-2"
+              >
+                {savingBulk ? (
+                  <>
+                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                    Saving...
+                  </>
+                ) : (
+                  <>
+                    <FontAwesomeIcon icon={faSave} />
+                    Apply to {selectedProcessIds.length} Process(es)
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* EDIT MODAL WITH USERS + REMARK */}
       {editModal && (
         <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-[9999]">
           <div className="bg-white dark:bg-boxdark p-6 rounded-xl w-[600px] shadow-xl">
-
             <h3 className="text-lg font-semibold mb-4 dark:text-white">
               Edit Process
             </h3>
 
-            {/* TWO COLUMN GRID */}
             <div className="grid grid-cols-2 gap-4 mb-4">
-
               <div>
                 <label className="text-xs text-gray-500">Start Date</label>
                 <input
@@ -1383,52 +2275,42 @@ const handleSave = async (process) => {
                 >
                   <option value="in_progress">In Progress</option>
                   <option value="hold_by_client">Hold by Client</option>
-                <option value="hold_by_avcore">Hold by Avcore</option>
+                  <option value="hold_by_avcore">Hold by Avcore</option>
                   <option value="completed">Completed</option>
                 </select>
               </div>
 
-              {/* USERS CHECKBOXES */}
               <div className="col-span-2">
                 <label className="text-xs text-gray-500">Assign Users</label>
                 <div className="grid grid-cols-2 gap-2 max-h-32 overflow-y-auto border p-2 rounded">
-
-                {users.map((user) => {
-  const selected = editModal.assigned_user_ids || [];
-
-  return (
-    <div key={user.user_id} className="flex items-center">
-      <input
-        type="checkbox"
-        checked={selected.includes(user.user_id)}
-        onChange={() => {
-          let updated = [...selected];
-
-          if (updated.includes(user.user_id)) {
-            updated = updated.filter(id => id !== user.user_id);
-          } else {
-            updated.push(user.user_id);
-          }
-
-          setEditModal({
-            ...editModal,
-            assigned_user_ids: updated,  // ✅ STORE IDS
-          });
-        }}
-        className="mr-2"
-      />
-      <span className="text-sm dark:text-white">
-        {user.name}
-      </span>
-    </div>
-  );
-})}
-
-
+                  {users.map((user) => {
+                    const selected = editModal.assigned_user_ids || [];
+                    return (
+                      <div key={user.user_id} className="flex items-center">
+                        <input
+                          type="checkbox"
+                          checked={selected.includes(user.user_id)}
+                          onChange={() => {
+                            let updated = [...selected];
+                            if (updated.includes(user.user_id)) {
+                              updated = updated.filter(id => id !== user.user_id);
+                            } else {
+                              updated.push(user.user_id);
+                            }
+                            setEditModal({
+                              ...editModal,
+                              assigned_user_ids: updated,
+                            });
+                          }}
+                          className="mr-2"
+                        />
+                        <span className="text-sm dark:text-white">{user.name}</span>
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
 
-              {/* REMARK */}
               <div className="col-span-2">
                 <label className="text-xs text-gray-500">Remark</label>
                 <textarea
@@ -1439,7 +2321,6 @@ const handleSave = async (process) => {
                   className="w-full border rounded px-2 py-1"
                 />
               </div>
-
             </div>
 
             <div className="flex justify-end gap-2">
@@ -1449,140 +2330,92 @@ const handleSave = async (process) => {
               >
                 Cancel
               </button>
-
-
-<button
-  onClick={async () => {
-    await handleSave(editModal);   // ✅ call common save function
-    setEditModal(null);            // close modal after save
-  }}
-  className="px-4 py-1 bg-green-600 text-white rounded"
->
-  Save Changes
-</button>
-
-
+              <button
+                onClick={async () => {
+                  await handleSave(editModal);
+                  setEditModal(null);
+                }}
+                className="px-4 py-1 bg-green-600 text-white rounded"
+              >
+                Save Changes
+              </button>
             </div>
-
           </div>
         </div>
       )}
 
+      {/* LOGS MODAL */}
+      {logsModal && (
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-[9999]">
+          <div className="bg-white dark:bg-boxdark p-6 rounded-xl w-[760px] max-h-[80vh] overflow-y-auto shadow-xl">
+            <div className="flex justify-between items-start mb-4">
+              <div>
+                <h3 className="text-lg font-semibold dark:text-white">
+                  {lead.name} • #{lead.master_id}
+                </h3>
+                <p className="text-sm text-gray-500">
+                  Process: {logsModal.process_name}
+                </p>
+              </div>
+              <button onClick={() => setLogsModal(null)} className="text-xl px-2">
+                ×
+              </button>
+            </div>
 
-{/* LOGS MODAL */}
-{logsModal && (
-  <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-[9999]">
-    <div className="bg-white dark:bg-boxdark p-6 rounded-xl w-[760px] max-h-[80vh] overflow-y-auto shadow-xl">
-
-      {/* HEADER */}
-      <div className="flex justify-between items-start mb-4">
-        <div>
-          <h3 className="text-lg font-semibold dark:text-white">
-            {lead.name} • #{lead.master_id}
-          </h3>
-          <p className="text-sm text-gray-500">
-            Process: {logsModal.process_name}
-          </p>
+            {logsData.length === 0 ? (
+              <div className="text-center text-gray-500 py-6">
+                No logs available
+              </div>
+            ) : (
+              <table className="w-full text-sm border border-gray-200 dark:border-gray-700">
+                <thead className="bg-gray-100 dark:bg-gray-800">
+                  <tr>
+                    <th className="px-3 py-2 text-left">Start</th>
+                    <th className="px-3 py-2 text-left">End</th>
+                    <th className="px-3 py-2 text-left">Status</th>
+                    <th className="px-3 py-2 text-left">Assigned To</th>
+                    <th className="px-3 py-2 text-left">Remark</th>
+                    <th className="px-3 py-2 text-left">Updated By</th>
+                    <th className="px-3 py-2 text-left">Update Date</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {logsData.map((log) => (
+                    <tr key={log.log_id} className="border-t">
+                      <td className="px-3 py-2">
+                        {log.start_date ? new Date(log.start_date).toLocaleDateString("en-GB") : "-"}
+                      </td>
+                      <td className="px-3 py-2">
+                        {log.end_date ? new Date(log.end_date).toLocaleDateString("en-GB") : "-"}
+                      </td>
+                      <td className="px-3 py-2">
+                        <span className={`px-2 py-0.5 rounded text-xs font-semibold
+                          ${log.status === "completed" ? "bg-green-100 text-green-700" :
+                            log.status === "in_progress" ? "bg-blue-100 text-blue-700" :
+                            "bg-gray-100 text-gray-700"}`}>
+                          {log.status}
+                        </span>
+                      </td>
+                      <td className="px-3 py-2">
+                        {log.assigned_to_names?.length > 0 ? (
+                          <div className="font-medium text-blue-600">
+                            {log.assigned_to_names.join(", ")}
+                          </div>
+                        ) : "-"}
+                      </td>
+                      <td className="px-3 py-2">{log.remark || "-"}</td>
+                      <td className="px-3 py-2">{log.updated_by_name || "-"}</td>
+                      <td className="px-3 py-2">
+                        {new Date(log.created_at).toLocaleString("en-GB")}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+          </div>
         </div>
-
-        <button
-          onClick={() => setLogsModal(null)}
-          className="text-xl px-2"
-        >
-          ×
-        </button>
-      </div>
-
-      {/* TABLE */}
-      {logsData.length === 0 ? (
-        <div className="text-center text-gray-500 py-6">
-          No logs available
-        </div>
-      ) : (
-        <table className="w-full text-sm border border-gray-200 dark:border-gray-700">
-          
-          {/* HEADER */}
-          <thead className="bg-gray-100 dark:bg-gray-800">
-            <tr>
-              <th className="px-3 py-2 text-left">Start</th>
-              <th className="px-3 py-2 text-left">End</th>
-              <th className="px-3 py-2 text-left">Status</th>
-              <th className="px-3 py-2 text-left">Assigned To</th>
-              <th className="px-3 py-2 text-left">Remark</th>
-              <th className="px-3 py-2 text-left">Updated By</th>
-              <th className="px-3 py-2 text-left">Update Date</th>
-            </tr>
-          </thead>
-
-          {/* BODY */}
-          <tbody>
-            {logsData.map((log) => (
-              <tr key={log.log_id} className="border-t">
-                
-                {/* START */}
-                <td className="px-3 py-2">
-                  {log.start_date
-                    ? new Date(log.start_date).toLocaleDateString("en-GB")
-                    : "-"}
-                </td>
-
-                {/* END */}
-                <td className="px-3 py-2">
-                  {log.end_date
-                    ? new Date(log.end_date).toLocaleDateString("en-GB")
-                    : "-"}
-                </td>
-
-                {/* STATUS */}
-                <td className="px-3 py-2">
-                  <span className={`px-2 py-0.5 rounded text-xs font-semibold
-                    ${
-                      log.status === "completed"
-                        ? "bg-green-100 text-green-700"
-                        : log.status === "in_progress"
-                        ? "bg-blue-100 text-blue-700"
-                        : "bg-gray-100 text-gray-700"
-                    }`}>
-                    {log.status}
-                  </span>
-                </td>
-
-             {/* ASSIGNED USERS - Shows ONLY users assigned in that specific log */}
-<td className="px-3 py-2">
-  {log.assigned_to_names?.length > 0 ? (
-    <div className="font-medium text-blue-600">
-      {log.assigned_to_names.join(", ")}
-    </div>
-  ) : (
-    "-"
-  )}
-</td>
-
-                {/* REMARK */}
-                <td className="px-3 py-2">
-                  {log.remark || "-"}
-                </td>
-
-                {/* UPDATED BY */}
-                <td className="px-3 py-2">
-                  {log.updated_by_name || "-"}
-                </td>
-
-                {/* DATE */}
-                <td className="px-3 py-2">
-                  {new Date(log.created_at).toLocaleString("en-GB")}
-                </td>
-
-              </tr>
-            ))}
-          </tbody>
-        </table>
       )}
-    </div>
-  </div>
-)}
-
-
     </>
   );
 };
@@ -1990,6 +2823,84 @@ const [loadingExecutionDocs, setLoadingExecutionDocs] = useState(false);
 
 const [showContactEditModal, setShowContactEditModal] = useState(false);
 const [selectedClientForContactEdit, setSelectedClientForContactEdit] = useState<any>(null);
+
+// Unified View Modal state
+const [showUnifiedViewModal, setShowUnifiedViewModal] = useState(false);
+const [selectedUnifiedLead, setSelectedUnifiedLead] = useState(null);
+const [unifiedQuotationData, setUnifiedQuotationData] = useState(null);
+const [unifiedQuotationLoading, setUnifiedQuotationLoading] = useState(false);
+const [unifiedDocuments, setUnifiedDocuments] = useState([]);
+const [unifiedDocumentsLoading, setUnifiedDocumentsLoading] = useState(false);
+const [unifiedChecklistItems, setUnifiedChecklistItems] = useState([]);
+const [unifiedSelectedChecklistItems, setUnifiedSelectedChecklistItems] = useState([]);
+const [unifiedChecklistLoading, setUnifiedChecklistLoading] = useState(false);
+
+
+// Fetch all data for unified view modal
+const fetchUnifiedViewData = async (lead) => {
+  if (!lead) return;
+  
+  setSelectedUnifiedLead(lead);
+  
+  // Fetch Quotation
+  setUnifiedQuotationLoading(true);
+  try {
+    const quotationRes = await axios.get(
+      `${BASE_URL}api/quotation/latest/${lead.master_id}`,
+      { withCredentials: true }
+    );
+    setUnifiedQuotationData(quotationRes.data);
+  } catch (err) {
+    console.error("Error fetching quotation:", err);
+    setUnifiedQuotationData(null);
+  } finally {
+    setUnifiedQuotationLoading(false);
+  }
+  
+  // Fetch Documents
+  setUnifiedDocumentsLoading(true);
+  try {
+    const docsRes = await axios.get(
+      `${BASE_URL}api/daily-execution/manager-processes/${lead.master_id}`,
+      { withCredentials: true }
+    );
+    setUnifiedDocuments(docsRes.data.success ? docsRes.data.data : []);
+  } catch (err) {
+    console.error("Error fetching documents:", err);
+    setUnifiedDocuments([]);
+  } finally {
+    setUnifiedDocumentsLoading(false);
+  }
+  
+  // Fetch Checklist
+  setUnifiedChecklistLoading(true);
+  try {
+    const checklistRes = await axios.get(
+      `${BASE_URL}api/execution/checklists`,
+      { withCredentials: true }
+    );
+    
+    const selectedRes = await axios.get(
+      `${BASE_URL}api/execution/get-checklist/${lead.master_id}`,
+      { withCredentials: true }
+    );
+    
+    if (checklistRes.data.success) {
+      setUnifiedChecklistItems(checklistRes.data.data);
+    }
+    if (selectedRes.data.success) {
+      setUnifiedSelectedChecklistItems(selectedRes.data.selected_items || []);
+    }
+  } catch (err) {
+    console.error("Error fetching checklist:", err);
+    setUnifiedChecklistItems([]);
+    setUnifiedSelectedChecklistItems([]);
+  } finally {
+    setUnifiedChecklistLoading(false);
+  }
+  
+  setShowUnifiedViewModal(true);
+};
 
 
 // Document fetching function - exactly like in RawData
@@ -2783,11 +3694,7 @@ const renderDetailsModal = () => {
                                 <div className="font-medium text-gray-800 dark:text-gray-200 truncate">
                                   {doc.document_name}
                                 </div>
-                                {doc.remark && (
-                                  <div className="text-sm text-gray-600 dark:text-gray-400 truncate">
-                                    {doc.remark}
-                                  </div>
-                                )}
+
                               </div>
                             </div>
                             <div className="flex items-center gap-2">
@@ -2843,11 +3750,7 @@ const renderDetailsModal = () => {
                                   Download
                                 </a>
                               </div>
-                              {video.remark && (
-                                <div className="mt-2 text-sm text-gray-600 dark:text-gray-400">
-                                  {video.remark}
-                                </div>
-                              )}
+                             
                             </div>
                           </div>
                         ))}
@@ -3791,24 +4694,20 @@ const handleSettingsClick = (lead) => {
 
 <td className="py-1 px-2">
   <div className="flex justify-center">
-  <ActionButton
-  onView={() => handleViewChecklist(lead)}
-  onEdit={() => handleEditChecklist(lead)}
-  onEditContact={() => {  // NEW
-    setSelectedClientForContactEdit(lead);
-    setShowContactEditModal(true);
-  }}
-  onViewDocuments={() => handleViewExecutionDocuments(lead)}
-  onEditExecution={() => handleEditExecution(lead)}
-  onSettings={() => handleSettingsClick(lead)}
-  onLogs={() => handleLogsClick(lead)}
-  onViewQuotation={() => handleViewQuotation(lead)}
-  viewCount={itemCounts[lead.master_id] || 0}
-  className="text-xs"
-/>
+    <ActionButton
+      onViewAll={() => fetchUnifiedViewData(lead)}  // Single unified handler
+      onEdit={() => handleEditChecklist(lead)}
+      onEditContact={() => {
+        setSelectedClientForContactEdit(lead);
+        setShowContactEditModal(true);
+      }}
+      onEditExecution={() => handleEditExecution(lead)}
+      onSettings={() => handleSettingsClick(lead)}
+      viewCount={itemCounts[lead.master_id] || 0}
+      className="text-xs"
+    />
   </div>
 </td>
-
 
               
               
@@ -3972,6 +4871,29 @@ const handleSettingsClick = (lead) => {
     fetchPendingExecutionLeads(); // Refresh the leads data after edit
   }}
 />
+
+{/* Unified View Modal - Shows Documents, Quotation, and Checklist in tabs */}
+{showUnifiedViewModal && selectedUnifiedLead && (
+  <UnifiedViewModal
+    show={showUnifiedViewModal}
+    onClose={() => {
+      setShowUnifiedViewModal(false);
+      setSelectedUnifiedLead(null);
+      setUnifiedQuotationData(null);
+      setUnifiedDocuments([]);
+      setUnifiedChecklistItems([]);
+      setUnifiedSelectedChecklistItems([]);
+    }}
+    lead={selectedUnifiedLead}
+    documents={unifiedDocuments}
+    loadingDocs={unifiedDocumentsLoading}
+    quotationData={unifiedQuotationData}
+    quotationLoading={unifiedQuotationLoading}
+    checklistItems={unifiedChecklistItems}
+    selectedChecklistItems={unifiedSelectedChecklistItems}
+    checklistLoading={unifiedChecklistLoading}
+  />
+)}
 
 
     </div>

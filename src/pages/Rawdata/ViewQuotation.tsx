@@ -82,6 +82,34 @@ const ViewQuotation = () => {
   const [quotation, setQuotation] = useState(null);
   const [loading, setLoading] = useState(true);
 
+  const [companyLogo, setCompanyLogo] = useState<string | null>(null);
+const [logoLoading, setLogoLoading] = useState(true);
+
+
+// This useEffect runs when component mounts
+useEffect(() => {
+  const fetchActiveLogo = async () => {
+    try {
+      // Fetches the active logo from database
+      const response = await axios.get(`${BASE_URL}api/logo/active`, {
+        withCredentials: true
+      });
+      
+      if (response.data.success && response.data.data) {
+        // Sets the URL of the active logo
+        const logoUrl = `${BASE_URL}${response.data.data.logo_url}`;
+        setCompanyLogo(logoUrl);  // This becomes the primary logo
+      }
+    } catch (error) {
+      console.error('Error fetching active logo:', error);
+    } finally {
+      setLogoLoading(false);
+    }
+  };
+  
+  fetchActiveLogo();
+}, []);
+
 
   // Helper function to check if option should hide the "OPTION X" label
 const shouldHideOptionLabel = (opt) => {
@@ -143,7 +171,9 @@ const handleDownloadPDF = async () => {
 
 
   try {
-    const logoBase64 = await urlToBase64(logo);
+const logoToUse = companyLogo || logo;
+const logoBase64 = await urlToBase64(logoToUse);
+
     const allOptions = quotation.options || [];
 
     // FOR MAIN CONTENT: Show ALL options
@@ -946,8 +976,23 @@ const acousticBlock = quotation.acoustic_terms
           </p>
         </div>
         <div className="bg-black p-1 ml-4 flex-shrink-0">
-          <img src={logo} className="w-24 h-auto border border-black" alt="Logo" />
-        </div>
+  {!logoLoading && companyLogo ? (
+    <img 
+      src={companyLogo} 
+      className="w-24 h-26 border border-black object-contain" 
+      alt="Company Logo"
+      onError={(e) => {
+        (e.target as HTMLImageElement).src = logo;
+      }}
+    />
+  ) : (
+    <img 
+      src={logo} 
+      className="w-24 h-26 border border-black object-contain" 
+      alt="Logo" 
+    />
+  )}
+</div>
       </div>
 
       {/* client info */}

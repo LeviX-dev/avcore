@@ -119,9 +119,13 @@ const ECommerce: React.FC = () => {
     'sub_admin',
     'tech-sale-sound-engineer',
     'tech_sale_sound_engineer',
+    'technical_head',
   ];
 
-  const isAdminOrSubAdmin = ADMIN_AND_SUB_ADMIN_ROLES.includes(role);
+const isAdminOrSubAdmin =
+  ADMIN_AND_SUB_ADMIN_ROLES.includes(role) ||
+  role === 'technical_head'; 
+  
   const totalLeadsForCard = totalLeads;
 
   const shouldShowQuotationProjection = ROLES_WITH_QUOTATION_PROJECTION.includes(role);

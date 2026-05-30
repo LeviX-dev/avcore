@@ -115,6 +115,12 @@ const AddQuotation = () => {
 const [selectedOptionsForSummary, setSelectedOptionsForSummary] = useState([]);
 const [currentSummarySelection, setCurrentSummarySelection] = useState([]); 
 
+
+// Add this with other useState declarations
+const [companyLogo, setCompanyLogo] = useState<string | null>(null);
+const [logoLoading, setLogoLoading] = useState(true);
+
+
   const selectAllOptionsForSummary = () => {
     setSelectedOptionsForSummary(options.map((_, idx) => idx));
   };
@@ -169,6 +175,28 @@ const removeSummaryCombination = (combinationIdx) => {
       setSelectedKit(''); setSelectedKitData(null); setKitQty(1);
     });
   }, [selectedCategory]);
+
+  // Add this useEffect to fetch active logo
+useEffect(() => {
+  const fetchActiveLogo = async () => {
+    try {
+      const response = await axios.get(`${BASE_URL}api/logo/active`, {
+        withCredentials: true
+      });
+      
+      if (response.data.success && response.data.data) {
+        const logoUrl = `${BASE_URL}${response.data.data.logo_url}`;
+        setCompanyLogo(logoUrl);
+      }
+    } catch (error) {
+      console.error('Error fetching active logo:', error);
+    } finally {
+      setLogoLoading(false);
+    }
+  };
+  
+  fetchActiveLogo();
+}, []);
 
   useEffect(() => {
     if (!selectedKit) { setSelectedKitData(null); return; }
@@ -690,7 +718,26 @@ const handleRoomNameChange = (value) => {
             <p className="text-[16px] font-bold text-black">Website: <span className="text-blue-600">www.avcore.in</span></p>
             <p className="text-[12px] font-bold text-black uppercase">CO.NO: 8329728210 / 8766786026</p>
           </div>
-          <div className="bg-black p-1"><img src={logo} className="w-28 h-auto border border-black" alt="Logo" /></div>
+
+<div className="bg-black p-1">
+  {!logoLoading && companyLogo ? (
+    <img 
+      src={companyLogo} 
+      className="w-28 h-26 border border-black object-contain" 
+      alt="Company Logo"
+      onError={(e) => {
+        (e.target as HTMLImageElement).src = logo;
+      }}
+    />
+  ) : (
+    <img 
+      src={logo} 
+      className="w-28 h-26 border border-black object-contain" 
+      alt="Logo" 
+    />
+  )}
+</div>
+
         </div>
 
         {/* client info */}

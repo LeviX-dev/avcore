@@ -1471,112 +1471,133 @@ const clearCustomRecordCount = () => {
     setUploadFiles(selectedFiles);
   };
 
-  const handleUploadSubmit = async () => {
-    if (!docsClient || uploadFiles.length === 0) {
-      alert('Please select files to upload.');
-      return;
-    }
+// Add these with your other state declarations
+const [isUploading, setIsUploading] = useState<boolean>(false);
+const [uploadProgress, setUploadProgress] = useState<number>(0);
 
-    const formData = new FormData();
+
+const handleUploadSubmit = async () => {
+  if (!docsClient || uploadFiles.length === 0) {
+    alert('Please select files to upload.');
+    return;
+  }
+
+  // Start loading
+  setIsUploading(true);
+  setUploadProgress(0);
+
+  const formData = new FormData();
+  
+  // Add files
+  uploadFiles.forEach((file) => {
+    formData.append('files', file);
+  });
+  
+  // Add additional fields
+  if (locationLink) formData.append("location_link", locationLink);
+  if (remark) formData.append("remark", remark);
+  if (followupDate) formData.append("followup_date", followupDate);
+  if (leadStage) formData.append("leadStage", leadStage);
+  
+  // Add detailed remark field
+  if (detailedRemark) {
+    formData.append('detailed_remark', detailedRemark);
+  }
+
+  // Enhanced assignedTo handling
+  if (selectedUsers && selectedUsers.length > 0) {
+    const assignedToString = selectedUsers.join(',');
+    formData.append('assignedTo', assignedToString);
     
-    // Add files
-    uploadFiles.forEach((file) => {
-      formData.append('files', file);
+    selectedUsers.forEach((userId) => {
+      formData.append('assignedTo[]', userId);
     });
+  } else {
+    formData.append('assignedTo', '');
+  }
+
+  try {
+    const response = await axios.post(
+      `${BASE_URL}api/upload/${docsClient.master_id}`,
+      formData,
+      {
+        headers: { 
+          'Content-Type': 'multipart/form-data',
+        },
+        withCredentials: true,
+        onUploadProgress: (progressEvent: any) => {
+          const percentCompleted = Math.round(
+            (progressEvent.loaded * 100) / progressEvent.total
+          );
+          setUploadProgress(percentCompleted);
+        },
+      }
+    );
+
+    let successMsg = '✅ Files uploaded successfully!\n\n';
     
-    // Add additional fields
-    if (locationLink) formData.append("location_link", locationLink);
-    if (remark) formData.append("remark", remark);
-    if (followupDate) formData.append("followup_date", followupDate);
-    if (leadStage) formData.append("leadStage", leadStage);
-    
-    // Add detailed remark field
-    if (detailedRemark) {
-      formData.append('detailed_remark', detailedRemark);
+    if (response.data.summary) {
+      const { summary } = response.data;
+      successMsg += `📁 Files Uploaded: ${summary.files_uploaded}\n`;
+      successMsg += `👥 Reassignments Added: ${summary.reassignments_added}\n`;
+      if (summary.duplicates_skipped > 0) {
+        successMsg += `⚠️ Duplicates Skipped: ${summary.duplicates_skipped}\n`;
+      }
     }
 
-    // Enhanced assignedTo handling
-    if (selectedUsers && selectedUsers.length > 0) {
-      const assignedToString = selectedUsers.join(',');
-      formData.append('assignedTo', assignedToString);
-      
-      selectedUsers.forEach((userId) => {
-        formData.append('assignedTo[]', userId);
-      });
-    } else {
-      formData.append('assignedTo', '');
-    }
-
-    try {
-      const response = await axios.post(
-        `${BASE_URL}api/upload/${docsClient.master_id}`,
-        formData,
-        {
-          headers: { 
-            'Content-Type': 'multipart/form-data',
-          },
-          withCredentials: true,    
-        }
-      );
-
-      let successMsg = '✅ Files uploaded successfully!\n\n';
-      
-      if (response.data.summary) {
-        const { summary } = response.data;
-        successMsg += `📁 Files Uploaded: ${summary.files_uploaded}\n`;
-        successMsg += `👥 Reassignments Added: ${summary.reassignments_added}\n`;
-        if (summary.duplicates_skipped > 0) {
-          successMsg += `⚠️ Duplicates Skipped: ${summary.duplicates_skipped}\n`;
-        }
-      }
-
-      if (response.data.updated_fields) {
-        const fields = response.data.updated_fields;
-        successMsg += '\n📊 Updates:\n';
-        if (fields.raw_data_followup_date || fields.followup_date) successMsg += '• Follow-up date updated\n';
-        if (fields.raw_data_lead_stage || fields.lead_stage) successMsg += '• Lead stage updated\n';
-        if (fields.raw_data_detailed_remark || fields.detailed_remark) successMsg += '• Detailed remark updated\n';
-        if (fields.reassignments_created > 0 || fields.reassignment_count > 0) {
-          const count = fields.reassignments_created || fields.reassignment_count;
-          successMsg += `• ${count} reassignment(s) created\n`;
-        } else {
-          successMsg += '• No reassignments created\n';
-        }
-      }
-
-      alert(successMsg);
-
-      // Wait a moment for the server to process, then refresh
-      await new Promise(resolve => setTimeout(resolve, 500));
-      
-      // Refresh the document list
-      await refreshDocumentList();
-      
-      // Clear the form
-      setUploadFiles([]);
-      setLocationLink("");
-      setRemark("");
-      setDetailedRemark("");
-      setFollowupDate("");
-      setSelectedUsers([]);
-      setLeadStage("");
-
-      // Refresh the main table data
-      setRefreshTrigger(prev => prev + 1);
-
-    } catch (error: any) {
-      console.error("❌ Upload error:", error);
-      
-      if (error.response?.data?.message) {
-        alert(`❌ Upload failed: ${error.response.data.message}`);
-        if (error.response.data.error) {
-          console.error('Server error details:', error.response.data.error);
-        }
+    if (response.data.updated_fields) {
+      const fields = response.data.updated_fields;
+      successMsg += '\n📊 Updates:\n';
+      if (fields.raw_data_followup_date || fields.followup_date) successMsg += '• Follow-up date updated\n';
+      if (fields.raw_data_lead_stage || fields.lead_stage) successMsg += '• Lead stage updated\n';
+      if (fields.raw_data_detailed_remark || fields.detailed_remark) successMsg += '• Detailed remark updated\n';
+      if (fields.reassignments_created > 0 || fields.reassignment_count > 0) {
+        const count = fields.reassignments_created || fields.reassignment_count;
+        successMsg += `• ${count} reassignment(s) created\n`;
       } else {
-        alert("❌ Error uploading files. Please check console for details.");
+        successMsg += '• No reassignments created\n';
       }
     }
-  };
+
+    alert(successMsg);
+
+    // Wait a moment for the server to process, then refresh
+    await new Promise(resolve => setTimeout(resolve, 500));
+    
+    // Refresh the document list
+    await refreshDocumentList();
+    
+    // Clear the form
+    setUploadFiles([]);
+    setLocationLink("");
+    setRemark("");
+    setDetailedRemark("");
+    setFollowupDate("");
+    setSelectedUsers([]);
+    setLeadStage("");
+
+    // Refresh the main table data
+    setRefreshTrigger(prev => prev + 1);
+
+  } catch (error: any) {
+    console.error("❌ Upload error:", error);
+    
+    if (error.response?.data?.message) {
+      alert(`❌ Upload failed: ${error.response.data.message}`);
+      if (error.response.data.error) {
+        console.error('Server error details:', error.response.data.error);
+      }
+    } else if (error.code === 'ECONNABORTED') {
+      alert('❌ Upload timeout. The files might be too large or the server is slow.');
+    } else {
+      alert("❌ Error uploading files. Please check console for details.");
+    }
+  } finally {
+    setIsUploading(false);
+    setUploadProgress(0);
+  }
+};
+
 
   const [showUpdateLocationPopup, setShowUpdateLocationPopup] = useState(false);
 const [updateLocationClient, setUpdateLocationClient] = useState<Lead | null>(null);
@@ -2483,11 +2504,7 @@ const handleUpdateLocation = async () => {
                               >
                                 View
                               </a>
-                              {image.remark && (
-                                <div className="absolute bottom-0 left-0 right-0 bg-black/70 text-white text-xs p-2 rounded-b-lg">
-                                  {image.remark}
-                                </div>
-                              )}
+                          
                             </div>
                           </div>
                         ))}
@@ -2514,19 +2531,11 @@ const handleUpdateLocation = async () => {
                                 <div className="font-medium text-gray-800 dark:text-gray-200 truncate">
                                   {doc.document_name}
                                 </div>
-                                {doc.remark && (
-                                  <div className="text-sm text-gray-600 dark:text-gray-400 truncate">
-                                    {doc.remark}
-                                  </div>
-                                )}
+                            
                               </div>
                             </div>
                             <div className="flex items-center gap-2">
-                              {doc.uploaded_at && (
-                                <span className="text-xs text-gray-500 dark:text-gray-400">
-                                  {new Date(doc.uploaded_at).toLocaleDateString()}
-                                </span>
-                              )}
+                             
                               <a
                                 href={doc.url}
                                 target="_blank"
@@ -2574,11 +2583,7 @@ const handleUpdateLocation = async () => {
                                   Download
                                 </a>
                               </div>
-                              {video.remark && (
-                                <div className="mt-2 text-sm text-gray-600 dark:text-gray-400">
-                                  {video.remark}
-                                </div>
-                              )}
+                            
                             </div>
                           </div>
                         ))}
@@ -2987,18 +2992,43 @@ const handleUpdateLocation = async () => {
                     </div>
                   )}
 
-                  {/* Submit Button */}
-                  <button
-                    onClick={handleUploadSubmit}
-                    disabled={uploadFiles.length === 0}
-                    className={`w-full py-3 rounded-lg font-bold text-sm transition-all shadow-md ${
-                      uploadFiles.length > 0
-                        ? 'bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white active:scale-95'
-                        : 'bg-gray-200 dark:bg-gray-700 text-gray-400 cursor-not-allowed'
-                    }`}
-                  >
-                    UPLOAD & UPDATE
-                  </button>
+               
+               {/* Submit Button with Loader */}
+<button
+  onClick={handleUploadSubmit}
+  disabled={uploadFiles.length === 0 || isUploading}
+  className={`w-full py-3 rounded-lg font-bold text-sm transition-all shadow-md ${
+    uploadFiles.length > 0 && !isUploading
+      ? 'bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white active:scale-95'
+      : 'bg-gray-200 dark:bg-gray-700 text-gray-400 cursor-not-allowed'
+  }`}
+>
+  {isUploading ? (
+    <div className="flex items-center justify-center gap-2">
+      <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+      <span>Uploading... {uploadProgress}%</span>
+    </div>
+  ) : (
+    'UPLOAD & UPDATE'
+  )}
+</button>
+
+{/* Progress Bar - Show during upload */}
+{isUploading && (
+  <div className="mt-3">
+    <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2 overflow-hidden">
+      <div 
+        className="bg-gradient-to-r from-blue-500 to-purple-500 h-2 rounded-full transition-all duration-300"
+        style={{ width: `${uploadProgress}%` }}
+      ></div>
+    </div>
+    <p className="text-[11px] text-center text-gray-500 dark:text-gray-400 mt-1">
+      Uploading {uploadFiles.length} file(s)... {uploadProgress}% complete
+    </p>
+  </div>
+)}
+
+
                 </div>
               </div>
             </div>
@@ -3069,11 +3099,7 @@ const handleUpdateLocation = async () => {
                                 🔗 {doc.link}
                               </a>
                             )}
-                            {doc.remark && (
-                              <p className="text-[11px] text-gray-500 dark:text-gray-400 italic bg-gray-50 dark:bg-gray-700/50 p-1.5 rounded">
-                                💬 {doc.remark}
-                              </p>
-                            )}
+                       
                           </div>
                         </div>
                       </div>
@@ -3104,12 +3130,7 @@ const handleUpdateLocation = async () => {
                               <p className="font-semibold text-sm dark:text-white truncate">
                                 {doc.url.split('/').pop()}
                               </p>
-                              {doc.remark && (
-                                <p className="text-xs text-gray-500 mt-1">
-                                  Remark:{' '}
-                                  <span className="italic">{doc.remark}</span>
-                                </p>
-                              )}
+                             
                               {doc.link && (
                                 <a
                                   href={doc.link}
@@ -3214,11 +3235,7 @@ const handleUpdateLocation = async () => {
                               🔗 Map/Source Link
                             </a>
                           )}
-                          {doc.remark && (
-                            <p className="text-[11px] text-gray-500 italic border-t border-gray-100 dark:border-gray-700 pt-2 mt-1">
-                              {doc.remark}
-                            </p>
-                          )}
+                    
                         </div>
                       </div>
                     ))}
@@ -3250,9 +3267,44 @@ const handleUpdateLocation = async () => {
     );
   };
 
+
+
+  // Loading Overlay Component
+const renderUploadingOverlay = (): JSX.Element | null => {
+  if (!isUploading) return null;
+  
+  return (
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[10000]">
+      <div className="bg-white dark:bg-boxdark rounded-xl p-6 shadow-2xl max-w-sm w-full mx-4">
+        <div className="text-center">
+          <div className="w-16 h-16 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+          <h3 className="text-lg font-semibold text-gray-800 dark:text-white mb-2">
+            Uploading Files
+          </h3>
+          <p className="text-[13px] text-gray-600 dark:text-gray-400 mb-3">
+            Please wait while we upload {uploadFiles.length} file(s)...
+          </p>
+          <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2 mb-2">
+            <div 
+              className="bg-gradient-to-r from-blue-500 to-purple-500 h-2 rounded-full transition-all duration-300"
+              style={{ width: `${uploadProgress}%` }}
+            ></div>
+          </div>
+          <p className="text-[12px] text-gray-500 dark:text-gray-400">
+            {uploadProgress}% complete
+          </p>
+          <p className="text-[11px] text-gray-400 dark:text-gray-500 mt-3">
+            This may take a few moments depending on file sizes
+          </p>
+        </div>
+      </div>
+    </div>
+  );
+};
+
   return (
     <div className="p-4">
-
+    {renderUploadingOverlay()}
       {/* Sticky Header with Filters */}
       <div className="sticky top-0 z-50 w-full bg-white/95 dark:bg-boxdark/95 backdrop-blur-sm shadow-lg border-b border-gray-200/80 dark:border-gray-800 mb-4">
         <div className="px-4 py-3">

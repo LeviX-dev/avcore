@@ -592,8 +592,8 @@ const [modalDocsFetched, setModalDocsFetched] = useState(false);
     'Closed Deal': 100
   };
 
-// Fetch closed leads with pagination support - UPDATED
-const fetchClosedLeads = async (): Promise<void> => {
+
+  const fetchClosedLeads = async (): Promise<void> => {
   try {
     setLoading(true);
     const response = await axios.get(
@@ -607,27 +607,16 @@ const fetchClosedLeads = async (): Promise<void> => {
       }
     );
 
-    // Handle the new paginated response structure
     let closedLeads: any[] = [];
     let totalCount = 0;
     
-    // New response structure with pagination
     if (response.data.success && Array.isArray(response.data.data)) {
       closedLeads = response.data.data;
       totalCount = response.data.pagination?.total || 0;
-      
-      console.log('📊 Pagination info:', {
-        page: response.data.pagination?.page,
-        total: response.data.pagination?.total,
-        totalPages: response.data.pagination?.totalPages,
-        showing: response.data.pagination?.showingStart + ' - ' + response.data.pagination?.showingEnd
-      });
     }
-    // Fallback for old response structure (backward compatibility)
     else if (Array.isArray(response.data)) {
       closedLeads = response.data;
       totalCount = response.data.length;
-      console.warn('⚠️ Using old API response format. Consider updating backend.');
     }
     else if (response.data.data && Array.isArray(response.data.data)) {
       closedLeads = response.data.data;
@@ -664,15 +653,27 @@ const fetchClosedLeads = async (): Promise<void> => {
     };
 
     const processedData = closedLeads.map((item: any) => {
-      // For closed leads, the lead_stage should be "Closed Deal"
+      // 🔥 CRITICAL FIX: Use raw_data lead_stage as PRIMARY source
+      // DO NOT prioritize latest_leadStage from reassignment table
+      // The raw_data lead_stage is the true current stage of the lead
       const lead_stage = parseStringValue(
-  item.latest_leadStage ||
-  item.lead_stage ||
-  item.current_stage
-);
+        item.lead_stage || item.current_stage || 'Closed Deal'
+      );
       
-      // For closed deals, always show 100% battery
-      const status_percentage = 100;
+      // Calculate percentage based on actual stage
+      let status_percentage = 100;
+      if (lead_stage === 'Closed Deal') {
+        status_percentage = 100;
+      } else if (lead_stage === 'Execution') {
+        status_percentage = 100;
+      } else if (lead_stage === 'Pre Execution') {
+        status_percentage = 90;
+      } else if (lead_stage === 'Fresh Lead') {
+        status_percentage = 50;
+      } else {
+        // For other stages, use the map
+        status_percentage = STAGE_PERCENTAGE_MAP[lead_stage] || 50;
+      }
 
       // Process reassignment_remarks
       const reassignmentRemarks: ReassignmentRemark[] = [];
@@ -694,17 +695,17 @@ const fetchClosedLeads = async (): Promise<void> => {
         });
       }
 
-      // 🔥 IMPORTANT: Determine display city with priority: area_name first, then city
+      // Determine display city with priority: area_name first, then city
       let displayCity = '';
       const areaName = parseStringValue(item.area_name || item.area);
       const cityName = parseStringValue(item.city);
       
       if (areaName && areaName !== '' && areaName !== 'Not Available') {
-        displayCity = areaName; // Use area_name if available
+        displayCity = areaName;
       } else if (cityName && cityName !== '' && cityName !== 'Not Available') {
-        displayCity = cityName; // Fallback to city if area_name not available
+        displayCity = cityName;
       } else {
-        displayCity = ''; // Empty if neither available
+        displayCity = '';
       }
 
       // Create the lead object
@@ -715,13 +716,13 @@ const fetchClosedLeads = async (): Promise<void> => {
         alternate_number: parseStringValue(item.alternate_number),
         email: parseStringValue(item.email),
         address: parseStringValue(item.address),
-        city: displayCity, // 🔥 THIS IS THE KEY CHANGE - Use the prioritized display city
-        original_city: parseStringValue(item.city), // Keep original if needed elsewhere
-        original_area: parseStringValue(item.area_name || item.area), // Keep original if needed elsewhere
+        city: displayCity,
+        original_city: parseStringValue(item.city),
+        original_area: parseStringValue(item.area_name || item.area),
         cat_id: parseIdValue(item.cat_id) || 0,
         status: parseStringValue(item.status),
         lead_status: parseStringValue(item.lead_status),
-        lead_stage: lead_stage,
+        lead_stage: lead_stage, // 🔥 USE RAW_DATA lead_stage
         created_at: parseStringValue(item.created_at),
         quick_remark: parseStringValue(item.quick_remark),
         detailed_remark: parseStringValue(item.detailed_remark),
@@ -779,12 +780,11 @@ const fetchClosedLeads = async (): Promise<void> => {
         reassignment_id: parseIdValue(item.reassignment_id),
         reassigned_to: parseStringValue(item.reassigned_to),
         latest_assignedTo: parseStringValue(item.latest_assignedTo || item.assigned_to || item.reassigned_to || ''),
-        latest_leadStage: parseStringValue(item.latest_leadStage || 'Closed Deal'),
+        latest_leadStage: parseStringValue(item.lead_stage || 'Closed Deal'), // 🔥 Use raw_data lead_stage, not latest_leadStage
 
-        // Ensure these fields are mapped from API
         latest_reassign_id: parseIdValue(item.reassignment_id),
         latest_reassigned_to: parseStringValue(item.latest_assignedTo || item.assigned_to || item.reassigned_to || ''),
-        latest_lead_stage: parseStringValue(item.latest_leadStage || 'Closed Deal'),
+        latest_lead_stage: parseStringValue(item.lead_stage || 'Closed Deal'), // 🔥 Use raw_data lead_stage
         latest_remark: parseStringValue(item.quick_remark),
         reassignment_date: parseStringValue(item.reassignment_date),
         document_location_link: parseStringValue(item.document_location_link),
@@ -804,28 +804,18 @@ const fetchClosedLeads = async (): Promise<void> => {
     setFilteredLeads(sortedData);
     setTotalLeads(totalCount);
     
-    // 🔥 UPDATED: Extract unique cities from the prioritized displayCity field
+    // Extract unique cities
     const cities = sortedData
-      .map(lead => lead.city?.trim()) // This now uses the prioritized displayCity
+      .map(lead => lead.city?.trim())
       .filter(city => city && city !== '' && city !== 'Not Available' && city !== 'N/A')
       .filter((city, index, self) => self.indexOf(city) === index)
       .sort() as string[];
     setAvailableCities(cities);
-
-    // Debug log to verify the changes
-    console.log('📊 Closed Leads Processed:', {
-      totalLeads: sortedData.length,
-      sampleLead: sortedData[0],
-      city: sortedData[0]?.city, // Should show area_name first
-      original_city: sortedData[0]?.original_city,
-      original_area: sortedData[0]?.original_area,
-    });
     
   } catch (error: any) {
     console.error('❌ Error fetching closed leads:', error);
     console.error('Error details:', error.response?.data || error.message);
     
-    // Handle specific error cases
     if (error.response?.status === 401) {
       console.error('Authentication error - Session may have expired');
     } else if (error.response?.status === 400) {
@@ -835,14 +825,11 @@ const fetchClosedLeads = async (): Promise<void> => {
     setLeads([]);
     setFilteredLeads([]);
     setTotalLeads(0);
-    
-    // Reset to page 1 on error
     setCurrentPage(1);
   } finally {
     setLoading(false);
   }
 };
-
 
 // Reset when client changes
 useEffect(() => {
@@ -1345,131 +1332,151 @@ const fetchDocumentsForModal = async () => {
     setUploadFiles(validFiles);
   };
 
-  const handleUploadSubmit = async () => {
-    if (!docsClient || uploadFiles.length === 0) {
-      alert('Please select files to upload.');
-      return;
-    }
+  // Add these with your other state declarations
+const [isUploading, setIsUploading] = useState<boolean>(false);
+const [uploadProgress, setUploadProgress] = useState<number>(0);
 
-    const formData = new FormData();
-    
-    // Add files
-    uploadFiles.forEach((file) => {
-      formData.append('files', file);
+
+const handleUploadSubmit = async () => {
+  if (!docsClient || uploadFiles.length === 0) {
+    alert('Please select files to upload.');
+    return;
+  }
+
+  // Start loading
+  setIsUploading(true);
+  setUploadProgress(0);
+
+  const formData = new FormData();
+  
+  // Add files
+  uploadFiles.forEach((file) => {
+    formData.append('files', file);
+  });
+  
+  // Add additional fields
+  if (locationLink) formData.append("location_link", locationLink);
+  if (followupDate) formData.append("followup_date", followupDate);
+  if (leadStage) formData.append("leadStage", leadStage);
+  
+  if (detailedRemark) {
+    formData.append('detailed_remark', detailedRemark);
+  }
+
+  if (selectedUsers && selectedUsers.length > 0) {
+    const assignedToString = selectedUsers.join(',');
+    formData.append('assignedTo', assignedToString);
+    selectedUsers.forEach((userId) => {
+      formData.append('assignedTo[]', userId);
     });
+  } else {
+    formData.append('assignedTo', '');
+  }
+
+  try {
+    const response = await axios.post(
+      `${BASE_URL}api/upload/${docsClient.master_id}`,
+      formData,
+      {
+        headers: { 
+          'Content-Type': 'multipart/form-data',
+        },
+        withCredentials: true,
+        onUploadProgress: (progressEvent: any) => {
+          const percentCompleted = Math.round(
+            (progressEvent.loaded * 100) / progressEvent.total
+          );
+          setUploadProgress(percentCompleted);
+        },
+      }
+    );
+
+    let successMsg = '✅ Files uploaded successfully!\n\n';
     
-    // Add additional fields
-    if (locationLink) formData.append("location_link", locationLink);
-    if (followupDate) formData.append("followup_date", followupDate);
-    if (leadStage) formData.append("leadStage", leadStage);
-    
-    if (detailedRemark) {
-      formData.append('detailed_remark', detailedRemark);
+    if (response.data.summary) {
+      const { summary } = response.data;
+      successMsg += `📁 Files Uploaded: ${summary.files_uploaded}\n`;
+      successMsg += `👥 Reassignments Added: ${summary.reassignments_added}\n`;
+      if (summary.duplicates_skipped > 0) {
+        successMsg += `⚠️ Duplicates Skipped: ${summary.duplicates_skipped}\n`;
+      }
     }
 
-    if (selectedUsers && selectedUsers.length > 0) {
-      const assignedToString = selectedUsers.join(',');
-      formData.append('assignedTo', assignedToString);
-      selectedUsers.forEach((userId) => {
-        formData.append('assignedTo[]', userId);
-      });
-    } else {
-      formData.append('assignedTo', '');
+    if (response.data.updated_fields) {
+      const fields = response.data.updated_fields;
+      successMsg += '\n📊 Updates:\n';
+      if (fields.raw_data_followup_date || fields.followup_date) successMsg += '• Follow-up date updated\n';
+      if (fields.raw_data_lead_stage || fields.lead_stage) successMsg += '• Lead stage updated\n';
+      if (fields.raw_data_detailed_remark || fields.detailed_remark) successMsg += '• Detailed remark updated\n';
+      if (fields.reassignments_created > 0 || fields.reassignment_count > 0) {
+        const count = fields.reassignments_created || fields.reassignment_count;
+        successMsg += `• ${count} reassignment(s) created\n`;
+      } else {
+        successMsg += '• No reassignments created\n';
+      }
     }
 
-    try {
-      const response = await axios.post(
-        `${BASE_URL}api/upload/${docsClient.master_id}`,
-        formData,
-        {
-          headers: { 
-            'Content-Type': 'multipart/form-data',
-          },
-          withCredentials: true,
-        }
-      );
+    alert(successMsg);
 
-      let successMsg = '✅ Files uploaded successfully!\n\n';
-      
-      if (response.data.summary) {
-        const { summary } = response.data;
-        successMsg += `📁 Files Uploaded: ${summary.files_uploaded}\n`;
-        successMsg += `👥 Reassignments Added: ${summary.reassignments_added}\n`;
-        if (summary.duplicates_skipped > 0) {
-          successMsg += `⚠️ Duplicates Skipped: ${summary.duplicates_skipped}\n`;
-        }
-      }
+    // Refresh document list
+    const refreshResponse = await axios.get(
+      `${BASE_URL}api/documents/${docsClient.master_id}`,
+      { withCredentials: true }
+    );
 
-      if (response.data.updated_fields) {
-        const fields = response.data.updated_fields;
-        successMsg += '\n📊 Updates:\n';
-        if (fields.raw_data_followup_date || fields.followup_date) successMsg += '• Follow-up date updated\n';
-        if (fields.raw_data_lead_stage || fields.lead_stage) successMsg += '• Lead stage updated\n';
-        if (fields.raw_data_detailed_remark || fields.detailed_remark) successMsg += '• Detailed remark updated\n';
-        if (fields.reassignments_created > 0 || fields.reassignment_count > 0) {
-          const count = fields.reassignments_created || fields.reassignment_count;
-          successMsg += `• ${count} reassignment(s) created\n`;
-        } else {
-          successMsg += '• No reassignments created\n';
-        }
-      }
+    const processFilePath = (filePath: string) => {
+      filePath = filePath.replace(/^server\//, '').replace(/\\/g, '/');
+      if (!filePath.startsWith('uploads/')) filePath = `uploads/${filePath}`;
+      return `${BASE_URL}${filePath}`;
+    };
 
-      alert(successMsg);
+    const images: DocItem[] = [];
+    const documents: DocItem[] = [];
+    const videos: DocItem[] = [];
 
-      // Refresh document list
-      const refreshResponse = await axios.get(
-        `${BASE_URL}api/documents/${docsClient.master_id}`,
-        { withCredentials: true }
-      );
-
-      const processFilePath = (filePath: string) => {
-        filePath = filePath.replace(/^server\//, '').replace(/\\/g, '/');
-        if (!filePath.startsWith('uploads/')) filePath = `uploads/${filePath}`;
-        return `${BASE_URL}${filePath}`;
+    refreshResponse.data.documents.forEach((doc: any) => {
+      const docObj: DocItem = {
+        doc_id: doc.doc_id,
+        url: processFilePath(doc.document_path),
+        link: doc.location_link,
+        remark: doc.remark,
+        document_type: doc.document_type
       };
 
-      const images: DocItem[] = [];
-      const documents: DocItem[] = [];
-      const videos: DocItem[] = [];
+      if (doc.document_type === "image") images.push(docObj);
+      else if (doc.document_type === "video") videos.push(docObj);
+      else documents.push(docObj);
+    });
 
-      refreshResponse.data.documents.forEach((doc: any) => {
-        const docObj: DocItem = {
-          doc_id: doc.doc_id,
-          url: processFilePath(doc.document_path),
-          link: doc.location_link,
-          remark: doc.remark,
-          document_type: doc.document_type
-        };
+    // Update state
+    setDocsData({ images, documents, videos });
+    
+    // Clear the form
+    setUploadFiles([]);
+    setLocationLink("");
+    setDetailedRemark("");
+    setFollowupDate("");
+    setSelectedUsers([]);
+    setLeadStage("");
 
-        if (doc.document_type === "image") images.push(docObj);
-        else if (doc.document_type === "video") videos.push(docObj);
-        else documents.push(docObj);
-      });
+    // Refresh the main table data
+    fetchClosedLeads();
 
-      // Update state
-      setDocsData({ images, documents, videos });
-      
-      // Clear the form
-      setUploadFiles([]);
-      setLocationLink("");
-      setDetailedRemark("");
-      setFollowupDate("");
-      setSelectedUsers([]);
-      setLeadStage("");
-
-      // Refresh the main table data
-      fetchClosedLeads();
-
-    } catch (error: any) {
-      console.error("❌ Upload error:", error);
-      
-      if (error.response?.data?.message) {
-        alert(`❌ Upload failed: ${error.response.data.message}`);
-      } else {
-        alert("❌ Error uploading files. Please check console for details.");
-      }
+  } catch (error: any) {
+    console.error("❌ Upload error:", error);
+    
+    if (error.response?.data?.message) {
+      alert(`❌ Upload failed: ${error.response.data.message}`);
+    } else if (error.code === 'ECONNABORTED') {
+      alert('❌ Upload timeout. The files might be too large or the server is slow.');
+    } else {
+      alert("❌ Error uploading files. Please check console for details.");
     }
-  };
+  } finally {
+    setIsUploading(false);
+    setUploadProgress(0);
+  }
+};
 
   const [showUpdateLocationPopup, setShowUpdateLocationPopup] = useState(false);
 const [updateLocationClient, setUpdateLocationClient] = useState<Lead | null>(null);
@@ -2209,11 +2216,7 @@ const handleUpdateLocation = async () => {
                               >
                                 View
                               </a>
-                              {image.remark && (
-                                <div className="absolute bottom-0 left-0 right-0 bg-black/70 text-white text-xs p-2 rounded-b-lg">
-                                  {image.remark}
-                                </div>
-                              )}
+                           
                             </div>
                           </div>
                         ))}
@@ -2240,19 +2243,11 @@ const handleUpdateLocation = async () => {
                                 <div className="font-medium text-gray-800 dark:text-gray-200 truncate">
                                   {doc.document_name}
                                 </div>
-                                {doc.remark && (
-                                  <div className="text-sm text-gray-600 dark:text-gray-400 truncate">
-                                    {doc.remark}
-                                  </div>
-                                )}
+                             
                               </div>
                             </div>
                             <div className="flex items-center gap-2">
-                              {doc.uploaded_at && (
-                                <span className="text-xs text-gray-500 dark:text-gray-400">
-                                  {new Date(doc.uploaded_at).toLocaleDateString()}
-                                </span>
-                              )}
+                             
                               <a
                                 href={doc.url}
                                 target="_blank"
@@ -2300,11 +2295,7 @@ const handleUpdateLocation = async () => {
                                   Download
                                 </a>
                               </div>
-                              {video.remark && (
-                                <div className="mt-2 text-sm text-gray-600 dark:text-gray-400">
-                                  {video.remark}
-                                </div>
-                              )}
+                            
                             </div>
                           </div>
                         ))}
@@ -2696,18 +2687,40 @@ const handleUpdateLocation = async () => {
                     </div>
                   )}
 
-                  {/* Submit Button */}
-                  <button
-                    onClick={handleUploadSubmit}
-                    disabled={uploadFiles.length === 0}
-                    className={`w-full py-3 rounded-lg font-bold text-sm transition-all shadow-md ${
-                      uploadFiles.length > 0 
-                      ? 'bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white active:scale-95' 
-                      : 'bg-gray-200 dark:bg-gray-700 text-gray-400 cursor-not-allowed'
-                    }`}
-                  >
-                    UPLOAD & UPDATE
-                  </button>
+                 {/* Submit Button with Loader */}
+<button
+  onClick={handleUploadSubmit}
+  disabled={uploadFiles.length === 0 || isUploading}
+  className={`w-full py-3 rounded-lg font-bold text-sm transition-all shadow-md ${
+    uploadFiles.length > 0 && !isUploading
+      ? 'bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white active:scale-95'
+      : 'bg-gray-200 dark:bg-gray-700 text-gray-400 cursor-not-allowed'
+  }`}
+>
+  {isUploading ? (
+    <div className="flex items-center justify-center gap-2">
+      <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+      <span>Uploading... {uploadProgress}%</span>
+    </div>
+  ) : (
+    'UPLOAD & UPDATE'
+  )}
+</button>
+
+{/* Progress Bar - Show during upload */}
+{isUploading && (
+  <div className="mt-3">
+    <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2 overflow-hidden">
+      <div 
+        className="bg-gradient-to-r from-blue-500 to-purple-500 h-2 rounded-full transition-all duration-300"
+        style={{ width: `${uploadProgress}%` }}
+      ></div>
+    </div>
+    <p className="text-[11px] text-center text-gray-500 dark:text-gray-400 mt-1">
+      Uploading {uploadFiles.length} file(s)... {uploadProgress}% complete
+    </p>
+  </div>
+)}
                 </div>
               </div>
             </div>
@@ -2749,11 +2762,7 @@ const handleUpdateLocation = async () => {
                                 🔗 {doc.link}
                               </a>
                             )}
-                            {doc.remark && (
-                              <p className="text-[11px] text-gray-500 dark:text-gray-400 italic bg-gray-50 dark:bg-gray-700/50 p-1.5 rounded">
-                                💬 {doc.remark}
-                              </p>
-                            )}
+                           
                           </div>
                         </div>
                       </div>
@@ -2839,11 +2848,7 @@ const handleUpdateLocation = async () => {
                               🔗 Map/Source Link
                             </a>
                           )}
-                          {doc.remark && (
-                            <p className="text-[11px] text-gray-500 italic border-t border-gray-100 dark:border-gray-700 pt-2 mt-1">
-                              {doc.remark}
-                            </p>
-                          )}
+
                         </div>
                       </div>
                     ))}
@@ -3186,8 +3191,42 @@ const handleUpdateLocation = async () => {
     );
   };
 
+
+  // Loading Overlay Component
+const renderUploadingOverlay = (): JSX.Element | null => {
+  if (!isUploading) return null;
+  
   return (
-    <div className="p-4">
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[10000]">
+      <div className="bg-white dark:bg-boxdark rounded-xl p-6 shadow-2xl max-w-sm w-full mx-4">
+        <div className="text-center">
+          <div className="w-16 h-16 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+          <h3 className="text-lg font-semibold text-gray-800 dark:text-white mb-2">
+            Uploading Files
+          </h3>
+          <p className="text-[13px] text-gray-600 dark:text-gray-400 mb-3">
+            Please wait while we upload {uploadFiles.length} file(s)...
+          </p>
+          <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2 mb-2">
+            <div 
+              className="bg-gradient-to-r from-blue-500 to-purple-500 h-2 rounded-full transition-all duration-300"
+              style={{ width: `${uploadProgress}%` }}
+            ></div>
+          </div>
+          <p className="text-[12px] text-gray-500 dark:text-gray-400">
+            {uploadProgress}% complete
+          </p>
+          <p className="text-[11px] text-gray-400 dark:text-gray-500 mt-3">
+            This may take a few moments depending on file sizes
+          </p>
+        </div>
+      </div>
+    </div>
+  );
+};
+  return (
+    <div className="p-4"> 
+        {renderUploadingOverlay()}
       {/* Sticky Header with Filters */}
       <div className="sticky top-0 z-50 w-full bg-white/95 dark:bg-boxdark/95 backdrop-blur-sm shadow-lg border-b border-gray-200/80 dark:border-gray-800 mb-4">  
         <div className="px-4 py-3">

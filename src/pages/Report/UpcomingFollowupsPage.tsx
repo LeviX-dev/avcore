@@ -2046,11 +2046,7 @@ const renderDetailsModal = () => {
                               >
                                 View
                               </a>
-                              {image.remark && (
-                                <div className="absolute bottom-0 left-0 right-0 bg-black/70 text-white text-xs p-2 rounded-b-lg">
-                                  {image.remark}
-                                </div>
-                              )}
+                           
                             </div>
                           </div>
                         ))}
@@ -2077,19 +2073,11 @@ const renderDetailsModal = () => {
                                 <div className="font-medium text-gray-800 dark:text-gray-200 truncate">
                                   {doc.document_name}
                                 </div>
-                                {doc.remark && (
-                                  <div className="text-sm text-gray-600 dark:text-gray-400 truncate">
-                                    {doc.remark}
-                                  </div>
-                                )}
+
                               </div>
                             </div>
                             <div className="flex items-center gap-2">
-                              {doc.uploaded_at && (
-                                <span className="text-xs text-gray-500 dark:text-gray-400">
-                                  {new Date(doc.uploaded_at).toLocaleDateString()}
-                                </span>
-                              )}
+                          
                               <a
                                 href={doc.url}
                                 target="_blank"
@@ -2137,11 +2125,7 @@ const renderDetailsModal = () => {
                                   Download
                                 </a>
                               </div>
-                              {video.remark && (
-                                <div className="mt-2 text-sm text-gray-600 dark:text-gray-400">
-                                  {video.remark}
-                                </div>
-                              )}
+                             
                             </div>
                           </div>
                         ))}
@@ -2551,11 +2535,7 @@ const renderDetailsModal = () => {
                                 🔗 {doc.link}
                               </a>
                             )}
-                            {doc.remark && (
-                              <p className="text-[11px] text-gray-500 dark:text-gray-400 italic bg-gray-50 dark:bg-gray-700/50 p-1.5 rounded">
-                                💬 {doc.remark}
-                              </p>
-                            )}
+                       
                           </div>
                         </div>
                       </div>
@@ -2639,11 +2619,7 @@ const renderDetailsModal = () => {
                               🔗 Map/Source Link
                             </a>
                           )}
-                          {doc.remark && (
-                            <p className="text-[11px] text-gray-500 italic border-t border-gray-100 dark:border-gray-700 pt-2 mt-1">
-                              {doc.remark}
-                            </p>
-                          )}
+
                         </div>
                       </div>
                     ))}

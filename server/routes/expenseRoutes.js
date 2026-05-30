@@ -15,7 +15,9 @@ import {
   updateExpenseCategory,
   deleteExpenseCategory,
   resubmitExpense,
+
 } from '../controllers/expenseController.js';
+import { getMonthlyTrendStats, getProjectWiseStats } from '../controllers/expenseStatsController.js';
 
 // ─── Expense Options (projects, vendors, employees) ──────────────────────────
 router.get('/expense/options', getExpenseOptions);
@@ -40,5 +42,10 @@ router.get('/expense/categories', getExpenseCategories);
 router.post('/expense/categories', createExpenseCategory);
 router.put('/expense/categories/:id', updateExpenseCategory);
 router.delete('/expense/categories/:id', deleteExpenseCategory);
+
+
+router.get('/stats/projects', getProjectWiseStats);
+router.get('/stats/monthly-trend', getMonthlyTrendStats);
+
 
 export default router;

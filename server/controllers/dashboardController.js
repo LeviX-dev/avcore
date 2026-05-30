@@ -2489,34 +2489,93 @@ export const getExecutionDashboardCounts = async (req, res) => {
     const completeExecutionCount = completeExecutionRows[0]?.total || 0;
 
     // ================= ASSIGNED PROCESS (Daily Process Assignments) =================
-    let assignedProcessQuery = `
-      SELECT COUNT(*) AS total
-      FROM execution_process_user_map epum
-      WHERE epum.user_id = ?
-    `;
-    
-    const assignedProcessParams = [userId];
+// ================= ASSIGNED PROCESS =================
+let assignedProcessCount = 0;
+let assignedProcessUserWise = [];
 
-    const [assignedProcessRows] = await db.query(assignedProcessQuery, assignedProcessParams);
-    const assignedProcessCount = assignedProcessRows[0]?.total || 0;
+if (canSeeAllData()) {
+
+  const [assignedRows] = await db.query(`
+    SELECT 
+      u.user_id,
+      u.name,
+      u.role,
+      COUNT(epum.id) AS total_assigned
+
+    FROM execution_process_user_map epum
+
+    LEFT JOIN users u
+      ON u.user_id = epum.user_id
+
+    GROUP BY epum.user_id
+
+    ORDER BY total_assigned DESC
+  `);
+
+  assignedProcessUserWise = assignedRows;
+
+  assignedProcessCount = assignedRows.reduce(
+    (sum, row) => sum + Number(row.total_assigned || 0),
+    0
+  );
+
+} else {
+
+  const [assignedRows] = await db.query(`
+    SELECT COUNT(*) AS total
+    FROM execution_process_user_map epum
+    WHERE epum.user_id = ?
+  `, [userId]);
+
+  assignedProcessCount =
+    assignedRows[0]?.total || 0;
+}
+
+
 
     // ================= DAILY OPERATION (Documents Uploaded by User) =================
-    let dailyOperationQuery = `
-      SELECT COUNT(*) AS total
-      FROM execution_documents ed
-    `;
+// ================= DAILY OPERATION =================
+let dailyOperationCount = 0;
+let dailyOperationUserWise = [];
 
-    const dailyOperationParams = [];
+if (canSeeAllData()) {
 
-    // For project manager and telecaller roles, show only their own documents
-    if (isProjectManager() || isTelecallerLike() || !canSeeAllData()) {
-      dailyOperationQuery += ` WHERE ed.uploaded_by = ?`;
-      dailyOperationParams.push(userId);
-    }
-    // Admin, sub_admin, technical_head see all documents
+  const [dailyRows] = await db.query(`
+    SELECT 
+      u.user_id,
+      u.name,
+      u.role,
+      COUNT(ed.id) AS total_updates
 
-    const [dailyOperationRows] = await db.query(dailyOperationQuery, dailyOperationParams);
-    const dailyOperationCount = dailyOperationRows[0]?.total || 0;
+    FROM execution_documents ed
+
+    LEFT JOIN users u
+      ON u.user_id = ed.uploaded_by
+
+    GROUP BY ed.uploaded_by
+
+    ORDER BY total_updates DESC
+  `);
+
+  dailyOperationUserWise = dailyRows;
+
+  dailyOperationCount = dailyRows.reduce(
+    (sum, row) => sum + Number(row.total_updates || 0),
+    0
+  );
+
+} else {
+
+  const [dailyRows] = await db.query(`
+    SELECT COUNT(*) AS total
+    FROM execution_documents ed
+    WHERE ed.uploaded_by = ?
+  `, [userId]);
+
+  dailyOperationCount =
+    dailyRows[0]?.total || 0;
+}
+
 
     // ================= GET ASSIGNED LEADS FOR PROJECT MANAGER (For debugging/info) =================
     let assignedLeadsList = [];

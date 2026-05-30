@@ -332,6 +332,10 @@ import avCoreDocumentRoutes from './routes/avCoreDocumentRoutes.js';
 
 import avcorePriceListRoutes from './routes/avcorePriceListRoutes.js';
 
+import logoRoutes from './routes/logoRoutes.js';
+import downloadCenterRoutes from './routes/downloadCenterRoutes.js';
+import expenseStatsRoutes from './routes/expenseStatsRoutes.js';
+
 
 
 import path from 'path';
@@ -453,6 +457,15 @@ app.use('/uploads', (req, res, next) => {
   }
 }));
 
+
+app.use(express.json({ limit: '500mb' }));
+
+app.use(express.urlencoded({
+  extended: true,
+  limit: '500mb'
+}));
+
+
 app.use(checkTimeLogout);
 
 // Debug route to check file accessibility
@@ -551,6 +564,10 @@ app.use('/api', avCoreDocumentRoutes);
 
 
 app.use('/api', avcorePriceListRoutes); 
+
+app.use('/api/logo', logoRoutes);
+app.use('/api/apk', downloadCenterRoutes);
+app.use('/api/v1/expense/stats', expenseStatsRoutes);
 
 
 // ✅ ADD CRON HERE

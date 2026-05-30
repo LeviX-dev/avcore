@@ -271,6 +271,7 @@ export const getClosedLeadsData1 = async (req, res) => {
   }
 }; 
 
+
 export const getPreExecutionLeadsData = async (req, res) => {
   try {
     if (!req.session.user) {
@@ -305,8 +306,7 @@ export const getPreExecutionLeadsData = async (req, res) => {
         SELECT r1.*, ROW_NUMBER() OVER (PARTITION BY master_id ORDER BY id DESC) rn
         FROM reassignment r1
       ) lr ON rd.master_id = lr.master_id AND lr.rn = 1
-      WHERE rd.lead_stage = 'Pre Execution'
-         OR lr.leadStage = 'Pre Execution'
+     WHERE rd.lead_stage = 'Pre Execution'
     `;
 
     const countParams = [];
@@ -405,7 +405,7 @@ export const getPreExecutionLeadsData = async (req, res) => {
 
     /* ================= PRE EXECUTION FILTER ================= */
     query += `
-      WHERE (rd.lead_stage = 'Pre Execution' OR lr.leadStage = 'Pre Execution')
+WHERE rd.lead_stage = 'Pre Execution'
     `;
 
     if (isTelecallerLike(role)) {

@@ -2550,11 +2550,7 @@ const renderDetailsModal = () => {
                   🔗 {doc.link}
                 </a>
               )}
-              {doc.remark && (
-                <p className="text-[11px] text-gray-500 dark:text-gray-400 italic bg-gray-50 dark:bg-gray-700/50 p-1.5 rounded">
-                  💬 {doc.remark}
-                </p>
-              )}
+
             </div>
           </div>
         </div>
@@ -2641,11 +2637,7 @@ const renderDetailsModal = () => {
                 🔗 Map/Source Link
               </a>
             )}
-            {doc.remark && (
-              <p className="text-[11px] text-gray-500 italic border-t border-gray-100 dark:border-gray-700 pt-2 mt-1">
-                {doc.remark}
-              </p>
-            )}
+          
           </div>
         </div>
       ))}

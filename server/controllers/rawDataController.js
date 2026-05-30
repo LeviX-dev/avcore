@@ -3925,7 +3925,7 @@ const mimeExtensionMap = {
 
 
 
-export const uploadDocuments = async (req, res) => {
+export const uploadDocuments1 = async (req, res) => {
   try {
     const { master_id } = req.params;
 
@@ -4157,7 +4157,494 @@ export const uploadDocuments = async (req, res) => {
       message: 'Server error during upload'
     });
   }
+}; 
+
+
+
+// ======================================================
+// GLOBAL ERROR LOGGING
+// ======================================================
+process.on('uncaughtException', (err) => {
+  console.error('UNCAUGHT EXCEPTION:', err);
+});
+
+process.on('unhandledRejection', (err) => {
+  console.error('UNHANDLED REJECTION:', err);
+});
+
+// ======================================================
+// CONTROLLER
+// ======================================================
+export const uploadDocuments = async (req, res) => {
+  try {
+    console.log('\n===================================');
+    console.log('UPLOAD API HIT');
+    console.log('===================================');
+
+    const { master_id } = req.params;
+
+    // ======================================================
+    // VALIDATIONS
+    // ======================================================
+    if (!master_id) {
+      return res.status(400).json({
+        success: false,
+        message: 'master_id is required',
+      });
+    }
+
+    if (!req.files || !req.files.files) {
+      console.log('NO FILES RECEIVED');
+
+      return res.status(400).json({
+        success: false,
+        message: 'No files uploaded',
+      });
+    }
+
+    // ======================================================
+    // BODY DATA
+    // ======================================================
+    const {
+      location_link,
+      remark,
+      detailed_remark,
+      reassignment_remark,
+      new_remark,
+      followup_date,
+      leadStage,
+      assignedTo,
+    } = req.body;
+
+    console.log('BODY:', req.body);
+
+    // ======================================================
+    // NORMALIZE assignedTo
+    // ======================================================
+    let assignedToArray = [];
+
+    if (Array.isArray(assignedTo)) {
+      assignedToArray = assignedTo;
+    } else if (
+      typeof assignedTo === 'string' &&
+      assignedTo.trim() !== ''
+    ) {
+      assignedToArray = assignedTo
+        .split(',')
+        .map((v) => v.trim())
+        .filter(Boolean);
+    }
+
+    console.log('assignedToArray:', assignedToArray);
+
+    // ======================================================
+    // FINAL REMARK
+    // ======================================================
+    const finalRemark =
+      detailed_remark ||
+      reassignment_remark ||
+      new_remark ||
+      remark ||
+      null;
+
+    // ======================================================
+    // FILE ARRAY
+    // ======================================================
+    const filesArray = Array.isArray(req.files.files)
+      ? req.files.files
+      : [req.files.files];
+
+    console.log(`FILES RECEIVED: ${filesArray.length}`);
+
+    // ======================================================
+    // RESPONSE DATA
+    // ======================================================
+    const uploadedDocs = [];
+    const docValues = [];
+
+    const updated_fields = {
+      raw_data_followup_date: false,
+      raw_data_lead_stage: false,
+      raw_data_detailed_remark: false,
+      reassignments_created: 0,
+      documents_created: 0,
+    };
+
+    // ======================================================
+    // UPDATE raw_data
+    // ======================================================
+    try {
+      if (followup_date) {
+        await db.query(
+          `UPDATE raw_data 
+           SET followup_date = ? 
+           WHERE master_id = ?`,
+          [followup_date, master_id]
+        );
+
+        updated_fields.raw_data_followup_date = true;
+      }
+
+      if (leadStage) {
+        await db.query(
+          `UPDATE raw_data 
+           SET lead_stage = ? 
+           WHERE master_id = ?`,
+          [leadStage, master_id]
+        );
+
+        updated_fields.raw_data_lead_stage = true;
+      }
+
+      if (
+        detailed_remark &&
+        detailed_remark.trim() !== ''
+      ) {
+        await db.query(
+          `UPDATE raw_data 
+           SET detailed_remark = ? 
+           WHERE master_id = ?`,
+          [detailed_remark, master_id]
+        );
+
+        updated_fields.raw_data_detailed_remark = true;
+      }
+
+      console.log('raw_data updated');
+    } catch (dbError) {
+      console.error('RAW DATA UPDATE ERROR:', dbError);
+
+      return res.status(500).json({
+        success: false,
+        message: 'Error updating raw_data',
+        error: dbError.message,
+      });
+    }
+
+    // ======================================================
+    // CREATE REASSIGNMENTS
+    // ======================================================
+    let reassignments = [];
+
+    try {
+      if (assignedToArray.length > 0) {
+        const created_by_user =
+          req.session?.user?.id || 0;
+
+        const [assignData] = await db.query(
+          `SELECT assign_id 
+           FROM raw_data 
+           WHERE master_id = ?`,
+          [master_id]
+        );
+
+        let assign_id =
+          assignData.length > 0
+            ? assignData[0].assign_id
+            : null;
+
+        // CREATE NEW ASSIGNMENT
+        if (!assign_id) {
+          const [newAssign] = await db.execute(
+            `INSERT INTO assignments (assign_date)
+             VALUES (NOW())`
+          );
+
+          assign_id = newAssign.insertId;
+
+          await db.execute(
+            `UPDATE raw_data 
+             SET assign_id = ? 
+             WHERE master_id = ?`,
+            [assign_id, master_id]
+          );
+        }
+
+        const reassignment_date =
+          followup_date ||
+          new Date().toISOString().split('T')[0];
+
+        for (const userId of assignedToArray) {
+          if (!userId) continue;
+
+          let assignedName = userId;
+
+          // FETCH USER NAME
+          if (!isNaN(userId)) {
+            const [userRow] = await db.query(
+              `SELECT name 
+               FROM users 
+               WHERE user_id = ?`,
+              [userId]
+            );
+
+            if (userRow.length > 0) {
+              assignedName = userRow[0].name;
+            }
+          }
+
+          const reassignmentRemark =
+            detailed_remark ||
+            finalRemark ||
+            'Document uploaded';
+
+          const [insertRes] = await db.query(
+            `INSERT INTO reassignment
+            (
+              assign_id,
+              master_id,
+              created_by_user,
+              assignedTo,
+              leadStage,
+              remark,
+              reassignment_date,
+              created_at
+            )
+            VALUES (?, ?, ?, ?, ?, ?, ?, NOW())`,
+            [
+              assign_id,
+              master_id,
+              created_by_user,
+              assignedName,
+              leadStage || 'Cold Lead',
+              reassignmentRemark,
+              reassignment_date,
+            ]
+          );
+
+          reassignments.push({
+            id: insertRes.insertId,
+            userId,
+            assignedName,
+          });
+
+          updated_fields.reassignments_created++;
+        }
+      }
+
+      console.log('reassignments completed');
+    } catch (assignError) {
+      console.error(
+        'REASSIGNMENT ERROR:',
+        assignError
+      );
+
+      return res.status(500).json({
+        success: false,
+        message: 'Error creating reassignment',
+        error: assignError.message,
+      });
+    }
+
+    // ======================================================
+    // FILE UPLOAD
+    // ======================================================
+    try {
+      for (const file of filesArray) {
+        console.log('\n-------------------------');
+        console.log('UPLOADING FILE');
+        console.log('-------------------------');
+
+        console.log('Original Name:', file.name);
+        console.log('Mime Type:', file.mimetype);
+        console.log('Size:', file.size);
+
+        const originalName = file.name;
+
+        // ======================================================
+        // SAFE FILE NAME
+        // ======================================================
+        const cleanName = originalName
+          .replace(/[^a-zA-Z0-9._-]/g, '_')
+          .replace(/\s+/g, '_');
+
+        const safeName = `${master_id}_${Date.now()}_${cleanName}`;
+
+        console.log('safeName:', safeName);
+
+        // ======================================================
+        // FILE TYPE
+        // ======================================================
+        let fileType = 'document';
+
+        if (file.mimetype.startsWith('image/')) {
+          fileType = 'image';
+        } else if (
+          file.mimetype.startsWith('video/')
+        ) {
+          fileType = 'video';
+        }
+
+        console.log('fileType:', fileType);
+
+        // ======================================================
+        // UPLOAD DIRECTORY
+        // ======================================================
+        const uploadDir = path.resolve(
+          process.cwd(),
+          'uploads',
+          fileType
+        );
+
+        console.log('uploadDir:', uploadDir);
+
+        // CREATE DIRECTORY
+        if (!fs.existsSync(uploadDir)) {
+          console.log('Creating upload directory...');
+
+          fs.mkdirSync(uploadDir, {
+            recursive: true,
+          });
+        }
+
+        // ======================================================
+        // SAVE PATH
+        // ======================================================
+        const savePath = path.join(
+          uploadDir,
+          safeName
+        );
+
+        console.log('savePath:', savePath);
+
+        // ======================================================
+        // MOVE FILE
+        // ======================================================
+        console.log('Before file.mv');
+
+        await new Promise((resolve, reject) => {
+          file.mv(savePath, (err) => {
+            if (err) {
+              console.error(
+                'FILE MOVE ERROR:',
+                err
+              );
+
+              reject(err);
+            } else {
+              resolve();
+            }
+          });
+        });
+
+        console.log('After file.mv');
+
+        // ======================================================
+        // DB PATH
+        // ======================================================
+        const dbPath = `${fileType}/${safeName}`;
+
+        // ======================================================
+        // SAVE DOCUMENT ENTRY
+        // ======================================================
+        docValues.push([
+          master_id,
+          dbPath,
+          fileType,
+          location_link || null,
+          detailed_remark || finalRemark,
+        ]);
+
+        uploadedDocs.push({
+          document_path: dbPath,
+          document_type: fileType,
+        });
+
+        updated_fields.documents_created++;
+
+        console.log('FILE UPLOADED SUCCESSFULLY');
+      }
+    } catch (uploadError) {
+      console.error(
+        'DOCUMENT UPLOAD ERROR:',
+        uploadError
+      );
+
+      return res.status(500).json({
+        success: false,
+        message: 'Error uploading files',
+        error: uploadError.message,
+      });
+    }
+
+    // ======================================================
+    // INSERT DOCUMENTS INTO DB
+    // ======================================================
+    try {
+      if (docValues.length > 0) {
+        console.log(
+          'Saving documents into database...'
+        );
+
+        await db.query(
+          `INSERT INTO documents
+          (
+            master_id,
+            document_path,
+            document_type,
+            location_link,
+            remark
+          )
+          VALUES ?`,
+          [docValues]
+        );
+
+        console.log(
+          'Documents inserted into DB'
+        );
+      }
+    } catch (docInsertError) {
+      console.error(
+        'DOCUMENT DB INSERT ERROR:',
+        docInsertError
+      );
+
+      return res.status(500).json({
+        success: false,
+        message: 'Error saving documents in DB',
+        error: docInsertError.message,
+      });
+    }
+
+    // ======================================================
+    // SUCCESS RESPONSE
+    // ======================================================
+    console.log('\n===================================');
+    console.log('UPLOAD SUCCESS');
+    console.log('===================================');
+
+    return res.status(200).json({
+      success: true,
+
+      summary: {
+        files_uploaded: uploadedDocs.length,
+        reassignments_added:
+          updated_fields.reassignments_created,
+        documents_created:
+          updated_fields.documents_created,
+      },
+
+      updated_fields,
+
+      reassignments,
+
+      documents: uploadedDocs,
+    });
+
+  } catch (error) {
+    console.error(
+      '\nFINAL CONTROLLER ERROR:',
+      error
+    );
+
+    return res.status(500).json({
+      success: false,
+      message: 'Server error during upload',
+      error: error.message,
+    });
+  }
 };
+
 
 export const updateLocationLink = async (req, res) => {
   try {
@@ -6926,7 +7413,7 @@ export const getClosedLeadsFullData1 = async (req, res) => {
 };
 
 
-export const getClosedLeadsFullData = async (req, res) => {
+export const getClosedLeadsFullData2 = async (req, res) => {
   try {
     if (!req.session.user) {
       return res.status(401).json({ message: "Unauthorized: No session" });
@@ -6964,11 +7451,9 @@ export const getClosedLeadsFullData = async (req, res) => {
         SELECT r1.*, ROW_NUMBER() OVER (PARTITION BY master_id ORDER BY id DESC) rn
         FROM reassignment r1
       ) lr ON rd.master_id = lr.master_id AND lr.rn = 1
-      WHERE rd.lead_stage IN (${closedStages.map(() => '?').join(',')})
-         OR lr.leadStage IN (${closedStages.map(() => '?').join(',')})
-    `;
+     WHERE rd.lead_stage IN (${closedStages.map(() => '?').join(',')}) `;
 
-    const countParams = [...closedStages, ...closedStages];
+params.push(...closedStages);
 
     if (isTelecallerLike(role)) {
       countQuery += ` AND lr.assignedTo = ?`;
@@ -7193,6 +7678,331 @@ export const getClosedLeadsFullData = async (req, res) => {
     res.status(500).json({ 
       message: "Failed to fetch closed leads data",
       error: error.message 
+    });
+  }
+};
+
+
+export const getClosedLeadsFullData = async (req, res) => {
+  try {
+    if (!req.session.user) {
+      return res.status(401).json({ message: "Unauthorized: No session" });
+    }
+
+    const { id: userId, role } = req.session.user;
+
+    /* ================= PAGINATION PARAMETERS ================= */
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 10;
+    const offset = (page - 1) * limit;
+
+    // Validate pagination parameters
+    if (page < 1 || limit < 1 || limit > 100) {
+      return res.status(400).json({
+        message:
+          "Invalid pagination parameters. Page must be >=1, limit between 1-100",
+      });
+    }
+
+    /* ================= CURRENT USER ================= */
+    const [userResult] = await db.query(
+      "SELECT name FROM users WHERE user_id = ?",
+      [userId]
+    );
+
+    const currentUserName = userResult[0]?.name || "";
+
+    /* ================= CLOSED STAGES ARRAY ================= */
+    const closedStages = ["Closed Deal", "Execution", "Pre Execution"];
+
+    /* ================= TOTAL COUNT QUERY ================= */
+
+    const countParams = [...closedStages];
+
+    let countQuery = `
+      SELECT COUNT(DISTINCT rd.master_id) as total
+      FROM raw_data rd
+      LEFT JOIN (
+        SELECT r1.*, 
+               ROW_NUMBER() OVER (PARTITION BY master_id ORDER BY id DESC) rn
+        FROM reassignment r1
+      ) lr ON rd.master_id = lr.master_id AND lr.rn = 1
+      WHERE rd.lead_stage IN (${closedStages
+        .map(() => "?")
+        .join(",")})
+    `;
+
+    if (isTelecallerLike(role)) {
+      countQuery += ` AND lr.assignedTo = ?`;
+      countParams.push(currentUserName);
+    }
+
+    const [countResult] = await db.query(countQuery, countParams);
+
+    const total = countResult[0]?.total || 0;
+    const totalPages = Math.ceil(total / limit);
+
+    /* ================= MAIN QUERY WITH PAGINATION ================= */
+
+    let query = `
+      SELECT 
+        rd.master_id,
+
+        -- MAIN RAW DATA
+        IFNULL(rd.name, 'Not Available') AS name,
+        IFNULL(rd.number, 'Not Available') AS number,
+        IFNULL(rd.alternate_number, 'Not Available') AS alternate_number,
+        IFNULL(rd.email, 'Not Available') AS email,
+        IFNULL(rd.address, 'Not Available') AS address,
+        IFNULL(rd.city, 'Not Available') AS city,
+        IFNULL(rd.status, 'Not Available') AS status,
+        IFNULL(rd.lead_status, 'Not Available') AS lead_status,
+        IFNULL(rd.lead_stage, 'Not Available') AS lead_stage,
+        IFNULL(rd.current_stage, 'Not Available') AS current_stage,
+        IFNULL(rd.created_by_user, 'Not Available') AS created_by_user,
+        IFNULL(rd.assign_id, 'Not Available') AS assign_id,
+        IFNULL(rd.followup_date, 'Not Available') AS followup_date,
+
+        -- IDS
+        IFNULL(rd.cat_id, 'Not Available') AS cat_id,
+        IFNULL(rd.reference_id, 'Not Available') AS reference_id,
+        IFNULL(rd.area_id, 'Not Available') AS area_id,
+
+        -- DIMENSIONS
+        IFNULL(rd.room_length, 'Not Available') AS room_length,
+        IFNULL(rd.room_width, 'Not Available') AS room_width,
+        IFNULL(rd.room_height, 'Not Available') AS room_height,
+
+        -- EXTRA DETAILS
+        IFNULL(rd.location_link, 'Not Available') AS location_link,
+        IFNULL(rd.p_type, 'Not Available') AS p_type,
+        IFNULL(rd.budget_range, 'Not Available') AS budget_range,
+        IFNULL(rd.time_to_complete, 'Not Available') AS time_to_complete,
+        IFNULL(rd.site_visit_date, 'Not Available') AS site_visit_date,
+        IFNULL(rd.demo_date, 'Not Available') AS demo_date,
+
+        -- ACTIVITY
+        IFNULL(rd.lead_activity, 0) AS lead_activity,
+
+        -- NUMBERS
+        IFNULL(rd.ar_number, 'Not Available') AS ar_number,
+        IFNULL(rd.architect_name, 'Not Available') AS architect_name,
+        IFNULL(rd.ca_number, 'Not Available') AS ca_number,
+        IFNULL(rd.e_number, 'Not Available') AS e_number,
+        IFNULL(rd.sm_number, 'Not Available') AS sm_number,
+        IFNULL(rd.pop_number, 'Not Available') AS pop_number,
+        IFNULL(rd.other_number, 'Not Available') AS other_number,
+
+        -- REMARKS
+        IFNULL(rd.quick_remark, 'Not Available') AS quick_remark,
+        IFNULL(rd.detailed_remark, 'Not Available') AS detailed_remark,
+
+        -- AREA / CATEGORY / REFERENCE
+        IFNULL(a.area_name, 'Not Available') AS area_name,
+        IFNULL(c.cat_name, 'Not Available') AS cat_name,
+        IFNULL(ref.reference_name, 'Not Available') AS reference_name,
+
+        -- ASSIGN DATE
+        IFNULL(DATE(asg.assign_date), 'Not Available') AS assign_date,
+
+        -- LATEST REASSIGNMENT
+        lr.id AS reassignment_id,
+        lr.reassignment_date,
+        lr.assignedTo AS reassigned_to,
+        lr.remark AS reassignment_remark,
+        lr.leadStage AS reassignment_lead_stage,
+
+        -- USER
+        IFNULL(u.name, 'Not Available') AS telecaller_name,
+        u.user_id AS assigned_to_user_id,
+
+        -- CALL / PRODUCT
+        MAX(tct.tc_remark) AS call_remark,
+        MAX(tct.tc_call_duration) AS call_duration,
+        GROUP_CONCAT(DISTINCT p.product_name) AS products,
+
+        -- DOCUMENTS
+        MAX(d.location_link) AS document_location_link
+
+      FROM raw_data rd
+
+      LEFT JOIN area a 
+        ON rd.area_id = a.area_id
+
+      LEFT JOIN category c 
+        ON rd.cat_id = c.cat_id
+
+      LEFT JOIN reference ref 
+        ON rd.reference_id = ref.reference_id
+
+      LEFT JOIN assignments asg 
+        ON rd.assign_id = asg.assign_id
+
+      LEFT JOIN (
+        SELECT r1.*, 
+               ROW_NUMBER() OVER (PARTITION BY master_id ORDER BY id DESC) rn
+        FROM reassignment r1
+      ) lr 
+        ON rd.master_id = lr.master_id 
+       AND lr.rn = 1
+
+      LEFT JOIN users u 
+        ON lr.assignedTo = u.name
+
+      LEFT JOIN tele_caller_table tct 
+        ON rd.master_id = tct.master_id
+
+      LEFT JOIN product_mapping pm 
+        ON rd.master_id = pm.master_id
+
+      LEFT JOIN product p 
+        ON p.product_id = pm.product_id
+
+      LEFT JOIN documents d 
+        ON d.master_id = rd.master_id
+    `;
+
+    const params = [];
+
+    /* ================= CLOSED LEADS FILTER ================= */
+
+    query += `
+      WHERE rd.lead_stage IN (${closedStages
+        .map(() => "?")
+        .join(",")})
+    `;
+
+    params.push(...closedStages);
+
+    if (isTelecallerLike(role)) {
+      query += ` AND lr.assignedTo = ?`;
+      params.push(currentUserName);
+    }
+
+    /* ================= GROUP BY / PAGINATION ================= */
+
+    query += `
+      GROUP BY rd.master_id
+      ORDER BY rd.master_id DESC
+      LIMIT ? OFFSET ?
+    `;
+
+    params.push(limit, offset);
+
+    const [rows] = await db.query(query, params);
+
+    /* ================= OTHER INPUTS ================= */
+
+    const masterIds = rows.map((r) => r.master_id);
+
+    let otherInputsRows = [];
+
+    if (masterIds.length) {
+      const [otherInputs] = await db.query(
+        `
+        SELECT master_id, cat_id, reference_id, input_text
+        FROM raw_data_other_inputs
+        WHERE master_id IN (?)
+        ORDER BY created_at DESC
+        `,
+        [masterIds]
+      );
+
+      otherInputsRows = otherInputs;
+    }
+
+    /* ================= REASSIGNMENT HISTORY ================= */
+
+    let reassignmentRows = [];
+
+    if (masterIds.length) {
+      const [reassignments] = await db.query(
+        `
+        SELECT rm.*, u.name, u.role
+        FROM reassignment rm
+        LEFT JOIN users u 
+          ON u.user_id = rm.created_by_user
+        WHERE rm.master_id IN (?)
+        ORDER BY rm.reassignment_date DESC, rm.created_at DESC
+        `,
+        [masterIds]
+      );
+
+      reassignmentRows = reassignments;
+    }
+
+    /* ================= FINAL RESPONSE MAP ================= */
+
+    const formattedRows = rows.map((row) => {
+      const rowCatId = parseInt(row.cat_id);
+      const rowRefId = parseInt(row.reference_id);
+
+      const categoryOther =
+        otherInputsRows.find(
+          (oi) =>
+            oi.master_id === row.master_id &&
+            oi.cat_id === rowCatId
+        )?.input_text || "";
+
+      const referenceOther =
+        otherInputsRows.find(
+          (oi) =>
+            oi.master_id === row.master_id &&
+            oi.reference_id === rowRefId
+        )?.input_text || "";
+
+      const reassignments = reassignmentRows
+        .filter((r) => r.master_id === row.master_id)
+        .map((r) => ({
+          remark: r.remark || "",
+          assignedTo: r.assignedTo || "",
+          leadStage: r.leadStage || "",
+          created_by_user: r.created_by_user || "",
+          created_at: r.created_at
+            ? new Date(r.created_at).toLocaleString("en-GB")
+            : "",
+          reassignment_date: r.reassignment_date
+            ? new Date(r.reassignment_date).toLocaleString("en-GB")
+            : "",
+          name: r.name || "",
+          role: r.role || "",
+        }));
+
+      return {
+        ...row,
+        category_other: categoryOther,
+        reference_other: referenceOther,
+        reassignment_remarks: reassignments,
+        latest_assignedTo: reassignments[0]?.assignedTo || "",
+        latest_leadStage: reassignments[0]?.leadStage || "",
+        assign_date: row.assign_date,
+      };
+    });
+
+    /* ================= RESPONSE ================= */
+
+    return res.status(200).json({
+      success: true,
+      data: formattedRows,
+      pagination: {
+        total,
+        page,
+        limit,
+        totalPages,
+        hasNextPage: page < totalPages,
+        hasPrevPage: page > 1,
+        showingStart: offset + 1,
+        showingEnd: Math.min(offset + limit, total),
+      },
+    });
+
+  } catch (error) {
+    console.error("❌ Error in getClosedLeadsFullData:", error);
+
+    return res.status(500).json({
+      success: false,
+      message: "Failed to fetch closed leads data",
+      error: error.message,
     });
   }
 };

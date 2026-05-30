@@ -10,9 +10,6 @@ import {
   faDollarSign,
   faImage,
   faChevronRight,
-  faTrash,
-  faSave,
-  faLayerGroup
 } from '@fortawesome/free-solid-svg-icons';
 
 interface Model {
@@ -22,6 +19,7 @@ interface Model {
   price: string;
   image_path?: string;
   image?: File | null;
+  imageError?: boolean;
 }
 
 interface Brand {
@@ -45,30 +43,32 @@ interface Category {
 
 interface EditProductFormProps {
   productType: ProductType;
+  categories: Category[];
   onClose: () => void;
   onSuccess: () => void;
 }
 
-const EditProductForm = ({ productType, onClose, onSuccess }: EditProductFormProps) => {
+const EditProductForm = ({ productType, categories, onClose, onSuccess }: EditProductFormProps) => {
   const [productTypeName] = useState(productType.product_type_name || '');
   const [quotationType, setQuotationType] = useState(productType.quotation_type || '');
-  const [brands, setBrands] = useState<Brand[]>(productType.brands || []);
+  const [brands, setBrands] = useState<Brand[]>(() => {
+    return (productType.brands || []).map(brand => ({
+      ...brand,
+      models: brand.models.map(model => ({
+        ...model,
+        imageError: false
+      }))
+    }));
+  });
   const [customQuotationType, setCustomQuotationType] = useState('');
   const [showCustomInput, setShowCustomInput] = useState(quotationType === 'Other');
   const [loading, setLoading] = useState(false);
   const [expandedBrands, setExpandedBrands] = useState<number[]>([]);
-  const [categories, setCategories] = useState<Category[]>([]);
   const [catId, setCatId] = useState<number>(productType.cat_id);
 
   useEffect(() => {
     setExpandedBrands(brands.map((_, index) => index));
-    fetchCategories();
   }, [brands.length]);
-
-  const fetchCategories = async () => {
-    const res = await axios.get(`${BASE_URL}api/customised-categories`);
-    setCategories(res.data);
-  };
 
   const handleQuotationChange = (value: string) => {
     setQuotationType(value);
@@ -84,7 +84,7 @@ const EditProductForm = ({ productType, onClose, onSuccess }: EditProductFormPro
   const handleAddBrand = () => {
     const newBrand: Brand = {
       brand_name: '',
-      models: [{ model_no: '', description: '', price: '', image: null }]
+      models: [{ model_no: '', description: '', price: '', image: null, imageError: false }]
     };
     setBrands([...brands, newBrand]);
     setExpandedBrands([...expandedBrands, brands.length]);
@@ -98,7 +98,13 @@ const EditProductForm = ({ productType, onClose, onSuccess }: EditProductFormPro
 
   const handleAddModel = (brandIndex: number) => {
     const updated = [...brands];
-    updated[brandIndex].models.push({ model_no: '', description: '', price: '', image: null });
+    updated[brandIndex].models.push({ 
+      model_no: '', 
+      description: '', 
+      price: '', 
+      image: null,
+      imageError: false 
+    });
     setBrands(updated);
   };
 
@@ -132,6 +138,12 @@ const EditProductForm = ({ productType, onClose, onSuccess }: EditProductFormPro
     }
   };
 
+  const handleImageError = (brandIndex: number, modelIndex: number) => {
+    const updated = [...brands];
+    updated[brandIndex].models[modelIndex].imageError = true;
+    setBrands(updated);
+  };
+
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
     setLoading(true);
@@ -145,68 +157,88 @@ const EditProductForm = ({ productType, onClose, onSuccess }: EditProductFormPro
         formData.append('other_quotation_type', customQuotationType);
       }
 
-      const brandsData = brands.map(brand => ({
+      const brandsData = brands.map((brand, bIndex) => ({
         brand_name: brand.brand_name,
         brand_id: brand.brand_id,
-        models: brand.models.map(model => ({
+        brand_index: bIndex,
+        models: brand.models.map((model, mIndex) => ({
           model_id: model.model_id,
           model_no: model.model_no,
           description: model.description,
           price: model.price,
-          image_path: model.image_path
+          image_path: model.image_path,
+          model_index: mIndex
         }))
       }));
 
       formData.append('brands', JSON.stringify(brandsData));
 
+      const modelPositions = [];
+      
       brands.forEach((brand, bIndex) => {
         brand.models.forEach((model, mIndex) => {
-          if (model.image) {
+          if (model.image && model.image instanceof File) {
             formData.append('model_images[]', model.image);
-            formData.append('model_positions[]', `${bIndex}_${mIndex}`);
+            modelPositions.push({
+              brandIndex: bIndex,
+              modelIndex: mIndex
+            });
           }
         });
       });
+      
+      if (modelPositions.length > 0) {
+        formData.append('model_positions', JSON.stringify(modelPositions));
+      }
 
       const response = await axios.put(
         `${BASE_URL}api/product/${productType.product_type_id}`,
         formData,
-        { headers: { 'Content-Type': 'multipart/form-data' }, withCredentials: true }
+        { 
+          headers: { 'Content-Type': 'multipart/form-data' },
+          withCredentials: true 
+        }
       );
 
       if (response.data.success) {
         alert(response.data.message || 'Product updated successfully!');
         onSuccess();
+        onClose();
       }
     } catch (err: any) {
-      console.error(err);
+      console.error('Update error:', err);
       alert(err?.response?.data?.error || 'Failed to update product.');
     } finally {
       setLoading(false);
     }
   };
 
-  return (
-    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 overflow-y-auto">
-      <div className="flex justify-end min-h-full p-2 sm:p-6">
-        <div className="bg-white dark:bg-boxdark rounded-xl shadow-2xl w-full sm:max-w-2xl mt-10 sm:mr-[20%]">
+  const getImageUrl = (imagePath: string | undefined) => {
+    if (!imagePath) return null;
+    const cleanPath = imagePath.startsWith('/') ? imagePath.slice(1) : imagePath;
+    return `${BASE_URL}${cleanPath}`;
+  };
 
+  return (
+    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[9999] overflow-y-auto">
+      <div className="flex justify-end min-h-full p-2 sm:p-6">
+        {/* Fixed height and z-index */}
+        <div className="bg-white dark:bg-boxdark rounded-xl shadow-2xl w-full sm:max-w-2xl max-h-[85vh] overflow-y-auto mt-8 sm:mr-[20%] z-[10000]">
           {/* Header */}
-          <div className="sticky top-0 bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-t-xl p-4 flex justify-between items-center">
-            <div className="flex items-center gap-2">
-              <FontAwesomeIcon icon={faCube} />
-              <h2 className="text-lg font-bold">Edit Product Type</h2>
-            </div>
-            <button onClick={onClose} className="p-2 rounded-full hover:bg-white/20">
-              <FontAwesomeIcon icon={faTimes} />
-            </button>
-          </div>
+        <div className="sticky top-0 bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-white rounded-t-xl py-2 px-4 flex justify-between items-center z-10 border-b border-gray-300 dark:border-gray-600">
+  <div className="flex items-center gap-2">
+    <FontAwesomeIcon icon={faCube} />
+    <h2 className="text-base font-semibold">Edit Product Type</h2>
+  </div>
+  <button onClick={onClose} className="p-1 rounded-full hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors">
+    <FontAwesomeIcon icon={faTimes} />
+  </button>
+</div>
 
           <form onSubmit={handleSubmit} className="p-4 space-y-4">
-
             {/* Basic Info */}
             <div className="bg-blue-50 dark:bg-gray-800 border dark:border-strokedark rounded-lg p-4 space-y-3">
-              {/* Category Dropdown */}
+              {/* Category Dropdown - Now shows the saved value */}
               <div className="flex flex-col gap-2">
                 <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
                   Product Subject
@@ -227,7 +259,7 @@ const EditProductForm = ({ productType, onClose, onSuccess }: EditProductFormPro
 
               {/* Quotation Type Dropdown */}
               <div>
-                <label className="text-sm font-medium text-gray-700 dark:text-gray-300">Product Subject Type</label>
+                <label className="text-sm font-medium text-gray-700 dark:text-gray-300">Quotation Type</label>
                 <select
                   value={quotationType}
                   onChange={(e) => handleQuotationChange(e.target.value)}
@@ -284,25 +316,34 @@ const EditProductForm = ({ productType, onClose, onSuccess }: EditProductFormPro
                     className="bg-gray-50 dark:bg-gray-800 px-3 py-2 cursor-pointer flex justify-between items-center border-b dark:border-strokedark"
                     onClick={() => toggleBrandExpansion(bIndex)}
                   >
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-2 flex-1">
                       <FontAwesomeIcon
                         icon={faChevronRight}
                         className={`text-gray-500 transition-transform ${expandedBrands.includes(bIndex) ? 'rotate-90' : ''}`}
                       />
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-2 flex-1">
                         <FontAwesomeIcon icon={faTag} className="text-green-600" />
                         <input
                           type="text"
                           value={brand.brand_name}
                           onChange={(e) => handleBrandChange(bIndex, e.target.value)}
                           placeholder="Brand name"
-                          className="bg-transparent text-sm font-semibold text-gray-800 dark:text-white px-1 py-1 rounded border dark:border-strokedark dark:bg-gray-700"
+                          className="bg-transparent text-sm font-semibold text-gray-800 dark:text-white px-1 py-1 rounded border dark:border-strokedark dark:bg-gray-700 flex-1"
                           onClick={(e) => e.stopPropagation()}
                         />
                       </div>
-                      <span className="text-xs text-gray-500 dark:text-gray-300 ml-2">{brand.models.length} model(s)</span>
+                      <span className="text-xs text-gray-500 dark:text-gray-300">{brand.models.length} model(s)</span>
                     </div>
-             
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleRemoveBrand(bIndex);
+                      }}
+                      className="text-red-500 hover:text-red-700 px-2"
+                    >
+                      <FontAwesomeIcon icon={faTimes} />
+                    </button>
                   </div>
 
                   {/* Models */}
@@ -340,7 +381,7 @@ const EditProductForm = ({ productType, onClose, onSuccess }: EditProductFormPro
                               required
                             />
                           </div>
-                          <label className="sm:col-span-3 flex items-center gap-1 border border-gray-300 dark:border-strokedark rounded px-2 py-1 text-sm cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700">
+                          <label className="sm:col-span-2 flex items-center gap-1 border border-gray-300 dark:border-strokedark rounded px-2 py-1 text-sm cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700">
                             <FontAwesomeIcon icon={faImage} className="text-gray-400 text-xs" />
                             <span className="truncate text-black dark:text-white">
                               {model.image ? model.image.name : model.image_path ? 'Change' : 'Choose'}
@@ -352,15 +393,30 @@ const EditProductForm = ({ productType, onClose, onSuccess }: EditProductFormPro
                               accept="image/*"
                             />
                           </label>
-                          {model.image_path && (
-                            <img
-                              src={`${BASE_URL}${model.image_path.replace(/^\//, '')}`}
-                              alt="Current"
-                              className="h-6 w-6 object-cover rounded sm:col-span-1"
-                              onError={(e) => { e.currentTarget.src = 'https://via.placeholder.com/24'; }}
-                            />
+                          {model.image_path && !model.image && !model.imageError && (
+                            <div className="sm:col-span-1">
+                              <img
+                                src={getImageUrl(model.image_path) || ''}
+                                alt={model.model_no || 'Model'}
+                                className="h-6 w-6 object-cover rounded"
+                                onError={() => handleImageError(bIndex, mIndex)}
+                              />
+                            </div>
                           )}
-                        
+                          {(model.imageError || (model.image_path && !model.image)) && (
+                            <div className="sm:col-span-1 flex items-center justify-center">
+                              <div className="h-6 w-6 bg-gray-200 dark:bg-gray-600 rounded flex items-center justify-center text-xs text-gray-500">
+                                <FontAwesomeIcon icon={faImage} />
+                              </div>
+                            </div>
+                          )}
+                          <button
+                            type="button"
+                            onClick={() => handleRemoveModel(bIndex, mIndex)}
+                            className="text-red-500 hover:text-red-700 sm:col-span-1"
+                          >
+                            <FontAwesomeIcon icon={faTimes} />
+                          </button>
                         </div>
                       ))}
                       
@@ -392,7 +448,7 @@ const EditProductForm = ({ productType, onClose, onSuccess }: EditProductFormPro
             </div>
 
             {/* Footer */}
-            <div className="flex flex-col sm:flex-row justify-end gap-2">
+            <div className="flex flex-col sm:flex-row justify-end gap-2 pt-4 border-t dark:border-strokedark">
               <button
                 type="button"
                 onClick={onClose}
@@ -405,7 +461,7 @@ const EditProductForm = ({ productType, onClose, onSuccess }: EditProductFormPro
                 disabled={loading}
                 className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 text-sm flex items-center gap-1 disabled:opacity-50"
               >
-                {loading ? 'Updating...' : 'Update'}
+                {loading ? 'Updating...' : 'Update Product'}
               </button>
             </div>
           </form>

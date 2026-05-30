@@ -114,6 +114,13 @@ import AVCorePriceList from './pages/Report/AVCorePriceList';
 
 import MRNDashboard from './pages/Dashboard/MRNDashboard';
 
+import LogoUpload from './pages/Master/LogoUpload';
+
+import DownloadCenter from './pages/DownloadCenter/DownloadCenter';
+import ExpenseStats from './pages/Expense/ExpenseStats';
+import ExpenseDashboard from './pages/Expense/ExpenseDashboard';
+
+
 
 
 function App() {
@@ -657,7 +664,26 @@ function App() {
   }
 />
 
-
+<Route
+              path="/expense"
+              element={
+                <ProtectedRoute menuKey="expense_dashboard.dashboard">
+                  <DefaultLayout userRole={userRole}>
+                    <ExpenseDashboard />
+                  </DefaultLayout>
+                </ProtectedRoute>
+              }
+            />
+               <Route
+              path="/expense/stats"
+              element={
+                <ProtectedRoute menuKey="expense_dashboard.statistics">
+                  <DefaultLayout userRole={userRole}>
+                      <ExpenseStats />
+                  </DefaultLayout>
+                </ProtectedRoute>
+              }
+            />
 <Route
   path="/expense/reports"
   element={
@@ -1138,6 +1164,33 @@ path="/schedule/settings/:id"
     </ProtectedRoute>
   }
 />
+
+<Route
+  path="/master/logo"
+  element={
+    <ProtectedRoute menuKey="master.logo">
+      <DefaultLayout userRole={userRole}>
+        <PageTitle title="Logo Upload" />
+        <LogoUpload />
+      </DefaultLayout>
+    </ProtectedRoute>
+  }
+/> 
+
+
+<Route
+  path="/download-center"
+  element={
+    <ProtectedRoute menuKey="download_center">
+      <DefaultLayout userRole={userRole}>
+        <PageTitle title="Download Center" />
+        <DownloadCenter />
+      </DefaultLayout>
+    </ProtectedRoute>
+  }
+/>
+
+
 
           </>
         ) : (

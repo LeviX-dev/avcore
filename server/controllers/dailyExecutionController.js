@@ -70,7 +70,7 @@ export const getDailyExecutionProcesses1 = async (req, res) => {
   }
 }; 
 
-export const getDailyExecutionProcesses = async (req, res) => {
+export const getDailyExecutionProcesses2 = async (req, res) => {
   try {
     const user = req.session.user;
 
@@ -143,6 +143,290 @@ export const getDailyExecutionProcesses = async (req, res) => {
     });
   }
 };
+
+
+
+export const getDailyExecutionProcesses3 = async (req, res) => {
+  try {
+    const user = req.session.user;
+
+    if (!user) {
+      return res.status(401).json({
+        success: false,
+        message: "Unauthorized",
+      });
+    }
+
+    const userId = user.id;
+
+    // ✅ Admin + Project Manager can see all processes
+    const canSeeAll =
+      user.role === "admin" ||
+      user.role === "project_manager";
+
+    let query = `
+      SELECT 
+        epum.lead_id,
+
+        -- ✅ Raw Data Details
+        rd.master_id,
+        rd.name AS lead_name,
+        rd.number,
+
+        -- ✅ Show area_name if available else city
+        CASE
+          WHEN rd.area_id IS NOT NULL
+               AND rd.area_id != ''
+               AND a.area_name IS NOT NULL
+          THEN a.area_name
+          ELSE rd.city
+        END AS city,
+
+        -- ✅ Location Link from documents table
+        d.location_link,
+
+        rd.ar_number,
+        rd.architect_name,
+        rd.ca_number,
+        rd.e_number,
+        rd.sm_number,
+        rd.pop_number,
+        rd.other_number,
+
+        -- ✅ Area Details
+        rd.area_id,
+        a.area_name,
+
+        -- ✅ Process Details
+        epum.process_id,
+        pe.process_name,
+        pe.description,
+
+        -- ✅ Execution Log Details
+        epl.id AS execution_id,
+        epl.type_id,
+
+        -- ✅ Execution Type Details
+        et.type_name,
+        et.completion_percentage,
+
+        epl.start_date,
+        epl.end_date,
+        epl.status,
+        epl.remark,
+        epl.assigned_to,
+
+        -- ✅ Manager Approval Details
+        ed.manager_status,
+        ed.manager_remark
+
+      FROM execution_process_user_map epum
+
+      JOIN process_execution pe
+        ON pe.process_id = epum.process_id
+
+      LEFT JOIN execution_process_logs epl
+        ON epl.process_id = epum.process_id
+       AND epl.lead_id = epum.lead_id
+
+      -- ✅ Fetch execution type
+      LEFT JOIN execution_type et
+        ON et.type_id = epl.type_id
+
+      -- ✅ Manager fields table
+      LEFT JOIN execution_documents ed
+        ON ed.process_id = epum.process_id
+       AND ed.lead_id = epum.lead_id
+
+      -- ✅ Raw Data
+      LEFT JOIN raw_data rd
+        ON rd.master_id = epum.lead_id
+
+      -- ✅ Area Table
+      LEFT JOIN area a
+        ON a.area_id = rd.area_id
+
+      -- ✅ Documents Table for location link
+      LEFT JOIN documents d
+        ON d.master_id = rd.master_id
+    `;
+
+    let queryParams = [];
+
+    // ✅ Only normal users see their own processes
+    if (!canSeeAll) {
+      query += ` WHERE epum.user_id = ?`;
+      queryParams.push(userId);
+    }
+
+    query += ` ORDER BY epum.lead_id ASC, pe.process_name ASC`;
+
+    const [rows] = await db.query(query, queryParams);
+
+    res.json({
+      success: true,
+      total: rows.length,
+      data: rows,
+    });
+
+  } catch (error) {
+    console.error("DailyExecution error:", error);
+
+    res.status(500).json({
+      success: false,
+      message: "Server error",
+      error: error.message,
+    });
+  }
+};
+
+export const getDailyExecutionProcesses = async (req, res) => {
+  try {
+    const user = req.session.user;
+
+    if (!user) {
+      return res.status(401).json({
+        success: false,
+        message: "Unauthorized",
+      });
+    }
+
+    const userId = user.id;
+
+    // ✅ Admin + Project Manager can see all processes
+    const canSeeAll =
+      user.role === "admin" ||
+      user.role === "project_manager";
+
+    let query = `
+      SELECT 
+        epum.lead_id,
+
+        -- ✅ Raw Data Details
+        rd.master_id,
+        rd.name AS lead_name,
+        rd.number,
+
+        -- ✅ Show area_name if available else city
+        CASE
+          WHEN rd.area_id IS NOT NULL
+               AND rd.area_id != ''
+               AND a.area_name IS NOT NULL
+          THEN a.area_name
+          ELSE rd.city
+        END AS city,
+
+        -- ✅ Location Link from documents table
+        d.location_link,
+
+        rd.ar_number,
+        rd.architect_name,
+        rd.ca_number,
+        rd.e_number,
+        rd.sm_number,
+        rd.pop_number,
+        rd.other_number,
+
+        -- ✅ Area Details
+        rd.area_id,
+        a.area_name,
+
+        -- ✅ Process Details
+        epum.process_id,
+        pe.process_name,
+        pe.description,
+
+        -- ✅ Execution Log Details
+        epl.id AS execution_id,
+        epl.type_id,
+
+        -- ✅ Execution Type Details
+        et.type_name,
+        et.completion_percentage,
+
+        epl.start_date,
+        epl.end_date,
+        epl.status,
+        epl.remark,
+        epl.assigned_to,
+
+        -- ✅ Manager Approval Details - Use a subquery to get the latest document
+        (
+          SELECT ed.manager_status 
+          FROM execution_documents ed 
+          WHERE ed.process_id = epum.process_id 
+            AND ed.lead_id = epum.lead_id 
+          ORDER BY ed.created_at DESC 
+          LIMIT 1
+        ) AS manager_status,
+        
+        (
+          SELECT ed.manager_remark 
+          FROM execution_documents ed 
+          WHERE ed.process_id = epum.process_id 
+            AND ed.lead_id = epum.lead_id 
+          ORDER BY ed.created_at DESC 
+          LIMIT 1
+        ) AS manager_remark
+
+      FROM execution_process_user_map epum
+
+      JOIN process_execution pe
+        ON pe.process_id = epum.process_id
+
+      LEFT JOIN execution_process_logs epl
+        ON epl.process_id = epum.process_id
+       AND epl.lead_id = epum.lead_id
+
+      -- ✅ Fetch execution type
+      LEFT JOIN execution_type et
+        ON et.type_id = epl.type_id
+
+      -- ✅ Raw Data
+      LEFT JOIN raw_data rd
+        ON rd.master_id = epum.lead_id
+
+      -- ✅ Area Table
+      LEFT JOIN area a
+        ON a.area_id = rd.area_id
+
+      -- ✅ Documents Table for location link
+      LEFT JOIN documents d
+        ON d.master_id = rd.master_id
+    `;
+
+    let queryParams = [];
+
+    // ✅ Only normal users see their own processes
+    if (!canSeeAll) {
+      query += ` WHERE epum.user_id = ?`;
+      queryParams.push(userId);
+    }
+
+    query += ` GROUP BY epum.lead_id, epum.process_id, epl.id`;
+    query += ` ORDER BY epum.lead_id ASC, pe.process_name ASC`;
+
+    const [rows] = await db.query(query, queryParams);
+
+    res.json({
+      success: true,
+      total: rows.length,
+      data: rows,
+    });
+
+  } catch (error) {
+    console.error("DailyExecution error:", error);
+
+    res.status(500).json({
+      success: false,
+      message: "Server error",
+      error: error.message,
+    });
+  }
+};
+
+
+
 
 
 export const uploadExecutionDocuments1 = async (req, res) => {

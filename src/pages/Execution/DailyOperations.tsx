@@ -1321,8 +1321,10 @@ import {
   FaEdit,
   FaTrash,
   FaInfoCircle,
-  FaFileUpload   
+  FaFileUpload, FaEye, FaMapMarker, FaPhone, FaBuilding
 } from "react-icons/fa";
+
+
 
 // Types and Interfaces based on actual API response
 interface Document {
@@ -2434,9 +2436,7 @@ const ProcessStatusModal = ({
                         <p className="text-xs text-gray-600 dark:text-gray-400 truncate">
                           {doc.file_path.split('/').pop()}
                         </p>
-                        {doc.remark && (
-                          <p className="text-[10px] text-gray-500 mt-0.5">Remark: {doc.remark}</p>
-                        )}
+                     
                       </div>
                     </div>
                   </div>
@@ -2749,7 +2749,7 @@ const isAdmin = userInfo?.role === 'admin';
                 <>
                 <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-gradient-to-r from-purple-100 to-indigo-200 dark:from-purple-900/30 dark:to-indigo-800/30 text-purple-800 dark:text-purple-300 border border-purple-200 dark:border-purple-700/30">
   <FaClock className="w-3 h-3 mr-1" />
-  {totalDocuments} {(isAdmin || userInfo?.role === 'project_manager') ? 'Total Documents' : 'Your Documents'}
+  {totalDocuments} {(isAdmin || userInfo?.role === 'project_manager') ? 'Daily Execution Updates' : 'Daily Execution Updates'}
 </span>
                   
                  

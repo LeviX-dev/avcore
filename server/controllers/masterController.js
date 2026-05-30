@@ -161,23 +161,177 @@ export const removeCategory = async (req, res) => {
 };
 
 
-// ------------------------------ product --------------------------------
 
 
+// ==================== PRODUCT CONTROLLERS ====================
 
-// ------------------------------ product --------------------------------
+// Get all products with complete nested structure
+export const getProductsFull = async (req, res) => {
+  try {
+    // FETCH PRODUCT TYPES WITH CATEGORY
+    const [productTypes] = await db.execute(`
+      SELECT 
+        pt.product_type_id,
+        pt.product_type_name,
+        pt.quotation_type,
+        pt.cat_id,
+        c.cat_name,
+        pt.status,
+        pt.created_at
+      FROM product_types pt
+      LEFT JOIN category c ON c.cat_id = pt.cat_id
+      ORDER BY pt.product_type_id DESC
+    `);
 
+    if (productTypes.length === 0) {
+      return res.status(200).json([]);
+    }
 
+    const productTypeIds = productTypes.map((pt) => pt.product_type_id).filter(id => id);
+
+    // FETCH BRANDS
+    let brands = [];
+    if (productTypeIds.length > 0) {
+      const [brandRows] = await db.execute(
+        `SELECT 
+          b.brand_id,
+          b.brand_name,
+          b.product_type_id
+        FROM brands b
+        WHERE b.product_type_id IN (${productTypeIds.map(() => '?').join(',')})`,
+        productTypeIds,
+      );
+      brands = brandRows;
+    }
+
+    const brandIds = brands.map((b) => b.brand_id).filter(id => id);
+
+    // FETCH MODELS
+    let models = [];
+    if (brandIds.length > 0) {
+      const [rows] = await db.execute(
+        `SELECT 
+          m.model_id,
+          m.brand_id,
+          m.model_no,
+          m.description,
+          m.price,
+          m.image_path,
+          m.status
+        FROM models m
+        WHERE m.brand_id IN (${brandIds.map(() => '?').join(',')})`,
+        brandIds,
+      );
+      models = rows;
+    }
+
+    // BUILD NESTED RESPONSE
+    const result = productTypes.map((pt) => ({
+      product_type_id: pt.product_type_id,
+      product_type_name: pt.product_type_name,
+      quotation_type: pt.quotation_type,
+      cat_id: pt.cat_id || null,
+      cat_name: pt.cat_name || '-',
+      status: pt.status,
+      created_at: pt.created_at,
+      brands: brands
+        .filter((b) => b.product_type_id === pt.product_type_id)
+        .map((b) => ({
+          brand_id: b.brand_id,
+          brand_name: b.brand_name,
+          models: models.filter((m) => m.brand_id === b.brand_id),
+        })),
+    }));
+
+    return res.status(200).json(result);
+  } catch (err) {
+    console.error('❌ getProductsFull Error:', err);
+    return res.status(500).json({
+      success: false,
+      error: err.message,
+    });
+  }
+};
+
+// Get specific product type with all details
+export const getProductTypeDetails = async (req, res) => {
+  try {
+    const { product_type_id } = req.params;
+
+    // Get product type with category info
+    const [productTypes] = await db.execute(
+      `SELECT 
+        pt.*, 
+        c.cat_name 
+      FROM product_types pt
+      LEFT JOIN category c ON c.cat_id = pt.cat_id
+      WHERE pt.product_type_id = ?`,
+      [product_type_id],
+    );
+
+    if (productTypes.length === 0) {
+      return res.status(404).json({ error: 'Product type not found' });
+    }
+
+    const productType = productTypes[0];
+
+    // Get brands for this product type
+    const [brands] = await db.execute(
+      `SELECT * FROM brands WHERE product_type_id = ?`,
+      [product_type_id],
+    );
+
+    const brandIds = brands.map((b) => b.brand_id);
+
+    // Get models for these brands
+    let models = [];
+    if (brandIds.length > 0) {
+      const [rows] = await db.execute(
+        `SELECT * FROM models WHERE brand_id IN (${brandIds.map(() => '?').join(',')})`,
+        brandIds,
+      );
+      models = rows;
+    }
+
+    // Build nested structure with cat_id and cat_name
+    const result = {
+      product_type_id: productType.product_type_id,
+      product_type_name: productType.product_type_name,
+      quotation_type: productType.quotation_type,
+      cat_id: productType.cat_id,
+      cat_name: productType.cat_name || '-',
+      status: productType.status,
+      created_at: productType.created_at,
+      brands: brands.map((brand) => ({
+        ...brand,
+        models: models.filter((model) => model.brand_id === brand.brand_id),
+      })),
+    };
+
+    return res.status(200).json(result);
+  } catch (err) {
+    console.error('❌ getProductTypeDetails Error:', err);
+    return res.status(500).json({
+      success: false,
+      error: err.message,
+    });
+  }
+};
+
+// Create full product (type + brands + models)
 export const addProductFull = async (req, res) => {
   try {
     console.log('RAW BODY ===>', req.body);
     console.log('FILES ===>', req.files);
 
-    const { product_type_name, quotation_type, other_quotation_type } =
-      req.body;
+    const { product_type_name, quotation_type, other_quotation_type, cat_id } = req.body;
 
     if (!product_type_name) {
       return res.status(400).json({ error: 'product_type_name is required' });
+    }
+
+    if (!cat_id) {
+      return res.status(400).json({ error: 'cat_id is required' });
     }
 
     if (!quotation_type) {
@@ -207,20 +361,16 @@ export const addProductFull = async (req, res) => {
         .json({ error: 'brands must be a non-empty array' });
     }
 
-    // -----------------------------
-    // CREATE PRODUCT TYPE  (UPDATED)
-    // -----------------------------
+    // CREATE PRODUCT TYPE
     const [pt] = await db.execute(
-      `INSERT INTO product_types (product_type_name, quotation_type) 
-       VALUES (?, ?)`,
-      [product_type_name, finalQuotationType],
+      `INSERT INTO product_types (product_type_name, quotation_type, cat_id, status) 
+       VALUES (?, ?, ?, 'active')`,
+      [product_type_name, finalQuotationType, cat_id],
     );
 
     const product_type_id = pt.insertId;
 
-    // -----------------------------
-    // LOOP BRANDS (unchanged)
-    // -----------------------------
+    // LOOP BRANDS
     for (const brand of brands) {
       if (!brand.brand_name) continue;
 
@@ -231,9 +381,7 @@ export const addProductFull = async (req, res) => {
 
       const brand_id = br.insertId;
 
-      // -----------------------------
-      // LOOP MODELS (unchanged)
-      // -----------------------------
+      // LOOP MODELS
       for (const model of brand.models || []) {
         let savedImagePaths = [];
 
@@ -256,8 +404,8 @@ export const addProductFull = async (req, res) => {
 
         await db.execute(
           `INSERT INTO models 
-            (brand_id, model_no, description, price, image_path)
-           VALUES (?, ?, ?, ?, ?)`,
+            (brand_id, model_no, description, price, image_path, status)
+           VALUES (?, ?, ?, ?, ?, 'active')`,
           [
             brand_id,
             model.model_no || '',
@@ -272,6 +420,7 @@ export const addProductFull = async (req, res) => {
     return res.status(201).json({
       success: true,
       message: 'Product type + brands + models created successfully',
+      product_type_id: product_type_id,
     });
   } catch (err) {
     console.error('❌ addProductFull Error:', err);
@@ -282,145 +431,29 @@ export const addProductFull = async (req, res) => {
   }
 };
 
-// Update product controller
-
-export const updateProductFull1 = async (req, res) => {
-  const { product_type_id } = req.params;
-
-  try {
-    const { product_type_name, quotation_type, other_quotation_type } =
-      req.body;
-
-    if (!product_type_name) {
-      return res.status(400).json({ error: 'product_type_name is required' });
-    }
-
-    if (!quotation_type) {
-      return res.status(400).json({ error: 'quotation_type is required' });
-    }
-
-    const finalQuotationType =
-      quotation_type === 'Other' && other_quotation_type
-        ? other_quotation_type
-        : quotation_type;
-
-    if (!req.body.brands) {
-      return res.status(400).json({ error: 'brands is required' });
-    }
-
-    let brands;
-
-    try {
-      brands = JSON.parse(req.body.brands);
-    } catch (e) {
-      return res.status(400).json({ error: 'brands must be valid JSON' });
-    }
-
-    if (!Array.isArray(brands) || brands.length === 0) {
-      return res
-        .status(400)
-        .json({ error: 'brands must be a non-empty array' });
-    }
-
-    // --------------------------------
-    // UPDATE PRODUCT TYPE
-    // --------------------------------
-    await db.execute(
-      `UPDATE product_types 
-       SET product_type_name = ?, quotation_type = ?
-       WHERE product_type_id = ?`,
-      [product_type_name, finalQuotationType, product_type_id],
-    );
-
-    // --------------------------------
-    // DELETE OLD BRANDS + MODELS
-    // --------------------------------
-    await db.execute(
-      `DELETE m FROM models m 
-       INNER JOIN brands b ON m.brand_id = b.brand_id
-       WHERE b.product_type_id = ?`,
-      [product_type_id],
-    );
-
-    await db.execute(`DELETE FROM brands WHERE product_type_id = ?`, [
-      product_type_id,
-    ]);
-
-    // --------------------------------
-    // RE-CREATE BRANDS + MODELS
-    // --------------------------------
-    for (const brand of brands) {
-      if (!brand.brand_name) continue;
-
-      const [br] = await db.execute(
-        `INSERT INTO brands (brand_name, product_type_id)
-         VALUES (?, ?)`,
-        [brand.brand_name, product_type_id],
-      );
-
-      const brand_id = br.insertId;
-
-      for (const model of brand.models || []) {
-        let savedImagePaths = [];
-
-        if (req.files && req.files['model_images[]']) {
-          let images = req.files['model_images[]'];
-          if (!Array.isArray(images)) images = [images];
-
-          for (const img of images) {
-            const fileName = `${Date.now()}_${img.name}`;
-            const uploadDir = path.join(__dirname, '../uploads');
-
-            if (!fs.existsSync(uploadDir)) fs.mkdirSync(uploadDir);
-
-            const fullPath = path.join(uploadDir, fileName);
-            await img.mv(fullPath);
-
-            savedImagePaths.push(`/uploads/${fileName}`);
-          }
-        }
-
-        await db.execute(
-          `INSERT INTO models 
-            (brand_id, model_no, description, price, image_path)
-           VALUES (?, ?, ?, ?, ?)`,
-          [
-            brand_id,
-            model.model_no || '',
-            model.description || '',
-            model.price || null,
-            savedImagePaths[0] || null,
-          ],
-        );
-      }
-    }
-
-    return res.status(200).json({
-      success: true,
-      message: 'Product updated successfully',
-    });
-  } catch (err) {
-    console.error('❌ updateProductFull Error:', err);
-    return res.status(500).json({
-      success: false,
-      error: err.message,
-    });
-  }
-};
-
+// Update product (preserves existing data where not changed)
 export const updateProductFull = async (req, res) => {
   const { product_type_id } = req.params;
 
   try {
-    const { product_type_name, quotation_type, other_quotation_type } =
-      req.body;
+    const { product_type_name, quotation_type, other_quotation_type, cat_id } = req.body;
 
     if (!product_type_name) {
-      return res.status(400).json({ error: 'product_type_name is required' });
+      return res.status(400).json({
+        error: 'product_type_name is required',
+      });
+    }
+
+    if (!cat_id) {
+      return res.status(400).json({
+        error: 'cat_id is required',
+      });
     }
 
     if (!quotation_type) {
-      return res.status(400).json({ error: 'quotation_type is required' });
+      return res.status(400).json({
+        error: 'quotation_type is required',
+      });
     }
 
     const finalQuotationType =
@@ -429,93 +462,261 @@ export const updateProductFull = async (req, res) => {
         : quotation_type;
 
     if (!req.body.brands) {
-      return res.status(400).json({ error: 'brands is required' });
+      return res.status(400).json({
+        error: 'brands is required',
+      });
     }
 
     let brands;
-
     try {
       brands = JSON.parse(req.body.brands);
     } catch (e) {
-      return res.status(400).json({ error: 'brands must be valid JSON' });
+      return res.status(400).json({
+        error: 'brands must be valid JSON',
+      });
     }
 
     if (!Array.isArray(brands) || brands.length === 0) {
-      return res
-        .status(400)
-        .json({ error: 'brands must be a non-empty array' });
+      return res.status(400).json({
+        error: 'brands must be a non-empty array',
+      });
     }
 
-    // --------------------------------
-    // UPDATE PRODUCT TYPE
-    // --------------------------------
-    await db.execute(
-      `UPDATE product_types 
-       SET product_type_name = ?, quotation_type = ?
-       WHERE product_type_id = ?`,
-      [product_type_name, finalQuotationType, product_type_id],
-    );
-
-    // --------------------------------
-    // DELETE OLD BRANDS + MODELS
-    // --------------------------------
-    await db.execute(
-      `DELETE m FROM models m 
+    // FETCH EXISTING MODELS
+    const [existingModels] = await db.execute(
+      `SELECT 
+          m.model_id,
+          m.image_path,
+          m.description,
+          m.price,
+          m.brand_id
+       FROM models m
        INNER JOIN brands b ON m.brand_id = b.brand_id
        WHERE b.product_type_id = ?`,
-      [product_type_id],
+      [product_type_id]
     );
 
-    await db.execute(`DELETE FROM brands WHERE product_type_id = ?`, [
-      product_type_id,
-    ]);
+    const existingModelMap = new Map();
+    existingModels.forEach((model) => {
+      existingModelMap.set(model.model_id, model);
+    });
 
-    // --------------------------------
-    // RE-CREATE BRANDS + MODELS
-    // --------------------------------
+    // UPDATE PRODUCT TYPE
+    await db.execute(
+      `UPDATE product_types
+       SET
+         product_type_name = ?,
+         quotation_type = ?,
+         cat_id = ?
+       WHERE product_type_id = ?`,
+      [
+        product_type_name,
+        finalQuotationType,
+        cat_id,
+        product_type_id,
+      ]
+    );
+
+    // PARSE MODEL POSITIONS
+    let modelPositions = [];
+    if (req.body.model_positions) {
+      try {
+        modelPositions = JSON.parse(req.body.model_positions);
+      } catch (e) {
+        console.log('Failed to parse model_positions');
+      }
+    }
+
+    // GET UPLOADED IMAGES
+    let uploadedImages = [];
+    if (req.files && req.files['model_images[]']) {
+      uploadedImages = req.files['model_images[]'];
+      if (!Array.isArray(uploadedImages)) {
+        uploadedImages = [uploadedImages];
+      }
+    }
+
+    // GET EXISTING BRANDS TO COMPARE
+    const [existingBrands] = await db.execute(
+      `SELECT brand_id, brand_name FROM brands WHERE product_type_id = ?`,
+      [product_type_id]
+    );
+    const existingBrandMap = new Map();
+    existingBrands.forEach(brand => {
+      existingBrandMap.set(brand.brand_id, brand);
+    });
+
+    // TRACK BRANDS TO DELETE (those not in incoming data)
+    const incomingBrandIds = brands.filter(b => b.brand_id).map(b => b.brand_id);
+    const brandsToDelete = existingBrands.filter(b => !incomingBrandIds.includes(b.brand_id));
+
+    // DELETE MODELS FOR BRANDS THAT WILL BE REMOVED
+    for (const brandToDelete of brandsToDelete) {
+      // Get models for this brand to delete images
+      const [modelsToDelete] = await db.execute(
+        `SELECT image_path FROM models WHERE brand_id = ?`,
+        [brandToDelete.brand_id]
+      );
+      
+      for (const model of modelsToDelete) {
+        if (model.image_path) {
+          const filePath = path.join(process.cwd(), model.image_path);
+          if (fs.existsSync(filePath)) {
+            fs.unlinkSync(filePath);
+          }
+        }
+      }
+      
+      await db.execute(
+        `DELETE FROM models WHERE brand_id = ?`,
+        [brandToDelete.brand_id]
+      );
+    }
+
+    // DELETE BRANDS THAT ARE REMOVED
+    if (brandsToDelete.length > 0) {
+      await db.execute(
+        `DELETE FROM brands WHERE brand_id IN (${brandsToDelete.map(() => '?').join(',')})`,
+        brandsToDelete.map(b => b.brand_id)
+      );
+    }
+
+    // UPDATE / INSERT BRANDS + MODELS
     for (const brand of brands) {
       if (!brand.brand_name) continue;
 
-      const [br] = await db.execute(
-        `INSERT INTO brands (brand_name, product_type_id)
-         VALUES (?, ?)`,
-        [brand.brand_name, product_type_id],
+      let brand_id = brand.brand_id;
+
+      // UPDATE EXISTING BRAND OR INSERT NEW
+      if (brand_id && existingBrandMap.has(brand_id)) {
+        await db.execute(
+          `UPDATE brands SET brand_name = ? WHERE brand_id = ?`,
+          [brand.brand_name, brand_id]
+        );
+      } else if (brand_id && !existingBrandMap.has(brand_id)) {
+        // This shouldn't happen, but just in case, insert it
+        const [br] = await db.execute(
+          `INSERT INTO brands (brand_name, product_type_id) VALUES (?, ?)`,
+          [brand.brand_name, product_type_id]
+        );
+        brand_id = br.insertId;
+      } else {
+        // INSERT NEW BRAND
+        const [br] = await db.execute(
+          `INSERT INTO brands (brand_name, product_type_id) VALUES (?, ?)`,
+          [brand.brand_name, product_type_id]
+        );
+        brand_id = br.insertId;
+      }
+
+      // GET EXISTING MODELS FOR THIS BRAND
+      const [existingModelsForBrand] = await db.execute(
+        `SELECT model_id, model_no, description, price, image_path FROM models WHERE brand_id = ?`,
+        [brand_id]
       );
+      const existingModelMapForBrand = new Map();
+      existingModelsForBrand.forEach(model => {
+        existingModelMapForBrand.set(model.model_id, model);
+      });
 
-      const brand_id = br.insertId;
+      // TRACK MODELS TO KEEP
+      const incomingModelIds = brand.models.filter(m => m.model_id).map(m => m.model_id);
+      const modelsToDelete = existingModelsForBrand.filter(m => !incomingModelIds.includes(m.model_id));
 
-      for (const model of brand.models || []) {
-        let savedImagePaths = [];
+      // DELETE MODELS THAT ARE REMOVED
+      if (modelsToDelete.length > 0) {
+        // Delete image files for removed models
+        for (const modelToDelete of modelsToDelete) {
+          if (modelToDelete.image_path) {
+            const filePath = path.join(process.cwd(), modelToDelete.image_path);
+            if (fs.existsSync(filePath)) {
+              fs.unlinkSync(filePath);
+            }
+          }
+        }
+        await db.execute(
+          `DELETE FROM models WHERE model_id IN (${modelsToDelete.map(() => '?').join(',')})`,
+          modelsToDelete.map(m => m.model_id)
+        );
+      }
 
-        if (req.files && req.files['model_images[]']) {
-          let images = req.files['model_images[]'];
-          if (!Array.isArray(images)) images = [images];
+      // PROCESS MODELS
+      for (let idx = 0; idx < (brand.models || []).length; idx++) {
+        const model = brand.models[idx];
+        let savedImagePath = null;
 
-          for (const img of images) {
+        // CHECK FOR NEW IMAGE UPLOAD
+        const matchingPosition = modelPositions.find(
+          (pos) => pos.brandIndex === brand.brand_index && pos.modelIndex === idx
+        );
+
+        if (matchingPosition && uploadedImages.length > 0) {
+          const imageIndex = modelPositions.findIndex(
+            (pos) => pos.brandIndex === brand.brand_index && pos.modelIndex === idx
+          );
+
+          if (imageIndex !== -1 && uploadedImages[imageIndex]) {
+            const img = uploadedImages[imageIndex];
             const fileName = `${Date.now()}_${img.name}`;
             const uploadDir = path.join(__dirname, '../uploads');
 
-            if (!fs.existsSync(uploadDir)) fs.mkdirSync(uploadDir);
+            if (!fs.existsSync(uploadDir)) {
+              fs.mkdirSync(uploadDir);
+            }
 
             const fullPath = path.join(uploadDir, fileName);
             await img.mv(fullPath);
+            savedImagePath = `/uploads/${fileName}`;
 
-            savedImagePaths.push(`/uploads/${fileName}`);
+            // Delete old image if exists
+            if (model.model_id && existingModelMapForBrand.get(model.model_id)?.image_path) {
+              const oldImagePath = path.join(process.cwd(), existingModelMapForBrand.get(model.model_id).image_path);
+              if (fs.existsSync(oldImagePath)) {
+                fs.unlinkSync(oldImagePath);
+              }
+            }
           }
         }
 
-        await db.execute(
-          `INSERT INTO models 
-            (brand_id, model_no, description, price, image_path)
-           VALUES (?, ?, ?, ?, ?)`,
-          [
-            brand_id,
-            model.model_no || '',
-            model.description || '',
-            model.price || null,
-            savedImagePaths[0] || null,
-          ],
-        );
+        // UPDATE OR INSERT MODEL
+        if (model.model_id && existingModelMapForBrand.has(model.model_id)) {
+          const existingModel = existingModelMapForBrand.get(model.model_id);
+          
+          if (!savedImagePath) {
+            savedImagePath = existingModel?.image_path || null;
+          }
+
+          await db.execute(
+            `UPDATE models
+             SET
+               model_no = ?,
+               description = ?,
+               price = ?,
+               image_path = ?
+             WHERE model_id = ?`,
+            [
+              model.model_no || '',
+              model.description || '',
+              model.price || null,
+              savedImagePath,
+              model.model_id,
+            ]
+          );
+        } else {
+          // INSERT NEW MODEL
+          await db.execute(
+            `INSERT INTO models
+              (brand_id, model_no, description, price, image_path, status)
+             VALUES (?, ?, ?, ?, ?, 'active')`,
+            [
+              brand_id,
+              model.model_no || '',
+              model.description || '',
+              model.price || null,
+              savedImagePath || null,
+            ]
+          );
+        }
       }
     }
 
@@ -532,6 +733,7 @@ export const updateProductFull = async (req, res) => {
   }
 };
 
+// Delete product entity (model, brand, or product type)
 export const deleteProductEntity = async (req, res) => {
   try {
     const { entity, id } = req.params;
@@ -543,9 +745,7 @@ export const deleteProductEntity = async (req, res) => {
 
     console.log('🟡 Delete requested →', entity, 'ID:', safeId);
 
-    // =========================
-    // 🔵 DELETE MODEL
-    // =========================
+    // DELETE MODEL
     if (entity === 'model') {
       const [rows] = await db.execute(
         'SELECT image_path, model_no FROM models WHERE model_id = ?',
@@ -574,9 +774,7 @@ export const deleteProductEntity = async (req, res) => {
       });
     }
 
-    // =========================
-    // 🟢 DELETE BRAND (models cascade)
-    // =========================
+    // DELETE BRAND (models cascade)
     if (entity === 'brand') {
       // get all model images for cleanup
       const [models] = await db.execute(
@@ -591,6 +789,7 @@ export const deleteProductEntity = async (req, res) => {
         }
       }
 
+      await db.execute('DELETE FROM models WHERE brand_id = ?', [safeId]);
       await db.execute('DELETE FROM brands WHERE brand_id = ?', [safeId]);
 
       return res.json({
@@ -600,9 +799,7 @@ export const deleteProductEntity = async (req, res) => {
       });
     }
 
-    // =========================
-    // 🟣 DELETE PRODUCT TYPE (brands + models cascade)
-    // =========================
+    // DELETE PRODUCT TYPE (brands + models cascade)
     if (entity === 'product-type') {
       // gather all model images first
       const [models] = await db.execute(
@@ -620,9 +817,19 @@ export const deleteProductEntity = async (req, res) => {
         }
       }
 
-      await db.execute('DELETE FROM product_types WHERE product_type_id = ?', [
-        safeId,
-      ]);
+      // Delete models first
+      await db.execute(
+        `DELETE m FROM models m 
+         INNER JOIN brands b ON m.brand_id = b.brand_id
+         WHERE b.product_type_id = ?`,
+        [safeId]
+      );
+      
+      // Delete brands
+      await db.execute(`DELETE FROM brands WHERE product_type_id = ?`, [safeId]);
+      
+      // Delete product type
+      await db.execute('DELETE FROM product_types WHERE product_type_id = ?', [safeId]);
 
       return res.json({
         success: true,
@@ -640,185 +847,20 @@ export const deleteProductEntity = async (req, res) => {
   }
 };
 
-// Fetch products with category names
+// ==================== STEP-BY-STEP CONTROLLERS ====================
 
-export const getProductsFull1 = async (req, res) => {
+// Step 1: Create product type only
+export const addProductTypeOnly = async (req, res) => {
   try {
-    // Fetch product types + quotation type
-    const [productTypes] = await db.execute(`
-      SELECT 
-        pt.product_type_id,
-        pt.product_type_name,
-        pt.quotation_type
-      FROM product_types pt
-      ORDER BY pt.product_type_id DESC
-    `);
+    const { product_type_name, quotation_type, other_quotation_type, cat_id } = req.body;
 
-    if (productTypes.length === 0) {
-      return res.status(200).json([]);
-    }
-
-    const productTypeIds = productTypes.map((pt) => pt.product_type_id);
-
-    // Fetch brands under these product types
-    const [brands] = await db.execute(
-      `
-      SELECT 
-        b.brand_id,
-        b.brand_name,
-        b.product_type_id
-      FROM brands b
-      WHERE b.product_type_id IN (${productTypeIds.map(() => '?').join(',')})
-      `,
-      productTypeIds,
-    );
-
-    const brandIds = brands.map((b) => b.brand_id);
-
-    let models = [];
-    if (brandIds.length > 0) {
-      // Fetch models under those brands
-      const [rows] = await db.execute(
-        `
-        SELECT 
-          m.model_id,
-          m.brand_id,
-          m.model_no,
-          m.description,
-          m.price,
-          m.image_path
-        FROM models m
-        WHERE m.brand_id IN (${brandIds.map(() => '?').join(',')})
-        `,
-        brandIds,
-      );
-
-      models = rows;
-    }
-
-    // -------------------------
-    // BUILD NESTED JSON
-    // -------------------------
-    const result = productTypes.map((pt) => ({
-      product_type_id: pt.product_type_id,
-      product_type_name: pt.product_type_name,
-      quotation_type: pt.quotation_type,
-      brands: brands
-        .filter((b) => b.product_type_id === pt.product_type_id)
-        .map((b) => ({
-          brand_id: b.brand_id,
-          brand_name: b.brand_name,
-          models: models.filter((m) => m.brand_id === b.brand_id),
-        })),
-    }));
-
-    return res.status(200).json(result);
-  } catch (err) {
-    console.error('❌ getProductsFull Error:', err);
-    return res.status(500).json({
-      success: false,
-      error: err.message,
-    });
-  }
-};
-
-export const getProductsFull = async (req, res) => {
-  try {
-    // --------------------------------
-    // FETCH PRODUCT TYPES + CATEGORY
-    // --------------------------------
-    const [productTypes] = await db.execute(`
-      SELECT 
-        pt.product_type_id,
-        pt.product_type_name,
-        pt.cat_id,
-        c.cat_name
-      FROM product_types pt
-      INNER JOIN category c ON c.cat_id = pt.cat_id
-      ORDER BY pt.product_type_id DESC
-    `);
-
-    if (productTypes.length === 0) {
-      return res.status(200).json([]);
-    }
-
-    const productTypeIds = productTypes.map((pt) => pt.product_type_id);
-
-    // --------------------------------
-    // FETCH BRANDS
-    // --------------------------------
-    const [brands] = await db.execute(
-      `
-      SELECT 
-        b.brand_id,
-        b.brand_name,
-        b.product_type_id
-      FROM brands b
-      WHERE b.product_type_id IN (${productTypeIds.map(() => '?').join(',')})
-      `,
-      productTypeIds,
-    );
-
-    const brandIds = brands.map((b) => b.brand_id);
-
-    // --------------------------------
-    // FETCH MODELS
-    // --------------------------------
-    let models = [];
-    if (brandIds.length > 0) {
-      const [rows] = await db.execute(
-        `
-        SELECT 
-          m.model_id,
-          m.brand_id,
-          m.model_no,
-          m.description,
-          m.price,
-          m.image_path
-        FROM models m
-        WHERE m.brand_id IN (${brandIds.map(() => '?').join(',')})
-        `,
-        brandIds,
-      );
-
-      models = rows;
-    }
-
-    // --------------------------------
-    // BUILD NESTED RESPONSE
-    // --------------------------------
-    const result = productTypes.map((pt) => ({
-      product_type_id: pt.product_type_id,
-      product_type_name: pt.product_type_name,
-      cat_id: pt.cat_id,
-      cat_name: pt.cat_name,
-      brands: brands
-        .filter((b) => b.product_type_id === pt.product_type_id)
-        .map((b) => ({
-          brand_id: b.brand_id,
-          brand_name: b.brand_name,
-          models: models.filter((m) => m.brand_id === b.brand_id),
-        })),
-    }));
-
-    return res.status(200).json(result);
-  } catch (err) {
-    console.error('❌ getProductsFull Error:', err);
-    return res.status(500).json({
-      success: false,
-      error: err.message,
-    });
-  }
-};
-
-// Step 1: Create product type only (without brands/models)
-export const addProductTypeOnly1 = async (req, res) => {
-  try {
-    const { product_type_name, quotation_type, other_quotation_type } =
-      req.body;
-
+    // Validation
     if (!product_type_name) {
       return res.status(400).json({ error: 'product_type_name is required' });
+    }
+
+    if (!cat_id) {
+      return res.status(400).json({ error: 'cat_id is required' });
     }
 
     if (!quotation_type) {
@@ -830,11 +872,12 @@ export const addProductTypeOnly1 = async (req, res) => {
         ? other_quotation_type
         : quotation_type;
 
-    // Create product type
+    // Insert product type
     const [pt] = await db.execute(
-      `INSERT INTO product_types (product_type_name, quotation_type) 
-       VALUES (?, ?)`,
-      [product_type_name, finalQuotationType],
+      `INSERT INTO product_types 
+        (product_type_name, quotation_type, cat_id, status) 
+       VALUES (?, ?, ?, 'active')`,
+      [product_type_name, finalQuotationType, cat_id],
     );
 
     return res.status(201).json({
@@ -843,42 +886,6 @@ export const addProductTypeOnly1 = async (req, res) => {
       product_type_id: pt.insertId,
       product_type_name,
       quotation_type: finalQuotationType,
-    });
-  } catch (err) {
-    console.error('❌ addProductTypeOnly Error:', err);
-    return res.status(500).json({
-      success: false,
-      error: err.message,
-    });
-  }
-};
-
-export const addProductTypeOnly = async (req, res) => {
-  try {
-    const { product_type_name, quotation_type, cat_id } = req.body;
-
-    // 🔹 Validation
-    if (!product_type_name) {
-      return res.status(400).json({ error: 'product_type_name is required' });
-    }
-
-    if (!cat_id) {
-      return res.status(400).json({ error: 'cat_id is required' });
-    }
-
-    // 🔹 Insert product type
-    const [pt] = await db.execute(
-      `INSERT INTO product_types 
-        (product_type_name, cat_id) 
-       VALUES (?, ?)`,
-      [product_type_name, cat_id],
-    );
-
-    return res.status(201).json({
-      success: true,
-      message: 'Product type created successfully',
-      product_type_id: pt.insertId,
-      product_type_name,
       cat_id,
     });
   } catch (err) {
@@ -932,76 +939,6 @@ export const addBrandToProduct = async (req, res) => {
 };
 
 // Step 3: Add model to existing brand
-// export const addModelToBrand = async (req, res) => {
-//   try {
-//     const { brand_id } = req.params;
-//     const { model_no, description, price } = req.body;
-
-//     if (!model_no) {
-//       return res.status(400).json({ error: "model_no is required" });
-//     }
-
-//     if (!price) {
-//       return res.status(400).json({ error: "price is required" });
-//     }
-
-//     // Check if brand exists
-//     const [brand] = await db.execute(
-//       `SELECT * FROM brands WHERE brand_id = ?`,
-//       [brand_id]
-//     );
-
-//     if (brand.length === 0) {
-//       return res.status(404).json({ error: "Brand not found" });
-//     }
-
-//     let savedImagePath = null;
-
-//     // Handle image upload
-//     if (req.files && req.files.model_image) {
-//       const image = req.files.model_image;
-//       const fileName = `${Date.now()}_${image.name}`;
-//       const uploadDir = path.join(__dirname, "../uploads");
-
-//       if (!fs.existsSync(uploadDir)) fs.mkdirSync(uploadDir);
-
-//       const fullPath = path.join(uploadDir, fileName);
-//       await image.mv(fullPath);
-
-//       savedImagePath = `/uploads/${fileName}`;
-//     }
-
-//     // Add model
-//     const [model] = await db.execute(
-//       `INSERT INTO models
-//         (brand_id, model_no, description, price, image_path)
-//        VALUES (?, ?, ?, ?, ?)`,
-//       [
-//         brand_id,
-//         model_no,
-//         description || "",
-//         price,
-//         savedImagePath
-//       ]
-//     );
-
-//     return res.status(201).json({
-//       success: true,
-//       message: "Model added successfully",
-//       model_id: model.insertId,
-//       model_no,
-//       price,
-//       image_path: savedImagePath
-//     });
-
-//   } catch (err) {
-//     console.error("❌ addModelToBrand Error:", err);
-//     return res.status(500).json({
-//       success: false,
-//       error: err.message,
-//     });
-//   }
-// };
 export const addModelToBrand = async (req, res) => {
   try {
     const { brand_id } = req.params;
@@ -1015,13 +952,12 @@ export const addModelToBrand = async (req, res) => {
       return res.status(400).json({ error: 'price is required' });
     }
 
-    /* ✅ PRICE FIX (ONLY CHANGE) */
+    // Clean price (remove commas)
     const cleanPrice = Number(price.toString().replace(/,/g, ''));
 
     if (isNaN(cleanPrice)) {
       return res.status(400).json({ error: 'Invalid price format' });
     }
-    /* ✅ PRICE FIX END */
 
     // Check if brand exists
     const [brand] = await db.execute(
@@ -1052,13 +988,13 @@ export const addModelToBrand = async (req, res) => {
     // Add model
     const [model] = await db.execute(
       `INSERT INTO models 
-        (brand_id, model_no, description, price, image_path)
-       VALUES (?, ?, ?, ?, ?)`,
+        (brand_id, model_no, description, price, image_path, status)
+       VALUES (?, ?, ?, ?, ?, 'active')`,
       [
         brand_id,
         model_no,
         description || '',
-        cleanPrice, // ✅ FIXED PRICE USED HERE
+        cleanPrice,
         savedImagePath,
       ],
     );
@@ -1080,62 +1016,7 @@ export const addModelToBrand = async (req, res) => {
   }
 };
 
-// Get specific product type with all details
-export const getProductTypeDetails = async (req, res) => {
-  try {
-    const { product_type_id } = req.params;
-
-    // Get product type
-    const [productTypes] = await db.execute(
-      `SELECT * FROM product_types WHERE product_type_id = ?`,
-      [product_type_id],
-    );
-
-    if (productTypes.length === 0) {
-      return res.status(404).json({ error: 'Product type not found' });
-    }
-
-    const productType = productTypes[0];
-
-    // Get brands for this product type
-    const [brands] = await db.execute(
-      `SELECT * FROM brands WHERE product_type_id = ?`,
-      [product_type_id],
-    );
-
-    const brandIds = brands.map((b) => b.brand_id);
-
-    // Get models for these brands
-    let models = [];
-    if (brandIds.length > 0) {
-      const [rows] = await db.execute(
-        `SELECT * FROM models WHERE brand_id IN (${brandIds
-          .map(() => '?')
-          .join(',')})`,
-        brandIds,
-      );
-      models = rows;
-    }
-
-    // Build nested structure
-    const result = {
-      ...productType,
-      brands: brands.map((brand) => ({
-        ...brand,
-        models: models.filter((model) => model.brand_id === brand.brand_id),
-      })),
-    };
-
-    return res.status(200).json(result);
-  } catch (err) {
-    console.error('❌ getProductTypeDetails Error:', err);
-    return res.status(500).json({
-      success: false,
-      error: err.message,
-    });
-  }
-};
-
+// Update brand
 export const updateBrand = async (req, res) => {
   try {
     const { brand_id } = req.params;
@@ -11368,10 +11249,31 @@ export const getLatestQuotationByMasterId = async (req, res) => {
  
   try {
     // Get lead information
+ 
     const [[lead]] = await connection.query(
-      `SELECT name, number, city, address FROM raw_data WHERE master_id = ?`,
-      [master_id]
-    );
+  `SELECT 
+      rd.name,
+      rd.number,
+      rd.address,
+
+      -- ✅ If area exists show area_name else show city
+      CASE
+        WHEN rd.area_id IS NOT NULL 
+             AND rd.area_id != ''
+             AND a.area_name IS NOT NULL
+        THEN a.area_name
+        ELSE rd.city
+      END AS city
+
+   FROM raw_data rd
+
+   LEFT JOIN area a
+      ON a.area_id = rd.area_id
+
+   WHERE rd.master_id = ?`,
+  [master_id]
+);
+
     
     if (!lead) {
       return res.status(404).json({ message: 'Lead not found' });

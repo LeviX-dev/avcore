@@ -271,3 +271,48 @@ export const getUsersList = async (req, res) => {
       res.status(500).json({ success: false, message: 'Failed to adjust wallet' });
     }
   };
+
+  // Add to walletController.js
+export const getWalletTrendStats = async (req, res) => {
+  try {
+    const user = req.session?.user;
+    if (!user) return res.status(401).json({ success: false, message: 'Unauthorized' });
+
+    const { from_date, to_date, user_id } = req.query;
+    let userIdCondition = '';
+    const params = [];
+
+    // Admins can see any user; others see only themselves
+    const isAdmin = ['admin', 'hr', 'sub_admin'].includes(user.role);
+    if (!isAdmin && !user_id) {
+      userIdCondition = 'AND user_id = ?';
+      params.push(user.id);
+    } else if (user_id && isAdmin) {
+      userIdCondition = 'AND user_id = ?';
+      params.push(user_id);
+    }
+
+    if (from_date) params.push(from_date);
+    if (to_date) params.push(to_date);
+
+    const query = `
+      SELECT
+        DATE_FORMAT(created_at, '%Y-%m') AS month,
+        COALESCE(SUM(CASE WHEN transaction_type = 'credit' THEN amount ELSE 0 END), 0) AS total_credit,
+        COALESCE(SUM(CASE WHEN transaction_type = 'debit'  THEN amount ELSE 0 END), 0) AS total_debit
+      FROM wallet_transactions
+      WHERE 1=1 ${userIdCondition}
+        ${from_date ? 'AND created_at >= ?' : ''}
+        ${to_date   ? 'AND created_at <= ?' : ''}
+        AND status = 'approved'
+      GROUP BY DATE_FORMAT(created_at, '%Y-%m')
+      ORDER BY month ASC
+    `;
+
+    const [rows] = await db.query(query, params);
+    res.json({ success: true, data: rows });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ success: false, message: 'Failed to fetch wallet trend' });
+  }
+};

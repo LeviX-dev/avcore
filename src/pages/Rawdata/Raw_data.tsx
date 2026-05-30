@@ -1420,11 +1420,7 @@ const RawData = () => {
                                 >
                                   View
                                 </a>
-                                {image.remark && (
-                                  <div className="absolute bottom-0 left-0 right-0 bg-black/70 text-white text-xs p-2 rounded-b-lg">
-                                    {image.remark}
-                                  </div>
-                                )}
+                      
                               </div>
                             </div>
                           ))}
@@ -1456,21 +1452,11 @@ const RawData = () => {
                                   <div className="font-medium text-gray-800 dark:text-gray-200 truncate">
                                     {doc.document_name}
                                   </div>
-                                  {doc.remark && (
-                                    <div className="text-sm text-gray-600 dark:text-gray-400 truncate">
-                                      {doc.remark}
-                                    </div>
-                                  )}
+                               
                                 </div>
                               </div>
                               <div className="flex items-center gap-2">
-                                {doc.uploaded_at && (
-                                  <span className="text-xs text-gray-500 dark:text-gray-400">
-                                    {new Date(
-                                      doc.uploaded_at,
-                                    ).toLocaleDateString()}
-                                  </span>
-                                )}
+                              
                                 <a
                                   href={doc.url}
                                   target="_blank"
@@ -1525,11 +1511,7 @@ const RawData = () => {
                                     Download
                                   </a>
                                 </div>
-                                {video.remark && (
-                                  <div className="mt-2 text-sm text-gray-600 dark:text-gray-400">
-                                    {video.remark}
-                                  </div>
-                                )}
+                            
                               </div>
                             </div>
                           ))}

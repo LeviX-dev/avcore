@@ -1400,24 +1400,41 @@ const formatDateTime = (dateString: string | undefined): string => {
 </div>
 
 
-              <div className="md:col-span-1 mt-4 ">
-                <label className="block mb-1 text-base font-semibold text-green-700 dark:text-green-600">
-                  Lead Stage
-                </label>
-                <select
-                  name="lead_stage"
-                  value={editingClient.lead_stage || ''}
-                  onChange={handleInputChange}
-                  className="w-full p-2 border rounded text-sm dark:border-form-strokedark dark:bg-form-input dark:text-white"
-                >
-                  <option value="">Select Lead Stage</option>
-                  {leadStages.map((stage, index) => (
-                    <option key={index} value={stage}>
-                      {stage}
-                    </option>
-                  ))}
-                </select>
-              </div>
+           <div className="md:col-span-1 mt-4 ">
+  <label className="block mb-1 text-base font-semibold text-green-700 dark:text-green-600">
+    Lead Stage
+  </label>
+  
+  {/* 🔥 FIX: If lead stage is "Execution", show as disabled/read-only */}
+  {editingClient.lead_stage === 'Execution' ? (
+    <div className="relative">
+      <input
+        type="text"
+        value="Execution"
+        disabled
+        className="w-full p-2 border rounded text-sm dark:border-form-strokedark dark:bg-form-input dark:text-white bg-gray-100 cursor-not-allowed"
+      />
+      <div className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none">
+        <span className="text-xs text-red-500 font-semibold">🔒 Locked</span>
+      </div>
+     
+    </div>
+  ) : (
+    <select
+      name="lead_stage"
+      value={editingClient.lead_stage || ''}
+      onChange={handleInputChange}
+      className="w-full p-2 border rounded text-sm dark:border-form-strokedark dark:bg-form-input dark:text-white"
+    >
+      <option value="">Select Lead Stage</option>
+      {leadStages.map((stage, index) => (
+        <option key={index} value={stage}>
+          {stage}
+        </option>
+      ))}
+    </select>
+  )}
+</div>
 
               <div className="md:col-span-1 mt-4">
                 <label className="block mb-1 text-sm dark:text-white">

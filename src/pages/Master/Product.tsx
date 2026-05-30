@@ -61,71 +61,71 @@ const Product = () => {
   const [loading, setLoading] = useState(false);
   const [categories, setCategories] = useState([]);
 
-useEffect(() => {
-  const init = async () => {
-    await fetchCategories();
-    await fetchProductTypes();
-  };
+  useEffect(() => {
+    const init = async () => {
+      await fetchCategories();
+      await fetchProductTypes();
+    };
+    init();
+  }, []);
 
-  init();
-}, []);
-
-
-  
   const fetchCategories = async () => {
-    const res = await axios.get(BASE_URL + 'api/customised-categories');
-    setCategories(res.data);
+    try {
+      const res = await axios.get(BASE_URL + 'api/customised-categories');
+      setCategories(res.data);
+    } catch (error) {
+      console.error('Failed to fetch categories:', error);
+    }
   };
 
   const fetchProductTypes = async () => {
-  try {
-    setLoading(true);
-    const res = await axios.get(BASE_URL + 'api/product');
+    try {
+      setLoading(true);
+      const res = await axios.get(BASE_URL + 'api/product');
+      
+      // Categories should already be loaded
+      const data = res.data.map((pt: ProductType) => {
+        return {
+          ...pt,
+          cat_name: pt.cat_name || categories.find((c: any) => c.cat_id === pt.cat_id)?.cat_name || "-",
+          brandCount: pt.brands?.length || 0,
+          modelCount: pt.brands?.reduce((t, b) => t + (b.models?.length || 0), 0) || 0,
+        };
+      });
 
-    const data = res.data.map((pt: ProductType) => {
-      const category = categories.find((c: any) => c.cat_id === pt.cat_id);
-
-      return {
-        ...pt,
-        cat_name: category?.cat_name || "-",   // ✅ ADD THIS
-        brandCount: pt.brands?.length || 0,
-        modelCount:
-          pt.brands?.reduce((t, b) => t + (b.models?.length || 0), 0) || 0,
-      };
-    });
-
-    setProductTypes(data);
-    setFilteredData(data);
-  } finally {
-    setLoading(false);
-  }
-};
-
-
+      setProductTypes(data);
+      setFilteredData(data);
+    } catch (error) {
+      console.error('Error fetching products:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const refreshProductType = async (id: number) => {
-    const res = await axios.get(`${BASE_URL}api/product/${id}/details`);
-    const pt = res.data;
-    const category = categories.find((c: any) => c.cat_id === pt.cat_id);
+    try {
+      const res = await axios.get(`${BASE_URL}api/product/${id}/details`);
+      const pt = res.data;
+      
+      const updated = {
+        ...pt,
+        cat_name: pt.cat_name || categories.find((c: any) => c.cat_id === pt.cat_id)?.cat_name || "-",
+        brandCount: pt.brands?.length || 0,
+        modelCount: pt.brands?.reduce(
+          (t: number, b: Brand) => t + (b.models?.length || 0),
+          0,
+        ) || 0,
+      };
 
-    
-const updated = {
-  ...pt,
-  cat_name: category?.cat_name || "-",   // ✅ ADD THIS
-  brandCount: pt.brands?.length || 0,
-  modelCount:
-    pt.brands?.reduce(
-      (t: number, b: Brand) => t + (b.models?.length || 0),
-      0,
-    ) || 0,
-}
-
-    setProductTypes((prev) =>
-      prev.map((p) => (p.product_type_id === id ? updated : p)),
-    );
-    setFilteredData((prev) =>
-      prev.map((p) => (p.product_type_id === id ? updated : p)),
-    );
+      setProductTypes((prev) =>
+        prev.map((p) => (p.product_type_id === id ? updated : p)),
+      );
+      setFilteredData((prev) =>
+        prev.map((p) => (p.product_type_id === id ? updated : p)),
+      );
+    } catch (error) {
+      console.error('Error refreshing product type:', error);
+    }
   };
 
   const handleSearch = () => {
@@ -192,7 +192,7 @@ const updated = {
         </button>
       </div>
 
-      {/* POPUPS (unchanged) */}
+      {/* POPUPS */}
       {showAddProductTypePopup && (
         <AddProductTypeForm
           categories={categories}

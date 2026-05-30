@@ -47,43 +47,68 @@ const ProcessSettings = () => {
   };
 
   /* ================= SAVE (ADD / EDIT) ================= */
+
+  const [isSaving, setIsSaving] = useState(false);
+
+
   const saveProcess = async () => {
-    if (!newProcess.process_name.trim()) {
-      alert("Process name required");
-      return;
+
+  if (isSaving) return;
+
+  if (!newProcess.process_name.trim()) {
+    alert("Process name required");
+    return;
+  }
+
+  try {
+
+    setIsSaving(true);
+
+    if (editMode) {
+
+      await axios.put(
+        BASE_URL + `api/process/${editingId}`,
+        {
+          ...newProcess,
+          type_id: typeId
+        },
+        { withCredentials: true }
+      );
+
+      setSuccessMessage("Process updated successfully!");
+
+    } else {
+
+      await axios.post(
+        BASE_URL + "api/process",
+        {
+          ...newProcess,
+          type_id: typeId
+        },
+        { withCredentials: true }
+      );
+
+      setSuccessMessage("Process added successfully!");
     }
 
-    try {
-      if (editMode) {
-        await axios.put(
-          BASE_URL + `api/process/${editingId}`,
-          {
-            ...newProcess,
-            type_id: typeId
-          },
-          { withCredentials: true }
-        );
-        setSuccessMessage("Process updated successfully!");
-      } else {
-        await axios.post(
-          BASE_URL + "api/process",
-          {
-            ...newProcess,
-            type_id: typeId
-          },
-          { withCredentials: true }
-        );
-        setSuccessMessage("Process added successfully!");
-      }
+    resetForm();
 
-      resetForm();
-      fetchProcesses();
-      setTimeout(() => setSuccessMessage(""), 2000);
-    } catch (error) {
-      console.error("Save error:", error);
-      alert("Failed to save process.");
-    }
-  };
+    fetchProcesses();
+
+    setTimeout(() => setSuccessMessage(""), 2000);
+
+  } catch (error) {
+
+    console.error("Save error:", error);
+
+    alert("Failed to save process.");
+
+  } finally {
+
+    setIsSaving(false);
+  }
+};
+
 
   /* ================= EDIT ================= */
   const handleEdit = (process) => {
@@ -346,12 +371,18 @@ const ProcessSettings = () => {
                   Cancel
                 </button>
 
-                <button
-                  className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600"
-                  onClick={saveProcess}
-                >
-                  Save
-                </button>
+<button
+  className={`px-4 py-2 text-white rounded ${
+    isSaving
+      ? "bg-gray-400 cursor-not-allowed"
+      : "bg-blue-500 hover:bg-blue-600"
+  }`}
+  onClick={saveProcess}
+  disabled={isSaving}
+>
+  {isSaving ? "Saving..." : "Save"}
+</button>
+
               </div>
             </div>
           </div>

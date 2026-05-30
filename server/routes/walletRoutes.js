@@ -13,7 +13,8 @@ import {
   getUserTransactions,
   manualAdjustWallet,
   getUsersList,
-  getAllWalletTransactions
+  getAllWalletTransactions ,
+  getWalletTrendStats,
 } from '../controllers/walletController.js';
 
 const router = express.Router();
@@ -35,5 +36,7 @@ router.get('/admin/wallet/users/:id/transactions', getUserTransactions);
 router.post('/admin/wallet/users/:id/adjust', manualAdjustWallet);
 
 // After other admin routes:
-router.get('/admin/wallet/all-transactions', getAllWalletTransactions);
+router.get('/admin/wallet/all-transactions', getAllWalletTransactions); 
+router.get('/stats/trend', getWalletTrendStats);
+
 export default router;

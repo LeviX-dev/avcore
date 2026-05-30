@@ -1248,11 +1248,7 @@ const [quotationVersions, setQuotationVersions] = useState<any>(null);
                                 >
                                   View
                                 </a>
-                                {image.remark && (
-                                  <div className="absolute bottom-0 left-0 right-0 bg-black/70 text-white text-xs p-2 rounded-b-lg">
-                                    {image.remark}
-                                  </div>
-                                )}
+
                               </div>
                             </div>
                           ))}
@@ -1284,21 +1280,10 @@ const [quotationVersions, setQuotationVersions] = useState<any>(null);
                                   <div className="font-medium text-gray-800 dark:text-gray-200 truncate">
                                     {doc.document_name}
                                   </div>
-                                  {doc.remark && (
-                                    <div className="text-sm text-gray-600 dark:text-gray-400 truncate">
-                                      {doc.remark}
-                                    </div>
-                                  )}
+                              
                                 </div>
                               </div>
-                              <div className="flex items-center gap-2">
-                                {doc.uploaded_at && (
-                                  <span className="text-xs text-gray-500 dark:text-gray-400">
-                                    {new Date(
-                                      doc.uploaded_at,
-                                    ).toLocaleDateString()}
-                                  </span>
-                                )}
+                              <div className="flex items-center gap-2">                               
                                 <a
                                   href={doc.url}
                                   target="_blank"
@@ -1353,11 +1338,7 @@ const [quotationVersions, setQuotationVersions] = useState<any>(null);
                                     Download
                                   </a>
                                 </div>
-                                {video.remark && (
-                                  <div className="mt-2 text-sm text-gray-600 dark:text-gray-400">
-                                    {video.remark}
-                                  </div>
-                                )}
+                              
                               </div>
                             </div>
                           ))}
@@ -2600,164 +2581,121 @@ const fetchClientQuotationVersionsForModal = async (master_id: number) => {
     setUploadFiles(validFiles);
   };
 
-  const handleUploadSubmit = async () => {
+// ==============================
+// FRONTEND HANDLE UPLOAD
+// ============================== 
+// Add this with your other state declarations
+const [isUploading, setIsUploading] = useState(false);
+const [uploadProgress, setUploadProgress] = useState(0);
+
+
+const handleUploadSubmit = async () => {
+  try {
     if (!docsClient || uploadFiles.length === 0) {
       alert('Please select files to upload.');
       return;
     }
 
+    // Start loading
+    setIsUploading(true);
+    setUploadProgress(0);
+
     const formData = new FormData();
 
-    // Add files
+    // FILES
     uploadFiles.forEach((file) => {
       formData.append('files', file);
     });
 
-    // Add additional fields
+    // OPTIONAL FIELDS
     if (locationLink) formData.append('location_link', locationLink);
     if (remark) formData.append('remark', remark);
     if (followupDate) formData.append('followup_date', followupDate);
     if (leadStage) formData.append('leadStage', leadStage);
+    if (detailedRemark) formData.append('detailed_remark', detailedRemark);
 
-    // 🔴 FIX: Add detailed_remark field
-    if (detailedRemark) {
-      formData.append('detailed_remark', detailedRemark);
-      console.log('📝 Sending detailed_remark:', detailedRemark);
-    }
-
-    // 🔴 CRITICAL FIX: Send assignedTo correctly
-    if (selectedUsers && selectedUsers.length > 0) {
-      // METHOD 1: Send as comma-separated string (RECOMMENDED)
-      const assignedToString = selectedUsers.join(',');
-      formData.append('assignedTo', assignedToString);
-
-      // 🔴 ALSO send as array for backward compatibility
-      selectedUsers.forEach((userId) => {
-        formData.append('assignedTo[]', userId);
-      });
-
-      console.log(`📤 Sending assignedTo as: ${assignedToString}`);
-      console.log(
-        `📤 Also sending as array with ${selectedUsers.length} users`,
-      );
+    // assignedTo
+    if (selectedUsers.length > 0) {
+      formData.append('assignedTo', selectedUsers.join(','));
     } else {
       formData.append('assignedTo', '');
-      console.log('📤 Sending empty assignedTo');
     }
 
-    // 🔴 DEBUG: Log all form data entries
-    console.log('\n📤 ALL FORM DATA ENTRIES:');
-    console.log('-'.repeat(40));
-    const formDataEntries = Array.from(formData.entries());
-    formDataEntries.forEach(([key, value]) => {
-      if (key === 'files') {
-        console.log(`${key}: File object - ${value.name}`);
-      } else {
-        console.log(`${key}: ${value}`);
-      }
-    });
-    console.log('-'.repeat(40));
-
-    try {
-      const response = await axios.post(
-        `${BASE_URL}api/upload/${docsClient.master_id}`,
-        formData,
-        {
-          headers: {
-            'Content-Type': 'multipart/form-data',
-          },
-          withCredentials: true,
+    // API CALL with progress tracking
+    const response = await axios.post(
+      `${BASE_URL}api/upload/${docsClient.master_id}`,
+      formData,
+      {
+        withCredentials: true,
+        timeout: 300000, // 5 minutes
+        maxBodyLength: Infinity,
+        maxContentLength: Infinity,
+        onUploadProgress: (progressEvent) => {
+          const percentCompleted = Math.round(
+            (progressEvent.loaded * 100) / progressEvent.total
+          );
+          setUploadProgress(percentCompleted);
         },
-      );
-
-      // Show success message
-      let successMsg = '✅ Files uploaded successfully!\n\n';
-
-      if (response.data.summary) {
-        const { summary } = response.data;
-        successMsg += `📁 Files Uploaded: ${summary.files_uploaded}\n`;
-        successMsg += `👥 Reassignments Added: ${summary.reassignments_added}\n`;
-        if (summary.duplicates_skipped > 0) {
-          successMsg += `⚠️ Duplicates Skipped: ${summary.duplicates_skipped}\n`;
-        }
       }
+    );
 
-      if (response.data.updated_fields) {
-        const fields = response.data.updated_fields;
-        successMsg += '\n📊 Updates:\n';
-        if (fields.raw_data_followup_date)
-          successMsg += '• Follow-up date updated\n';
-        if (fields.raw_data_lead_stage) successMsg += '• Lead stage updated\n';
-        if (fields.raw_data_detailed_remark)
-          successMsg += '• Detailed remark updated\n';
-        if (fields.reassignments_created > 0) {
-          successMsg += `• ${fields.reassignments_created} reassignment(s) created\n`;
-        } else {
-          successMsg += '• No reassignments created\n';
-        }
-      }
+    console.log('UPLOAD SUCCESS:', response.data);
+    alert('✅ Files uploaded successfully!');
 
-      alert(successMsg);
-      console.log('✅ Server response:', response.data);
+    // Refresh the document list after upload
+    const refreshResponse = await axios.get(
+      `${BASE_URL}api/documents/${docsClient.master_id}`,
+      { withCredentials: true },
+    );
 
-      // Refresh document list
-      const refreshResponse = await axios.get(
-        `${BASE_URL}api/documents/${docsClient.master_id}`,
-        { withCredentials: true },
-      );
+    const processFilePath = (filePath: string) => {
+      filePath = filePath.replace(/^server\//, '').replace(/\\/g, '/');
+      if (!filePath.startsWith('uploads/')) filePath = `uploads/${filePath}`;
+      return `${BASE_URL}${filePath}`;
+    };
 
-      const processFilePath = (filePath: string) => {
-        filePath = filePath.replace(/^server\//, '').replace(/\\/g, '/');
-        if (!filePath.startsWith('uploads/')) filePath = `uploads/${filePath}`;
-        return `${BASE_URL}${filePath}`;
+    const images: DocItem[] = [];
+    const documents: DocItem[] = [];
+    const videos: DocItem[] = [];
+
+    refreshResponse.data.documents.forEach((doc: any) => {
+      const docObj: DocItem = {
+        doc_id: doc.doc_id,
+        url: processFilePath(doc.document_path),
+        link: doc.location_link,
+        remark: doc.remark,
+        document_type: doc.document_type,
       };
 
-      const images: DocItem[] = [];
-      const documents: DocItem[] = [];
-      const videos: DocItem[] = [];
+      if (doc.document_type === 'image') images.push(docObj);
+      else if (doc.document_type === 'video') videos.push(docObj);
+      else documents.push(docObj);
+    });
 
-      refreshResponse.data.documents.forEach((doc: any) => {
-        const docObj: DocItem = {
-          doc_id: doc.doc_id,
-          url: processFilePath(doc.document_path),
-          link: doc.location_link,
-          remark: doc.remark,
-          document_type: doc.document_type,
-        };
+    setDocsData({ images, documents, videos });
 
-        if (doc.document_type === 'image') images.push(docObj);
-        else if (doc.document_type === 'video') videos.push(docObj);
-        else documents.push(docObj);
-      });
-
-      // Update state
-      setDocsData({ images, documents, videos });
-
-      // Clear the form
-      setUploadFiles([]);
-      setLocationLink('');
-      setRemark('');
-      setDetailedRemark('');
-      setFollowupDate('');
-      setSelectedUsers([]);
-      setLeadStage('');
-
-      // Refresh the main table data
-      // fetchTaleCallerData();
-      refreshDataWithPagePreservation(); // Changed from fetchTaleCallerData()
-    } catch (error: any) {
-      console.error('❌ Upload error:', error);
-
-      if (error.response?.data?.message) {
-        alert(`❌ Upload failed: ${error.response.data.message}`);
-        if (error.response.data.error) {
-          console.error('Server error details:', error.response.data.error);
-        }
-      } else {
-        alert('❌ Error uploading files. Please check console for details.');
-      }
+    // Clear form after successful upload
+    setUploadFiles([]);
+    setLocationLink('');
+    setRemark('');
+    setDetailedRemark('');
+    setFollowupDate('');
+    setLeadStage('');
+    setSelectedUsers([]);
+    
+  } catch (error: any) {
+    console.error('UPLOAD ERROR:', error);
+    if (error.response) {
+      alert(`❌ ${error.response.data.message || 'Upload failed!'}`);
+    } else {
+      alert('❌ Network error or server issue. Please try again.');
     }
-  };
+  } finally {
+    setIsUploading(false);
+    setUploadProgress(0);
+  }
+};
+
 
   const getFileIcon = (fileName: string) => {
     const ext = fileName.split('.').pop()?.toLowerCase() || '';
@@ -4674,18 +4612,42 @@ const fetchClientQuotationVersionsForModal = async (master_id: number) => {
                       </div>
                     )}
 
-                    {/* Submit Button */}
-                    <button
-                      onClick={handleUploadSubmit}
-                      disabled={uploadFiles.length === 0}
-                      className={`w-full py-3 rounded-lg font-bold text-sm transition-all shadow-md ${
-                        uploadFiles.length > 0
-                          ? 'bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white active:scale-95'
-                          : 'bg-gray-200 dark:bg-gray-700 text-gray-400 cursor-not-allowed'
-                      }`}
-                    >
-                      UPLOAD & UPDATE
-                    </button>
+                   {/* Submit Button with Loader */}
+<button
+  onClick={handleUploadSubmit}
+  disabled={uploadFiles.length === 0 || isUploading}
+  className={`w-full py-3 rounded-lg font-bold text-sm transition-all shadow-md ${
+    uploadFiles.length > 0 && !isUploading
+      ? 'bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white active:scale-95'
+      : 'bg-gray-200 dark:bg-gray-700 text-gray-400 cursor-not-allowed'
+  }`}
+>
+  {isUploading ? (
+    <div className="flex items-center justify-center gap-2">
+      <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+      <span>Uploading... {uploadProgress}%</span>
+    </div>
+  ) : (
+    'UPLOAD & UPDATE'
+  )}
+</button>
+
+
+{/* Progress Bar - Show during upload */}
+{isUploading && (
+  <div className="mt-3">
+    <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2 overflow-hidden">
+      <div 
+        className="bg-gradient-to-r from-blue-500 to-purple-500 h-2 rounded-full transition-all duration-300"
+        style={{ width: `${uploadProgress}%` }}
+      ></div>
+    </div>
+    <p className="text-xs text-center text-gray-500 dark:text-gray-400 mt-1">
+      Uploading {uploadFiles.length} file(s)... {uploadProgress}%
+    </p>
+  </div>
+)}
+
                   </div>
                 </div>
               </div>
@@ -4756,11 +4718,7 @@ const fetchClientQuotationVersionsForModal = async (master_id: number) => {
                                   🔗 {doc.link}
                                 </a>
                               )}
-                              {doc.remark && (
-                                <p className="text-[11px] text-gray-500 dark:text-gray-400 italic bg-gray-50 dark:bg-gray-700/50 p-1.5 rounded">
-                                  💬 {doc.remark}
-                                </p>
-                              )}
+                              
                             </div>
                           </div>
                         </div>
@@ -4794,12 +4752,7 @@ const fetchClientQuotationVersionsForModal = async (master_id: number) => {
                                 <p className="font-semibold text-sm dark:text-white truncate">
                                   {doc.url.split('/').pop()}
                                 </p>
-                                {doc.remark && (
-                                  <p className="text-xs text-gray-500 mt-1">
-                                    Remark:{' '}
-                                    <span className="italic">{doc.remark}</span>
-                                  </p>
-                                )}
+
                                 {doc.link && (
                                   <a
                                     href={doc.link}
@@ -4909,11 +4862,7 @@ const fetchClientQuotationVersionsForModal = async (master_id: number) => {
                                 🔗 Map/Source Link
                               </a>
                             )}
-                            {doc.remark && (
-                              <p className="text-[11px] text-gray-500 italic border-t border-gray-100 dark:border-gray-700 pt-2 mt-1">
-                                {doc.remark}
-                              </p>
-                            )}
+                           
                           </div>
                         </div>
                       ))}
@@ -5768,6 +5717,37 @@ const fetchClientQuotationVersionsForModal = async (master_id: number) => {
       </div>
 
   
+    </div>
+  </div>
+)}
+
+
+
+{/* Loading Overlay */}
+{isUploading && (
+  <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[10000]">
+    <div className="bg-white dark:bg-boxdark rounded-xl p-6 shadow-2xl max-w-sm w-full mx-4">
+      <div className="text-center">
+        <div className="w-16 h-16 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+        <h3 className="text-lg font-semibold text-gray-800 dark:text-white mb-2">
+          Uploading Files
+        </h3>
+        <p className="text-sm text-gray-600 dark:text-gray-400 mb-3">
+          Please wait while we upload {uploadFiles.length} file(s)...
+        </p>
+        <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2 mb-2">
+          <div 
+            className="bg-gradient-to-r from-blue-500 to-purple-500 h-2 rounded-full transition-all duration-300"
+            style={{ width: `${uploadProgress}%` }}
+          ></div>
+        </div>
+        <p className="text-xs text-gray-500 dark:text-gray-400">
+          {uploadProgress}% complete
+        </p>
+        <p className="text-xs text-gray-400 dark:text-gray-500 mt-3">
+          This may take a few moments depending on file sizes
+        </p>
+      </div>
     </div>
   </div>
 )}
