@@ -1306,7 +1306,7 @@ export const createExecutionStart = async (req, res) => {
 };
 
 
-export const updateExecution = async (req, res) => {
+export const updateExecution2 = async (req, res) => {
   try {
     const { execution_id } = req.params;
     const {
@@ -1444,6 +1444,183 @@ export const updateExecution = async (req, res) => {
   } catch (err) {
     await db.query("ROLLBACK");
     res.status(500).json({ success:false, error:err.message });
+  }
+};
+
+
+export const updateExecution = async (req, res) => {
+  try {
+    const { execution_id } = req.params;
+    const {
+      start_date,
+      end_date,
+      remark,
+      status,
+      assigned_users,
+      assigned_user_ids
+    } = req.body;
+
+    const { id: changed_by } = req.session.user;
+
+    await db.query("START TRANSACTION");
+
+    const [rows] = await db.query(
+      `SELECT * FROM execution_start WHERE execution_id=?`,
+      [execution_id]
+    );
+
+    if (!rows.length) {
+      await db.query("ROLLBACK");
+      return res.status(404).json({ success: false, message: "Execution not found" });
+    }
+
+    const old = rows[0];
+    const updates = [];
+    const values = [];
+
+    const logField = async (field, oldVal, newVal) => {
+      if (oldVal != newVal) {
+        await db.query(
+          `INSERT INTO execution_history
+           (execution_id, field_name, old_value, new_value, changed_by)
+           VALUES (?, ?, ?, ?, ?)`,
+          [execution_id, field, oldVal, newVal, changed_by]
+        );
+      }
+    };
+
+    if (start_date && start_date !== old.start_date) {
+      updates.push("start_date=?");
+      values.push(start_date);
+      await logField("start_date", old.start_date, start_date);
+    }
+
+    if (end_date && end_date !== old.end_date) {
+      updates.push("end_date=?");
+      values.push(end_date);
+      await logField("end_date", old.end_date, end_date);
+    }
+
+    if (remark !== undefined && remark !== old.remark) {
+      updates.push("remark=?");
+      values.push(remark);
+      await logField("remark", old.remark, remark);
+    }
+
+    if (status && status !== old.status) {
+      updates.push("status=?");
+      values.push(status);
+      await logField("status", old.status, status);
+    }
+
+    if (updates.length) {
+      updates.push("updated_at=CURRENT_TIMESTAMP");
+      values.push(execution_id);
+
+      await db.query(
+        `UPDATE execution_start SET ${updates.join(",")}
+         WHERE execution_id=?`,
+        values
+      );
+    }
+
+    /* ===== USER REASSIGNMENT ===== */
+    if (assigned_user_ids && assigned_users) {
+
+      const [oldUsers] = await db.query(
+        `SELECT user_id,user_name
+         FROM execution_assigned_users
+         WHERE execution_id=?`,
+        [execution_id]
+      );
+
+      const oldIds = oldUsers.map(u => u.user_id);
+
+      /* removed */
+      for (const u of oldUsers) {
+        if (!assigned_user_ids.includes(u.user_id)) {
+          await db.query(
+            `INSERT INTO execution_user_history
+             (execution_id,user_id,user_name,action_type,changed_by)
+             VALUES (?,?,?,'REMOVED',?)`,
+            [execution_id, u.user_id, u.user_name, changed_by]
+          );
+        }
+      }
+
+      /* added */
+      for (let i = 0; i < assigned_user_ids.length; i++) {
+        if (!oldIds.includes(assigned_user_ids[i])) {
+          await db.query(
+            `INSERT INTO execution_user_history
+             (execution_id,user_id,user_name,action_type,changed_by)
+             VALUES (?,?,?,'ASSIGNED',?)`,
+            [execution_id, assigned_user_ids[i], assigned_users[i], changed_by]
+          );
+        }
+      }
+
+      await db.query(
+        `DELETE FROM execution_assigned_users
+         WHERE execution_id=?`,
+        [execution_id]
+      );
+
+      for (let i = 0; i < assigned_user_ids.length; i++) {
+        await db.query(
+          `INSERT INTO execution_assigned_users
+           (execution_id,user_id,user_name)
+           VALUES (?,?,?)`,
+          [execution_id, assigned_user_ids[i], assigned_users[i]]
+        );
+      }
+    }
+
+    // ===== CRITICAL FIX: Update lead stage to Execution =====
+    // Get lead_ids from execution_start
+    const [executionData] = await db.query(
+      `SELECT lead_ids FROM execution_start WHERE execution_id=?`,
+      [execution_id]
+    );
+    
+    if (executionData.length > 0 && executionData[0].lead_ids) {
+      const leadIds = executionData[0].lead_ids.split(',');
+      
+      for (const master_id of leadIds) {
+        // Check current stage
+        const [[lead]] = await db.query(
+          `SELECT lead_stage FROM raw_data WHERE master_id = ?`,
+          [master_id]
+        );
+        
+        // Only update if not already in Execution
+        if (lead && lead.lead_stage !== 'Execution') {
+          await db.query(
+            `UPDATE raw_data SET lead_stage = 'Execution' WHERE master_id = ?`,
+            [master_id]
+          );
+          
+          // Log the stage change
+          await db.query(
+            `INSERT INTO execution_lead_history
+             (execution_id, master_id, action_type, old_value, new_value, changed_by)
+             VALUES (?, ?, 'STAGE_CHANGED', ?, 'Execution', ?)`,
+            [execution_id, master_id, lead.lead_stage, changed_by]
+          );
+        }
+      }
+    }
+
+    await db.query("COMMIT");
+
+    res.json({
+      success: true,
+      message: "Execution updated with structured history"
+    });
+
+  } catch (err) {
+    await db.query("ROLLBACK");
+    res.status(500).json({ success: false, error: err.message });
   }
 };
 
