@@ -27,26 +27,48 @@ import {
 import { BASE_URL } from '../../../public/config.js';
 import ReceivePOPopup from './ReceivePOPopup.js';
 
+interface PurchaseItem {
+  poi_id: number;
+  pr_id: number;
+  mpm_id: number;
+
+  product_type_id: number | null;
+
+  brand_id: number;
+  model_id: number;
+
+  brand_name: string;
+  model_no: string;
+
+  qty: number;
+
+  unit_price: string;
+  total_price: string;
+
+  received_qty: number;
+  status: string;
+
+  vendor: {
+    vendor_id: number;
+    vendor_name: string;
+  };
+}
+
 interface PurchaseOrder {
   po_id: number;
   po_number: string;
-  qty: number;
-  unit_price: string;
-  total_price: string;
   po_status: string;
   created_at: string;
-  vendor_id: number;
-  vendor_name: string;
-  pr_id: number;
-  mrn_id: number;
-  mpm_id: number;
-  mrn_number: string;
+
+  mrn: {
+    mrn_id: number;
+    mrn_number: string;
+  };
+
   client_name: string;
   city: string;
-  model_id: number;
-  brand_id: number;
-  brand_name: string;
-  model_no: string;
+
+  items: PurchaseItem[];
 }
 
 const PurchaseApproval: React.FC = () => {
@@ -82,7 +104,11 @@ const PurchaseApproval: React.FC = () => {
   );
 
   const availableVendors = Array.from(
-    new Set(purchaseOrders.map((po) => po.vendor_name)),
+    new Set(
+      purchaseOrders.flatMap((po) =>
+        po.items.map((item) => item.vendor?.vendor_name),
+      ),
+    ),
   );
 
   const availableStatuses = Array.from(
@@ -164,7 +190,10 @@ const PurchaseApproval: React.FC = () => {
       order.po_number.toLowerCase().includes(searchTerm.toLowerCase()) ||
       order.client_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
       order.mrn_number.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      order.model_no.toLowerCase().includes(searchTerm.toLowerCase());
+      order.items.some(
+        (item) =>
+          item.model_no?.toLowerCase().includes(searchTerm.toLowerCase()),
+      );
 
     // City filter
     const matchesCity =
@@ -173,7 +202,9 @@ const PurchaseApproval: React.FC = () => {
     // Vendor filter
     const matchesVendor =
       selectedVendors.length === 0 ||
-      selectedVendors.includes(order.vendor_name);
+      order.items.some((item) =>
+        selectedVendors.includes(item.vendor?.vendor_name),
+      );
 
     // Status filter
     const matchesStatus =
@@ -602,134 +633,160 @@ const PurchaseApproval: React.FC = () => {
                 </td>
               </tr>
             ) : (
-              currentItems.map((order) => (
-                <tr
-                  key={order.po_id}
-                  className="hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors"
-                >
-                  {/* PO Details */}
-                  <td className="py-4 px-4">
-                    <div>
-                      <div className="text-sm font-bold font-mono text-purple-600 dark:text-purple-400">
-                        {order.po_number}
-                      </div>
-                    </div>
-                  </td>
+              currentItems.map((order) =>
+                order.items.map((item, index) => (
+                  <tr
+                    key={`${order.po_id}-${item.poi_id}`}
+                    className="hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors"
+                  >
+                    {/* PO Details */}
+                    <td className="py-4 px-4">
+                      <div>
+                        <div className="text-sm font-bold font-mono text-purple-600 dark:text-purple-400">
+                          {order.po_number}
+                        </div>
 
-                  {/* Client Details */}
-                  <td className="py-4 px-4">
-                    <div>
+                        {index === 0 && (
+                          <div className="text-xs text-gray-500 mt-1">
+                            {formatDate(order.created_at)}
+                          </div>
+                        )}
+                      </div>
+                    </td>
+
+                    {/* Client Details */}
+                    <td className="py-4 px-4">
+                      <div>
+                        <div className="text-sm font-bold text-gray-900 dark:text-white flex items-center gap-1">
+                          <FontAwesomeIcon
+                            icon={faUser}
+                            className="text-gray-400 text-xs"
+                          />
+                          {order.client_name}
+                        </div>
+
+                        <div className="text-xs text-gray-500 mt-1">
+                          {order.mrn?.mrn_number}
+                        </div>
+                      </div>
+                    </td>
+
+                    {/* City */}
+                    <td className="py-4 px-4">
                       <div className="text-sm font-bold text-gray-900 dark:text-white flex items-center gap-1">
                         <FontAwesomeIcon
-                          icon={faUser}
+                          icon={faMapMarkerAlt}
                           className="text-gray-400 text-xs"
                         />
-                        {order.client_name}
+                        {order.city}
                       </div>
-                    </div>
-                  </td>
+                    </td>
 
-                  {/* City */}
-                  <td className="py-4 px-4">
-                    <div className="text-sm font-bold text-gray-900 dark:text-white flex items-center gap-1">
-                      <FontAwesomeIcon
-                        icon={faMapMarkerAlt}
-                        className="text-gray-400 text-xs"
-                      />
-                      {order.city}
-                    </div>
-                  </td>
-
-                  {/* Vendor */}
-                  <td className="py-4 px-4">
-                    <div className="flex items-center gap-2">
-                      <FontAwesomeIcon
-                        icon={faStore}
-                        className="text-gray-400 text-xs"
-                      />
-                      <span className="text-sm font-medium text-gray-900 dark:text-white">
-                        {order.vendor_name}
-                      </span>
-                    </div>
-                  </td>
-
-                  {/* Product */}
-                  <td className="py-4 px-4">
-                    <div>
-                      <div className="text-sm font-semibold text-gray-900 dark:text-white">
-                        {order.model_no}
-                      </div>
-                    </div>
-                  </td>
-
-                  {/* Quantity */}
-                  <td className="py-4 px-4">
-                    <div className="text-center">
-                      <span className="inline-flex items-center px-3 py-1.5 rounded-lg text-sm font-bold bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300">
+                    {/* Vendor */}
+                    <td className="py-4 px-4">
+                      <div className="flex items-center gap-2">
                         <FontAwesomeIcon
-                          icon={faBox}
-                          className="h-3 w-3 mr-1"
+                          icon={faStore}
+                          className="text-gray-400 text-xs"
                         />
-                        {order.qty}
-                      </span>
-                    </div>
-                  </td>
 
-                  {/* Amount */}
-                  <td className="py-4 px-4">
-                    <div>
-                      <div className="text-sm font-bold text-green-600 dark:text-green-400 flex items-center gap-1">
-                        <FontAwesomeIcon
-                          icon={faRupeeSign}
-                          className="h-3 w-3"
-                        />
-                        {parseFloat(order.total_price).toLocaleString('en-IN', {
-                          minimumFractionDigits: 2,
-                          maximumFractionDigits: 2,
-                        })}
+                        <span className="text-sm font-medium text-gray-900 dark:text-white">
+                          {item.vendor?.vendor_name}
+                        </span>
                       </div>
-                      <div className="text-xs text-gray-500 dark:text-gray-400">
-                        Unit: ₹
-                        {parseFloat(order.unit_price).toLocaleString('en-IN', {
-                          minimumFractionDigits: 2,
-                          maximumFractionDigits: 2,
-                        })}
+                    </td>
+
+                    {/* Product */}
+                    <td className="py-4 px-4">
+                      <div>
+                        <div className="text-sm font-semibold text-gray-900 dark:text-white">
+                          {item.model_no}
+                        </div>
+
+                        <div className="text-xs text-gray-500 mt-1">
+                          {item.brand_name}
+                        </div>
                       </div>
-                    </div>
-                  </td>
+                    </td>
 
-                  {/* Status */}
-                  <td className="py-4 px-4">
-                    {getStatusBadge(order.po_status)}
-                  </td>
+                    {/* Quantity */}
+                    <td className="py-4 px-4">
+                      <div className="text-center">
+                        <span className="inline-flex items-center px-3 py-1.5 rounded-lg text-sm font-bold bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300">
+                          <FontAwesomeIcon
+                            icon={faBox}
+                            className="h-3 w-3 mr-1"
+                          />
+                          {item.qty}
+                        </span>
+                      </div>
+                    </td>
 
-                  {/* Actions */}
+                    {/* Amount */}
+                    <td className="py-4 px-4">
+                      <div>
+                        <div className="text-sm font-bold text-green-600 dark:text-green-400 flex items-center gap-1">
+                          <FontAwesomeIcon
+                            icon={faRupeeSign}
+                            className="h-3 w-3"
+                          />
 
-                  <td className="py-4 flex gap-2 px-4">
-                    <button
-                      onClick={() => handlePurchase(order)}
-                      disabled={order.po_status === 'Received'}
-                      className={`px-2 py-1 rounded text-white transition-all
-    ${
-      order.po_status === 'Received'
-        ? 'bg-gray-400 cursor-not-allowed'
-        : 'bg-purple-600 hover:bg-purple-700'
-    }
-  `}
-                    >
-                      <FontAwesomeIcon icon={faShoppingCart} />
-                    </button>
+                          {parseFloat(item.total_price).toLocaleString(
+                            'en-IN',
+                            {
+                              minimumFractionDigits: 2,
+                              maximumFractionDigits: 2,
+                            },
+                          )}
+                        </div>
 
-                    <button
-                      onClick={() => handleViewMRN(order.mrn_number)}
-                      className="w-8 h-8 bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white rounded-lg flex items-center justify-center"
-                      title="View MRN Details"
-                    >
-                      <FontAwesomeIcon icon={faEye} className="h-3.5 w-3.5" />
-                    </button>
-                  </td>
-                </tr>
-              ))
+                        <div className="text-xs text-gray-500 dark:text-gray-400">
+                          Unit: ₹
+                          {parseFloat(item.unit_price).toLocaleString('en-IN', {
+                            minimumFractionDigits: 2,
+                            maximumFractionDigits: 2,
+                          })}
+                        </div>
+                      </div>
+                    </td>
+
+                    {/* Status */}
+                    <td className="py-4 px-4">
+                      {getStatusBadge(order.po_status)}
+                    </td>
+
+                    {/* Actions */}
+                    <td className="py-4 flex gap-2 px-4">
+                      <button
+                        onClick={() =>
+                          handlePurchase({
+                            ...order,
+                            selected_item: item,
+                          })
+                        }
+                        disabled={item.status === 'Received'}
+                        className={`px-2 py-1 rounded text-white transition-all
+            ${
+              item.status === 'Received'
+                ? 'bg-gray-400 cursor-not-allowed'
+                : 'bg-purple-600 hover:bg-purple-700'
+            }
+          `}
+                      >
+                        <FontAwesomeIcon icon={faShoppingCart} />
+                      </button>
+
+                      <button
+                        onClick={() => handleViewMRN(order.mrn?.mrn_number)}
+                        className="w-8 h-8 bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white rounded-lg flex items-center justify-center"
+                        title="View MRN Details"
+                      >
+                        <FontAwesomeIcon icon={faEye} className="h-3.5 w-3.5" />
+                      </button>
+                    </td>
+                  </tr>
+                )),
+              )
             )}
           </tbody>
         </table>

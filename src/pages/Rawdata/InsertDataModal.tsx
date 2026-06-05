@@ -324,6 +324,13 @@ const handleSelectAllFiltered = () => {
   const handleAddSingleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
   event.preventDefault();
 
+    // 🔥 CHECK DUPLICATE FIRST
+  const isDuplicate = await checkDuplicate();
+
+  if (isDuplicate) {
+    return;
+  }
+
   // Basic validation
   if (!singleFormData.name || !singleFormData.number || !singleFormData.cat_id || !singleFormData.reference_id) {
     alert('Please fill all required fields: Name, Contact, Category, and Sources');
@@ -492,22 +499,27 @@ const handleSelectAllFiltered = () => {
       headers: err.response?.headers
     });
 
-    // 🔥 HANDLE DUPLICATE CONTACT ERROR
-    if (err.response?.status === 409) {
-      const duplicateData = err.response.data;
-      
-      setDuplicateEntries([{
-        name: singleFormData.name,
-        number: singleFormData.number,
-        existingId: duplicateData.duplicate?.master_id,
-        existingName: duplicateData.duplicate?.name,
-        reason: "Contact number already exists"
-      }]);
-      setShowDuplicateModal(true);
-      setShowAddPopup(false);
-      return;
+// 🔥 HANDLE DUPLICATE CONTACT ERROR
+if (err.response?.status === 409) {
+  const duplicateData = err.response.data;
+  
+  setDuplicateEntries([
+    {
+      row: 1,
+      name: singleFormData.name,
+      number: singleFormData.number,
+      existingId: duplicateData.lead_details?.master_id || duplicateData.duplicate?.master_id,
+      existingName: duplicateData.lead_details?.name || duplicateData.duplicate?.name,
+      // ✅ FIX: Extract the correct fields from lead_details
+      currentWorkingBy: duplicateData.lead_details?.current_working_by || 'N/A',
+      currentLeadStage: duplicateData.lead_details?.current_lead_stage || 'N/A',
+      lastWorkingDate: duplicateData.lead_details?.last_working_date || null,
     }
-
+  ]);
+  setShowDuplicateModal(true);
+  setShowAddPopup(false);
+  return;
+}
     // Handle validation errors
     if (err.response?.status === 400) {
       const errorMsg = err.response.data.message || "Validation failed";
@@ -520,6 +532,46 @@ const handleSelectAllFiltered = () => {
     alert(`Error: ${backendMessage}`);
   }
 };
+
+
+const checkDuplicate = async () => {
+  try {
+    const res = await axios.post(
+      `${BASE_URL}api/sujit-master-data/check-duplicate-contact`,
+      {
+        number: singleFormData.number
+      },
+      {
+        withCredentials: true
+      }
+    );
+    
+    // ✅ If duplicate is found, handle it here
+    if (res.data.duplicate === true) {
+      setDuplicateEntries([
+        {
+          row: 1,
+          name: singleFormData.name,
+          number: singleFormData.number,
+          existingId: res.data.lead_details?.master_id,
+          existingName: res.data.lead_details?.name,
+          currentWorkingBy: res.data.lead_details?.current_working_by || 'N/A',
+          currentLeadStage: res.data.lead_details?.current_lead_stage || 'N/A',
+          lastWorkingDate: res.data.lead_details?.last_working_date || null,
+        }
+      ]);
+      setShowDuplicateModal(true);
+      setShowAddPopup(false);
+      return true;
+    }
+    return false;
+  } catch (err) {
+    console.error(err);
+    return false;
+  }
+};
+
+
 
   // Get role display name for helper text
   const getRoleDisplayName = (role: string) => {

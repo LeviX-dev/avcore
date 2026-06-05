@@ -271,8 +271,8 @@ const ApproveMRNModal = ({ data, onClose, onSave }: ApproveMRNModalProps) => {
             <h3 className="text-base font-semibold text-gray-900 dark:text-white mb-2">
               No Items Found
             </h3>
-            <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
-              No pending approval items for this MRN.
+            <p className="text-md text-black-900 dark:text-gray-700 mb-4">
+              Waiting for Purchase Approval for this MRN.
             </p>
             <button
               onClick={onClose}

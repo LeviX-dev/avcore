@@ -14,7 +14,12 @@
 
 
 import express from "express";
-import { getExecutionLeads, getLatestQuotationByMasterId, generateMRN, getExecutionLeadDetails, getMRNListByMasterId, getMRNDetailsByNumber, getMRNDetailsById, getVerificationPendingMRNs,  verifyMRN, getVerifiedMRNs,getApprovalItems, approveMRN , getPurchaseItemsByMRN, getApprovedMRNs, issueMRNItems, getIssueItems, getMRNsForIssueAndPurchase, getMRNLogs, approvePurchaseRequest, createPurchaseOrder, receivePurchaseOrder, issueMRN, getVendors, getGeneratedPOList, getCompletedMRNs } from "../controllers/onwardController.js";
+import { getExecutionLeads, getLatestQuotationByMasterId, generateMRN, getExecutionLeadDetails,
+     getMRNListByMasterId, getMRNDetailsByNumber, getMRNDetailsById, getVerificationPendingMRNs, 
+      verifyMRN, getVerifiedMRNs,getApprovalItems, approveMRN , getPurchaseItemsByMRN, getApprovedMRNs, 
+      issueMRNItems, getIssueItems, getMRNsForIssueAndPurchase, getMRNLogs, approvePurchaseRequest,
+       createPurchaseOrder, receivePurchaseOrder, issueMRN, getVendors, getGeneratedPOList,
+        getCompletedMRNs  , approvePurchaseRequestByMRN ,} from "../controllers/onwardController.js";
 
 import { uploadBillImages } from '../middleware/billUpload.js';
 
@@ -62,7 +67,7 @@ router.get("/mrn/logs/:mrn_id", getMRNLogs);
 
 router.get("/purchase/items", getPurchaseItemsByMRN);
 
-router.post("/purchase-request/approve", approvePurchaseRequest);
+router.post("/purchase-request/approved", approvePurchaseRequest);
 
 router.post("/purchase-order/create", createPurchaseOrder);
 
@@ -80,6 +85,9 @@ router.get("/completed/mrns", getCompletedMRNs);
 // router.post('/processmrncontroller', processMRNController);
 
 // router.post("/verify-mrnnnn", verifyController);
+
+router.post('/purchase-request/approve',approvePurchaseRequestByMRN,);
+
 
 export default router;
 

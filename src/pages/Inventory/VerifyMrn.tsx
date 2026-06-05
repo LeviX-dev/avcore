@@ -16,9 +16,7 @@ import {
   faMapMarkerAlt,
   faIdCard,
 } from '@fortawesome/free-solid-svg-icons';
-import {
-  FaEye,
-} from 'react-icons/fa';
+import { FaEye } from 'react-icons/fa';
 import { BASE_URL } from '../../../public/config.js';
 import VerifyMRNModal from './VerifyMRNModal.js';
 import EditVerifyModal from './EditVerifyModal.js';
@@ -97,7 +95,7 @@ const VerifyMrn = () => {
     return new Date(dateString).toLocaleDateString('en-IN', {
       day: '2-digit',
       month: 'short',
-      year: 'numeric'
+      year: 'numeric',
     });
   };
 
@@ -107,7 +105,7 @@ const VerifyMrn = () => {
     return new Date(dateString).toLocaleDateString('en-IN', {
       day: '2-digit',
       month: 'short',
-      year: 'numeric'
+      year: 'numeric',
     });
   };
 
@@ -115,30 +113,35 @@ const VerifyMrn = () => {
   const fetchMRNData = async () => {
     setLoading(true);
     setError(null);
-    
+
     try {
       const response = await axios.get(`${BASE_URL}api/verification/pending`);
-      
+
       if (response.data && response.data.data) {
         const mrnData = response.data.data;
         setData(mrnData);
         setFilteredData(mrnData);
-        
+
         // Extract unique cities and schedules for filters
         const cities: string[] = Array.from(
           new Set(
             mrnData
               .map((item: MRNData) => item.city)
-              .filter((city): city is string => typeof city === "string" && city.length > 0)
-          )
+              .filter(
+                (city): city is string =>
+                  typeof city === 'string' && city.length > 0,
+              ),
+          ),
         );
 
         const schedules: string[] = Array.from(
           new Set(
             mrnData
               .map((item: MRNData) => item.execution?.schedule_name)
-              .filter((s): s is string => typeof s === "string" && s.length > 0)
-          )
+              .filter(
+                (s): s is string => typeof s === 'string' && s.length > 0,
+              ),
+          ),
         );
         setAvailableCities(cities);
         setAvailableSchedules(schedules);
@@ -163,7 +166,7 @@ const VerifyMrn = () => {
         (item) =>
           item.client_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
           item.mrn_number?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          item.city?.toLowerCase().includes(searchTerm.toLowerCase())
+          item.city?.toLowerCase().includes(searchTerm.toLowerCase()),
       );
     }
 
@@ -175,7 +178,7 @@ const VerifyMrn = () => {
     // Schedule filter
     if (selectedSchedules.length > 0) {
       filtered = filtered.filter((item) =>
-        selectedSchedules.includes(item.execution?.schedule_name)
+        selectedSchedules.includes(item.execution?.schedule_name),
       );
     }
 
@@ -202,7 +205,14 @@ const VerifyMrn = () => {
 
     setFilteredData(filtered);
     setCurrentPage(1);
-  }, [data, searchTerm, selectedCities, selectedSchedules, selectedDateFrom, selectedDateTo]);
+  }, [
+    data,
+    searchTerm,
+    selectedCities,
+    selectedSchedules,
+    selectedDateFrom,
+    selectedDateTo,
+  ]);
 
   // Handle verify click
   const handleVerifyClick = (mrn: MRNData) => {
@@ -213,7 +223,7 @@ const VerifyMrn = () => {
       client_name: mrn.client_name,
       city: mrn.city,
       execution: mrn.execution,
-      items: mrn.items
+      items: mrn.items,
     };
     setSelectedVerifyData(verifyData);
     setShowVerifyModal(true);
@@ -224,7 +234,6 @@ const VerifyMrn = () => {
     setEditingMRNData(mrn);
     setShowEditModal(true);
   };
-
 
   // Clear all filters
   const clearFilters = () => {
@@ -246,13 +255,22 @@ const VerifyMrn = () => {
   // Handle click outside
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
-      if (dateFilterRef.current && !dateFilterRef.current.contains(event.target as Node)) {
+      if (
+        dateFilterRef.current &&
+        !dateFilterRef.current.contains(event.target as Node)
+      ) {
         setShowDateFilter(false);
       }
-      if (cityFilterRef.current && !cityFilterRef.current.contains(event.target as Node)) {
+      if (
+        cityFilterRef.current &&
+        !cityFilterRef.current.contains(event.target as Node)
+      ) {
         setShowCityFilter(false);
       }
-      if (scheduleFilterRef.current && !scheduleFilterRef.current.contains(event.target as Node)) {
+      if (
+        scheduleFilterRef.current &&
+        !scheduleFilterRef.current.contains(event.target as Node)
+      ) {
         setShowScheduleFilter(false);
       }
     };
@@ -266,7 +284,7 @@ const VerifyMrn = () => {
     fetchMRNData();
   }, []);
 
-    const handleViewMRN = (mrnNumber) => {
+  const handleViewMRN = (mrnNumber) => {
     navigate(`/mrn/view/${mrnNumber}`);
   };
 
@@ -315,14 +333,21 @@ const VerifyMrn = () => {
               <div className="w-full sm:w-48">
                 <div className="relative">
                   <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                    <FontAwesomeIcon icon={faFileAlt} className="h-4 w-4 text-gray-400" />
+                    <FontAwesomeIcon
+                      icon={faFileAlt}
+                      className="h-4 w-4 text-gray-400"
+                    />
                   </div>
                   <input
                     type="number"
                     className="w-full pl-10 pr-10 py-2 text-sm border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all"
                     placeholder="Show N records"
                     value={itemsPerPage}
-                    onChange={(e) => setItemsPerPage(Math.max(1, parseInt(e.target.value) || 10))}
+                    onChange={(e) =>
+                      setItemsPerPage(
+                        Math.max(1, parseInt(e.target.value) || 10),
+                      )
+                    }
                     min="1"
                   />
                 </div>
@@ -332,7 +357,10 @@ const VerifyMrn = () => {
               <div className="w-full sm:w-72">
                 <div className="relative">
                   <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                    <FontAwesomeIcon icon={faSearch} className="h-4 w-4 text-gray-400" />
+                    <FontAwesomeIcon
+                      icon={faSearch}
+                      className="h-4 w-4 text-gray-400"
+                    />
                   </div>
                   <input
                     type="text"
@@ -352,39 +380,78 @@ const VerifyMrn = () => {
                 <FontAwesomeIcon icon={faTimes} className="h-4 w-4" />
                 Reset Filter
               </button>
-
-            
-           
             </div>
           </div>
         </div>
       </div>
 
       {/* Active Filters Display */}
-      {(selectedDateFrom || selectedDateTo || selectedCities.length > 0 || selectedSchedules.length > 0) && (
+      {(selectedDateFrom ||
+        selectedDateTo ||
+        selectedCities.length > 0 ||
+        selectedSchedules.length > 0) && (
         <div className="flex items-center gap-2 mb-4 p-3 bg-white dark:bg-boxdark rounded-lg shadow-sm border border-gray-200 dark:border-gray-800">
-          <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Active filters:</span>
+          <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
+            Active filters:
+          </span>
           <div className="flex flex-wrap gap-2">
             {(selectedDateFrom || selectedDateTo) && (
               <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs bg-blue-100 text-blue-800 dark:bg-blue-900/50 dark:text-blue-300 border border-blue-200 dark:border-blue-800">
-                Date: {selectedDateFrom ? formatFilterDate(selectedDateFrom) : 'Any'} to {selectedDateTo ? formatFilterDate(selectedDateTo) : 'Any'}
-                <button onClick={() => { setSelectedDateFrom(''); setSelectedDateTo(''); }} className="ml-1 text-blue-600 hover:text-blue-800">×</button>
+                Date:{' '}
+                {selectedDateFrom ? formatFilterDate(selectedDateFrom) : 'Any'}{' '}
+                to {selectedDateTo ? formatFilterDate(selectedDateTo) : 'Any'}
+                <button
+                  onClick={() => {
+                    setSelectedDateFrom('');
+                    setSelectedDateTo('');
+                  }}
+                  className="ml-1 text-blue-600 hover:text-blue-800"
+                >
+                  ×
+                </button>
               </span>
             )}
             {selectedCities.map((city) => (
-              <span key={city} className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs bg-teal-100 text-teal-800 dark:bg-teal-900/50 dark:text-teal-300 border border-teal-200 dark:border-teal-800">
+              <span
+                key={city}
+                className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs bg-teal-100 text-teal-800 dark:bg-teal-900/50 dark:text-teal-300 border border-teal-200 dark:border-teal-800"
+              >
                 <FontAwesomeIcon icon={faMapMarkerAlt} className="h-3 w-3" />
                 {city}
-                <button onClick={() => setSelectedCities(prev => prev.filter(c => c !== city))} className="ml-1 text-teal-600 hover:text-teal-800">×</button>
+                <button
+                  onClick={() =>
+                    setSelectedCities((prev) => prev.filter((c) => c !== city))
+                  }
+                  className="ml-1 text-teal-600 hover:text-teal-800"
+                >
+                  ×
+                </button>
               </span>
             ))}
             {selectedSchedules.map((schedule) => (
-              <span key={schedule} className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs bg-indigo-100 text-indigo-800 dark:bg-indigo-900/50 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800">
+              <span
+                key={schedule}
+                className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs bg-indigo-100 text-indigo-800 dark:bg-indigo-900/50 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800"
+              >
                 {schedule}
-                <button onClick={() => setSelectedSchedules(prev => prev.filter(s => s !== schedule))} className="ml-1 text-indigo-600 hover:text-indigo-800">×</button>
+                <button
+                  onClick={() =>
+                    setSelectedSchedules((prev) =>
+                      prev.filter((s) => s !== schedule),
+                    )
+                  }
+                  className="ml-1 text-indigo-600 hover:text-indigo-800"
+                >
+                  ×
+                </button>
               </span>
             ))}
-            <button onClick={clearFilters} className="ml-2 text-sm text-red-600 hover:text-red-800 font-medium">Clear all</button>
+            <button
+              onClick={clearFilters}
+              className="ml-2 text-sm text-red-600 hover:text-red-800 font-medium"
+            >
+              Clear all
+            </button>
           </div>
         </div>
       )}
@@ -397,7 +464,10 @@ const VerifyMrn = () => {
       ) : error ? (
         <div className="flex justify-center items-center h-64">
           <div className="text-center text-red-600 dark:text-red-400">
-            <FontAwesomeIcon icon={faTimesCircle} className="h-12 w-12 mx-auto mb-4" />
+            <FontAwesomeIcon
+              icon={faTimesCircle}
+              className="h-12 w-12 mx-auto mb-4"
+            />
             <p className="text-lg font-medium">{error}</p>
           </div>
         </div>
@@ -409,7 +479,10 @@ const VerifyMrn = () => {
               <thead className="bg-gradient-to-r from-gray-50 to-gray-100 dark:from-gray-800 dark:to-gray-900">
                 <tr>
                   <th className="py-3 px-4 relative">
-                    <div ref={dateFilterRef} className="flex items-center justify-between gap-2">
+                    <div
+                      ref={dateFilterRef}
+                      className="flex items-center justify-between gap-2"
+                    >
                       <span className="text-xs font-extrabold uppercase tracking-wider text-gray-700 dark:text-gray-300">
                         Created Date
                       </span>
@@ -421,7 +494,12 @@ const VerifyMrn = () => {
                         }}
                         className="text-gray-500 hover:text-purple-600 dark:text-gray-400 dark:hover:text-purple-400 focus:outline-none transition-colors"
                       >
-                        <FontAwesomeIcon icon={faChevronDown} className={`h-3 w-3 transition-transform duration-200 ${showDateFilter ? 'rotate-180' : ''}`} />
+                        <FontAwesomeIcon
+                          icon={faChevronDown}
+                          className={`h-3 w-3 transition-transform duration-200 ${
+                            showDateFilter ? 'rotate-180' : ''
+                          }`}
+                        />
                       </button>
                     </div>
 
@@ -429,7 +507,9 @@ const VerifyMrn = () => {
                     {showDateFilter && (
                       <div className="absolute top-full left-0 mt-1 z-50 bg-white dark:bg-boxdark border border-gray-300 dark:border-gray-700 rounded-lg shadow-lg p-4 min-w-[250px]">
                         <div className="flex justify-between items-center mb-3">
-                          <span className="font-semibold text-sm dark:text-white">Select Date Range</span>
+                          <span className="font-semibold text-sm dark:text-white">
+                            Select Date Range
+                          </span>
                           <button
                             onClick={() => {
                               setSelectedDateFrom('');
@@ -443,20 +523,28 @@ const VerifyMrn = () => {
                         </div>
                         <div className="space-y-3">
                           <div>
-                            <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">From Date</label>
+                            <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">
+                              From Date
+                            </label>
                             <input
                               type="date"
                               value={selectedDateFrom}
-                              onChange={(e) => setSelectedDateFrom(e.target.value)}
+                              onChange={(e) =>
+                                setSelectedDateFrom(e.target.value)
+                              }
                               className="w-full p-2 border border-gray-300 dark:border-gray-600 rounded-lg text-sm font-medium dark:bg-form-input dark:text-white focus:ring-2 focus:ring-purple-500"
                             />
                           </div>
                           <div>
-                            <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">To Date</label>
+                            <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">
+                              To Date
+                            </label>
                             <input
                               type="date"
                               value={selectedDateTo}
-                              onChange={(e) => setSelectedDateTo(e.target.value)}
+                              onChange={(e) =>
+                                setSelectedDateTo(e.target.value)
+                              }
                               className="w-full p-2 border border-gray-300 dark:border-gray-600 rounded-lg text-sm font-medium dark:bg-form-input dark:text-white focus:ring-2 focus:ring-purple-500"
                             />
                           </div>
@@ -478,8 +566,13 @@ const VerifyMrn = () => {
                   </th>
 
                   <th className="py-3 px-4 relative">
-                    <div ref={cityFilterRef} className="flex items-center justify-between gap-2">
-                      <span className="text-xs font-extrabold uppercase tracking-wider text-gray-700 dark:text-gray-300">City</span>
+                    <div
+                      ref={cityFilterRef}
+                      className="flex items-center justify-between gap-2"
+                    >
+                      <span className="text-xs font-extrabold uppercase tracking-wider text-gray-700 dark:text-gray-300">
+                        City
+                      </span>
                       <button
                         onClick={(e) => {
                           e.stopPropagation();
@@ -488,7 +581,12 @@ const VerifyMrn = () => {
                         }}
                         className="text-gray-500 hover:text-purple-600 dark:text-gray-400 dark:hover:text-purple-400 focus:outline-none transition-colors"
                       >
-                        <FontAwesomeIcon icon={faFilter} className={`h-3 w-3 ${selectedCities.length > 0 ? 'text-purple-600' : ''}`} />
+                        <FontAwesomeIcon
+                          icon={faFilter}
+                          className={`h-3 w-3 ${
+                            selectedCities.length > 0 ? 'text-purple-600' : ''
+                          }`}
+                        />
                       </button>
                     </div>
 
@@ -496,8 +594,15 @@ const VerifyMrn = () => {
                     {showCityFilter && (
                       <div className="absolute top-full left-0 mt-1 z-50 bg-white dark:bg-boxdark border border-gray-300 dark:border-gray-700 rounded-lg shadow-lg p-4 min-w-[200px] max-h-[300px] overflow-y-auto">
                         <div className="flex justify-between items-center mb-3">
-                          <span className="font-semibold text-sm dark:text-white">Filter Cities</span>
-                          <button onClick={() => setSelectedCities([])} className="text-xs font-medium text-purple-600 hover:text-purple-800">Clear All</button>
+                          <span className="font-semibold text-sm dark:text-white">
+                            Filter Cities
+                          </span>
+                          <button
+                            onClick={() => setSelectedCities([])}
+                            className="text-xs font-medium text-purple-600 hover:text-purple-800"
+                          >
+                            Clear All
+                          </button>
                         </div>
                         {availableCities.map((city) => (
                           <div key={city} className="flex items-center mb-2">
@@ -506,13 +611,18 @@ const VerifyMrn = () => {
                               id={`city-${city}`}
                               checked={selectedCities.includes(city)}
                               onChange={() => {
-                                setSelectedCities(prev =>
-                                  prev.includes(city) ? prev.filter(c => c !== city) : [...prev, city]
+                                setSelectedCities((prev) =>
+                                  prev.includes(city)
+                                    ? prev.filter((c) => c !== city)
+                                    : [...prev, city],
                                 );
                               }}
                               className="h-3.5 w-3.5 mr-2.5 text-purple-600 rounded border-gray-300 focus:ring-2 focus:ring-purple-500"
                             />
-                            <label htmlFor={`city-${city}`} className="text-sm font-medium dark:text-white cursor-pointer">
+                            <label
+                              htmlFor={`city-${city}`}
+                              className="text-sm font-medium dark:text-white cursor-pointer"
+                            >
                               {city}
                             </label>
                           </div>
@@ -522,8 +632,13 @@ const VerifyMrn = () => {
                   </th>
 
                   <th className="py-3 px-4 relative">
-                    <div ref={scheduleFilterRef} className="flex items-center justify-between gap-2">
-                      <span className="text-xs font-extrabold uppercase tracking-wider text-gray-700 dark:text-gray-300">Schedule</span>
+                    <div
+                      ref={scheduleFilterRef}
+                      className="flex items-center justify-between gap-2"
+                    >
+                      <span className="text-xs font-extrabold uppercase tracking-wider text-gray-700 dark:text-gray-300">
+                        Schedule
+                      </span>
                       <button
                         onClick={(e) => {
                           e.stopPropagation();
@@ -532,7 +647,14 @@ const VerifyMrn = () => {
                         }}
                         className="text-gray-500 hover:text-purple-600 dark:text-gray-400 dark:hover:text-purple-400 focus:outline-none transition-colors"
                       >
-                        <FontAwesomeIcon icon={faFilter} className={`h-3 w-3 ${selectedSchedules.length > 0 ? 'text-purple-600' : ''}`} />
+                        <FontAwesomeIcon
+                          icon={faFilter}
+                          className={`h-3 w-3 ${
+                            selectedSchedules.length > 0
+                              ? 'text-purple-600'
+                              : ''
+                          }`}
+                        />
                       </button>
                     </div>
 
@@ -540,23 +662,38 @@ const VerifyMrn = () => {
                     {showScheduleFilter && (
                       <div className="absolute top-full left-0 mt-1 z-50 bg-white dark:bg-boxdark border border-gray-300 dark:border-gray-700 rounded-lg shadow-lg p-4 min-w-[200px] max-h-[300px] overflow-y-auto">
                         <div className="flex justify-between items-center mb-3">
-                          <span className="font-semibold text-sm dark:text-white">Filter Schedules</span>
-                          <button onClick={() => setSelectedSchedules([])} className="text-xs font-medium text-purple-600 hover:text-purple-800">Clear All</button>
+                          <span className="font-semibold text-sm dark:text-white">
+                            Filter Schedules
+                          </span>
+                          <button
+                            onClick={() => setSelectedSchedules([])}
+                            className="text-xs font-medium text-purple-600 hover:text-purple-800"
+                          >
+                            Clear All
+                          </button>
                         </div>
                         {availableSchedules.map((schedule) => (
-                          <div key={schedule} className="flex items-center mb-2">
+                          <div
+                            key={schedule}
+                            className="flex items-center mb-2"
+                          >
                             <input
                               type="checkbox"
                               id={`schedule-${schedule}`}
                               checked={selectedSchedules.includes(schedule)}
                               onChange={() => {
-                                setSelectedSchedules(prev =>
-                                  prev.includes(schedule) ? prev.filter(s => s !== schedule) : [...prev, schedule]
+                                setSelectedSchedules((prev) =>
+                                  prev.includes(schedule)
+                                    ? prev.filter((s) => s !== schedule)
+                                    : [...prev, schedule],
                                 );
                               }}
                               className="h-3.5 w-3.5 mr-2.5 text-purple-600 rounded border-gray-300 focus:ring-2 focus:ring-purple-500"
                             />
-                            <label htmlFor={`schedule-${schedule}`} className="text-sm font-medium dark:text-white cursor-pointer">
+                            <label
+                              htmlFor={`schedule-${schedule}`}
+                              className="text-sm font-medium dark:text-white cursor-pointer"
+                            >
                               {schedule}
                             </label>
                           </div>
@@ -583,15 +720,25 @@ const VerifyMrn = () => {
                   <tr>
                     <td colSpan={7} className="px-6 py-12 text-center">
                       <div className="text-gray-500 dark:text-gray-400">
-                        <FontAwesomeIcon icon={faCheckCircle} className="h-12 w-12 mx-auto mb-4 opacity-50" />
-                        <p className="text-lg font-medium">No pending MRN records found</p>
-                        <p className="text-sm mt-2">All MRNs have been verified</p>
+                        <FontAwesomeIcon
+                          icon={faCheckCircle}
+                          className="h-12 w-12 mx-auto mb-4 opacity-50"
+                        />
+                        <p className="text-lg font-medium">
+                          No pending MRN records found
+                        </p>
+                        <p className="text-sm mt-2">
+                          All MRNs have been verified
+                        </p>
                       </div>
                     </td>
                   </tr>
                 ) : (
                   currentItems.map((mrn) => (
-                    <tr key={mrn.mrn_id} className="hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors">
+                    <tr
+                      key={mrn.mrn_id}
+                      className="hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors"
+                    >
                       {/* Created Date - Only date without time */}
                       <td className="py-4 px-4">
                         <div className="font-semibold text-sm bg-gradient-to-r from-blue-50 to-blue-100 dark:from-blue-900/20 dark:to-blue-800/10 text-blue-800 dark:text-blue-300 px-3 py-1.5 rounded-lg border border-blue-100 dark:border-blue-800/30 shadow-sm">
@@ -611,7 +758,10 @@ const VerifyMrn = () => {
                       {/* City */}
                       <td className="py-4 px-4">
                         <div className="text-sm font-bold text-gray-900 dark:text-white flex items-center gap-1">
-                          <FontAwesomeIcon icon={faMapMarkerAlt} className="text-gray-400 text-xs" />
+                          <FontAwesomeIcon
+                            icon={faMapMarkerAlt}
+                            className="text-gray-400 text-xs"
+                          />
                           {mrn.city || '—'}
                         </div>
                       </td>
@@ -646,24 +796,29 @@ const VerifyMrn = () => {
                           >
                             {verifyingMRN === mrn.mrn_number ? (
                               <>
-                                <FontAwesomeIcon icon={faSpinner} className="h-3 w-3 animate-spin" />
+                                <FontAwesomeIcon
+                                  icon={faSpinner}
+                                  className="h-3 w-3 animate-spin"
+                                />
                                 Verifying...
                               </>
                             ) : (
                               <>
-                                <FontAwesomeIcon icon={faCheckCircle} className="h-3 w-3" />
+                                <FontAwesomeIcon
+                                  icon={faCheckCircle}
+                                  className="h-3 w-3"
+                                />
                                 Verify
                               </>
                             )}
                           </button>
-    <button
+                          <button
                             onClick={() => handleViewMRN(mrn.mrn_number)}
                             className="flex items-center gap-2 px-4 py-2 rounded-lg font-medium bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white shadow-md hover:shadow-lg transition-all duration-200"
                             title="View MRN Details"
                           >
                             <FaEye className="text-sm" />
                           </button>
-                       
                         </div>
                       </td>
                     </tr>
@@ -679,11 +834,14 @@ const VerifyMrn = () => {
               <div className="text-sm text-gray-600 dark:text-gray-400">
                 Showing <span className="font-semibold">{showingStart}</span> to{' '}
                 <span className="font-semibold">{showingEnd}</span> of{' '}
-                <span className="font-semibold">{filteredData.length}</span> results
+                <span className="font-semibold">{filteredData.length}</span>{' '}
+                results
               </div>
               <div className="flex items-center gap-2">
                 <button
-                  onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                  onClick={() =>
+                    setCurrentPage((prev) => Math.max(1, prev - 1))
+                  }
                   disabled={currentPage === 1}
                   className="px-3 py-1.5 text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-md hover:bg-gray-50 dark:hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
@@ -717,7 +875,9 @@ const VerifyMrn = () => {
                   })}
                 </div>
                 <button
-                  onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+                  onClick={() =>
+                    setCurrentPage((prev) => Math.min(totalPages, prev + 1))
+                  }
                   disabled={currentPage === totalPages}
                   className="px-3 py-1.5 text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-md hover:bg-gray-50 dark:hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
@@ -735,12 +895,9 @@ const VerifyMrn = () => {
                 setShowVerifyModal(false);
                 setSelectedVerifyData(null);
               }}
-                  onSave={fetchMRNData} 
-             
+              onSave={fetchMRNData}
             />
           )}
-
-       
         </>
       )}
     </div>

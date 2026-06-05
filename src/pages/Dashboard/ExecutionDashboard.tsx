@@ -35,6 +35,7 @@ const TELECALLER_ROLES = [
   'hr_executive',
   'project_manager',
   'carpenter',
+  'accountant'
 ];
 
 const ADMIN_ROLES = ['admin', 'sub_admin'];

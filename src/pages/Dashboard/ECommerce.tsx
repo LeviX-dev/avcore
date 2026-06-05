@@ -111,6 +111,7 @@ const ECommerce: React.FC = () => {
   'acoustic_designer',
    'hr_executive',
    'carpenter',
+   'accountant'
   
   ];
 

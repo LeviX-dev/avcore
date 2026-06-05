@@ -5201,99 +5201,161 @@ const handleUploadSubmit = async () => {
         setShowDuplicateModal={setShowDuplicateModal}
       />
 
+      
       {/* Add Duplicate Modal (similar to RawData) */}
-      {showDuplicateModal && (
-        <div className="fixed inset-0 z-[99999] bg-black bg-opacity-75 flex justify-center items-center px-4">
-          <div className="bg-white dark:bg-boxdark p-6 rounded-lg shadow-lg w-full max-w-2xl max-h-[80vh] overflow-auto border dark:border-strokedark">
-            {/* Duplicate modal content - same as RawData */}
-            <div className="flex justify-between items-center border-b mb-4 pb-3 dark:border-strokedark">
-              <h2 className="text-xl font-bold dark:text-white text-black">
-                Duplicate Contacts Found ({duplicateEntries.length})
-              </h2>
-              <button
-                onClick={() => {
-                  setShowDuplicateModal(false);
-                  setDuplicateEntries([]);
-                  setShowAddPopup(false);
-                }}
-                className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 text-xl"
-              >
-                ×
-              </button>
-            </div>
+{showDuplicateModal && (
+  <div className="fixed inset-0 z-[99999] bg-black bg-opacity-75 flex justify-center items-center px-4">
+    <div className="bg-white dark:bg-boxdark p-6 rounded-lg shadow-lg w-full max-w-4xl max-h-[80vh] overflow-auto border dark:border-strokedark">
+      {/* Header */}
+      <div className="flex justify-between items-center border-b mb-4 pb-3 dark:border-strokedark">
+        <h2 className="text-xl font-bold dark:text-white text-black">
+          Duplicate Contacts Found ({duplicateEntries.length})
+        </h2>
+        <button
+          onClick={() => {
+            setShowDuplicateModal(false);
+            setDuplicateEntries([]);
+            setShowAddPopup(false);
+          }}
+          className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 text-xl"
+        >
+          ×
+        </button>
+      </div>
 
-            <div className="mb-6 p-4 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg">
-              <div className="flex items-center gap-3">
-                <svg
-                  className="w-6 h-6 text-yellow-600 dark:text-yellow-400"
-                  fill="currentColor"
-                  viewBox="0 0 20 20"
-                >
-                  <path
-                    fillRule="evenodd"
-                    d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z"
-                    clipRule="evenodd"
-                  />
-                </svg>
-                <div>
-                  <h3 className="font-semibold text-yellow-800 dark:text-yellow-300">
-                    {duplicateEntries.length} duplicate contact(s) found
-                  </h3>
-                  <p className="text-sm text-yellow-700 dark:text-yellow-400 mt-1">
-                    This contact already exists in the system.
-                  </p>
-                </div>
-              </div>
-            </div>
-
-            <div className="space-y-4 mb-6">
-              <h4 className="font-medium text-gray-700 dark:text-gray-300">
-                Duplicate Entry:
-              </h4>
-              <div className="overflow-y-auto">
-                <table className="w-full text-sm">
-                  <thead className="bg-gray-100 dark:bg-gray-800">
-                    <tr>
-                      <th className="p-2 text-left">Name</th>
-                      <th className="p-2 text-left">Number</th>
-                      <th className="p-2 text-left">Existing Name</th>
-                      <th className="p-2 text-left">Existing ID</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {duplicateEntries.map((dup, index) => (
-                      <tr
-                        key={index}
-                        className="hover:bg-gray-50 dark:hover:bg-gray-800"
-                      >
-                        <td className="p-2">{dup.name}</td>
-                        <td className="p-2 font-mono text-red-600 dark:text-red-400">
-                          {dup.number}
-                        </td>
-                        <td className="p-2">{dup.existingName}</td>
-                        <td className="p-2">{dup.existingId}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-
-            <div className="flex gap-3">
-              <button
-                onClick={() => {
-                  setShowDuplicateModal(false);
-                  setDuplicateEntries([]);
-                  setShowAddPopup(false);
-                }}
-                className="flex-1 px-4 py-3 bg-gray-200 hover:bg-gray-300 dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-800 dark:text-gray-200 rounded-lg font-medium transition-colors"
-              >
-                Close & Try Again
-              </button>
-            </div>
+      {/* Warning Message */}
+      <div className="mb-6 p-4 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg">
+        <div className="flex items-center gap-3">
+          <svg
+            className="w-6 h-6 text-yellow-600 dark:text-yellow-400"
+            fill="currentColor"
+            viewBox="0 0 20 20"
+          >
+            <path
+              fillRule="evenodd"
+              d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z"
+              clipRule="evenodd"
+            />
+          </svg>
+          <div>
+            <h3 className="font-semibold text-yellow-800 dark:text-yellow-300">
+              {duplicateEntries.length} duplicate contact(s) found
+            </h3>
+            <p className="text-sm text-yellow-700 dark:text-yellow-400 mt-1">
+              This contact already exists in the system.
+            </p>
           </div>
         </div>
-      )}
+      </div>
+
+      {/* Duplicate Details Table */}
+      <div className="space-y-4 mb-6">
+        <h4 className="font-medium text-gray-700 dark:text-gray-300">
+          Duplicate Entry:
+        </h4>
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead className="bg-gray-100 dark:bg-gray-800">
+              <tr>
+                <th className="p-2 text-left">New Name</th>
+                <th className="p-2 text-left">Number</th>
+                <th className="p-2 text-left">Existing Name</th>
+                <th className="p-2 text-left">Existing ID</th>
+                <th className="p-2 text-left">Working By</th>
+                <th className="p-2 text-left">Lead Stage</th>
+                <th className="p-2 text-left">Last Working</th>
+              </tr>
+            </thead>
+            <tbody>
+              {duplicateEntries.map((dup, index) => (
+                <tr
+                  key={index}
+                  className="hover:bg-gray-50 dark:hover:bg-gray-800 border-b border-gray-200 dark:border-gray-700"
+                >
+                  <td className="p-2 font-medium">{dup.name}</td>
+                  <td className="p-2 font-mono text-red-600 dark:text-red-400">
+                    {dup.number}
+                  </td>
+                  <td className="p-2">{dup.existingName || 'N/A'}</td>
+                  <td className="p-2 font-semibold text-blue-600 dark:text-blue-400">
+                    #{dup.existingId || 'N/A'}
+                  </td>
+                  <td className="p-2">
+                    <span className="px-2 py-1 rounded bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300 text-xs font-medium">
+                      {dup.currentWorkingBy || 'N/A'}
+                    </span>
+                  </td>
+                  <td className="p-2">
+                    <span className="px-2 py-1 rounded bg-yellow-100 text-yellow-700 dark:bg-yellow-900 dark:text-yellow-300 text-xs font-medium">
+                      {dup.currentLeadStage || 'N/A'}
+                    </span>
+                  </td>
+                  <td className="p-2 text-xs text-gray-500 dark:text-gray-400">
+                    {dup.lastWorkingDate
+                      ? new Date(dup.lastWorkingDate).toLocaleString()
+                      : 'N/A'}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      {/* Action Buttons */}
+      <div className="flex flex-col sm:flex-row gap-3">
+        <button
+          onClick={() => {
+            // Download duplicate list as CSV
+            const csvContent =
+              'data:text/csv;charset=utf-8,' +
+              'New Name,Number,Existing Name,Existing ID,Working By,Lead Stage,Last Working\n' +
+              duplicateEntries
+                .map(
+                  (d) =>
+                    `"${d.name}","${d.number}","${d.existingName || 'N/A'}","${d.existingId || 'N/A'}","${d.currentWorkingBy || 'N/A'}","${d.currentLeadStage || 'N/A'}","${d.lastWorkingDate || 'N/A'}"`
+                )
+                .join('\n');
+
+            const encodedUri = encodeURI(csvContent);
+            const link = document.createElement('a');
+            link.setAttribute('href', encodedUri);
+            link.setAttribute('download', 'duplicate_contact.csv');
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+          }}
+          className="flex-1 px-4 py-3 bg-blue-500 hover:bg-blue-600 text-white rounded-lg font-medium transition-colors flex items-center justify-center gap-2"
+        >
+          <svg
+            className="w-4 h-4"
+            fill="currentColor"
+            viewBox="0 0 20 20"
+          >
+            <path
+              fillRule="evenodd"
+              d="M3 17a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm3.293-7.707a1 1 0 011.414 0L9 10.586V3a1 1 0 112 0v7.586l1.293-1.293a1 1 0 111.414 1.414l-3 3a1 1 0 01-1.414 0l-3-3a1 1 0 010-1.414z"
+              clipRule="evenodd"
+            />
+          </svg>
+          Download Duplicates List
+        </button>
+
+        <button
+          onClick={() => {
+            setShowDuplicateModal(false);
+            setDuplicateEntries([]);
+            setShowAddPopup(false);
+          }}
+          className="flex-1 px-4 py-3 bg-gray-200 hover:bg-gray-300 dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-800 dark:text-gray-200 rounded-lg font-medium transition-colors"
+        >
+          Close & Continue
+        </button>
+      </div>
+    </div>
+  </div>
+)}
+
 
       {/* View Only Documents Modal */}
       {showViewOnlyDocsPopup && viewOnlyDocsClient && (

@@ -179,9 +179,12 @@ import {
 import { BASE_URL } from '../../../public/config.js';
 
 type ItemType = {
+  poi_id: number;
   mpm_id: number;
+
   qty: number;
   receive_qty: number;
+
   model_no?: string;
   brand_name?: string;
 };
@@ -200,12 +203,18 @@ type ReceivePOPopupProps = {
 };
 
 const ReceivePOPopup = ({ po, onClose, onSuccess }: ReceivePOPopupProps) => {
-  const [items, setItems] = useState<ItemType[]>([
-    {
-      ...po,
-      receive_qty: po.qty,
-    },
-  ]);
+  const [items, setItems] = useState<ItemType[]>(
+    po.items.map((item: any) => ({
+      poi_id: item.poi_id,
+      mpm_id: item.mpm_id,
+
+      qty: Number(item.qty),
+      receive_qty: Number(item.qty),
+
+      model_no: item.model_no,
+      brand_name: item.brand_name,
+    })),
+  );
 
   const [loading, setLoading] = useState(false);
   const [billNumber, setBillNumber] = useState('');
@@ -249,49 +258,72 @@ const ReceivePOPopup = ({ po, onClose, onSuccess }: ReceivePOPopupProps) => {
 
   // Helper component for Info Box - highlight prop is now optional
 
-  const handleSubmit = async () => {
-    try {
-      setLoading(true);
+const handleSubmit = async () => {
+  try {
+    setLoading(true);
 
-      if (!billNumber) {
-        alert('Bill Number is required');
-        return;
-      }
+    if (!billNumber) {
+      alert('Bill Number is required');
+      return;
+    }
 
-      const formData = new FormData();
+    const formData = new FormData();
 
-      formData.append('po_id', String(po.po_id));
-      formData.append('bill_number', billNumber);
-      formData.append('bill_date', billDate || '');
+    formData.append('po_id', String(po.po_id));
+    formData.append('bill_number', billNumber);
+    formData.append('bill_date', billDate || '');
 
-      const totalReceiveQty = items.reduce(
-        (sum: number, i: any) => sum + Number(i.receive_qty || 0),
-        0,
-      );
+    // ✅ total amount
+    const totalAmount = items.reduce(
+      (sum, item: any) =>
+        sum +
+        Number(item.receive_qty || 0) *
+          Number(item.unit_price || 0),
+      0,
+    );
 
-      formData.append('received_qty', String(totalReceiveQty));
+    formData.append(
+      'total_amount',
+      String(totalAmount),
+    );
 
-      billImages.forEach((file) => {
-        formData.append('bill_images', file);
-      });
+    // ✅ SEND ITEMS ARRAY
+    formData.append(
+      'items',
+      JSON.stringify(
+        items.map((item: any) => ({
+          poi_id: item.poi_id,
+          received_qty: item.receive_qty,
+        })),
+      ),
+    );
 
-      await axios.post(`${BASE_URL}api/purchase-order/receive`, formData, {
+    // ✅ images
+    billImages.forEach((file) => {
+      formData.append('bill_images', file);
+    });
+
+    await axios.post(
+      `${BASE_URL}api/purchase-order/receive`,
+      formData,
+      {
         headers: {
           'Content-Type': 'multipart/form-data',
         },
-      });
+      },
+    );
 
-      alert('✅ Items Received Successfully');
+    alert('✅ Items Received Successfully');
 
-      onSuccess?.();
-      onClose();
-    } catch (err) {
-      console.error(err);
-      alert('❌ Failed to receive items');
-    } finally {
-      setLoading(false);
-    }
-  };
+    onSuccess?.();
+    onClose();
+  } catch (err) {
+    console.error(err);
+    alert('❌ Failed to receive items');
+  } finally {
+    setLoading(false);
+  }
+};
 
   const handleRemoveFile = (index: number) => {
     setBillImages((prev) => prev.filter((_, i) => i !== index));
@@ -365,12 +397,13 @@ const ReceivePOPopup = ({ po, onClose, onSuccess }: ReceivePOPopupProps) => {
             />
             <InfoBox
               label="Vendor Name"
-              value={po.vendor_name}
+              value={po.items?.[0]?.vendor?.vendor_name || '-'}
               icon={faBuilding}
             />
+
             <InfoBox
               label="MRN Number"
-              value={po.mrn_number}
+              value={po.mrn?.mrn_number || '-'}
               icon={faBarcode}
             />
           </div>

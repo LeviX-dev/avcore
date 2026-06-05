@@ -24,6 +24,8 @@ import {
   faImage,
   faFileAlt
 } from '@fortawesome/free-solid-svg-icons';
+import { BASE_URL } from "../../../public/config.js";
+
 
 // ============================================================
 // TYPES & INTERFACES
@@ -794,7 +796,7 @@ const LeadDetailsModal = ({ lead, onClose }: { lead: MyProcess | null; onClose: 
   });
   const [loadingDocs, setLoadingDocs] = useState(false);
   const [docsFetched, setDocsFetched] = useState(false);
-  const BASE_URL = "http://localhost:3000/";
+  
 
   if (!lead) return null;
 
@@ -1271,7 +1273,6 @@ const LogsModal = ({
   const [documents, setDocuments] = useState<DocumentLog[]>([]);
   const [loading, setLoading] = useState(false);
   const [imageViewer, setImageViewer] = useState<string | null>(null);
-  const BASE_URL = "http://localhost:3000/";
 
   useEffect(() => {
     if (process?.execution_id && process?.process_id) {
@@ -1418,7 +1419,6 @@ const UploadModal = ({
   const [newRemark, setNewRemark] = useState("");
   const [uploadedImages, setUploadedImages] = useState<UploadedImage[]>([]);
   const [loading, setLoading] = useState(false);
-  const BASE_URL = "http://localhost:3000/";
 
   const getCurrentDateTime = () => {
     const now = new Date();
@@ -1708,7 +1708,6 @@ const AssignProcess = ({ onViewAll, managerReportRef }: AssignProcessProps) => {
   
   // Refs
   const statusFilterRef = useRef<HTMLDivElement>(null);
-  const BASE_URL = "http://localhost:3000/";
 
   // Status options for filter
   const statusOptions = [

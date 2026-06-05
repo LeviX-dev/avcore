@@ -24,7 +24,9 @@ const GenerateMRNModal = ({ master_id, onClose, onSave }: Props) => {
   const [data, setData] = useState<any>(null);
   const [mrnNumber, setMrnNumber] = useState('');
   const [selectedItems, setSelectedItems] = useState<number[]>([]);
-  const [requiredQty, setRequiredQty] = useState<{ [key: number]: number | string }>({});
+  const [requiredQty, setRequiredQty] = useState<{
+    [key: number]: number | string;
+  }>({});
   const [loading, setLoading] = useState(true);
   const [selectAll, setSelectAll] = useState(false);
   const [submitting, setSubmitting] = useState(false);
@@ -44,102 +46,186 @@ const GenerateMRNModal = ({ master_id, onClose, onSave }: Props) => {
   }, []);
 
   /* ================= FETCH QUOTATION ================= */
-  useEffect(() => {
-    const fetchQuotation = async () => {
-      try {
-        const res = await axios.get(
-          `${BASE_URL}api/getquotationofmrn/${master_id}`,
-          { withCredentials: true },
-        );
+useEffect(() => {
+  const fetchQuotation = async () => {
+    try {
+      const res = await axios.get(
+        `${BASE_URL}api/getquotationofmrn/${master_id}`,
+        { withCredentials: true },
+      );
 
-        const apiData = res.data;
+      const apiData = res.data;
 
-        if (!apiData.success) {
-          setData({
-            lead: apiData.client,
-            quotation: null,
-          });
-          return;
-        }
-
-        const latestRev = Number(apiData.latest_revision?.revision || 1);
-
-        /* ================= FILTER BY REVISION ================= */
-        const revisionProducts = (apiData.items || []).filter(
-          (item: any) => Number(item.current_revision) === latestRev,
-        );
-
-        /* ================= SPLIT PRODUCTS ================= */
-        // Items that can generate MRN
-        const pendingProducts = revisionProducts.filter(
-          (item: any) => Number(item.is_mrn_generated) === 0,
-        );
-
-        // Items already having MRN
-        const generatedProducts = revisionProducts.filter(
-          (item: any) => Number(item.is_mrn_generated) === 1,
-        );
-
-        /* ================= FUNCTION TO GROUP BY KIT ================= */
-        const buildKitMap = (products: any[]) => {
-          const map: any = {};
-
-          products.forEach((item: any) => {
-            const kitKey = item.kit_id || 'no_kit';
-            
-            if (!map[kitKey]) {
-              map[kitKey] = {
-                kit_id: item.kit_id,
-                product_type: item.product_type,
-                kit_name: item.kit_name || item.product_type || 'Individual',
-                items: [],
-              };
-            }
-
-            map[kitKey].items.push({
-              qm_id: item.qm_id,
-              prod_id: item.prod_id,
-              model_id: item.model_id,
-              brand_id: item.brand_id,
-              model: item.model_no,
-              brand_name: item.brand_name,
-              total_qty: item.total_qty,
-              mrn_pending_qty: item.mrn_pending_qty,
-              already_requested: item.total_requested_qty,
-              prod_price: item.model_price || 0,
-              description: item.description || '',
-              kit_products: item.kit_products || [],
-            });
-          });
-
-          return Object.values(map);
-        };
-
-        /* ================= BUILD KITS ================= */
-        const pendingKits = buildKitMap(pendingProducts);
-        const generatedKits = buildKitMap(generatedProducts);
-
-        /* ================= SET STATE ================= */
+      if (!apiData.success) {
         setData({
-          lead: apiData.client,
-          quotation: {
-            ...apiData.quotation,
-            qt_number: apiData.quotation?.qt_number || `QT-${Date.now()}`,
-            kits: pendingKits,
-            generated_kits: generatedKits,
-          },
+          lead: apiData.lead || null,
+          quotation: null,
         });
-      } catch (err) {
-        console.error(err);
-        alert('Failed to load quotation');
-        onClose();
-      } finally {
-        setLoading(false);
-      }
-    };
 
-    fetchQuotation();
-  }, [master_id]);
+        return;
+      }
+
+      /* =========================
+         BUILD PENDING / GENERATED
+      ========================== */
+
+      const pendingKits: any[] = [];
+      const generatedKits: any[] = [];
+
+      (apiData.quotation?.options || []).forEach((option: any) => {
+        (option.items || []).forEach((kit: any) => {
+          const pendingItems: any[] = [];
+          const generatedItems: any[] = [];
+
+          (kit.items || []).forEach((item: any) => {
+            const formattedItem = {
+              qm_id: item.qm_id,
+
+              prod_id: item.prod_id || null,
+
+              model_id: item.model_id,
+
+              brand_id: item.brand_id || null,
+
+              kit_id: item.kit_id || null,
+
+              option_id: option.option_id,
+
+              option_name: option.option_name,
+
+              model: item.model,
+
+              brand_name: item.brand_name,
+
+              total_qty: Number(item.qty || 0),
+
+              already_requested: Number(
+                item.total_requested_qty || 0,
+              ),
+
+              total_issued_qty: Number(
+                item.total_issued_qty || 0,
+              ),
+
+              mrn_pending_qty: Number(
+                item.mrn_pending_qty || 0,
+              ),
+
+              issue_pending_qty: Number(
+                item.issue_pending_qty || 0,
+              ),
+
+              prod_price: Number(item.price || 0),
+
+              description: item.description || '',
+
+              image_path: item.image_path || '',
+
+              current_revision:
+                item.current_revision || apiData.revision,
+
+              product_type_name:
+                item.product_type_name || '',
+
+              cat_name: item.cat_name || '',
+
+              is_mrn_generated:
+                Number(item.is_mrn_generated || 0),
+            };
+
+            /* =========================
+               PARTIAL MRN FLOW
+            ========================== */
+
+            if (formattedItem.mrn_pending_qty > 0) {
+              pendingItems.push(formattedItem);
+            } else {
+              generatedItems.push(formattedItem);
+            }
+          });
+
+          /* =========================
+             PENDING KIT
+          ========================== */
+
+          if (pendingItems.length > 0) {
+            pendingKits.push({
+              option_id: option.option_id,
+
+              option_name: option.option_name,
+
+              subject: option.subject,
+
+              kit_id: kit.kit_id,
+
+              kit_name: kit.kit_name || 'Individual',
+
+              items: pendingItems,
+            });
+          }
+
+          /* =========================
+             GENERATED KIT
+          ========================== */
+
+          if (generatedItems.length > 0) {
+            generatedKits.push({
+              option_id: option.option_id,
+
+              option_name: option.option_name,
+
+              subject: option.subject,
+
+              kit_id: kit.kit_id,
+
+              kit_name: kit.kit_name || 'Individual',
+
+              items: generatedItems,
+            });
+          }
+        });
+      });
+
+      /* =========================
+         SET STATE
+      ========================== */
+
+      setData({
+        master_id: apiData.master_id,
+
+        revision: apiData.revision,
+
+        lead: apiData.lead,
+
+        quotation: {
+          ...apiData.quotation,
+
+          qt_id: apiData.quotation?.qt_id,
+
+          qt_number:
+            apiData.quotation?.qt_number ||
+            `QT-${Date.now()}`,
+
+          options: apiData.quotation?.options || [],
+
+          kits: pendingKits,
+
+          generated_kits: generatedKits,
+        },
+      });
+    } catch (err) {
+      console.error(err);
+
+      alert('Failed to load quotation');
+
+      onClose();
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  fetchQuotation();
+}, [master_id]);
 
   /* ================= CHECKBOX HANDLERS ================= */
   const toggleItem = (qm_id: number, maxQty: number) => {
@@ -195,97 +281,180 @@ const GenerateMRNModal = ({ master_id, onClose, onSave }: Props) => {
   };
 
   const handleQtyChange = (qm_id: number, value: string, maxQty: number) => {
-  if (value === '') {
+    if (value === '') {
+      setRequiredQty((prev) => ({
+        ...prev,
+        [qm_id]: '', // ✅ allowed now
+      }));
+      return;
+    }
+
+    if (!/^\d+$/.test(value)) return;
+
+    let numValue = Number(value);
+
+    if (numValue > maxQty) {
+      numValue = maxQty;
+    }
+    if (numValue < 1) {
+      numValue = 1;
+    }
+
     setRequiredQty((prev) => ({
       ...prev,
-      [qm_id]: '', // ✅ allowed now
+      [qm_id]: numValue, // ✅ number
     }));
-    return;
-  }
+  };
 
-  if (!/^\d+$/.test(value)) return;
 
-  let numValue = Number(value);
-
-  if (numValue > maxQty) {
-    numValue = maxQty;
-  }
-  if (numValue < 1) {
-    numValue = 1;
-  }
-
-  setRequiredQty((prev) => ({
-    ...prev,
-    [qm_id]: numValue, // ✅ number
-  }));
-};
 
   const handleSubmit = async (e: any) => {
-    e.preventDefault();
+  e.preventDefault();
+
+  try {
     setSubmitting(true);
 
     const selectedProducts: any[] = [];
 
-    data.quotation.kits.forEach((kit: any) => {
-      kit.items.forEach((item: any) => {
-        if (selectedItems.includes(item.qm_id)) {
-          const required = requiredQty[item.qm_id];
+    /* =========================
+       LOOP THROUGH KITS
+    ========================== */
 
-          if (!required || required <= 0 || required > item.mrn_pending_qty) {
-            alert(`Invalid required quantity for ${item.model}`);
-            setSubmitting(false);
-            throw new Error('Invalid quantity');
+    data?.quotation?.kits?.forEach((kit: any) => {
+      kit.items?.forEach((item: any) => {
+        if (selectedItems.includes(item.qm_id)) {
+          const required = Number(
+            requiredQty[item.qm_id] || 0,
+          );
+
+          /* =========================
+             VALIDATION
+          ========================== */
+
+          if (!required || required <= 0) {
+            throw new Error(
+              `Invalid required quantity for ${item.model}`,
+            );
           }
 
-          if (!item.prod_id || !item.model_id || !item.brand_id) {
-            console.warn('Skipping invalid product:', item);
+          if (required > Number(item.mrn_pending_qty || 0)) {
+            throw new Error(
+              `Only ${item.mrn_pending_qty} qty allowed for ${item.model}`,
+            );
+          }
+
+          if (!item.model_id) {
+            console.warn(
+              'Skipping invalid product:',
+              item,
+            );
             return;
           }
 
+          /* =========================
+             PRODUCT ARRAY
+          ========================== */
+
           selectedProducts.push({
-            prod_id: Number(item.prod_id),
+            qm_id: Number(item.qm_id),
+
+            prod_id: item.prod_id
+              ? Number(item.prod_id)
+              : null,
+
             model_id: Number(item.model_id),
-            brand_id: Number(item.brand_id),
-            kit_id: kit.kit_id || null,
-            requested_qty: Number(required),
+
+            brand_id: item.brand_id
+              ? Number(item.brand_id)
+              : null,
+
+            kit_id: item.kit_id
+              ? Number(item.kit_id)
+              : null,
+
+            requested_qty: required,
+
+            option_id: item.option_id,
+
+            option_name: item.option_name,
+
+            model: item.model,
+
+            brand_name: item.brand_name,
           });
         }
       });
     });
 
+    /* =========================
+       NO PRODUCTS
+    ========================== */
+
     if (selectedProducts.length === 0) {
       alert('Please select at least one product');
-      setSubmitting(false);
       return;
     }
 
+    /* =========================
+       PAYLOAD
+    ========================== */
+
     const payload = {
       master_id,
-      qt_id: data.quotation.qt_id,
+
+      qt_id: data?.quotation?.qt_id,
+
       mrn_number: mrnNumber,
+
       expected_date: null,
+
       products: selectedProducts,
     };
 
-    try {
-      const res = await axios.post(`${BASE_URL}api/generate-mrn`, payload, {
-        withCredentials: true,
-      });
-console.log("res", res)
-      if (res.data) {
-        alert('MRN Generated Successfully');
-        onSave(res.data);
-        onClose();
-      }
-    } catch (error: any) {
-      console.error('MRN Generation Error:', error);
-      alert(error?.response?.data?.message || 'Failed to generate MRN');
-    } finally {
-      setSubmitting(false);
-    }
-  };
+    console.log('MRN Payload =>', payload);
 
-  
+    /* =========================
+       API CALL
+    ========================== */
+
+    const res = await axios.post(
+      `${BASE_URL}api/generate-mrn`,
+      payload,
+      {
+        withCredentials: true,
+      },
+    );
+
+    console.log('MRN Response =>', res.data);
+
+    if (res.data?.success) {
+      alert('MRN Generated Successfully');
+
+      onSave(res.data);
+
+      onClose();
+    } else {
+      alert(
+        res.data?.message ||
+          'Failed to generate MRN',
+      );
+    }
+  } catch (error: any) {
+    console.error(
+      'MRN Generation Error:',
+      error,
+    );
+
+    alert(
+      error?.response?.data?.message ||
+        error?.message ||
+        'Failed to generate MRN',
+    );
+  } finally {
+    setSubmitting(false);
+  }
+};
+ 
 
   const getSelectedCount = () => {
     return selectedItems.length;

@@ -427,6 +427,7 @@
 
 import db from '../database/db.js';
 
+
 export const getExecutionLeads = async (req, res) => {
   const connection = await db.getConnection();
 
@@ -437,12 +438,25 @@ export const getExecutionLeads = async (req, res) => {
         es.schedule_name AS schedule,
         es.start_date,
         es.end_date,
+
         rd.master_id,
         rd.name AS client_name,
-        rd.city
+        rd.city,
+
+        q.qt_id,
+        q.qt_number,
+        q.quotation_type,
+        q.current_revision
+
       FROM execution_start es
+
       JOIN raw_data rd 
         ON FIND_IN_SET(rd.master_id, es.lead_ids)
+
+      LEFT JOIN quotation q 
+        ON q.master_id = rd.master_id
+        AND q.quotation_type = 'finalized'
+
       ORDER BY es.start_date DESC
     `;
 
@@ -454,6 +468,7 @@ export const getExecutionLeads = async (req, res) => {
     });
   } catch (error) {
     console.error('getExecutionLeads Error:', error);
+
     return res.status(500).json({
       message: 'Failed to fetch execution data',
     });
@@ -462,23 +477,28 @@ export const getExecutionLeads = async (req, res) => {
   }
 };
 
+
 export const getLatestQuotationByMasterId = async (req, res) => {
   try {
     if (!req.session.user) {
-      return res.status(401).json({ message: 'Unauthorized: No session' });
+      return res.status(401).json({
+        message: 'Unauthorized: No session',
+      });
     }
 
     const { master_id } = req.params;
 
     if (!master_id) {
-      return res.status(400).json({ message: 'master_id is required' });
+      return res.status(400).json({
+        message: 'master_id is required',
+      });
     }
 
     /* =========================
-       1️⃣ CLIENT BASIC DATA
+       1️⃣ CLIENT DATA
     ========================== */
     const [clientData] = await db.query(
-      `SELECT 
+      `SELECT
           master_id,
           name,
           number,
@@ -499,12 +519,13 @@ export const getLatestQuotationByMasterId = async (req, res) => {
     }
 
     /* =========================
-       2️⃣ GET LATEST QUOTATION
+       2️⃣ GET LATEST FINALIZED QUOTATION
     ========================== */
     const [quotationData] = await db.query(
       `SELECT *
        FROM quotation
        WHERE master_id = ?
+         AND quotation_type = 'finalized'
        ORDER BY qt_id DESC
        LIMIT 1`,
       [master_id],
@@ -513,8 +534,7 @@ export const getLatestQuotationByMasterId = async (req, res) => {
     if (quotationData.length === 0) {
       return res.status(200).json({
         success: false,
-        message: 'No quotation found for this lead',
-        client: clientData[0],
+        message: 'No finalized quotation found',
       });
     }
 
@@ -534,138 +554,398 @@ export const getLatestQuotationByMasterId = async (req, res) => {
 
     const latestRevision = revisionData[0] || null;
 
-    /* =========================
-       4️⃣ GET MAPPED ITEMS
-    ========================== */
-    const [mappedItems] = await db.query(
-      `SELECT 
-        qm.*,
-        k.kit_name,
-        k.kit_price,
+    if (!latestRevision) {
+      return res.status(404).json({
+        success: false,
+        message: 'No revision found',
+      });
+    }
 
-        m.model_no,
-        b.brand_id,
-        b.product_type_id AS prod_id,
-        b.brand_name,
-        pt.product_type_name,
-
-        COALESCE(SUM(mpm.requested_qty),0) AS total_requested_qty,
-        COALESCE(SUM(mpm.required_qty),0) AS total_required_qty,
-
-        COALESCE(SUM(mpm.requested_qty - mpm.required_qty),0) AS total_pending_qty
-
-      FROM quotation_mapped qm
-
-      LEFT JOIN kit k ON qm.kit_id = k.kit_id
-      LEFT JOIN models m ON qm.model_id = m.model_id
-      LEFT JOIN brands b ON m.brand_id = b.brand_id
-      LEFT JOIN product_types pt ON b.product_type_id = pt.product_type_id
-
-      LEFT JOIN generate_mrn gm 
-        ON gm.qt_id = qm.qt_id
-
-      LEFT JOIN mrn_prod_map mpm 
-        ON mpm.mrn_id = gm.mrn_id
-        AND mpm.model_id = qm.model_id
-
-      WHERE qm.qt_id = ?
-
-      GROUP BY qm.qm_id`,
-      [quotation.qt_id],
-    );
+    const revisionNumber = Number(latestRevision.revision || 1);
 
     /* =========================
-       5️⃣ GET KIT PRODUCT DETAILS
+       4️⃣ PARSE SUMMARY OPTIONS
     ========================== */
-    const kitIds = mappedItems
-      .filter((item) => item.kit_id)
-      .map((item) => item.kit_id);
+    let selectedOptionsForSummary = null;
 
-    let kitProducts = [];
-
-    if (kitIds.length > 0) {
-      const [kitProductData] = await db.query(
-        `SELECT 
-            km.kit_id,
-            km.qty,
-            m.model_no,
-            m.price,
-            b.brand_name,
-            pt.product_type_name
-         FROM kit_mapping km
-         LEFT JOIN models m ON km.model_id = m.model_id
-         LEFT JOIN brands b ON km.brand_id = b.brand_id
-         LEFT JOIN product_types pt ON km.product_type_id = pt.product_type_id
-         WHERE km.kit_id IN (?)`,
-        [kitIds],
-      );
-
-      kitProducts = kitProductData;
+    if (latestRevision.selected_options_for_summary) {
+      try {
+        selectedOptionsForSummary =
+          typeof latestRevision.selected_options_for_summary === 'string'
+            ? JSON.parse(latestRevision.selected_options_for_summary)
+            : latestRevision.selected_options_for_summary;
+      } catch (e) {
+        console.error('Error parsing selected_options_for_summary:', e);
+      }
     }
 
     /* =========================
-       6️⃣ FORMAT RESPONSE
+       5️⃣ CATEGORY MAP
     ========================== */
-    const formattedMappedItems = mappedItems.map((item) => {
-      const relatedKitProducts = kitProducts.filter(
-        (kp) => kp.kit_id === item.kit_id,
-      );
+    const [categories] = await db.query(
+      `SELECT cat_id, cat_name FROM category`,
+    );
 
-      const totalQty = Number(item.model_qty || 0);
-      const requestedQty = Number(item.total_requested_qty || 0);
-      const requiredQty = Number(item.total_required_qty || 0);
+    const categoryMap = {};
 
-      /* ✅ CORRECT CALCULATIONS */
-      const mrnPending = totalQty - requestedQty; // for MRN generation
-      const issuePending = requestedQty - requiredQty; // for issue stage
-
-      return {
-        qm_id: item.qm_id,
-
-        kit_id: item.kit_id,
-        kit_name: item.kit_name,
-        kit_price: item.kit_price,
-        kit_qty: item.kit_qty,
-
-        model_id: item.model_id,
-        model_no: item.model_no,
-
-        prod_id: item.prod_id,
-        brand_id: item.brand_id,
-
-        brand_name: item.brand_name,
-        product_type: item.product_type_name,
-
-        total_qty: totalQty,
-
-        /* ✅ FIXED NAMING */
-        mrn_pending_qty: mrnPending > 0 ? mrnPending : 0,
-        total_requested_qty: requestedQty,
-        total_issued_qty: requiredQty,
-
-        issue_pending_qty: issuePending > 0 ? issuePending : 0,
-
-        model_price: item.model_price,
-
-        is_mrn_generated: mrnPending <= 0 ? 1 : 0,
-
-        current_revision: item.current_revision,
-        kit_products: relatedKitProducts,
-      };
+    categories.forEach((c) => {
+      categoryMap[c.cat_id] = c.cat_name;
     });
 
     /* =========================
-       ✅ FINAL RESPONSE (FIX)
+       6️⃣ OPTIONS
+    ========================== */
+    const [optionRows] = await db.query(
+      `SELECT
+          option_id,
+          option_name,
+          option_order,
+          subject,
+          subject_type,
+          floor_name,
+          room_name
+       FROM quotation_options
+       WHERE qt_id = ?
+         AND revision = ?
+       ORDER BY option_order ASC`,
+      [quotation.qt_id, revisionNumber],
+    );
+
+    const builtOptions = [];
+
+    const GST_PERCENT = 18;
+
+    const gstBase = Number(latestRevision.gst_app_amt || 0);
+
+    for (const opt of optionRows) {
+      /* =========================
+         7️⃣ OPTION ITEMS
+      ========================== */
+      const [mappedItems] = await db.query(
+        `SELECT
+            qm.qm_id,
+            qm.cat_id,
+            qm.kit_id,
+            qm.model_id,
+            qm.model_qty AS qty,
+            qm.model_price AS price,
+            qm.current_revision,
+            qm.kit_qty,
+
+            k.kit_name,
+
+            m.model_no AS model,
+            m.image_path,
+            m.description,
+            m.price AS model_original_price,
+
+            b.brand_id,
+            b.brand_name,
+            b.product_type_id AS prod_id,
+
+            pt.product_type_name
+
+         FROM quotation_mapped qm
+
+         LEFT JOIN kit k
+           ON qm.kit_id = k.kit_id
+
+         LEFT JOIN models m
+           ON qm.model_id = m.model_id
+
+         LEFT JOIN brands b
+           ON m.brand_id = b.brand_id
+
+         LEFT JOIN product_types pt
+           ON b.product_type_id = pt.product_type_id
+
+         WHERE qm.qt_id = ?
+           AND qm.option_id = ?
+           AND qm.current_revision = ?
+
+         ORDER BY qm.kit_id`,
+        [quotation.qt_id, opt.option_id, revisionNumber],
+      );
+
+      const formattedItems = [];
+
+      for (const item of mappedItems) {
+        /* =========================
+           8️⃣ MRN CALCULATIONS
+        ========================== */
+        const [[sum]] = await db.query(
+          `SELECT
+              COALESCE(SUM(mpm.requested_qty),0) AS total_requested_qty,
+              COALESCE(SUM(mpm.required_qty),0) AS total_issued_qty
+           FROM mrn_prod_map mpm
+           JOIN generate_mrn gm
+             ON gm.mrn_id = mpm.mrn_id
+           WHERE gm.qt_id = ?
+             AND mpm.model_id = ?`,
+          [quotation.qt_id, item.model_id],
+        );
+
+        const totalQty = Number(item.qty || 0);
+
+        const requestedQty = Number(sum.total_requested_qty || 0);
+
+        const issuedQty = Number(sum.total_issued_qty || 0);
+
+        const mrnPendingQty = totalQty - requestedQty;
+
+        const issuePendingQty = requestedQty - issuedQty;
+
+        formattedItems.push({
+          qm_id: item.qm_id,
+
+          cat_id: item.cat_id,
+
+          kit_id: item.kit_id,
+
+          kit_name: item.kit_name,
+
+          model_id: item.model_id,
+
+          qty: totalQty,
+
+          price: Number(item.price || 0),
+
+          current_revision: item.current_revision,
+
+          kit_qty: item.kit_qty,
+
+          model: item.model,
+
+          image_path: item.image_path,
+
+          description: item.description,
+
+          model_original_price: Number(item.model_original_price || 0),
+
+          brand_id: item.brand_id,
+
+          prod_id: item.prod_id,
+
+          brand_name: item.brand_name,
+
+          product_type_name: item.product_type_name,
+
+          cat_name: categoryMap[item.cat_id] || 'Unknown',
+
+          /* ✅ MRN FLOW */
+          total_requested_qty: requestedQty,
+
+          total_issued_qty: issuedQty,
+
+          mrn_pending_qty: mrnPendingQty > 0 ? mrnPendingQty : 0,
+
+          issue_pending_qty: issuePendingQty > 0 ? issuePendingQty : 0,
+
+          is_mrn_generated: mrnPendingQty <= 0 ? 1 : 0,
+        });
+      }
+
+      /* =========================
+         9️⃣ GROUP KITS
+      ========================== */
+      const kitsMap = {};
+
+      for (const row of formattedItems) {
+        const key = row.kit_id ?? `single_${row.model_id}`;
+
+        if (!kitsMap[key]) {
+          kitsMap[key] = {
+            kit_id: row.kit_id,
+            kit_name: row.kit_name,
+            items: [],
+          };
+        }
+
+        kitsMap[key].items.push(row);
+      }
+
+      /* =========================
+         🔟 ADDITIONAL PRICES
+      ========================== */
+      const [additional] = await db.query(
+        `SELECT add_price_name, price
+         FROM additional_price
+         WHERE qt_id = ?
+           AND option_id = ?
+           AND revision = ?`,
+        [quotation.qt_id, opt.option_id, revisionNumber],
+      );
+
+      const additional_prices = additional.map((a) => ({
+        add_price_name: a.add_price_name,
+        price: Number(a.price || 0),
+      }));
+
+      /* =========================
+         1️⃣1️⃣ INSTALLMENTS
+      ========================== */
+      const [installmentRows] = await db.query(
+        `SELECT
+            description,
+            percentage,
+            amount,
+            payment_mode
+         FROM quotation_installments
+         WHERE qt_id = ?
+           AND option_id = ?
+           AND revision = ?`,
+        [quotation.qt_id, opt.option_id, revisionNumber],
+      );
+
+      /* =========================
+         1️⃣2️⃣ FINAL OFFER
+      ========================== */
+      const [finalOfferRows] = await db.query(
+        `SELECT
+            description,
+            percentage,
+            amount,
+            is_default
+         FROM quotation_final_offer
+         WHERE qt_id = ?
+           AND option_id = ?
+           AND revision = ?
+         LIMIT 1`,
+        [quotation.qt_id, opt.option_id, revisionNumber],
+      );
+
+      /* =========================
+         1️⃣3️⃣ TOTALS
+      ========================== */
+      const optProductsTotal = formattedItems.reduce(
+        (sum, row) => sum + Number(row.price) * Number(row.qty),
+        0,
+      );
+
+      const optAdditionalTotal = additional_prices.reduce(
+        (s, a) => s + a.price,
+        0,
+      );
+
+      const optGst =
+        quotation.type === 'with_gst' ? (gstBase * GST_PERCENT) / 100 : 0;
+
+      const optTotalWithGST = optProductsTotal + optAdditionalTotal + optGst;
+
+      let finalOfferData = null;
+
+      let finalOfferAmount = 0;
+
+      if (finalOfferRows.length > 0 && Number(finalOfferRows[0].amount) > 0) {
+        finalOfferData = {
+          description:
+            finalOfferRows[0].description || 'FINAL BEST OFFER (OPTIONAL)',
+
+          percentage: Number(finalOfferRows[0].percentage || 0),
+
+          amount: Number(finalOfferRows[0].amount || 0),
+        };
+
+        finalOfferAmount = Number(finalOfferRows[0].amount || 0);
+      }
+
+      const finalizedTotal = optTotalWithGST - finalOfferAmount;
+
+      /* =========================
+         1️⃣4️⃣ PUSH OPTION
+      ========================== */
+      builtOptions.push({
+        option_id: opt.option_id,
+
+        option_name: opt.option_name,
+
+        subject: opt.subject || null,
+
+        subject_type: opt.subject_type || 'master',
+
+        floor_name: opt.floor_name || null,
+
+        room_name: opt.room_name || null,
+
+        option_order: opt.option_order,
+
+        items: Object.values(kitsMap),
+
+        additional_prices,
+
+        installments: installmentRows.map((i) => ({
+          description: i.description,
+
+          percentage: Number(i.percentage || 0),
+
+          amount: Number(i.amount || 0),
+
+          payment_mode: i.payment_mode || 'Online',
+        })),
+
+        revision_details: {
+          total_without_gst: optProductsTotal,
+
+          total_with_gst: optTotalWithGST,
+
+          gst_app_amt: gstBase,
+
+          gst_percent: GST_PERCENT,
+
+          gst_calculated_amount: optGst,
+        },
+
+        final_offer: finalOfferData,
+
+        final_offer_amount: finalOfferAmount,
+
+        finalized_total: finalizedTotal,
+      });
+    }
+
+    /* =========================
+       ✅ FINAL RESPONSE
     ========================== */
     return res.status(200).json({
       success: true,
-      client: clientData[0],
-      quotation: quotation,
-      latest_revision: latestRevision,
-      items: formattedMappedItems,
+
+      master_id,
+
+      revision: revisionNumber,
+
+      lead: {
+        name: clientData[0].name,
+
+        number: clientData[0].number,
+
+        city: clientData[0].city,
+
+        address: clientData[0].address,
+      },
+
+      quotation: {
+        qt_id: quotation.qt_id,
+
+        qt_number: quotation.qt_number,
+
+        type: quotation.type,
+
+        quotation_type: quotation.quotation_type,
+
+        acoustic_terms: quotation.acoustic_terms,
+
+        subject: quotation.subject,
+
+        selected_options_for_summary: selectedOptionsForSummary,
+
+        created_at: quotation.created_at,
+
+        options: builtOptions,
+      },
     });
   } catch (error) {
     console.error('❌ Error fetching quotation:', error);
+
     return res.status(500).json({
       success: false,
       message: 'Failed to fetch quotation details',
@@ -673,6 +953,7 @@ export const getLatestQuotationByMasterId = async (req, res) => {
     });
   }
 };
+
 
 // export const generateMRNold = async (req, res) => {
 //   const connection = await db.getConnection();
@@ -825,11 +1106,13 @@ export const getLatestQuotationByMasterId = async (req, res) => {
 //   }
 // };
 
+
 export const generateMRN = async (req, res) => {
   const connection = await db.getConnection();
 
   try {
     const { master_id, qt_id, expected_date, products } = req.body;
+
     const created_by = req.session.user?.id || null;
 
     if (!master_id || !qt_id) {
@@ -839,94 +1122,240 @@ export const generateMRN = async (req, res) => {
       });
     }
 
+    if (!products || !Array.isArray(products) || products.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'Products are required',
+      });
+    }
+
     await connection.beginTransaction();
+
+    /* =========================
+       1️⃣ CHECK FINALIZED QUOTATION
+    ========================== */
+    const [[quotation]] = await connection.query(
+      `SELECT
+            qt_id,
+            quotation_type
+         FROM quotation
+         WHERE qt_id = ?
+           AND quotation_type = 'finalized'
+         LIMIT 1`,
+      [qt_id],
+    );
+
+    if (!quotation) {
+      throw new Error('Only finalized quotation allowed for MRN');
+    }
+
+    /* =========================
+       2️⃣ GET LATEST REVISION
+    ========================== */
+    const [[latestRevision]] = await connection.query(
+      `SELECT revision
+         FROM quotation_revision
+         WHERE qt_id = ?
+         ORDER BY revision DESC
+         LIMIT 1`,
+      [qt_id],
+    );
+
+    const currentRevision = latestRevision?.revision || 1;
 
     const mrn_number = `MRN${Date.now()}`;
 
     /* =========================
-       1️⃣ CREATE MRN
+       3️⃣ CREATE MRN
     ========================== */
     const [mrnResult] = await connection.query(
-      `INSERT INTO generate_mrn 
-       (mrn_number, master_id, qt_id, expected_date, created_by)
-       VALUES (?, ?, ?, ?, ?)`,
+      `INSERT INTO generate_mrn
+         (
+           mrn_number,
+           master_id,
+           qt_id,
+           expected_date,
+           created_by
+         )
+         VALUES (?, ?, ?, ?, ?)`,
       [mrn_number, master_id, qt_id, expected_date || null, created_by],
     );
 
     const mrn_id = mrnResult.insertId;
 
     /* =========================
-       2️⃣ INSERT ITEMS + LOGS
+       4️⃣ INSERT PRODUCTS
     ========================== */
     for (const item of products) {
-      if (item.requested_qty <= 0) {
+      const requestedQty = Number(item.requested_qty || 0);
+
+      if (requestedQty <= 0) {
         throw new Error('Requested qty must be greater than 0');
       }
 
-      /* 🔹 Quotation Qty */
+      /* =========================
+         5️⃣ GET QUOTATION QTY
+      ========================== */
       const [[qm]] = await connection.query(
-        `SELECT model_qty 
-         FROM quotation_mapped 
-         WHERE qt_id = ? AND model_id = ?`,
-        [qt_id, item.model_id],
+        `SELECT
+              qm_id,
+              model_qty,
+              current_revision
+           FROM quotation_mapped
+           WHERE qt_id = ?
+             AND model_id = ?
+             AND current_revision = ?
+           LIMIT 1`,
+        [qt_id, item.model_id, currentRevision],
       );
 
-      const quotationQty = Number(qm?.model_qty || 0);
-
-      /* 🔹 Already Requested */
-      const [[sum]] = await connection.query(
-        `SELECT COALESCE(SUM(requested_qty),0) as total_requested
-         FROM mrn_prod_map mp
-         JOIN generate_mrn gm ON gm.mrn_id = mp.mrn_id
-         WHERE gm.qt_id = ? AND mp.model_id = ?`,
-        [qt_id, item.model_id],
-      );
-
-      const totalRequested = Number(sum.total_requested);
-      const remaining = quotationQty - totalRequested;
-
-      if (item.requested_qty > remaining) {
-        throw new Error(`Only ${remaining} qty allowed`);
+      if (!qm) {
+        throw new Error(
+          `Quotation item not found for model_id ${item.model_id}`,
+        );
       }
 
+      const quotationQty = Number(qm.model_qty || 0);
+
+      /* =========================
+         6️⃣ TOTAL REQUESTED
+      ========================== */
+      const [[sum]] = await connection.query(
+        `SELECT
+              COALESCE(SUM(mpm.requested_qty),0) AS total_requested_qty,
+              COALESCE(SUM(mpm.required_qty),0) AS total_issued_qty
+           FROM mrn_prod_map mpm
+           JOIN generate_mrn gm
+             ON gm.mrn_id = mpm.mrn_id
+           WHERE gm.qt_id = ?
+             AND mpm.model_id = ?`,
+        [qt_id, item.model_id],
+      );
+
+      const totalRequested = Number(sum.total_requested_qty || 0);
+
+      const totalIssued = Number(sum.total_issued_qty || 0);
+
+      /* =========================
+         7️⃣ PENDING CALCULATION
+      ========================== */
+      const remainingQty = quotationQty - totalRequested;
+
+      if (remainingQty <= 0) {
+        throw new Error(
+          `MRN already fully generated for model_id ${item.model_id}`,
+        );
+      }
+
+      if (requestedQty > remainingQty) {
+        throw new Error(
+          `Only ${remainingQty} qty allowed for model_id ${item.model_id}`,
+        );
+      }
+
+      /* =========================
+         8️⃣ INSERT MRN PRODUCT
+      ========================== */
       const [mpmRes] = await connection.query(
         `INSERT INTO mrn_prod_map
-        (mrn_id, prod_id, model_id, brand_id, kit_id, requested_qty, required_qty, status, purchase_status)
-        VALUES (?, ?, ?, ?, ?, ?, 0, 'Verification Pending', 'Not Requested')`,
+          (
+            mrn_id,
+            prod_id,
+            model_id,
+            brand_id,
+            kit_id,
+            requested_qty,
+            required_qty,
+            status,
+            purchase_status
+          )
+          VALUES
+          (
+            ?, ?, ?, ?, ?, ?, 0,
+            'Verification Pending',
+            'Not Requested'
+          )`,
         [
           mrn_id,
-          item.prod_id,
+
+          item.prod_id || null,
+
           item.model_id,
-          item.brand_id,
+
+          item.brand_id || null,
+
           item.kit_id || null,
-          item.requested_qty,
+
+          requestedQty,
         ],
       );
 
       const mpm_id = mpmRes.insertId;
 
-      /* ✅ ITEM LOG ONLY */
+      /* =========================
+         9️⃣ LOG ENTRY
+      ========================== */
       await connection.query(
         `INSERT INTO mrn_activity_logs
-         (mrn_id, mpm_id, model_id, action_type, qty, status, created_by)
-         VALUES (?, ?, ?, 'VERIFICATION', ?, 'Generated', ?)`,
-        [mrn_id, mpm_id, item.model_id, item.requested_qty, created_by],
+        (
+          mrn_id,
+          mpm_id,
+          model_id,
+          action_type,
+          qty,
+          status,
+          created_by
+        )
+        VALUES
+        (
+          ?, ?, ?, 'VERIFICATION',
+          ?, 'Generated', ?
+        )`,
+        [mrn_id, mpm_id, item.model_id, requestedQty, created_by],
       );
+
+      /* OPTIONAL RESPONSE */
+      item.previous_requested_qty = totalRequested;
+
+      item.previous_issued_qty = totalIssued;
+
+      item.remaining_before_generation = remainingQty;
+
+      item.remaining_after_generation = remainingQty - requestedQty;
     }
 
     await connection.commit();
 
-    res.status(200).json({
+    /* =========================
+       ✅ FINAL RESPONSE
+    ========================== */
+    return res.status(200).json({
       success: true,
-      message: 'MRN generated',
-      mrn_id,
+
+      message: 'MRN generated successfully',
+
+      mrn: {
+        mrn_id,
+
+        mrn_number,
+
+        master_id,
+
+        qt_id,
+
+        revision: currentRevision,
+
+        expected_date,
+      },
+
+      products,
     });
   } catch (err) {
     await connection.rollback();
 
     console.error('generateMRN Error:', err);
 
-    res.status(500).json({
+    return res.status(500).json({
       success: false,
       message: err.message,
     });
@@ -934,6 +1363,7 @@ export const generateMRN = async (req, res) => {
     connection.release();
   }
 };
+
 
 // export const generateMRN = async (req, res) => {
 //   const connection = await db.getConnection();
@@ -1499,125 +1929,153 @@ WHERE mp.mrn_id = ?`,
 //   }
 // };
 
+
 export const verifyMRN = async (req, res) => {
   const connection = await db.getConnection();
 
   try {
     const { mrn_id, products } = req.body;
+
     const verified_by = req.session.user?.id || null;
+
+    if (!mrn_id || !products || !Array.isArray(products)) {
+      return res.status(400).json({
+        success: false,
+        message: 'mrn_id and products are required',
+      });
+    }
 
     await connection.beginTransaction();
 
     for (const item of products) {
       const { mpm_id, verified_qty } = item;
 
+      /* =========================
+         GET PRODUCT + STOCK
+      ========================== */
       const [[mpm]] = await connection.query(
-        `SELECT mpm.*, IFNULL(s.qty,0) as stock_qty
+        `SELECT 
+            mpm.*,
+            IFNULL(s.qty, 0) AS stock_qty
          FROM mrn_prod_map mpm
-         LEFT JOIN stock s ON s.model_id = mpm.model_id
-         WHERE mpm_id = ?`,
+         LEFT JOIN stock s
+           ON s.model_id = mpm.model_id
+         WHERE mpm.mpm_id=?`,
         [mpm_id],
       );
 
-      if (!mpm) throw new Error('Invalid MPM ID');
+      if (!mpm) {
+        throw new Error(`Invalid MPM ID: ${mpm_id}`);
+      }
 
-      const requested = Number(mpm.requested_qty);
-      const stock = Number(mpm.stock_qty);
+      const requestedQty = Number(mpm.requested_qty);
+      const stockQty = Number(mpm.stock_qty);
 
-      let finalVerified = 0;
+      let finalVerifiedQty = 0;
       let purchaseQty = 0;
 
-      /* ===============================
-         ✅ CORRECT BUSINESS LOGIC
-      =============================== */
+      /* =========================
+         STOCK VERIFICATION LOGIC
+      ========================== */
 
-      if (stock >= requested) {
-        finalVerified = requested;
+      // Full stock available
+      if (stockQty >= requestedQty) {
+        finalVerifiedQty = requestedQty;
         purchaseQty = 0;
-      } else if (stock > 0) {
-        finalVerified =
-          verified_qty != null ? Math.min(Number(verified_qty), stock) : stock;
-
-        purchaseQty = requested - finalVerified;
-      } else {
-        finalVerified = 0;
-        purchaseQty = requested;
       }
 
-      /* ===============================
-         ✅ UPDATE MPM
-      =============================== */
+      // Partial stock available
+      else if (stockQty > 0) {
+        finalVerifiedQty =
+          verified_qty != null
+            ? Math.min(Number(verified_qty), stockQty)
+            : stockQty;
+
+        purchaseQty = requestedQty - finalVerifiedQty;
+      }
+
+      // No stock available
+      else {
+        finalVerifiedQty = 0;
+        purchaseQty = requestedQty;
+      }
+
+      /* =========================
+         UPDATE MRM PRODUCT MAP
+      ========================== */
+
       await connection.query(
-        `UPDATE mrn_prod_map 
-         SET verified_qty=?, 
-             purchase_qty=?, 
-             status='Approval Pending',
-             purchase_status=CASE 
-               WHEN ? > 0 THEN 'Pending' 
-               ELSE 'Not Requested' 
+        `UPDATE mrn_prod_map
+         SET 
+           verified_qty=?,
+           purchase_qty=?,
+           status='Approval Pending',
+           purchase_status=
+             CASE
+               WHEN ? > 0 THEN 'Pending'
+               ELSE 'Not Requested'
              END
          WHERE mpm_id=?`,
-        [finalVerified, purchaseQty, purchaseQty, mpm_id],
+        [finalVerifiedQty, purchaseQty, purchaseQty, mpm_id],
       );
 
-      /* ===============================
-         ✅ PURCHASE REQUEST + LOG
-      =============================== */
-      if (purchaseQty > 0) {
-        const [pr] = await connection.query(
-          `INSERT INTO purchase_request
-           (mrn_id, mpm_id, product_type_id, brand_id, model_id, qty)
-           VALUES (?, ?, ?, ?, ?, ?)`,
-          [
-            mrn_id,
-            mpm_id,
-            mpm.prod_id,
-            mpm.brand_id,
-            mpm.model_id,
-            purchaseQty,
-          ],
-        );
+      /* =========================
+         VERIFICATION LOG
+      ========================== */
 
-        await connection.query(
-          `INSERT INTO mrn_activity_logs
-           (mrn_id, mpm_id, model_id, pr_id, action_type, qty, status, created_by)
-           VALUES (?, ?, ?, ?, 'PURCHASE_REQUEST', ?, 'Pending', ?)`,
-          [mrn_id, mpm_id, mpm.model_id, pr.insertId, purchaseQty, verified_by],
-        );
-      }
+      const logQty = finalVerifiedQty > 0 ? finalVerifiedQty : purchaseQty;
 
-      /* ===============================
-         ✅ VERIFICATION LOG (FIXED)
-      =============================== */
-      if (finalVerified > 0) {
-        await connection.query(
-          `INSERT INTO mrn_activity_logs
-           (mrn_id, mpm_id, model_id, action_type, qty, status, created_by)
-           VALUES (?, ?, ?, 'VERIFICATION', ?, 'Verified', ?)`,
-          [mrn_id, mpm_id, mpm.model_id, finalVerified, verified_by],
-        );
-      }
+      await connection.query(
+        `INSERT INTO mrn_activity_logs
+         (
+           mrn_id,
+           mpm_id,
+           model_id,
+           action_type,
+           qty,
+           status,
+           created_by
+         )
+         VALUES
+         (
+           ?, ?, ?, 'VERIFICATION',
+           ?, 'Verified', ?
+         )`,
+        [mrn_id, mpm_id, mpm.model_id, logQty, verified_by],
+      );
     }
 
-    /* ===============================
-       ✅ UPDATE MRN STATUS
-    =============================== */
+    /* =========================
+       UPDATE MRN STATUS
+    ========================== */
+
     await connection.query(
-      `UPDATE generate_mrn SET mrn_status='Verified' WHERE mrn_id=?`,
+      `UPDATE generate_mrn
+       SET mrn_status='Verified'
+       WHERE mrn_id=?`,
       [mrn_id],
     );
 
     await connection.commit();
 
-    res.json({ success: true, message: 'MRN Verified Successfully' });
+    return res.status(200).json({
+      success: true,
+      message: 'MRN Verified Successfully',
+    });
   } catch (err) {
     await connection.rollback();
+
     console.error('Verify MRN Error:', err);
-    res.status(500).json({ success: false, message: err.message });
+
+    return res.status(500).json({
+      success: false,
+      message: err.message,
+    });
   } finally {
     connection.release();
   }
 };
+
 
 const updateMRNStatus = async (mrn_id, connection) => {
   const [rows] = await connection.query(
@@ -1757,6 +2215,7 @@ export const getMRNDetailsById = async (req, res) => {
   }
 };
 
+
 export const getVerificationPendingMRNs = async (req, res) => {
   const connection = await db.getConnection();
 
@@ -1873,6 +2332,7 @@ export const getVerificationPendingMRNs = async (req, res) => {
     connection.release();
   }
 };
+
 
 export const getVerifiedMRNs = async (req, res) => {
   const connection = await db.getConnection();
@@ -1995,6 +2455,7 @@ export const getVerifiedMRNs = async (req, res) => {
   }
 };
 
+
 // export const getApprovalItems = async (req, res) => {
 //   const connection = await db.getConnection();
 
@@ -2088,6 +2549,7 @@ export const getApprovalItems = async (req, res) => {
     connection.release();
   }
 };
+
 
 // export const approveMRN = async (req, res) => {
 //   const connection = await db.getConnection();
@@ -2213,6 +2675,7 @@ export const getApprovalItems = async (req, res) => {
 //     connection.release();
 //   }
 // };
+
 
 export const approveMRN = async (req, res) => {
   const connection = await db.getConnection();
@@ -2352,6 +2815,7 @@ export const approveMRN = async (req, res) => {
     connection.release();
   }
 };
+
 
 // export const getApprovedMRNs = async (req, res) => {
 //   const connection = await db.getConnection();
@@ -2606,6 +3070,7 @@ export const getMRNsForIssueAndPurchase = async (req, res) => {
     connection.release();
   }
 };
+
 
 export const getApprovedMRNs = async (req, res) => {
   const connection = await db.getConnection();
@@ -3289,6 +3754,7 @@ export const issueMRNItems = async (req, res) => {
   }
 };
 
+
 export const getMRNLogs = async (req, res) => {
   const connection = await db.getConnection();
 
@@ -3372,64 +3838,106 @@ export const getPurchaseItemsByMRN = async (req, res) => {
       SELECT 
         gm.mrn_id,
         gm.mrn_number,
+
         rd.name AS client_name,
         rd.city,
-
-        es.execution_id,
-        es.schedule_name,
 
         mpm.mpm_id,
         mpm.model_id,
         mpm.brand_id,
+
         mpm.purchase_qty,
         mpm.purchase_status,
 
         pr.pr_id,
         pr.status AS pr_status,
 
-        po.po_id,                -- ✅ NEW
-        po.status AS po_status,  -- ✅ NEW
-
         b.brand_name,
         m.model_no
 
       FROM generate_mrn gm
-      JOIN mrn_prod_map mpm ON gm.mrn_id = mpm.mrn_id
 
-      LEFT JOIN purchase_request pr 
+      JOIN mrn_prod_map mpm
+        ON gm.mrn_id = mpm.mrn_id
+
+      LEFT JOIN purchase_request pr
         ON pr.mpm_id = mpm.mpm_id
 
-      LEFT JOIN purchase_order po   -- ✅ NEW JOIN
-        ON po.pr_id = pr.pr_id
-
-      LEFT JOIN raw_data rd 
+      LEFT JOIN raw_data rd
         ON rd.master_id = gm.master_id
 
-      LEFT JOIN brands b 
+      LEFT JOIN brands b
         ON b.brand_id = mpm.brand_id
 
-      LEFT JOIN models m 
+      LEFT JOIN models m
         ON m.model_id = mpm.model_id
 
-      LEFT JOIN execution_start es 
-        ON FIND_IN_SET(gm.master_id, es.lead_ids)
+      WHERE 
+        mpm.purchase_qty > 0
 
-      WHERE mpm.purchase_qty > 0
-      AND mpm.purchase_status IN ('Pending', 'Approved')
+        /* HIDE ITEMS AFTER PO GENERATED */
+        AND (
+          mpm.purchase_status IS NULL
+          OR mpm.purchase_status != 'Ordered'
+        )
 
       ORDER BY gm.mrn_id DESC
     `;
 
     const [rows] = await connection.query(query);
 
-    res.json({ success: true, data: rows });
+    /* =========================
+       GROUPING
+    ========================== */
+
+    const mrnMap = {};
+
+    rows.forEach((row) => {
+      if (!mrnMap[row.mrn_id]) {
+        mrnMap[row.mrn_id] = {
+          mrn_id: row.mrn_id,
+          mrn_number: row.mrn_number,
+
+          client_name: row.client_name,
+          city: row.city,
+
+          items: [],
+        };
+      }
+
+      mrnMap[row.mrn_id].items.push({
+        mpm_id: row.mpm_id,
+        pr_id: row.pr_id,
+
+        model_id: row.model_id,
+        brand_id: row.brand_id,
+
+        brand_name: row.brand_name,
+        model_no: row.model_no,
+
+        purchase_qty: row.purchase_qty,
+        purchase_status: row.purchase_status,
+
+        pr_status: row.pr_status,
+      });
+    });
+
+    return res.status(200).json({
+      success: true,
+      data: Object.values(mrnMap),
+    });
   } catch (err) {
     console.error('Get Purchase Items Error:', err);
-    res.status(500).json({ success: false, message: err.message });
+
+    return res.status(500).json({
+      success: false,
+      message: err.message,
+    });
   } finally {
     connection.release();
   }
 };
+
 
 export const approvePurchaseRequest = async (req, res) => {
   const connection = await db.getConnection();
@@ -3601,106 +4109,195 @@ export const approvePurchaseRequest = async (req, res) => {
 //   }
 // };
 
+
 export const createPurchaseOrder = async (req, res) => {
   const connection = await db.getConnection();
 
   try {
-    const { pr_id, qty, vendor_id, unit_price } = req.body;
+    const { mrn_id, items } = req.body;
 
-    if (!pr_id || !qty || !vendor_id || !unit_price) {
+    const created_by = req.session.user?.id || null;
+
+    // =========================
+    // VALIDATION
+    // =========================
+
+    if (!mrn_id) {
       return res.status(400).json({
         success: false,
-        message: 'pr_id, qty, vendor_id and unit_price required',
+        message: 'mrn_id required',
+      });
+    }
+
+    if (!items || !Array.isArray(items) || items.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'items required',
       });
     }
 
     await connection.beginTransaction();
 
-    /* =========================
-       1️⃣ GET PR
-    ========================== */
-    const [[pr]] = await connection.query(
-      `SELECT * FROM purchase_request WHERE pr_id=?`,
-      [pr_id],
-    );
-
-    if (!pr) throw new Error('PR not found');
-
-    if (pr.status !== 'Approved') {
-      throw new Error('PR must be approved first');
-    }
-
-    /* =========================
-       2️⃣ VALIDATE VENDOR
-    ========================== */
-    const [[vendor]] = await connection.query(
-      `SELECT * FROM vendors WHERE vendor_id=? AND is_active=1`,
-      [vendor_id],
-    );
-
-    if (!vendor) {
-      throw new Error('Invalid or inactive vendor');
-    }
-
-    /* =========================
-       3️⃣ CALCULATE PRICE
-    ========================== */
-    const total_price = qty * unit_price;
+    // =========================
+    // CREATE SINGLE PO HEADER
+    // =========================
 
     const po_number = `PO${Date.now()}`;
 
-    /* =========================
-       4️⃣ CREATE PO
-    ========================== */
     const [poRes] = await connection.query(
-      `INSERT INTO purchase_order
-       (po_number, pr_id, model_id, qty, vendor_id, unit_price, total_price, status)
-       VALUES (?, ?, ?, ?, ?, ?, ?, 'Ordered')`,
-      [po_number, pr_id, pr.model_id, qty, vendor_id, unit_price, total_price],
+      `
+        INSERT INTO purchase_order
+        (
+          po_number,
+          mrn_id,
+          status
+        )
+        VALUES (?, ?, 'Ordered')
+        `,
+      [po_number, mrn_id],
     );
 
-    /* =========================
-       5️⃣ UPDATE MPM STATUS
-    ========================== */
-    await connection.query(
-      `UPDATE mrn_prod_map 
-       SET purchase_status='Ordered' 
-       WHERE mpm_id=?`,
-      [pr.mpm_id],
-    );
+    const po_id = poRes.insertId;
 
-    /* =========================
-   6️⃣ LOG
-========================= */
-    const created_by = req.session.user?.id || null;
+    // =========================
+    // LOOP ITEMS
+    // =========================
 
-    await connection.query(
-      `INSERT INTO mrn_activity_logs
-   (mrn_id, mpm_id, model_id, pr_id, action_type, qty, status, remark, created_by)
-   VALUES (?, ?, ?, ?, 'PO_CREATED', ?, 'Ordered', ?, ?)`,
-      [
-        pr.mrn_id,
-        pr.mpm_id,
-        pr.model_id,
-        pr_id,
-        qty,
-        `Vendor: ${vendor.vendor_name}, Price: ${unit_price}`,
-        created_by, // ✅ FIXED
-      ],
-    );
+    for (const item of items) {
+      const { pr_id, mpm_id, model_id, brand_id, vendor_id, qty, unit_price } =
+        item;
+
+      // =========================
+      // VALIDATE VENDOR
+      // =========================
+
+      const [[vendor]] = await connection.query(
+        `
+          SELECT *
+          FROM vendors
+          WHERE vendor_id=?
+          AND is_active=1
+          `,
+        [vendor_id],
+      );
+
+      if (!vendor) {
+        throw new Error(`Invalid vendor ${vendor_id}`);
+      }
+
+      const total_price = Number(qty) * Number(unit_price);
+
+      // =========================
+      // INSERT PO ITEM
+      // =========================
+
+      await connection.query(
+        `
+        INSERT INTO purchase_order_items
+        (
+          po_id,
+          vendor_id,
+          pr_id,
+          mpm_id,
+          brand_id,
+          model_id,
+          qty,
+          unit_price,
+          total_price,
+          received_qty,
+          status
+        )
+        VALUES
+        (
+          ?, ?, ?, ?, ?, ?, ?, ?, ?, 0,
+          'Ordered'
+        )
+        `,
+        [
+          po_id,
+          vendor_id,
+          pr_id,
+          mpm_id,
+          brand_id,
+          model_id,
+          qty,
+          unit_price,
+          total_price,
+        ],
+      );
+
+      // =========================
+      // UPDATE STATUS
+      // =========================
+
+      await connection.query(
+        `
+        UPDATE mrn_prod_map
+        SET purchase_status='Ordered'
+        WHERE mpm_id=?
+        `,
+        [mpm_id],
+      );
+
+      await connection.query(
+        `
+        UPDATE purchase_request
+        SET status='Purchased'
+        WHERE pr_id=?
+        `,
+        [pr_id],
+      );
+
+      // =========================
+      // LOG
+      // =========================
+
+      await connection.query(
+        `
+        INSERT INTO mrn_activity_logs
+        (
+          mrn_id,
+          mpm_id,
+          model_id,
+          pr_id,
+          action_type,
+          qty,
+          status,
+          remark,
+          created_by
+        )
+        VALUES
+        (
+          ?, ?, ?, ?, 'PO_CREATED',
+          ?, 'Ordered', ?, ?
+        )
+        `,
+        [
+          mrn_id,
+          mpm_id,
+          model_id,
+          pr_id,
+          qty,
+          `Vendor: ${vendor.vendor_name || vendor.company_name}`,
+          created_by,
+        ],
+      );
+    }
 
     await connection.commit();
 
-    res.json({
+    return res.status(200).json({
       success: true,
-      message: 'PO Created Successfully',
-      po_id: poRes.insertId,
+      message: 'Purchase Order Created Successfully',
+      po_id,
+      po_number,
     });
   } catch (err) {
     await connection.rollback();
+
     console.error('Create PO Error:', err);
 
-    res.status(500).json({
+    return res.status(500).json({
       success: false,
       message: err.message,
     });
@@ -3708,6 +4305,7 @@ export const createPurchaseOrder = async (req, res) => {
     connection.release();
   }
 };
+
 
 export const getVendors = async (req, res) => {
   const connection = await db.getConnection();
@@ -3745,6 +4343,7 @@ export const getVendors = async (req, res) => {
   }
 };
 
+
 export const getGeneratedPOList = async (req, res) => {
   const connection = await db.getConnection();
 
@@ -3753,65 +4352,128 @@ export const getGeneratedPOList = async (req, res) => {
       SELECT 
         po.po_id,
         po.po_number,
-        po.qty,
-        po.unit_price,
-        po.total_price,
         po.status AS po_status,
         po.created_at,
 
-        v.vendor_id,
-        v.vendor_name,
-
-        pr.pr_id,
-        pr.mrn_id,
-        pr.mpm_id,
-
+        gm.mrn_id,
         gm.mrn_number,
 
         rd.name AS client_name,
         rd.city,
 
-        mpm.model_id,
-        mpm.brand_id,
+        poi.poi_id,
+        poi.vendor_id,
+        poi.pr_id,
+        poi.mpm_id,
+
+        poi.product_type_id,
+        poi.brand_id,
+        poi.model_id,
+
+        poi.qty,
+        poi.unit_price,
+        poi.total_price,
+        poi.received_qty,
+        poi.status AS item_status,
+
+        v.vendor_name,
+        v.company_name,
 
         b.brand_name,
         m.model_no
 
       FROM purchase_order po
 
-      JOIN purchase_request pr 
-        ON pr.pr_id = po.pr_id
+      JOIN purchase_order_items poi
+        ON poi.po_id = po.po_id
 
-      JOIN mrn_prod_map mpm 
-        ON mpm.mpm_id = pr.mpm_id
+      LEFT JOIN purchase_request pr
+        ON pr.pr_id = poi.pr_id
 
-      JOIN generate_mrn gm 
-        ON gm.mrn_id = pr.mrn_id
+      LEFT JOIN generate_mrn gm
+        ON gm.mrn_id = po.mrn_id
 
-      LEFT JOIN vendors v 
-        ON v.vendor_id = po.vendor_id
+      /* ✅ FIXED HERE */
+      LEFT JOIN vendors v
+        ON v.vendor_id = poi.vendor_id
 
-      LEFT JOIN raw_data rd 
+      LEFT JOIN raw_data rd
         ON rd.master_id = gm.master_id
 
-      LEFT JOIN brands b 
-        ON b.brand_id = mpm.brand_id
+      LEFT JOIN brands b
+        ON b.brand_id = poi.brand_id
 
-      LEFT JOIN models m 
-        ON m.model_id = mpm.model_id
+      LEFT JOIN models m
+        ON m.model_id = poi.model_id
 
       ORDER BY po.po_id DESC
     `;
 
     const [rows] = await connection.query(query);
 
-    res.json({
+    /* =========================
+       GROUP PO
+    ========================== */
+
+    const poMap = {};
+
+    rows.forEach((row) => {
+      if (!poMap[row.po_id]) {
+        poMap[row.po_id] = {
+          po_id: row.po_id,
+          po_number: row.po_number,
+          po_status: row.po_status,
+          created_at: row.created_at,
+
+          mrn: {
+            mrn_id: row.mrn_id,
+            mrn_number: row.mrn_number,
+          },
+
+          client_name: row.client_name,
+          city: row.city,
+
+          items: [],
+        };
+      }
+
+      poMap[row.po_id].items.push({
+        poi_id: row.poi_id,
+
+        vendor: {
+          vendor_id: row.vendor_id,
+          vendor_name: row.vendor_name || row.company_name,
+        },
+
+        pr_id: row.pr_id,
+        mpm_id: row.mpm_id,
+
+        product_type_id: row.product_type_id,
+
+        brand_id: row.brand_id,
+        model_id: row.model_id,
+
+        brand_name: row.brand_name,
+        model_no: row.model_no,
+
+        qty: row.qty,
+        unit_price: row.unit_price,
+        total_price: row.total_price,
+
+        received_qty: row.received_qty,
+
+        status: row.item_status,
+      });
+    });
+
+    return res.status(200).json({
       success: true,
-      data: rows,
+      data: Object.values(poMap),
     });
   } catch (err) {
     console.error('Get PO List Error:', err);
-    res.status(500).json({
+
+    return res.status(500).json({
       success: false,
       message: err.message,
     });
@@ -3819,6 +4481,7 @@ export const getGeneratedPOList = async (req, res) => {
     connection.release();
   }
 };
+
 
 // export const receivePurchaseOrder = async (req, res) => {
 //   const connection = await db.getConnection();
@@ -4012,57 +4675,56 @@ export const receivePurchaseOrder = async (req, res) => {
   const connection = await db.getConnection();
 
   try {
-    const { po_id, received_qty, bill_number, bill_date, total_amount } =
-      req.body;
+    let { po_id, bill_number, bill_date, total_amount, items } = req.body;
 
     const files = req.files;
+
+    // ✅ parse form-data JSON
+    if (typeof items === 'string') {
+      items = JSON.parse(items);
+    }
+
     const receivedBy = req.session.user?.id || null;
 
-    if (!po_id || !received_qty || !bill_number) {
+    /* =========================
+       VALIDATION
+    ========================== */
+    if (!po_id || !bill_number) {
       return res.status(400).json({
         success: false,
-        message: 'po_id, received_qty, bill_number required',
+        message: 'po_id and bill_number required',
+      });
+    }
+
+    if (!items || !items.length) {
+      return res.status(400).json({
+        success: false,
+        message: 'items required',
       });
     }
 
     await connection.beginTransaction();
 
     /* =========================
-       1️⃣ GET PO + PR + MPM
-    ========================== */
-    const [[po]] = await connection.query(
-      `SELECT po.*, pr.mrn_id, pr.mpm_id, pr.product_type_id, pr.brand_id
-       FROM purchase_order po
-       JOIN purchase_request pr ON pr.pr_id = po.pr_id
-       WHERE po.po_id=?`,
-      [po_id],
-    );
-
-    if (!po) throw new Error('PO not found');
-
-    if (po.status !== 'Ordered') {
-      throw new Error('PO already received or invalid state');
-    }
-
-    /* =========================
-       2️⃣ INSERT BILL
+       1. INSERT BILL
     ========================== */
     const [billRes] = await connection.query(
-      `INSERT INTO purchase_bill 
-       (po_id, bill_number, bill_date, total_amount)
-       VALUES (?, ?, ?, ?)`,
-      [po_id, bill_number, bill_date || null, total_amount || null],
+      `INSERT INTO purchase_bill
+      (po_id, bill_number, bill_date, total_amount)
+      VALUES (?, ?, ?, ?)`,
+      [po_id, bill_number, bill_date || null, total_amount || 0],
     );
 
     const bill_id = billRes.insertId;
 
     /* =========================
-       3️⃣ STORE MULTIPLE IMAGES
+       2. STORE BILL IMAGES
     ========================== */
-    if (files && files.length > 0) {
+    if (files?.length) {
       for (const file of files) {
         await connection.query(
-          `INSERT INTO purchase_bill_images (bill_id, image_path)
+          `INSERT INTO purchase_bill_images
+           (bill_id, image_path)
            VALUES (?, ?)`,
           [bill_id, file.path],
         );
@@ -4070,114 +4732,155 @@ export const receivePurchaseOrder = async (req, res) => {
     }
 
     /* =========================
-       4️⃣ UPDATE PO (PARTIAL SUPPORT)
+       3. PROCESS ITEMS
     ========================== */
-    const newReceivedQty = Number(po.received_qty || 0) + Number(received_qty);
+    for (const item of items) {
+      const { poi_id, received_qty } = item;
 
-    let newStatus = 'Ordered';
-    let billStatus = 'Partial';
+      const [[poi]] = await connection.query(
+        `SELECT * 
+         FROM purchase_order_items
+         WHERE poi_id = ?`,
+        [poi_id],
+      );
 
-    if (newReceivedQty >= po.qty) {
-      newStatus = 'Received';
-      billStatus = 'Completed';
+      if (!poi) {
+        throw new Error(`PO item not found: ${poi_id}`);
+      }
+
+      const receiveQty = Number(received_qty || 0);
+      const oldQty = Number(poi.received_qty || 0);
+      const orderQty = Number(poi.qty);
+
+      const newQty = oldQty + receiveQty;
+
+      if (newQty > orderQty) {
+        throw new Error(
+          `Received qty exceeds ordered qty for PO Item ${poi_id}`,
+        );
+      }
+
+      /* =========================
+         STATUS
+      ========================== */
+      let status = 'Pending';
+      if (newQty === orderQty) status = 'Received';
+      else if (newQty > 0) status = 'Partial';
+
+      /* =========================
+         UPDATE PO ITEM
+      ========================== */
+      await connection.query(
+        `UPDATE purchase_order_items
+         SET received_qty = ?, status = ?
+         WHERE poi_id = ?`,
+        [newQty, status, poi_id],
+      );
+
+      /* =========================
+         STOCK FIX (IMPORTANT)
+      ========================== */
+
+      // 🔥 ALWAYS ensure product_type_id exists
+      let productTypeId = poi.product_type_id;
+
+      if (!productTypeId) {
+        const [[pt]] = await connection.query(
+          `SELECT product_type_id
+           FROM product_types
+           WHERE cat_id = (
+             SELECT cat_id FROM mrn_prod_map WHERE mpm_id = ?
+           )
+           LIMIT 1`,
+          [poi.mpm_id],
+        );
+
+        productTypeId = pt?.product_type_id || 1; // fallback safe
+      }
+
+      await connection.query(
+        `INSERT INTO stock
+        (product_type_id, brand_id, model_id, qty)
+        VALUES (?, ?, ?, ?)
+        ON DUPLICATE KEY UPDATE
+          qty = qty + VALUES(qty)`,
+        [productTypeId, poi.brand_id, poi.model_id, receiveQty],
+      );
+
+      /* =========================
+         UPDATE MRN PROD MAP
+      ========================== */
+      await connection.query(
+        `UPDATE mrn_prod_map
+         SET 
+           verified_qty = verified_qty + ?,
+           purchase_qty = GREATEST(0, purchase_qty - ?),
+           purchase_status = CASE
+             WHEN purchase_qty - ? <= 0 THEN 'Purchased'
+             ELSE 'Partial Received'
+           END
+         WHERE mpm_id = ?`,
+        [receiveQty, receiveQty, receiveQty, poi.mpm_id],
+      );
+
+      /* =========================
+         LOG
+      ========================== */
+      const [[pr]] = await connection.query(
+        `SELECT * FROM purchase_request WHERE pr_id = ?`,
+        [poi.pr_id],
+      );
+
+      await connection.query(
+        `INSERT INTO mrn_activity_logs
+        (mrn_id, mpm_id, model_id, pr_id, action_type, qty, status, created_by, remark)
+        VALUES (?, ?, ?, ?, 'PO_RECEIVED', ?, ?, ?, ?)`,
+        [
+          pr?.mrn_id || null,
+          poi.mpm_id,
+          poi.model_id,
+          poi.pr_id,
+          receiveQty,
+          status,
+          receivedBy,
+          `Bill No: ${bill_number}`,
+        ],
+      );
     }
 
-    await connection.query(
-      `UPDATE purchase_order 
-       SET 
-         received_qty = ?,
-         received_date = NOW(),
-         status = ?,
-         bill_status = ?
-       WHERE po_id=?`,
-      [newReceivedQty, newStatus, billStatus, po_id],
-    );
-
     /* =========================
-       5️⃣ UPDATE STOCK
-    ========================== */
-    await connection.query(
-      `INSERT INTO stock (product_type_id, brand_id, model_id, qty)
-       VALUES (?, ?, ?, ?)
-       ON DUPLICATE KEY UPDATE qty = qty + VALUES(qty)`,
-      [po.product_type_id, po.brand_id, po.model_id, received_qty],
-    );
-
-    /* =========================
-       6️⃣ UPDATE MPM (🔥 FIXED)
-    ========================== */
-    await connection.query(
-      `UPDATE mrn_prod_map
-       SET 
-         verified_qty = LEAST(requested_qty, verified_qty + ?), -- ✅ SAFE UPDATE
-         purchase_qty = GREATEST(0, purchase_qty - ?),           -- ✅ FIXED
-         purchase_status = 'Purchased',
-         status = 'Approval Pending'                             -- ✅ RESET FOR RE-APPROVAL
-       WHERE mpm_id=?`,
-      [received_qty, received_qty, po.mpm_id],
-    );
-
-    /* =========================
-       7️⃣ CHECK ITEM COMPLETE
-    ========================== */
-    await connection.query(
-      `UPDATE mrn_prod_map
-       SET status = 'Approval Pending'
-       WHERE mpm_id = ?`,
-      [po.mpm_id],
-    );
-
-    /* =========================
-       8️⃣ CHECK FULL MRN STATUS
+       4. UPDATE PO STATUS
     ========================== */
     const [[pending]] = await connection.query(
       `SELECT COUNT(*) AS cnt
-       FROM mrn_prod_map
-       WHERE mrn_id = ?
-       AND verified_qty < requested_qty`,
-      [po.mrn_id],
+       FROM purchase_order_items
+       WHERE po_id = ?
+       AND received_qty < qty`,
+      [po_id],
     );
 
-    const mrnStatus = pending.cnt === 0 ? 'Approval Pending' : 'Partial Ready'; // ✅ CHANGED
+    const poStatus = pending.cnt === 0 ? 'Received' : 'Partial';
 
     await connection.query(
-      `UPDATE generate_mrn
-       SET mrn_status=?
-       WHERE mrn_id=?`,
-      [mrnStatus, po.mrn_id],
-    );
-
-    /* =========================
-       9️⃣ LOG
-    ========================== */
-    await connection.query(
-      `INSERT INTO mrn_activity_logs
-       (mrn_id, mpm_id, model_id, pr_id, action_type, qty, status, created_by, remark)
-       VALUES (?, ?, ?, ?, 'PO_RECEIVED', ?, ?, ?, ?)`,
-      [
-        po.mrn_id,
-        po.mpm_id,
-        po.model_id,
-        po.pr_id,
-        received_qty,
-        newStatus,
-        receivedBy,
-        `Bill No: ${bill_number}`,
-      ],
+      `UPDATE purchase_order
+       SET status = ?
+       WHERE po_id = ?`,
+      [poStatus, po_id],
     );
 
     await connection.commit();
 
-    res.json({
+    return res.status(200).json({
       success: true,
-      message: 'PO Received successfully. Sent for Approval.',
+      message: 'Purchase Order received successfully',
       bill_id,
     });
   } catch (err) {
     await connection.rollback();
+
     console.error('Receive PO Error:', err);
 
-    res.status(500).json({
+    return res.status(500).json({
       success: false,
       message: err.message,
     });
@@ -4185,7 +4888,6 @@ export const receivePurchaseOrder = async (req, res) => {
     connection.release();
   }
 };
-
 export const issueMRN = async (req, res) => {
   const connection = await db.getConnection();
 
@@ -4410,7 +5112,6 @@ export const getCompletedMRNs1 = async (req, res) => {
   }
 }; 
 
-
 export const getCompletedMRNs = async (req, res) => {
   const connection = await db.getConnection();
 
@@ -4453,12 +5154,13 @@ export const getCompletedMRNs = async (req, res) => {
         /* PURCHASE ORDER */
         po.po_id,
         po.po_number,
-        po.qty AS po_qty,
-        po.unit_price,
-        po.total_price,
-        po.status AS po_status,
-        po.received_qty,
-        po.bill_status,
+
+        poi.poi_id,
+        poi.qty AS po_qty,
+        poi.unit_price,
+        poi.total_price,
+        poi.received_qty,
+        poi.status AS po_status,
 
         /* BILL */
         pb.bill_id,
@@ -4486,24 +5188,32 @@ export const getCompletedMRNs = async (req, res) => {
       LEFT JOIN models m 
         ON m.model_id = mpm.model_id
 
-      /* ISSUE */
+      /* ISSUED QTY */
       LEFT JOIN (
         SELECT mpm_id, SUM(issued_qty) AS total_issued
         FROM issue_items
         GROUP BY mpm_id
-      ) iss ON iss.mpm_id = mpm.mpm_id
+      ) iss 
+        ON iss.mpm_id = mpm.mpm_id
 
-      /* CORRECT FLOW */
-      LEFT JOIN purchase_request pr 
+      /* PURCHASE REQUEST */
+      LEFT JOIN purchase_request pr
         ON pr.mpm_id = mpm.mpm_id
 
-      LEFT JOIN purchase_order po 
-        ON po.pr_id = pr.pr_id
+      /* PURCHASE ORDER ITEMS */
+      LEFT JOIN purchase_order_items poi
+        ON poi.pr_id = pr.pr_id
 
-      LEFT JOIN purchase_bill pb 
+      /* PURCHASE ORDER */
+      LEFT JOIN purchase_order po
+        ON po.po_id = poi.po_id
+
+      /* BILL */
+      LEFT JOIN purchase_bill pb
         ON pb.po_id = po.po_id
 
-      LEFT JOIN purchase_bill_images pbi 
+      /* BILL IMAGES */
+      LEFT JOIN purchase_bill_images pbi
         ON pbi.bill_id = pb.bill_id
 
       WHERE gm.mrn_status = 'Completed'
@@ -4516,8 +5226,6 @@ export const getCompletedMRNs = async (req, res) => {
     const mrnMap = {};
 
     rows.forEach((row) => {
-
-      /* ===== MRN LEVEL ===== */
       if (!mrnMap[row.mrn_id]) {
         mrnMap[row.mrn_id] = {
           mrn_id: row.mrn_id,
@@ -4542,7 +5250,6 @@ export const getCompletedMRNs = async (req, res) => {
 
       if (!row.mpm_id) return;
 
-      /* ===== ITEM LEVEL ===== */
       let item = mrnMap[row.mrn_id].items.find(
         (i) => i.mpm_id === row.mpm_id
       );
@@ -4550,6 +5257,7 @@ export const getCompletedMRNs = async (req, res) => {
       if (!item) {
         item = {
           mpm_id: row.mpm_id,
+          prod_id: row.prod_id,
           model_id: row.model_id,
           brand_id: row.brand_id,
 
@@ -4564,9 +5272,10 @@ export const getCompletedMRNs = async (req, res) => {
           purchase_status: row.purchase_status,
 
           issued_qty: row.issued_qty,
-          remaining_qty: row.remaining_qty > 0 ? row.remaining_qty : 0,
+          remaining_qty:
+            row.remaining_qty > 0 ? row.remaining_qty : 0,
 
-          status: row.item_status || 'Completed',
+          status: row.item_status || "Completed",
 
           purchase_orders: [],
         };
@@ -4574,7 +5283,6 @@ export const getCompletedMRNs = async (req, res) => {
         mrnMap[row.mrn_id].items.push(item);
       }
 
-      /* ===== PO LEVEL ===== */
       if (row.po_id) {
         let po = item.purchase_orders.find(
           (p) => p.po_id === row.po_id
@@ -4584,19 +5292,20 @@ export const getCompletedMRNs = async (req, res) => {
           po = {
             po_id: row.po_id,
             po_number: row.po_number,
+
             qty: row.po_qty,
             unit_price: row.unit_price,
             total_price: row.total_price,
-            status: row.po_status,
+
             received_qty: row.received_qty,
-            bill_status: row.bill_status,
+            status: row.po_status,
+
             bills: [],
           };
 
           item.purchase_orders.push(po);
         }
 
-        /* ===== BILL LEVEL ===== */
         if (row.bill_id) {
           let bill = po.bills.find(
             (b) => b.bill_id === row.bill_id
@@ -4614,15 +5323,21 @@ export const getCompletedMRNs = async (req, res) => {
             po.bills.push(bill);
           }
 
-const BASE_URL = process.env.BASE_URL || 'http://localhost:3000';
+          const BASE_URL =
+            process.env.BASE_URL || "http://localhost:3000";
 
-if (row.image_path && !bill.images.includes(row.image_path)) {
-  const cleanPath = row.image_path
-    .replace(/\\/g, '/')
-    .split('uploads/')[1]; // remove system path
+          if (
+            row.image_path &&
+            !bill.images.includes(row.image_path)
+          ) {
+            const cleanPath = row.image_path
+              .replace(/\\/g, "/")
+              .split("uploads/")[1];
 
-  bill.images.push(`${BASE_URL}/uploads/${cleanPath}`);
-}
+            bill.images.push(
+              `${BASE_URL}/uploads/${cleanPath}`
+            );
+          }
         }
       }
     });
@@ -4632,18 +5347,130 @@ if (row.image_path && !bill.images.includes(row.image_path)) {
     return res.status(200).json({
       success: true,
       message: result.length
-        ? 'Completed MRNs with PO & Bill details fetched'
-        : 'No Completed MRNs found',
+        ? "Completed MRNs with PO & Bill details fetched successfully"
+        : "No Completed MRNs found",
       data: result,
     });
-
   } catch (error) {
-    console.error('getCompletedMRNs Error:', error);
+    console.error("getCompletedMRNs Error:", error);
 
     return res.status(500).json({
       success: false,
-      message: 'Failed to fetch completed MRNs',
+      message: "Failed to fetch completed MRNs",
       error: error.message,
+    });
+  } finally {
+    connection.release();
+  }
+};
+
+
+export const approvePurchaseRequestByMRN = async (req, res) => {
+  const connection = await db.getConnection();
+
+  try {
+    const { mrn_id, items } = req.body;
+
+    const approved_by = req.session.user?.id || null;
+
+    if (!mrn_id || !items || items.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'mrn_id and items required',
+      });
+    }
+
+    await connection.beginTransaction();
+
+    for (const item of items) {
+      // =========================
+      // CREATE PURCHASE REQUEST
+      // =========================
+
+      const [insertPR] = await connection.query(
+        `
+        INSERT INTO purchase_request
+        (
+          mrn_id,
+          mpm_id,
+          brand_id,
+          model_id,
+          qty,
+          status,
+          approved_by
+        )
+        VALUES (?, ?, ?, ?, ?, ?, ?)
+        `,
+        [
+          mrn_id,
+          item.mpm_id,
+          item.brand_id,
+          item.model_id,
+          item.quantity,
+          'Approved',
+          approved_by,
+        ],
+      );
+
+      const pr_id = insertPR.insertId;
+
+      // =========================
+      // UPDATE MRN PRODUCT MAP
+      // =========================
+
+      await connection.query(
+        `
+        UPDATE mrn_prod_map
+        SET purchase_status = 'Approved'
+        WHERE mpm_id = ?
+        `,
+        [item.mpm_id],
+      );
+
+      // =========================
+      // INSERT ACTIVITY LOG
+      // =========================
+
+      await connection.query(
+        `
+        INSERT INTO mrn_activity_logs
+        (
+          mrn_id,
+          mpm_id,
+          model_id,
+          pr_id,
+          action_type,
+          status,
+          created_by
+        )
+        VALUES (?, ?, ?, ?, ?, ?, ?)
+        `,
+        [
+          mrn_id,
+          item.mpm_id,
+          item.model_id,
+          pr_id,
+          'PURCHASE_APPROVAL',
+          'Approved',
+          approved_by,
+        ],
+      );
+    }
+
+    await connection.commit();
+
+    return res.status(200).json({
+      success: true,
+      message: 'PR Generated & Approved Successfully',
+    });
+  } catch (err) {
+    await connection.rollback();
+
+    console.error('Approve PR Error:', err);
+
+    return res.status(500).json({
+      success: false,
+      message: err.message,
     });
   } finally {
     connection.release();

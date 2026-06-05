@@ -1458,7 +1458,8 @@ const formatDateTime = (dateString: string | undefined): string => {
               </div>
             </div>
 
-           {Array.isArray(editingClient.reassignment_remarks) &&
+          
+       {Array.isArray(editingClient.reassignment_remarks) &&
   editingClient.reassignment_remarks.length > 0 && (
     <div className="mt-3">
       <label className="text-md font-semibold mb-2 dark:text-white border-b pb-1">
@@ -1470,9 +1471,28 @@ const formatDateTime = (dateString: string | undefined): string => {
         {editingClient.reassignment_remarks
           .slice()
           .sort((a: any, b: any) => {
-            // Sort by created_at in DESC order (newest first)
-            const dateA = new Date(a?.created_at || a?.reassignment_date || 0);
-            const dateB = new Date(b?.created_at || b?.reassignment_date || 0);
+            // Helper function to parse dates in DD/MM/YYYY format
+            const parseDate = (dateStr: string) => {
+              if (!dateStr) return new Date(0);
+              
+              // Check if it's in DD/MM/YYYY, HH:MM:SS format
+              if (typeof dateStr === 'string' && dateStr.match(/^\d{2}\/\d{2}\/\d{4}/)) {
+                const [datePart, timePart] = dateStr.split(', ');
+                const [day, month, year] = datePart.split('/');
+                const [hours, minutes, seconds] = timePart ? timePart.split(':') : ['00', '00', '00'];
+                return new Date(parseInt(year), parseInt(month) - 1, parseInt(day), parseInt(hours), parseInt(minutes), parseInt(seconds));
+              }
+              
+              // Try parsing as ISO string
+              const date = new Date(dateStr);
+              if (!isNaN(date.getTime())) return date;
+              
+              return new Date(0);
+            };
+            
+            const dateA = parseDate(a?.created_at || a?.reassignment_date || '');
+            const dateB = parseDate(b?.created_at || b?.reassignment_date || '');
+            
             return dateB.getTime() - dateA.getTime();
           })
           .map((remarkObj: any, index: number) => {
@@ -1503,7 +1523,6 @@ const formatDateTime = (dateString: string | undefined): string => {
                       )}
                     </div>
 
-                    {/* ✅ FIXED: Show formatted created_at */}
                     <span className="text-[10px] text-gray-500" title={remarkObj.created_at}>
                       {formatDateTime(remarkObj.created_at)}
                     </span>
@@ -1559,6 +1578,7 @@ const formatDateTime = (dateString: string | undefined): string => {
       </div>
     </div>
   )}
+  
 
             <div className="mt-3">
               <label className="block mb-1 text-sm italic font-medium text-emerald-600 dark:text-emerald-400">

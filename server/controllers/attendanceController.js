@@ -315,6 +315,7 @@ const TELECALLER_ROLES = [
   'hr_executive',
     'project_manager',
     'carpenter',
+    'accountant'
   
 ];
 

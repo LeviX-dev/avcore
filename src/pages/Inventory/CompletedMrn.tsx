@@ -1103,262 +1103,262 @@ const CompletedMRNs: React.FC = () => {
         </div>
 
         {isModalOpen && selectedMRN && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 backdrop-blur-sm ml-40 flex items-center justify-center z-50 p-4 animate-in fade-in duration-200">
-            {/* MODAL BOX */}
-            <div className="bg-white w-[75%] max-w-6xl rounded-2xl shadow-2xl overflow-hidden animate-in slide-in-from-bottom-10 duration-300 max-h-[80vh] flex flex-col">
-              {/* HEADER with Gradient */}
-              <div className="bg-gradient-to-r from-gray-800 to-gray-900 px-6 py-4 flex justify-between items-center sticky top-0 z-10">
-                <div>
-                  <h2 className="text-xl font-semibold text-white">
-                    Material Requisition Note
-                  </h2>
-                  <p className="text-gray-300 text-sm mt-0.5">
-                    Complete details and item breakdown
-                  </p>
-                </div>
-                <button
-                  onClick={() => setIsModalOpen(false)}
-                  className="text-gray-400 hover:text-white transition-colors p-1 rounded-lg hover:bg-gray-700"
-                >
-                  <X size={20} />
-                </button>
-              </div>
+          
+          <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4">
+  <div className="bg-white dark:bg-gray-800 w-full max-w-3xl rounded-xl shadow-2xl overflow-hidden max-h-[75vh] flex flex-col">
+    {/* HEADER with Gradient */}
+    <div className="bg-gradient-to-r from-gray-800 to-gray-900 px-4 py-3 flex justify-between items-center sticky top-0 z-10">
+      <div>
+        <h2 className="text-base font-semibold text-white">
+          Material Requisition Note
+        </h2>
+        <p className="text-gray-300 text-xs mt-0.5">
+          Complete details and item breakdown
+        </p>
+      </div>
+      <button
+        onClick={() => setIsModalOpen(false)}
+        className="text-gray-400 hover:text-white transition-colors p-1 rounded-lg hover:bg-gray-700"
+      >
+        <X size={18} />
+      </button>
+    </div>
 
-              {/* =========================
-                  MRN INFO - Cards Grid
-              ========================== */}
-              <div className="p-6 bg-gray-50 border-b border-gray-200">
-                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
-                  <div className="bg-white rounded-xl p-3 shadow-sm border border-gray-100">
-                    <p className="text-xs text-gray-500 mb-1">MRN Number</p>
-                    <p className="font-semibold text-gray-800 text-sm">
-                      {selectedMRN.mrn_number}
+    {/* =========================
+        MRN INFO - Cards Grid
+    ========================== */}
+    <div className="p-3 bg-gray-50 border-b border-gray-200 dark:bg-gray-900 dark:border-gray-700">
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-2">
+        <div className="bg-white dark:bg-gray-800 rounded-lg p-2 shadow-sm border border-gray-100 dark:border-gray-700">
+          <p className="text-[10px] text-gray-500 mb-0.5">MRN Number</p>
+          <p className="font-semibold text-gray-800 dark:text-white text-xs">
+            {selectedMRN.mrn_number}
+          </p>
+        </div>
+
+        <div className="bg-white dark:bg-gray-800 rounded-lg p-2 shadow-sm border border-gray-100 dark:border-gray-700">
+          <p className="text-[10px] text-gray-500 mb-0.5">Client</p>
+          <p className="font-semibold text-gray-800 dark:text-white text-xs truncate">
+            {selectedMRN.client_name}
+          </p>
+        </div>
+
+        <div className="bg-white dark:bg-gray-800 rounded-lg p-2 shadow-sm border border-gray-100 dark:border-gray-700">
+          <p className="text-[10px] text-gray-500 mb-0.5">City</p>
+          <p className="font-semibold text-gray-800 dark:text-white text-xs">
+            {selectedMRN.city}
+          </p>
+        </div>
+
+        <div className="bg-white dark:bg-gray-800 rounded-lg p-2 shadow-sm border border-gray-100 dark:border-gray-700">
+          <p className="text-[10px] text-gray-500 mb-0.5">Date</p>
+          <p className="font-semibold text-gray-800 dark:text-white text-xs">
+            {new Date(selectedMRN.created_at).toLocaleDateString()}
+          </p>
+        </div>
+
+        <div className="bg-white dark:bg-gray-800 rounded-lg p-2 shadow-sm border border-gray-100 dark:border-gray-700">
+          <p className="text-[10px] text-gray-500 mb-0.5">Status</p>
+          <span className="inline-flex items-center px-1.5 py-0.5 rounded-full text-[10px] font-medium bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300">
+            <span className="w-1 h-1 bg-green-500 rounded-full mr-1"></span>
+            {selectedMRN.mrn_status}
+          </span>
+        </div>
+      </div>
+    </div>
+
+    {/* =========================
+        PRODUCT TABLE
+    ========================== */}
+    <div className="p-3 overflow-y-auto flex-1">
+      <div className="flex items-center justify-between mb-2">
+        <h3 className="text-sm font-semibold text-gray-800 dark:text-white">
+          Item Details
+        </h3>
+        <span className="text-[10px] text-gray-500">
+          {selectedMRN.items.length} items
+        </span>
+      </div>
+
+      <div className="overflow-x-auto rounded-lg border border-gray-200 dark:border-gray-700">
+        <table className="min-w-full text-xs">
+          {/* HEADER */}
+          <thead className="bg-gray-50 dark:bg-gray-700 sticky top-0">
+            <tr>
+              <th className="p-2 text-left text-[10px] font-semibold text-gray-600 dark:text-gray-300 uppercase">
+                Brand / Model
+              </th>
+              <th className="p-2 text-center text-[10px] font-semibold text-gray-600 dark:text-gray-300 uppercase">
+                Requested
+              </th>
+              <th className="p-2 text-center text-[10px] font-semibold text-gray-600 dark:text-gray-300 uppercase">
+                Verified
+              </th>
+              <th className="p-2 text-center text-[10px] font-semibold text-gray-600 dark:text-gray-300 uppercase">
+                Approved
+              </th>
+              <th className="p-2 text-center text-[10px] font-semibold text-gray-600 dark:text-gray-300 uppercase">
+                Purchased
+              </th>
+              <th className="p-2 text-center text-[10px] font-semibold text-gray-600 dark:text-gray-300 uppercase">   
+                Issued
+              </th>
+              <th className="p-2 text-center text-[10px] font-semibold text-gray-600 dark:text-gray-300 uppercase">
+                Remaining
+              </th>
+              <th className="p-2 text-center text-[10px] font-semibold text-gray-600 dark:text-gray-300 uppercase">
+                Status
+              </th>
+              <th className="p-2 text-center text-[10px] font-semibold text-gray-600 dark:text-gray-300 uppercase">
+                PO / Bill
+              </th>
+            </tr>
+          </thead>
+
+          {/* BODY */}
+          <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
+            {selectedMRN.items.map((item) => (
+              <tr
+                key={item.mpm_id}
+                className="hover:bg-gray-50 dark:hover:bg-gray-700/40 transition"
+              >
+                <td className="p-2">
+                  <div>
+                    <p className="font-medium text-gray-800 dark:text-white text-xs">
+                      {item.brand_name}
+                    </p>
+                    <p className="text-[10px] text-gray-500">
+                      {item.model_no}
                     </p>
                   </div>
+                </td>
 
-                  <div className="bg-white rounded-xl p-3 shadow-sm border border-gray-100">
-                    <p className="text-xs text-gray-500 mb-1">Client</p>
-                    <p className="font-semibold text-gray-800 text-sm">
-                      {selectedMRN.client_name}
-                    </p>
-                  </div>
+                <td className="p-2 text-center text-xs">
+                  {item.requested_qty}
+                </td>
 
-                  <div className="bg-white rounded-xl p-3 shadow-sm border border-gray-100">
-                    <p className="text-xs text-gray-500 mb-1">City</p>
-                    <p className="font-semibold text-gray-800 text-sm">
-                      {selectedMRN.city}
-                    </p>
-                  </div>
+                <td className="p-2 text-center text-xs">
+                  {item.verified_qty}
+                </td>
 
-                  <div className="bg-white rounded-xl p-3 shadow-sm border border-gray-100">
-                    <p className="text-xs text-gray-500 mb-1">Date</p>
-                    <p className="font-semibold text-gray-800 text-sm">
-                      {new Date(selectedMRN.created_at).toLocaleDateString()}
-                    </p>
-                  </div>
+                <td className="p-2 text-center text-xs">
+                  {item.approval_qty}
+                </td>
 
-                  <div className="bg-white rounded-xl p-3 shadow-sm border border-gray-100">
-                    <p className="text-xs text-gray-500 mb-1">Status</p>
-                    <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-700">
-                      <span className="w-1.5 h-1.5 bg-green-500 rounded-full mr-1"></span>
-                      {selectedMRN.mrn_status}
-                    </span>
-                  </div>
-                </div>
-              </div>
-
-              {/* =========================
-                  PRODUCT TABLE
-              ========================== */}
-              <div className="p-6 overflow-y-auto flex-1">
-                <div className="flex items-center justify-between mb-4">
-                  <h3 className="text-lg font-semibold text-gray-800">
-                    Item Details
-                  </h3>
-                  <span className="text-sm text-gray-500">
-                    {selectedMRN.items.length} items
+                <td className="p-2 text-center">
+                  <span className="bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-300 px-1.5 py-0.5 rounded-full text-[10px]">
+                    {item.purchase_qty}
                   </span>
-                </div>
+                </td>
 
-                <div className="overflow-x-auto rounded-xl border border-gray-200">
-                  <table className="min-w-full text-sm">
-                    {/* HEADER */}
-                    <thead className="bg-gray-50 sticky top-0">
-                      <tr>
-                        <th className="p-3 text-left text-xs font-semibold text-gray-600 uppercase">
-                          Brand / Model
-                        </th>
-                        <th className="p-3 text-center text-xs font-semibold text-gray-600 uppercase">
-                          Requested
-                        </th>
-                        <th className="p-3 text-center text-xs font-semibold text-gray-600 uppercase">
-                          Verified
-                        </th>
-                        <th className="p-3 text-center text-xs font-semibold text-gray-600 uppercase">
-                          Approved
-                        </th>
-                        <th className="p-3 text-center text-xs font-semibold text-gray-600 uppercase">
-                          Purchased
-                        </th>
-                        <th className="p-3 text-center text-xs font-semibold text-gray-600 uppercase">   
-                          Issued
-                        </th>
-                        <th className="p-3 text-center text-xs font-semibold text-gray-600 uppercase">
-                          Remaining
-                        </th>
-                        <th className="p-3 text-center text-xs font-semibold text-gray-600 uppercase">
-                          Status
-                        </th>
-                        <th className="p-3 text-center text-xs font-semibold text-gray-600 uppercase">
-                          PO / Bill
-                        </th>
-                      </tr>
-                    </thead>
+                <td className="p-2 text-center">
+                  <span className="bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300 px-1.5 py-0.5 rounded-full font-semibold text-[10px]">
+                    {item.issued_qty}
+                  </span>
+                </td>
 
-                    {/* BODY */}
-                    <tbody className="divide-y divide-gray-100">
-                      {selectedMRN.items.map((item) => (
-                        <tr
-                          key={item.mpm_id}
-                          className="hover:bg-gray-50 transition"
-                        >
-                          <td className="p-3">
-                            <div>
-                              <p className="font-medium text-gray-800">
-                                {item.brand_name}
-                              </p>
-                              <p className="text-xs text-gray-500">
-                                {item.model_no}
-                              </p>
-                            </div>
-                          </td>
+                <td className="p-2 text-center">
+                  <span className="text-red-500 font-medium text-xs">
+                    {item.remaining_qty}
+                  </span>
+                </td>
 
-                          <td className="p-3 text-center">
-                            {item.requested_qty}
-                          </td>
+                <td className="p-2 text-center">
+                  <span className="bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300 px-1.5 py-0.5 rounded-full text-[10px]">
+                    {item.status}
+                  </span>
+                </td>
 
-                          <td className="p-3 text-center">
-                            {item.verified_qty}
-                          </td>
-
-                          <td className="p-3 text-center">
-                            {item.approval_qty}
-                          </td>
-
-                          <td className="p-3 text-center">
-                            <span className="bg-yellow-100 text-yellow-700 px-2 py-1 rounded-full text-xs">
-                              {item.purchase_qty}
-                            </span>
-                          </td>
-
-                          <td className="p-3 text-center">
-                            <span className="bg-green-100 text-green-700 px-2 py-1 rounded-full font-semibold">
-                              {item.issued_qty}
-                            </span>
-                          </td>
-
-                          <td className="p-3 text-center">
-                            <span className="text-red-500 font-medium">
-                              {item.remaining_qty}
-                            </span>
-                          </td>
-
-                          <td className="p-3 text-center">
-                            <span className="bg-green-100 text-green-700 px-2 py-1 rounded-full text-xs">
-                              {item.status}
-                            </span>
-                          </td>
-
-                          <td className="p-3 text-center">
-                            {item.purchase_orders?.map((po) => (
-                              <div key={po.po_id} className="text-xs">
-                                <p className="font-medium text-blue-600">
-                                  {po.po_number}
-                                </p>
-                                <p className="text-gray-500 text-xs">
-                                  {po.status}
-                                </p>
-                                {po.bills?.map((bill) => (
-                                  <div key={bill.bill_id} className="mt-1">
-                                    <p className="text-green-600">
-                                      Bill: {bill.bill_number}
-                                    </p>
-                                    {bill.images?.map((img, idx) => (
-                                      <button
-                                        key={idx}
-                                        onClick={() => setSelectedImage(img)}
-                                        className="text-blue-500 text-xs underline hover:text-blue-700"
-                                      >
-                                        View Bill
-                                      </button>
-                                    ))}
-                                  </div>
-                                ))}
-                              </div>
-                            ))}
-                          </td>
-                        </tr>
+                <td className="p-2 text-center">
+                  {item.purchase_orders?.map((po) => (
+                    <div key={po.po_id} className="text-[10px]">
+                      <p className="font-medium text-blue-600 dark:text-blue-400">
+                        {po.po_number}
+                      </p>
+                      <p className="text-gray-500 text-[10px]">
+                        {po.status}
+                      </p>
+                      {po.bills?.map((bill) => (
+                        <div key={bill.bill_id} className="mt-1">
+                          <p className="text-green-600 dark:text-green-400 text-[10px]">
+                            Bill: {bill.bill_number}
+                          </p>
+                          {bill.images?.map((img, idx) => (
+                            <button
+                              key={idx}
+                              onClick={() => setSelectedImage(img)}
+                              className="text-blue-500 text-[10px] underline hover:text-blue-700"
+                            >
+                              View Bill
+                            </button>
+                          ))}
+                        </div>
                       ))}
-                    </tbody>
+                    </div>
+                  ))}
+                </td>
+              </tr>
+            ))}
+          </tbody>
 
-                    {/* TOTAL ROW */}
-                    <tfoot className="bg-gray-100 font-semibold">
-                      <tr>
-                        <td className="p-3 text-right">Total</td>
-                        <td className="p-3 text-center">
-                          {selectedMRN.items.reduce(
-                            (sum, i) => sum + Number(i.requested_qty || 0),
-                            0,
-                          )}
-                        </td>
-                        <td className="p-3 text-center">
-                          {selectedMRN.items.reduce(
-                            (sum, i) => sum + Number(i.verified_qty || 0),
-                            0,
-                          )}
-                        </td>
-                        <td className="p-3 text-center">
-                          {selectedMRN.items.reduce(
-                            (sum, i) => sum + Number(i.approval_qty || 0),
-                            0,
-                          )}
-                        </td>
-                        <td className="p-3 text-center">
-                          {selectedMRN.items.reduce(
-                            (sum, i) => sum + Number(i.purchase_qty || 0),
-                            0,
-                          )}
-                        </td>
-                        <td className="p-3 text-center text-green-700">
-                          {selectedMRN.items.reduce(
-                            (sum, i) => sum + Number(i.issued_qty || 0),
-                            0,
-                          )}
-                        </td>
-                        <td className="p-3 text-center text-red-500">
-                          {selectedMRN.items.reduce(
-                            (sum, i) => sum + Number(i.remaining_qty || 0),
-                            0,
-                          )}
-                        </td>
-                        <td colSpan={2}></td>
-                      </tr>
-                    </tfoot>
-                  </table>
-                </div>
-              </div>
+          {/* TOTAL ROW */}
+          <tfoot className="bg-gray-100 dark:bg-gray-700 font-semibold">
+            <tr>
+              <td className="p-2 text-right text-xs">Total</td>
+              <td className="p-2 text-center text-xs">
+                {selectedMRN.items.reduce(
+                  (sum, i) => sum + Number(i.requested_qty || 0),
+                  0,
+                )}
+              </td>
+              <td className="p-2 text-center text-xs">
+                {selectedMRN.items.reduce(
+                  (sum, i) => sum + Number(i.verified_qty || 0),
+                  0,
+                )}
+              </td>
+              <td className="p-2 text-center text-xs">
+                {selectedMRN.items.reduce(
+                  (sum, i) => sum + Number(i.approval_qty || 0),
+                  0,
+                )}
+              </td>
+              <td className="p-2 text-center text-xs">
+                {selectedMRN.items.reduce(
+                  (sum, i) => sum + Number(i.purchase_qty || 0),
+                  0,
+                )}
+              </td>
+              <td className="p-2 text-center text-green-700 dark:text-green-400 text-xs">
+                {selectedMRN.items.reduce(
+                  (sum, i) => sum + Number(i.issued_qty || 0),
+                  0,
+                )}
+              </td>
+              <td className="p-2 text-center text-red-500 text-xs">
+                {selectedMRN.items.reduce(
+                  (sum, i) => sum + Number(i.remaining_qty || 0),
+                  0,
+                )}
+              </td>
+              <td colSpan={2}></td>
+            </tr>
+          </tfoot>
+        </table>
+      </div>
+    </div>
 
-              {/* FOOTER */}
-              <div className="px-6 py-4 bg-gray-50 border-t border-gray-200 flex justify-end sticky bottom-0">
-                <button
-                  onClick={() => setIsModalOpen(false)}
-                  className="px-5 py-2 bg-gradient-to-r from-gray-600 to-gray-700 text-white rounded-xl hover:from-gray-700 hover:to-gray-800 transition-all duration-200 shadow-md hover:shadow-lg font-medium"
-                >
-                  Close
-                </button>
-              </div>
-            </div>
-          </div>
+    {/* FOOTER */}
+    <div className="px-3 py-3 bg-gray-50 dark:bg-gray-900 border-t border-gray-200 dark:border-gray-700 flex justify-end sticky bottom-0">
+      <button
+        onClick={() => setIsModalOpen(false)}
+        className="px-3 py-1.5 bg-gradient-to-r from-gray-600 to-gray-700 text-white rounded-md hover:from-gray-700 hover:to-gray-800 transition-all duration-200 shadow-md hover:shadow-lg font-medium text-xs"
+      >
+        Close
+      </button>
+    </div>
+  </div>
+</div>
         )}
 
         {/* Image Modal */}

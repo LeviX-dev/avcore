@@ -29,6 +29,7 @@ const ALLOWED_ROLES = [
   'hr_executive',
   'store',
   'carpenter',
+  'accountant'
   
 ];
 

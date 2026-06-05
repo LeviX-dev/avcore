@@ -14,6 +14,7 @@ const TELECALLER_ROLES = [
    'hr_executive',
     'project_manager',
     'carpenter',
+    'accountant'
 ];
 
 const isTelecallerLike = (role) => TELECALLER_ROLES.includes(role);

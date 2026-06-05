@@ -24,7 +24,7 @@ getEmployeeLeadList ,getEmployeeDetailedReport  ,getQuotationClosedLeads ,
     checkFavorite,
     getFavoritesBatch ,
   updateLocationLink ,
-updateContactNumbersOnly , 
+updateContactNumbersOnly ,  checkDuplicateLeadContact , 
 
 } from '../controllers/rawDataController.js';
 import uploadMiddleware from '../middleware/upload.js';
@@ -55,6 +55,12 @@ router.post('/master-data/delete-multiple', deleteMultipleClients);
 
 
 router.post('/sujit-master-data/add-single', addSingleRawData);
+
+router.post(
+  "/sujit-master-data/check-duplicate-contact",
+  checkDuplicateLeadContact
+);
+
 
 router.post('/upload/:master_id', uploadMiddleware, uploadDocuments); 
 router.put('/update-location/:master_id', updateLocationLink);

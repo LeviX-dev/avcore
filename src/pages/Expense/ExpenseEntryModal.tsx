@@ -429,8 +429,13 @@ const ExpenseEntryModal: React.FC<Props> = ({
 
           <div>
             <label className="mb-2 block text-sm font-medium text-black dark:text-white">Expense Type</label>
-            <select name="expense_type" value={form.expense_type} onChange={onChange}
-              className="w-full rounded-lg border border-stroke bg-transparent px-4 py-3 text-black dark:border-strokedark dark:text-white" required>
+            <select 
+              name="expense_type" 
+              value={form.expense_type} 
+              onChange={onChange}
+              className="w-full rounded-lg border border-stroke bg-white px-4 py-3 text-black dark:border-strokedark dark:bg-boxdark dark:text-white"
+              required
+            >
               <option value="direct_expense">Direct Expense</option>
               <option value="project_expense">Project Expense</option>
             </select>
@@ -438,9 +443,14 @@ const ExpenseEntryModal: React.FC<Props> = ({
 
           <div>
             <label className="mb-2 block text-sm font-medium text-black dark:text-white">Employee</label>
-            <select name="employee_id" value={form.employee_id} onChange={onChange}
+            <select 
+              name="employee_id" 
+              value={form.employee_id} 
+              onChange={onChange}
               disabled={!canSelectAnyEmployee}
-              className="w-full rounded-lg border border-stroke bg-transparent px-4 py-3 text-black disabled:bg-gray-100 dark:border-strokedark dark:text-white" required>
+              className="w-full rounded-lg border border-stroke bg-white px-4 py-3 text-black disabled:bg-gray-100 dark:border-strokedark dark:bg-boxdark dark:text-white dark:disabled:bg-gray-800"
+              required
+            >
               <option value="">Select employee</option>
               {employees.map((emp) => (
                 <option key={emp.user_id} value={emp.user_id}>{emp.name}</option>
@@ -451,8 +461,13 @@ const ExpenseEntryModal: React.FC<Props> = ({
           {form.expense_type === 'project_expense' && (
             <div>
               <label className="mb-2 block text-sm font-medium text-black dark:text-white">Project</label>
-              <select name="project_master_id" value={form.project_master_id} onChange={onChange}
-                className="w-full rounded-lg border border-stroke bg-transparent px-4 py-3 text-black dark:border-strokedark dark:text-white" required>
+              <select 
+                name="project_master_id" 
+                value={form.project_master_id} 
+                onChange={onChange}
+                className="w-full rounded-lg border border-stroke bg-white px-4 py-3 text-black dark:border-strokedark dark:bg-boxdark dark:text-white"
+                required
+              >
                 <option value="">Select project</option>
                 {projects.map((p) => (
                   <option key={p.master_id} value={p.master_id}>{p.project_name}</option>
@@ -464,8 +479,12 @@ const ExpenseEntryModal: React.FC<Props> = ({
           {form.expense_type === 'project_expense' && (
             <div>
               <label className="mb-2 block text-sm font-medium text-black dark:text-white">Site / Location</label>
-              <select name="site_location" value={form.site_location} onChange={onChange}
-                className="w-full rounded-lg border border-stroke bg-transparent px-4 py-3 text-black dark:border-strokedark dark:text-white">
+              <select 
+                name="site_location" 
+                value={form.site_location} 
+                onChange={onChange}
+                className="w-full rounded-lg border border-stroke bg-white px-4 py-3 text-black dark:border-strokedark dark:bg-boxdark dark:text-white"
+              >
                 <option value="">Select location</option>
                 {siteLocations.map((s) => (
                   <option key={s.site_location} value={s.site_location}>{s.site_location}</option>
@@ -476,8 +495,13 @@ const ExpenseEntryModal: React.FC<Props> = ({
 
           <div>
             <label className="mb-2 block text-sm font-medium text-black dark:text-white">Expense Category</label>
-            <select name="category_id" value={form.category_id} onChange={onChange}
-              className="w-full rounded-lg border border-stroke bg-transparent px-4 py-3 text-black dark:border-strokedark dark:text-white" required>
+            <select 
+              name="category_id" 
+              value={form.category_id} 
+              onChange={onChange}
+              className="w-full rounded-lg border border-stroke bg-white px-4 py-3 text-black dark:border-strokedark dark:bg-boxdark dark:text-white"
+              required
+            >
               <option value="">Select category</option>
               {categories.map((c) => (
                 <option key={c.category_id} value={c.category_id}>{c.category_name}</option>
@@ -487,8 +511,12 @@ const ExpenseEntryModal: React.FC<Props> = ({
 
           <div>
             <label className="mb-2 block text-sm font-medium text-black dark:text-white">Vendor Type</label>
-            <select name="vendor_source" value={form.vendor_source} onChange={onChange}
-              className="w-full rounded-lg border border-stroke bg-transparent px-4 py-3 text-black dark:border-strokedark dark:text-white">
+            <select 
+              name="vendor_source" 
+              value={form.vendor_source} 
+              onChange={onChange}
+              className="w-full rounded-lg border border-stroke bg-white px-4 py-3 text-black dark:border-strokedark dark:bg-boxdark dark:text-white"
+            >
               <option value="vendor">Active Vendor</option>
               <option value="other">Other</option>
             </select>
@@ -497,8 +525,12 @@ const ExpenseEntryModal: React.FC<Props> = ({
           {form.vendor_source === 'vendor' ? (
             <div>
               <label className="mb-2 block text-sm font-medium text-black dark:text-white">Vendor</label>
-              <select name="vendor_id" value={form.vendor_id} onChange={onChange}
-                className="w-full rounded-lg border border-stroke bg-transparent px-4 py-3 text-black dark:border-strokedark dark:text-white">
+              <select 
+                name="vendor_id" 
+                value={form.vendor_id} 
+                onChange={onChange}
+                className="w-full rounded-lg border border-stroke bg-white px-4 py-3 text-black dark:border-strokedark dark:bg-boxdark dark:text-white"
+              >
                 <option value="">Select vendor</option>
                 {vendors.map((v) => (
                   <option key={v.vendor_id} value={v.vendor_id}>
@@ -510,16 +542,24 @@ const ExpenseEntryModal: React.FC<Props> = ({
           ) : (
             <div>
               <label className="mb-2 block text-sm font-medium text-black dark:text-white">Other Vendor Name</label>
-              <input name="vendor_name" value={form.vendor_name} onChange={onChange}
+              <input 
+                name="vendor_name" 
+                value={form.vendor_name} 
+                onChange={onChange}
                 placeholder="Enter vendor name"
-                className="w-full rounded-lg border border-stroke bg-transparent px-4 py-3 text-black dark:border-strokedark dark:text-white" />
+                className="w-full rounded-lg border border-stroke bg-white px-4 py-3 text-black dark:border-strokedark dark:bg-boxdark dark:text-white" 
+              />
             </div>
           )}
 
           <div>
             <label className="mb-2 block text-sm font-medium text-black dark:text-white">Payment Mode</label>
-            <select name="payment_mode" value={form.payment_mode} onChange={onChange}
-              className="w-full rounded-lg border border-stroke bg-transparent px-4 py-3 text-black dark:border-strokedark dark:text-white">
+            <select 
+              name="payment_mode" 
+              value={form.payment_mode} 
+              onChange={onChange}
+              className="w-full rounded-lg border border-stroke bg-white px-4 py-3 text-black dark:border-strokedark dark:bg-boxdark dark:text-white"
+            >
               <option value="">Select payment mode</option>
               {paymentModes.map((m) => (
                 <option key={m.value} value={m.value}>{m.label}</option>
@@ -532,9 +572,13 @@ const ExpenseEntryModal: React.FC<Props> = ({
 
           <div>
             <label className="mb-2 block text-sm font-medium text-black dark:text-white">Bill Number</label>
-            <input name="bill_number" value={form.bill_number} onChange={onChange}
+            <input 
+              name="bill_number" 
+              value={form.bill_number} 
+              onChange={onChange}
               placeholder="Bill / invoice number"
-              className="w-full rounded-lg border border-stroke bg-transparent px-4 py-3 text-black dark:border-strokedark dark:text-white" />
+              className="w-full rounded-lg border border-stroke bg-white px-4 py-3 text-black dark:border-strokedark dark:bg-boxdark dark:text-white" 
+            />
             {expenseMode === 'direct' && !form.bill_number && (
               <p className="mt-1 text-xs text-orange-500">Required for direct expense</p>
             )}
@@ -542,22 +586,40 @@ const ExpenseEntryModal: React.FC<Props> = ({
 
           <div>
             <label className="mb-2 block text-sm font-medium text-black dark:text-white">Amount (₹)</label>
-            <input name="amount" type="number" min="0" step="0.01" value={form.amount} onChange={onChange}
+            <input 
+              name="amount" 
+              type="number" 
+              min="0" 
+              step="0.01" 
+              value={form.amount} 
+              onChange={onChange}
               placeholder="0.00"
-              className="w-full rounded-lg border border-stroke bg-transparent px-4 py-3 text-black dark:border-strokedark dark:text-white" required />
-           
+              className="w-full rounded-lg border border-stroke bg-white px-4 py-3 text-black dark:border-strokedark dark:bg-boxdark dark:text-white" 
+              required
+            />
           </div>
 
           <div>
             <label className="mb-2 block text-sm font-medium text-black dark:text-white">Expense Date</label>
-            <input name="expense_date" type="date" value={form.expense_date} onChange={onChange}
-              className="w-full rounded-lg border border-stroke bg-transparent px-4 py-3 text-black dark:border-strokedark dark:text-white" required />
+            <input 
+              name="expense_date" 
+              type="date" 
+              value={form.expense_date} 
+              onChange={onChange}
+              className="w-full rounded-lg border border-stroke bg-white px-4 py-3 text-black dark:border-strokedark dark:bg-boxdark dark:text-white" 
+              required 
+            />
           </div>
 
           <div className="xl:col-span-3">
             <label className="mb-2 block text-sm font-medium text-black dark:text-white">Description</label>
-            <textarea name="description" value={form.description} onChange={onChange} rows={3}
-              className="w-full rounded-lg border border-stroke bg-transparent px-4 py-3 text-black dark:border-strokedark dark:text-white" />
+            <textarea 
+              name="description" 
+              value={form.description} 
+              onChange={onChange} 
+              rows={3}
+              className="w-full rounded-lg border border-stroke bg-white px-4 py-3 text-black dark:border-strokedark dark:bg-boxdark dark:text-white" 
+            />
           </div>
 
           <div className="xl:col-span-2">
@@ -567,25 +629,39 @@ const ExpenseEntryModal: React.FC<Props> = ({
             {form.attachment_name && !attachmentFile && (
               <p className="mb-1 text-xs text-gray-500 dark:text-gray-400">Current: {form.attachment_name}</p>
             )}
-            <input type="file" accept="image/*,application/pdf"
+            <input 
+              type="file" 
+              accept="image/*,application/pdf"
               onChange={(e) => setAttachmentFile(e.target.files?.[0] || null)}
-              className="w-full rounded-lg border border-stroke bg-transparent px-4 py-3 text-black dark:border-strokedark dark:text-white" />
+              className="w-full rounded-lg border border-stroke bg-white px-4 py-3 text-black dark:border-strokedark dark:bg-boxdark dark:text-white" 
+            />
           </div>
 
           <div className="xl:col-span-1">
             <label className="mb-2 block text-sm font-medium text-black dark:text-white">Remark</label>
-            <input name="remark" value={form.remark} onChange={onChange}
+            <input 
+              name="remark" 
+              value={form.remark} 
+              onChange={onChange}
               placeholder="Optional note..."
-              className="w-full rounded-lg border border-stroke bg-transparent px-4 py-3 text-black dark:border-strokedark dark:text-white" />
+              className="w-full rounded-lg border border-stroke bg-white px-4 py-3 text-black dark:border-strokedark dark:bg-boxdark dark:text-white" 
+            />
           </div>
 
           <div className="xl:col-span-3 mt-2 flex flex-wrap justify-end gap-3">
-            <button type="button" onClick={onClose}
-              className="rounded-lg bg-gray-300 px-5 py-2.5 text-black transition hover:bg-gray-400 dark:bg-gray-600 dark:text-white">
+            <button 
+              type="button" 
+              onClick={onClose}
+              className="rounded-lg bg-gray-300 px-5 py-2.5 text-black transition hover:bg-gray-400 dark:bg-gray-600 dark:text-white"
+            >
               Cancel
             </button>
-            <button type="button" disabled={saving} onClick={submit}
-              className="rounded-lg bg-blue-500 px-5 py-2.5 text-white transition hover:bg-blue-600 disabled:opacity-70">
+            <button 
+              type="button" 
+              disabled={saving} 
+              onClick={submit}
+              className="rounded-lg bg-blue-500 px-5 py-2.5 text-white transition hover:bg-blue-600 disabled:opacity-70"
+            >
               {submitLabel()}
             </button>
           </div>

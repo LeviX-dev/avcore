@@ -4457,6 +4457,9 @@ const handleBulkDelete = async () => {
                       <th className="p-2 text-left">Number</th>
                       <th className="p-2 text-left">Existing Name</th>
                       <th className="p-2 text-left">Existing ID</th>
+                       <th className="p-2 text-left">Working By</th>
+    <th className="p-2 text-left">Lead Stage</th>
+    <th className="p-2 text-left">Last Working</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
@@ -4470,8 +4473,29 @@ const handleBulkDelete = async () => {
                         <td className="p-2 font-mono text-red-600 dark:text-red-400">
                           {dup.number}
                         </td>
-                        <td className="p-2">{dup.existingName}</td>
-                        <td className="p-2">{dup.existingId}</td>
+                       <td className="p-2">{dup.existingName}</td>
+
+<td className="p-2 font-semibold text-blue-600 dark:text-blue-400">
+  #{dup.existingId}
+</td>
+
+<td className="p-2">
+  <span className="px-2 py-1 rounded bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300 text-xs font-medium">
+    {dup.currentWorkingBy || 'N/A'}
+  </span>
+</td>
+
+<td className="p-2">
+  <span className="px-2 py-1 rounded bg-yellow-100 text-yellow-700 dark:bg-yellow-900 dark:text-yellow-300 text-xs font-medium">
+    {dup.currentLeadStage || 'N/A'}
+  </span>
+</td>
+
+<td className="p-2 text-xs text-gray-500 dark:text-gray-400">
+  {dup.lastWorkingDate
+    ? new Date(dup.lastWorkingDate).toLocaleString()
+    : 'N/A'}
+</td>
                       </tr>
                     ))}
                   </tbody>
