@@ -128,11 +128,11 @@ const ROLE_HIERARCHY = {
     description: 'Field Marketing Executive'
   },
   junior_autocad_designer: {
-    canSee: ['tech_sale_sound_engineer', 'technical_head' , 'junior_autocad_designer' , 'admin', 'sub_admin'],
+    canSee: ['tech_sale_sound_engineer', 'technical_head' ,'tele_caller', 'junior_autocad_designer' , 'admin', 'sub_admin'],
     description: 'Junior AutoCAD Designer'
   },
   senior_autocad_designer: {
-    canSee: ['project_manager' , 'senior_autocad_designer', 'admin', 'sub_admin' ],
+    canSee: ['project_manager' , 'senior_autocad_designer', 'tele_caller', 'admin', 'sub_admin' ],
     description: 'Senior AutoCAD Designer'
   },
   tech_sale_sound_engineer: {

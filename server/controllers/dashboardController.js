@@ -1265,7 +1265,7 @@ export const getDemoLeads = async (req, res) => {
   }
 };
 
-export const getLeadStageSummary = async (req, res) => {
+export const getLeadStageSummary1 = async (req, res) => {
   try {
     if (!req.session.user) {
       return res.status(401).json({ message: 'Unauthorized' });
@@ -1275,25 +1275,29 @@ export const getLeadStageSummary = async (req, res) => {
 
     const [userResult] = await db.query(
       'SELECT name FROM users WHERE user_id = ?',
-      [userId],
+      [userId]
     );
+
     const currentUserName = userResult[0]?.name || '';
 
     let query = `
-      SELECT 
-        COALESCE(lr.leadStage, rd.lead_stage) AS stage,
+      SELECT
+        CASE
+          WHEN rd.lead_stage = 'Fresh Lead' THEN 'Fresh Lead'
+          ELSE COALESCE(lr.leadStage, rd.lead_stage)
+        END AS stage,
         COUNT(DISTINCT rd.master_id) AS total
       FROM raw_data rd
       LEFT JOIN (
         SELECT r1.master_id, r1.leadStage, r1.assignedTo
         FROM reassignment r1
         INNER JOIN (
-          SELECT master_id, MAX(id) max_id
+          SELECT master_id, MAX(id) AS max_id
           FROM reassignment
           GROUP BY master_id
         ) r2 ON r1.id = r2.max_id
       ) lr ON lr.master_id = rd.master_id
-      WHERE 1=1
+      WHERE 1 = 1
     `;
 
     const params = [];
@@ -1306,21 +1310,113 @@ export const getLeadStageSummary = async (req, res) => {
       params.push(currentUserName);
     }
 
-    query += ` GROUP BY stage`;
+    query += `
+      GROUP BY
+        CASE
+          WHEN rd.lead_stage = 'Fresh Lead' THEN 'Fresh Lead'
+          ELSE COALESCE(lr.leadStage, rd.lead_stage)
+        END
+    `;
 
     const [rows] = await db.query(query, params);
 
     const summary = {};
+
     rows.forEach((r) => {
       summary[r.stage || 'Others'] = Number(r.total);
     });
 
-    return res.json({ success: true, summary });
+    return res.json({
+      success: true,
+      summary,
+    });
   } catch (err) {
     console.error(err);
-    res.status(500).json({ message: 'Stage summary error' });
+    return res.status(500).json({
+      message: 'Stage summary error',
+    });
+  }
+}; 
+
+
+export const getLeadStageSummary = async (req, res) => {
+  try {
+    if (!req.session.user) {
+      return res.status(401).json({ message: 'Unauthorized' });
+    }
+
+    let query = `
+      SELECT
+        CASE
+          WHEN lead_stage IN ('Drop', 'lost')
+            THEN 'Drop'
+
+          WHEN lead_stage IN (
+            'Closed Deal',
+            'Execution',
+            'Pre Execution'
+          )
+            THEN 'Closed'
+
+          ELSE lead_stage
+        END AS stage,
+
+        COUNT(DISTINCT master_id) AS total
+
+      FROM raw_data
+
+      GROUP BY
+        CASE
+          WHEN lead_stage IN ('Drop', 'lost')
+            THEN 'Drop'
+
+          WHEN lead_stage IN (
+            'Closed Deal',
+            'Execution',
+            'Pre Execution'
+          )
+            THEN 'Closed'
+
+          ELSE lead_stage
+        END
+    `;
+
+    const [rows] = await db.query(query);
+
+    const summary = {
+      'Fresh Lead': 0,
+      'Cold Lead': 0,
+      'On Hold': 0,
+      'Positive Lead': 0,
+      'Pre Site Visit': 0,
+      'Quotation Pending': 0,
+      'Quotation Created': 0,
+      'Quotation Follow-up': 0,
+      'Post Site Visit': 0,
+      'Demo': 0,
+      'Projection List': 0,
+      'Drop': 0,
+      'Closed': 0
+    };
+
+    rows.forEach((row) => {
+      summary[row.stage] = Number(row.total);
+    });
+
+    return res.json({
+      success: true,
+      summary
+    });
+
+  } catch (err) {
+    console.error('Lead Stage Summary Error:', err);
+    return res.status(500).json({
+      success: false,
+      message: 'Stage summary error'
+    });
   }
 };
+
 
 export const getCategorySummary = async (req, res) => {
   try {
@@ -2959,16 +3055,15 @@ export const getExecutionLeadsCount = async (req, res) => {
 
     // Query for pending executions count
     const pendingExecutionsQuery = `
-      SELECT COUNT(*) AS total
-      FROM execution_start
-      WHERE status != 'Completed'
-    `;
+    SELECT COUNT(DISTINCT mrn_id) AS total
+FROM generate_mrn
+WHERE mrn_status IN ('Verified', 'Approval Pending')`;
 
     // Query for verify MRN count (Verified status)
     const verifyMRNQuery = `
       SELECT COUNT(*) AS total
       FROM generate_mrn
-      WHERE mrn_status = 'Verified'
+      WHERE mrn_status = 'Verification Pending'
     `;
 
     // Query for managed MRN count (Approved or Partially Issued)

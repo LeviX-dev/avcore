@@ -203,32 +203,6 @@ const MRNDashboard: React.FC = () => {
       clickable: true,
       description: 'Fully completed'
     },
-{
-  id: 'total_pr',
-  title: 'Total PR',
-  value: formatDisplayValue(counts.total_pr),
-  icon: FileText,
-  color: 'text-orange-600',
-  bgGradient: 'from-orange-500/10 to-orange-600/5',
-  borderColor: 'border-orange-300/50',
-  animation: { scale: [1, 1.03, 1], rotate: [0, 2, -2, 0] },
-      onClick: () => navigate('/purchasemrn'),
-  clickable: true,     // Make it non-clickable
-  description: 'Purchase Requests'
-},
-{
-  id: 'total_po',
-  title: 'Total PO',
-  value: formatDisplayValue(counts.total_po),
-  icon: ShoppingCart,
-  color: 'text-rose-600',
-  bgGradient: 'from-rose-500/10 to-rose-600/5',
-  borderColor: 'border-rose-300/50',
-  animation: { y: [0, -3, 0], scale: [1, 1.02, 1] },
-      onClick: () => navigate('/purchasemrn'),
-  clickable: true,     // Make it non-clickable
-  description: 'Purchase Orders'
-},
   ];
 
   if (isLoading) {

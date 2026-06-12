@@ -52,22 +52,21 @@ const StatisticsDashboard = () => {
   const isAdminOrSubAdmin = ADMIN_AND_SUB_ADMIN_ROLES.includes(role);
   const isProjectManager = role === 'project_manager';
 
-  // Lead stage colors
-  const leadStageColors: Record<string, string> = {
-    'Fresh Lead': '#E5E7EB',
-    'Cold Lead': '#9CA3AF',
-    'On Hold': '#FDE68A',
-    'Positive Lead': '#93C5FD',
-    'Pre Site Visit': '#C4B5FD',
-    Demo: '#F9A8D4',
-    'Quotation Pending': '#F59E0B',
-    'Post Site Visit': '#6D28D9',
-    'Quotation Follow-up': '#92400E',
-    'Projection List': '#86EFAC',
-    Drop: '#EF4444',
-    'Closed Deal': '#166534',
-  };
-
+const leadStageColors: Record<string, string> = {
+  'Fresh Lead': '#E5E7EB',
+  'Cold Lead': '#9CA3AF',
+  'On Hold': '#FDE68A',
+  'Positive Lead': '#93C5FD',
+  'Pre Site Visit': '#C4B5FD',
+  Demo: '#F9A8D4',
+  'Quotation Pending': '#F59E0B',
+  'Quotation Created': '#D97706',
+  'Quotation Follow-up': '#92400E',
+  'Post Site Visit': '#6D28D9',
+  'Projection List': '#86EFAC',
+  Drop: '#EF4444',
+  Closed: '#166534',
+};
   const formatDisplayValue = useCallback((value: any): string => {
     if (value === null || value === undefined || value === '') {
       return 'N/A';
