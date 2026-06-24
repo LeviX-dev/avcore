@@ -810,7 +810,7 @@ const acousticBlock = quotation.acoustic_terms
               ? {
                   width: 96,
                   image: logoBase64,
-                  width: 90,
+                   
                   alignment: 'right',
                   margin: [0, 0, 0, 0],
                 }

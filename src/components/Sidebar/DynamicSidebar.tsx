@@ -294,6 +294,9 @@ const DynamicSidebar = ({ sidebarOpen, setSidebarOpen }: SidebarProps) => {
       
    download_center: <Download className="w-5 h-5 flex-shrink-0" />,
 
+   admin_report: <BarChart3 className="w-5 h-5 flex-shrink-0" />,
+'admin_report.overview': <LayoutDashboard className="w-5 h-5 flex-shrink-0" />,
+
 
   
       // Logout
@@ -356,6 +359,8 @@ const DynamicSidebar = ({ sidebarOpen, setSidebarOpen }: SidebarProps) => {
         'download center': <Download className="w-5 h-5 flex-shrink-0" />,
   'apk download': <Package className="w-5 h-5 flex-shrink-0" />,
       statistics: <BarChart className="w-5 h-5 flex-shrink-0" />,
+      'admin report': <BarChart3 className="w-5 h-5 flex-shrink-0" />,
+'overview report': <LayoutDashboard className="w-5 h-5 flex-shrink-0" />,
       logout: <LogOut className="w-5 h-5 flex-shrink-0" />,
     };
     

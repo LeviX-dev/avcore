@@ -525,6 +525,45 @@ const RawData = () => {
     fetchAssignUsers();
   }, [showAssignPopup]);
 
+
+
+
+  // Add to your state declarations
+const [budgetRanges, setBudgetRanges] = useState<Array<{budget_range: string, count: number}>>([]);
+const [selectedBudgetRanges, setSelectedBudgetRanges] = useState<string[]>([]);
+const [showBudgetFilter, setShowBudgetFilter] = useState(false);
+const budgetFilterRef = useRef<HTMLDivElement>(null);
+
+// Add this function to fetch budget ranges
+const fetchBudgetRanges = async () => {
+  try {
+    const response = await axios.get(`${BASE_URL}api/budget-ranges`, {
+      withCredentials: true
+    });
+    if (response.data.success) {
+      setBudgetRanges(response.data.data);
+    }
+  } catch (error) {
+    console.error('Error fetching budget ranges:', error);
+  }
+};
+
+// Call it in useEffect
+useEffect(() => {
+  fetchBudgetRanges();
+}, []);
+
+
+const handleBudgetSelect = (budgetRange: string) => {
+  setSelectedBudgetRanges((prev) =>
+    prev.includes(budgetRange)
+      ? prev.filter((b) => b !== budgetRange)
+      : [...prev, budgetRange],
+  );
+  setShowBudgetFilter(false);
+};
+
+
   const [importErrors, setImportErrors] = useState([]);
 
   // Filter states
@@ -1873,135 +1912,41 @@ const RawData = () => {
   }
 
   // Handle budget range filter from Budget Range-wise Leads chart
-  if (location.state?.budget_range) {
-    const budgetRange = location.state.budget_range;
-    const fromDashboard = location.state.from_dashboard;
+// Inside the useEffect that handles location.state
+if (location.state?.budget_range) {
+  const budgetRange = location.state.budget_range;
+  const fromDashboard = location.state.from_dashboard;
 
-    console.log(
-      `Filtering by budget range: "${budgetRange}" from dashboard: ${fromDashboard}`,
-    );
+  console.log(`Filtering by budget range: "${budgetRange}" from dashboard`);
 
-    // Clear any existing search
-    setSearchTerm('');
+  // Clear any existing search
+  setSearchTerm('');
 
-    if (budgetRange === 'Not Specified') {
-      // Filter for "Not Available", empty, or N/A budget ranges
-      const notSpecifiedFiltered = rawData.filter((client) => {
-        const clientBudget = client.budget_range?.trim() || '';
-        const isNotSpecified =
-          !clientBudget ||
-          clientBudget === '' ||
-          clientBudget.toLowerCase() === 'not available' ||
-          clientBudget.toLowerCase() === 'n/a' ||
-          clientBudget === 'N/A' ||
-          clientBudget === 'Not Available';
-        return isNotSpecified;
-      });
-
-      console.log(
-        `Not Specified Budget Filter: Found ${notSpecifiedFiltered.length} records`,
+  if (budgetRange === 'Not Specified') {
+    // Filter for empty/N/A budget ranges
+    const notSpecifiedFiltered = rawData.filter((client) => {
+      const clientBudget = client.budget_range?.trim() || '';
+      return (
+        !clientBudget ||
+        clientBudget === '' ||
+        clientBudget.toLowerCase() === 'not available' ||
+        clientBudget.toLowerCase() === 'n/a'
       );
-
-      // Debug: Show what records were found
-      if (notSpecifiedFiltered.length > 0) {
-        console.log(
-          'Not Specified budget records found:',
-          notSpecifiedFiltered.map((c) => ({
-            name: c.name,
-            budget_range: c.budget_range,
-            master_id: c.master_id,
-          })),
-        );
-      }
-
-      setFilteredClients(notSpecifiedFiltered);
-      setSearchTerm(''); // Clear search term for this case
-    } else if (
-      budgetRange === 'Other' ||
-      budgetRange === 'Others' ||
-      budgetRange.toLowerCase() === 'other'
-    ) {
-      // IMPORTANT: Your data has "7lack", not "other"
-      // We need to filter for budget ranges that are NOT empty/N/A and NOT matching the standard ranges
-      const standardRanges = [
-        'basic range: above ₹7 lakh',
-        'premium range: above ₹10 lakh',
-        'ultra-premium range: above ₹15 lakh',
-        'elite range: above ₹25 lakh',
-      ];
-
-      const otherFiltered = rawData.filter((client) => {
-        const clientBudget = (
-          client.budget_range?.trim() || ''
-        ).toLowerCase();
-
-        // Skip empty or "not available" budgets (those are "Not Specified")
-        if (
-          !clientBudget ||
-          clientBudget === '' ||
-          clientBudget === 'not available' ||
-          clientBudget === 'n/a' ||
-          clientBudget === 'not specified'
-        ) {
-          return false;
-        }
-
-        // Check if it matches any standard range
-        const isStandardRange = standardRanges.some(
-          (range) =>
-            clientBudget.includes(range) || range.includes(clientBudget),
-        );
-
-        // Check for "7lack" specifically
-        const is7Lack =
-          clientBudget.includes('7lack') || clientBudget.includes('7 lakh');
-
-        // Return true if it's NOT a standard range OR if it's "7lack"
-        return !isStandardRange || is7Lack;
-      });
-
-      console.log(
-        `Other Budget Filter: Found ${otherFiltered.length} records`,
-      );
-
-      // Debug: Show what budget records were found
-      if (otherFiltered.length > 0) {
-        console.log(
-          'Other budget records found:',
-          otherFiltered.map((c) => ({
-            name: c.name,
-            budget_range: c.budget_range,
-            master_id: c.master_id,
-          })),
-        );
-
-        // Set search term to the specific value (like "7lack")
-        const firstBudget = otherFiltered[0].budget_range || '';
-        if (firstBudget.includes('7lack') || firstBudget.includes('7 lakh')) {
-          setSearchTerm('7lack');
-        } else {
-          setSearchTerm(firstBudget);
-        }
-      }
-
-      setFilteredClients(otherFiltered);
-    } else {
-      // Normal budget filtering for specific ranges (like "Premium Range: Above ₹10 Lakh")
-      console.log(`Setting search term for budget: ${budgetRange}`);
-      setSearchTerm(budgetRange);
-    }
-
-    // Keep the from_dashboard flag
-    if (fromDashboard) {
-      window.history.replaceState(
-        {
-          budget_range: budgetRange,
-          from_dashboard: true,
-        },
-        document.title,
-      );
-    }
+    });
+    setFilteredClients(notSpecifiedFiltered);
+  } else {
+    // Set the budget in selectedBudgetRanges for UI
+    setSelectedBudgetRanges([budgetRange]);
+    
+    // Filter by the specific budget range
+    const budgetFiltered = rawData.filter((client) => {
+      const clientBudget = client.budget_range?.trim() || '';
+      return clientBudget === budgetRange;
+    });
+    setFilteredClients(budgetFiltered);
   }
+}
+
 
   // 🔥 AREA FILTER HANDLER
   // Handle area filter from Area-wise Leads chart
@@ -2197,7 +2142,7 @@ const RawData = () => {
         console.log(
           `"Not Specified" budget filter results: ${filtered.length} records`,
         );
-      }
+      } 
       // Special handling for "Other" budget filter
       else if (
         isBudgetFilter &&
@@ -2491,6 +2436,13 @@ const RawData = () => {
       );
     }
 
+    if (selectedBudgetRanges.length > 0) {
+  filtered = filtered.filter(
+    (client) => client.budget_range && selectedBudgetRanges.includes(client.budget_range)
+  );
+}
+
+
     // Apply City Filter
     if (selectedCities.length > 0) {
       filtered = filtered.filter(
@@ -2588,6 +2540,7 @@ const RawData = () => {
     setSelectedStages([]);
     setSelectedUsers([]);
     setSelectedCities([]);
+      setSelectedBudgetRanges([]);
 
     // Clear search term
     setSearchTerm('');
@@ -2602,6 +2555,8 @@ const RawData = () => {
     setShowStageFilter(false);
     setShowUserFilter(false);
     setShowCityFilter(false);
+  setShowBudgetFilter(false);
+
 
     // Reset to show all data
     setFilteredClients(rawData);
@@ -3687,6 +3642,7 @@ const handleBulkDelete = async () => {
     selectedStages,
     selectedUsers,
     selectedCities,
+      selectedBudgetRanges, // Add this
     rawData,
   ]);
 
@@ -4939,6 +4895,129 @@ const handleBulkDelete = async () => {
                       )}
                     </th>
 
+{/* Budget Range Column with Filter */}
+<th className="py-5 px-4 relative">
+  <div
+    ref={budgetFilterRef}
+    className="flex items-center justify-between gap-2"
+  >
+    <span className="text-xs font-extrabold uppercase tracking-wider text-gray-700 dark:text-gray-300">
+      Budget Range
+    </span>
+    <button
+      onClick={(e) => {
+        e.stopPropagation();
+        closeAllDropdowns();
+        setShowBudgetFilter(!showBudgetFilter);
+      }}
+      className="text-gray-500 hover:text-blue-600 dark:text-gray-400 dark:hover:text-blue-400 focus:outline-none transition-colors"
+    >
+      <FontAwesomeIcon
+        icon={faFilter}
+        className={`h-3 w-3 transition-colors duration-200 ${
+          selectedBudgetRanges.length > 0 ? 'text-blue-600' : ''
+        } ${showBudgetFilter ? 'text-blue-600' : ''}`}
+      />
+    </button>
+  </div>
+
+  {/* Budget Range Filter Dropdown */}
+  {showBudgetFilter && (
+    <div className="absolute top-full left-0 mt-1 z-50 bg-white dark:bg-boxdark border border-gray-300 dark:border-gray-700 rounded-lg shadow-lg p-4 min-w-[250px] max-h-[300px] overflow-y-auto">
+      <div className="flex justify-between items-center mb-3">
+        <span className="font-semibold text-sm dark:text-white">
+          Filter Budget Ranges
+        </span>
+        <div className="flex gap-2">
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              setSelectedBudgetRanges([]);
+            }}
+            className="text-xs font-medium text-blue-600 hover:text-blue-800 dark:text-blue-400 transition-colors"
+          >
+            Clear All
+          </button>
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              setShowBudgetFilter(false);
+            }}
+            className="text-xs font-medium text-gray-500 hover:text-gray-700 dark:text-gray-400 transition-colors"
+          >
+            ×
+          </button>
+        </div>
+      </div>
+
+      {budgetRanges.length > 0 ? (
+        <>
+          {budgetRanges.map((item) => (
+            <div
+              key={item.budget_range}
+              className="flex items-center mb-2"
+            >
+              <input
+                type="checkbox"
+                id={`budget-${item.budget_range}`}
+                checked={selectedBudgetRanges.includes(item.budget_range)}
+                onChange={(e) => {
+                  e.stopPropagation();
+                  handleBudgetSelect(item.budget_range);
+                }}
+                onClick={(e) => e.stopPropagation()}
+                className="h-3.5 w-3.5 mr-2.5 text-blue-600 rounded border-gray-300 focus:ring-2 focus:ring-blue-500"
+              />
+              <label
+                htmlFor={`budget-${item.budget_range}`}
+                className="text-sm font-medium dark:text-white cursor-pointer truncate hover:text-blue-600 dark:hover:text-blue-400 transition-colors flex-1"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleBudgetSelect(item.budget_range);
+                }}
+              >
+                {item.budget_range}
+                <span className="ml-2 text-xs text-gray-500 dark:text-gray-400">
+                  ({item.count})
+                </span>
+              </label>
+            </div>
+          ))}
+        </>
+      ) : (
+        <div className="text-sm font-medium text-gray-500 dark:text-gray-400 italic py-3 text-center">
+          No budget ranges available
+        </div>
+      )}
+
+      {selectedBudgetRanges.length > 0 && (
+        <div className="mt-4 pt-3 border-t border-gray-200 dark:border-gray-700">
+          <div className="text-xs font-semibold text-gray-600 dark:text-gray-400 mb-2">
+            Selected ({selectedBudgetRanges.length}):
+          </div>
+          <div className="flex flex-wrap gap-1.5">
+       {/* Active Budget Filter */}
+{selectedBudgetRanges.map((budget) => (
+  <span
+    key={budget}
+    className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-300"
+  >
+    Budget: {budget.length > 25 ? budget.substring(0, 25) + '...' : budget}
+    <button
+      onClick={() => handleBudgetSelect(budget)}
+      className="ml-1 text-amber-600 hover:text-amber-800 dark:text-amber-400"
+    >
+      ×
+    </button>
+  </span>
+))}
+          </div>
+        </div>
+      )}
+    </div>
+  )}
+</th>
+
                     {/* User Assign Column with Filter */}
                     <th className="py-5 px-4 relative">
                       <div
@@ -5273,6 +5352,13 @@ const handleBulkDelete = async () => {
                           )}
                         </div>
                       </td>
+
+{/* Budget Range */}
+<td className="py-4 px-4">
+  <div className="bg-gradient-to-r from-amber-50 to-amber-100 dark:from-amber-900/20 dark:to-amber-800/10 text-amber-800 dark:text-amber-300 px-3 py-1.5 rounded-lg font-medium text-sm border border-amber-200 dark:border-amber-800/30 shadow-sm text-center">
+    {client.budget_range || '—'}
+  </div>
+</td>
 
                       {/* User Assign */}
                       <td className="py-4 px-4">

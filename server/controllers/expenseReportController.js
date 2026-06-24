@@ -4,7 +4,14 @@ import PDFDocument from 'pdfkit';
 import { Parser } from 'json2csv';
 import { fileURLToPath } from 'url';
 import path from 'path';
-
+const REPORT_MAP = {
+  date_wise: { title: 'Date Wise Expense Report' },
+  employee_wise: { title: 'Employee Wise Expense Report' },
+  category_wise: { title: 'Category Wise Expense Report' },
+  vendor_wise: { title: 'Vendor Wise Expense Report' },
+  payment_mode: { title: 'Payment Mode Expense Report' },
+  project_wise: { title: 'Project Wise Expense Report' },
+};
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 

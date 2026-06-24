@@ -18,10 +18,12 @@ const db = mysql.createPool({
   password: '',
   // database: 'db_mms_newdb',
   
-    database: 'db_mms_avcore',
+    // database: 'db_mms_avcore', 
+    // dzmbjxtk_crm_avcore_updated 
+    database: 'dzmbjxtk_crm_avcore_updated',
 
   // database: 'db_mms',
-  port: 3308,
+  port: 3306,
 });
 
 

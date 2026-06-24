@@ -120,7 +120,7 @@ import DownloadCenter from './pages/DownloadCenter/DownloadCenter';
 import ExpenseStats from './pages/Expense/ExpenseStats';
 import ExpenseDashboard from './pages/Expense/ExpenseDashboard';
 
-
+import AdminOverviewReport from './pages/AdminReport/AdminOverviewReport';
 
 
 function App() {
@@ -1190,7 +1190,17 @@ path="/schedule/settings/:id"
   }
 />
 
-
+<Route
+  path="/admin-report/overview"
+  element={
+    <ProtectedRoute menuKey="admin_report.overview">
+      <DefaultLayout userRole={userRole}>
+        <PageTitle title="Admin Overview Report" />
+        <AdminOverviewReport />
+      </DefaultLayout>
+    </ProtectedRoute>
+  }
+/>
 
           </>
         ) : (

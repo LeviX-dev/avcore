@@ -25,6 +25,7 @@ getEmployeeLeadList ,getEmployeeDetailedReport  ,getQuotationClosedLeads ,
     getFavoritesBatch ,
   updateLocationLink ,
 updateContactNumbersOnly ,  checkDuplicateLeadContact , 
+getBudgetRanges , 
 
 } from '../controllers/rawDataController.js';
 import uploadMiddleware from '../middleware/upload.js';
@@ -43,6 +44,8 @@ router.post('/master-data/import', upload.single('file'), importRawData);
 router.put('/master-data/:master_id', updateRawData); 
 
 router.put('/master-data/:master_id/contact-numbers', updateContactNumbersOnly);
+
+router.get('/budget-ranges', getBudgetRanges);
 
 
 

@@ -1,7 +1,7 @@
 import express from 'express';
 import { getAssignedTeleCallerData, getReportDataByMasterId , 
     getAssignedLeads , getEmployeeAssignedSummary , getOverallAssignedLeads , 
-    getLeadsCount , 
+    getLeadsCount , getOverviewReport , getOverviewReportDetails , 
 
  } from '../controllers/reportController.js';
 
@@ -16,6 +16,16 @@ router.get('/data', getAssignedTeleCallerData);
 
 router.get('/:master_id', getReportDataByMasterId); 
 
+
+router.get(
+  "/admin/overview-report",
+  getOverviewReport
+);
+
+router.get(
+  "/admin/overview-report/details",
+  getOverviewReportDetails
+);
 
 
 export default router;

@@ -4166,6 +4166,41 @@ export const updateContactNumbersOnly = async (req, res) => {
   }
 };
 
+
+export const getBudgetRanges = async (req, res) => {
+  try {
+    // Fetch all unique budget ranges with counts
+    const [budgetRanges] = await db.execute(
+      `SELECT 
+        budget_range,
+        COUNT(*) as count
+       FROM raw_data 
+       WHERE budget_range IS NOT NULL 
+         AND budget_range != '' 
+       GROUP BY budget_range 
+       ORDER BY budget_range ASC`
+    );
+
+    // Format the response
+    const formattedBudgetRanges = budgetRanges.map(item => ({
+      budget_range: item.budget_range,
+      count: item.count
+    }));
+
+    res.status(200).json({
+      success: true,
+      data: formattedBudgetRanges,
+      total: formattedBudgetRanges.length
+    });
+  } catch (error) {
+    console.error('Error fetching budget ranges:', error);
+    res.status(500).json({ 
+      success: false, 
+      error: 'Failed to fetch budget ranges' 
+    });
+  }
+};
+
 // ✅ MIME → EXTENSION MAP (FIXES jpeg issue)
 const mimeExtensionMap = {
   'image/jpeg': '.jpeg',

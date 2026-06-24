@@ -452,8 +452,386 @@ export const getLeadsCount = async (req, res) => {
 };
 
 
+export const getOverviewReport = async (req, res) => {
+  try {
+    const {
+      fromDate,
+      toDate,
+      employee = "",
+    } = req.query;
+
+    // ─────────────────────────────────────────────────────────────
+    // 1️⃣ Get all employees (users who have reassignments)
+    // ─────────────────────────────────────────────────────────────
+    const [employeesResult] = await db.query(`
+      SELECT DISTINCT assignedTo
+      FROM reassignment
+      WHERE assignedTo IS NOT NULL AND assignedTo != ''
+      ORDER BY assignedTo
+    `);
+
+    const allEmployees = employeesResult.map(row => row.assignedTo);
+
+    // Filter employees if specific employee is selected
+    const targetEmployees = employee ? [employee] : allEmployees;
+
+    if (targetEmployees.length === 0) {
+      return res.status(200).json({
+        success: true,
+        employees: [],
+        data: []
+      });
+    }
+
+    const employeePlaceholders = targetEmployees.map(() => '?').join(',');
+
+    // ─────────────────────────────────────────────────────────────
+    // 2️⃣ Get all reassignments within date range for these employees
+    // ─────────────────────────────────────────────────────────────
+    const [reassignments] = await db.query(`
+      SELECT 
+        r.master_id,
+        r.assignedTo,
+        r.leadStage,
+        r.created_at
+      FROM reassignment r
+      WHERE DATE(r.created_at) BETWEEN ? AND ?
+        AND r.assignedTo IN (${employeePlaceholders})
+      ORDER BY r.master_id, r.created_at ASC
+    `, [fromDate, toDate, ...targetEmployees]);
+
+    if (reassignments.length === 0) {
+      return res.status(200).json({
+        success: true,
+        employees: targetEmployees,
+        data: targetEmployees.map(emp => ({
+          employee: emp,
+          total_leads_worked: 0,
+          current_leads: 0,
+          fresh: 0,
+          cold: 0,
+          on_hold: 0,
+          positive_leads: 0,
+          site_visit: 0,
+          demo: 0,
+          quotation: 0,
+          closed: 0,
+          dropped: 0
+        }))
+      });
+    }
+
+    // ─────────────────────────────────────────────────────────────
+    // 3️⃣ Get unique master_ids for these reassignments
+    // ─────────────────────────────────────────────────────────────
+    const masterIds = [...new Set(reassignments.map(r => r.master_id))];
+    const masterPlaceholders = masterIds.map(() => '?').join(',');
+
+    // ─────────────────────────────────────────────────────────────
+    // 4️⃣ Get current lead_stage from raw_data for these master_ids
+    // ─────────────────────────────────────────────────────────────
+    const [rawData] = await db.query(`
+      SELECT master_id, lead_stage
+      FROM raw_data
+      WHERE master_id IN (${masterPlaceholders})
+    `, masterIds);
+
+    const currentStageMap = {};
+    rawData.forEach(row => {
+      currentStageMap[row.master_id] = row.lead_stage;
+    });
+
+    // ─────────────────────────────────────────────────────────────
+    // 5️⃣ Process data per employee
+    // ─────────────────────────────────────────────────────────────
+    const reportMap = {};
+
+    targetEmployees.forEach(emp => {
+      reportMap[emp] = {
+        employee: emp,
+        total_leads_worked: 0,
+        current_leads: 0,
+        fresh: 0,
+        cold: 0,
+        on_hold: 0,
+        positive_leads: 0,
+        site_visit: 0,
+        demo: 0,
+        quotation: 0,
+        closed: 0,
+        dropped: 0
+      };
+    });
+
+    // Process each reassignment
+    reassignments.forEach(r => {
+      const emp = r.assignedTo;
+      if (!reportMap[emp]) return;
+
+      const stage = r.leadStage;
+      const masterId = r.master_id;
+
+      // Total leads worked (count each unique lead per employee)
+      reportMap[emp].total_leads_worked += 1;
+
+      // Count stages
+      switch(stage) {
+        case 'Fresh Lead':
+          reportMap[emp].fresh += 1;
+          break;
+        case 'Cold Lead':
+          reportMap[emp].cold += 1;
+          break;
+        case 'On Hold':
+          reportMap[emp].on_hold += 1;
+          break;
+        case 'Positive Lead':
+          reportMap[emp].positive_leads += 1;
+          break;
+        case 'Site Visit':
+        case 'Pre Site Visit':
+        case 'Post Site Visit':
+          reportMap[emp].site_visit += 1;
+          break;
+        case 'Demo':
+          reportMap[emp].demo += 1;
+          break;
+        case 'Quotation Pending':
+        case 'Quotation Created':
+        case 'Quotation Follow-up':
+          reportMap[emp].quotation += 1;
+          break;
+        case 'Closed Deal':
+        case 'Execution':
+        case 'Pre Execution':
+          reportMap[emp].closed += 1;
+          break;
+        case 'Drop':
+        case 'loss':
+          reportMap[emp].dropped += 1;
+          break;
+        default:
+          break;
+      }
+    });
+
+    // ─────────────────────────────────────────────────────────────
+    // 6️⃣ Calculate current_leads (latest stage is not closed/dropped)
+    // ─────────────────────────────────────────────────────────────
+    // Get latest reassignment per employee per lead
+    const latestReassignments = {};
+    reassignments.forEach(r => {
+      const key = `${r.master_id}_${r.assignedTo}`;
+      if (!latestReassignments[key] || new Date(r.created_at) > new Date(latestReassignments[key].created_at)) {
+        latestReassignments[key] = r;
+      }
+    });
+
+    Object.values(latestReassignments).forEach(r => {
+      const emp = r.assignedTo;
+      if (!reportMap[emp]) return;
+
+      // Get current stage from raw_data or use the latest reassignment stage
+      const currentStage = currentStageMap[r.master_id] || r.leadStage;
+      
+      // If current stage is not closed or dropped, count as current lead
+      const closedStages = ['Closed Deal', 'Execution', 'Pre Execution'];
+      const dropStages = ['Drop', 'loss'];
+      
+      if (!closedStages.includes(currentStage) && !dropStages.includes(currentStage)) {
+        reportMap[emp].current_leads += 1;
+      }
+    });
+
+    // ─────────────────────────────────────────────────────────────
+    // 7️⃣ Prepare final response
+    // ─────────────────────────────────────────────────────────────
+    const finalData = Object.values(reportMap);
+
+    return res.status(200).json({
+      success: true,
+      employees: targetEmployees,
+      data: finalData,
+    });
+
+  } catch (error) {
+    console.error('❌ getOverviewReport Error:', error);
+    return res.status(500).json({
+      success: false,
+      message: error.message,
+    });
+  }
+};
 
 
 
+// export const getOverviewReportDetails = async (
+//   req,
+//   res
+// ) => {
+//   try {
 
+//     const {
+//       employee,
+//       stage,
+//       fromDate,
+//       toDate,
+//     } = req.query;
 
+//     let stageCondition = "";
+
+//     if (stage === "Site Visit") {
+//       stageCondition =
+//         `AND r.leadStage IN ('Pre Site Visit','Post Site Visit')`;
+//     }
+//     else if (stage === "Quotation") {
+//       stageCondition =
+//         `AND r.leadStage IN (
+//           'Quotation Pending',
+//           'Quotation Created',
+//           'Quotation Follow-up'
+//         )`;
+//     }
+//     else {
+//       stageCondition =
+//         `AND r.leadStage = '${stage}'`;
+//     }
+
+//     const [rows] = await db.query(`
+//       SELECT DISTINCT
+
+//           rd.master_id,
+//           rd.name,
+//           rd.number,
+//           rd.city,
+
+//           r.leadStage,
+//           r.created_at
+
+//       FROM reassignment r
+
+//       INNER JOIN raw_data rd
+//       ON rd.master_id = r.master_id
+
+//       WHERE r.assignedTo = ?
+
+//       ${stageCondition}
+
+//       AND DATE(r.created_at)
+//       BETWEEN ? AND ?
+
+//       ORDER BY r.created_at DESC
+//     `,
+//     [
+//       employee,
+//       fromDate,
+//       toDate,
+//     ]);
+
+//     return res.status(200).json({
+//       success: true,
+//       data: rows,
+//     });
+
+//   } catch (error) {
+
+//     console.error(error);
+
+//     return res.status(500).json({
+//       success: false,
+//       message: error.message,
+//     });
+
+//   }
+// };
+
+export const getOverviewReportDetails = async (req, res) => {
+  try {
+    const {
+      employee,
+      stage,
+      fromDate,
+      toDate,
+    } = req.query;
+
+    // ─────────────────────────────────────────────────────────────
+    // 1️⃣ Map UI stage names to database values
+    // ─────────────────────────────────────────────────────────────
+    let stageCondition = '';
+    let stageValues = [];
+
+    switch(stage) {
+      case 'Site Visit':
+        stageCondition = `r.leadStage IN (?, ?, ?)`;
+        stageValues = ['Site Visit', 'Pre Site Visit', 'Post Site Visit'];
+        break;
+      case 'Quotation':
+        stageCondition = `r.leadStage IN (?, ?, ?)`;
+        stageValues = ['Quotation Pending', 'Quotation Created', 'Quotation Follow-up'];
+        break;
+      case 'Closed':
+        stageCondition = `r.leadStage IN (?, ?, ?)`;
+        stageValues = ['Closed Deal', 'Execution', 'Pre Execution'];
+        break;
+      case 'Dropped':
+        stageCondition = `r.leadStage IN (?, ?)`;
+        stageValues = ['Drop', 'loss'];
+        break;
+      case 'Fresh Lead':
+        stageCondition = `r.leadStage = ?`;
+        stageValues = ['Fresh Lead'];
+        break;
+      case 'Cold Lead':
+        stageCondition = `r.leadStage = ?`;
+        stageValues = ['Cold Lead'];
+        break;
+      case 'On Hold':
+        stageCondition = `r.leadStage = ?`;
+        stageValues = ['On Hold'];
+        break;
+      case 'Positive Lead':
+        stageCondition = `r.leadStage = ?`;
+        stageValues = ['Positive Lead'];
+        break;
+      case 'Demo':
+        stageCondition = `r.leadStage = ?`;
+        stageValues = ['Demo'];
+        break;
+      default:
+        // If stage is not recognized, try to use it as-is
+        stageCondition = `r.leadStage = ?`;
+        stageValues = [stage];
+    }
+
+    // ─────────────────────────────────────────────────────────────
+    // 2️⃣ Get details for the specific employee and stage
+    // ─────────────────────────────────────────────────────────────
+    const [rows] = await db.query(`
+      SELECT DISTINCT
+        rd.master_id,
+        rd.name,
+        rd.number,
+        rd.city,
+        r.leadStage,
+        r.created_at
+      FROM reassignment r
+      INNER JOIN raw_data rd ON rd.master_id = r.master_id
+      WHERE r.assignedTo = ?
+        AND ${stageCondition}
+        AND DATE(r.created_at) BETWEEN ? AND ?
+      ORDER BY r.created_at DESC
+    `, [employee, ...stageValues, fromDate, toDate]);
+
+    return res.status(200).json({
+      success: true,
+      data: rows,
+    });
+
+  } catch (error) {
+    console.error('❌ getOverviewReportDetails Error:', error);
+    return res.status(500).json({
+      success: false,
+      message: error.message,
+    });
+  }
+};
