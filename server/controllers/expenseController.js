@@ -1,23 +1,50 @@
 import db from '../database/db.js';
-import WalletService from '../services/walletService.js';
+import {WalletService} from '../services/walletService.js';
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import { BASE_URL } from '../../public/config.js'; 
-//for webmiles
-// import { BASE_URL } from '../public/config.js'; 
+import { BASE_URL } from '../../public/config.js';
+
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const expenseUploadDir = path.join(__dirname, '../uploads/expenses');
 
-const ADMIN_EXPENSE_ROLES = new Set(['admin', 'sub_admin', 'hr', 'hr_executive']);
+// ─── ROLE DEFINITIONS ─────────────────────────────────────────────────────────
+
+const EXPENSE_APPROVER_ROLES = new Set([
+  'admin',
+  'sub_admin',
+  'hr',
+  'hr_executive',
+  'project_manager',
+  'accountant'
+]);
+
+const EXPENSE_AUTO_APPROVE_ROLES = new Set([
+  'admin',
+  'sub_admin'
+]);
+
+// ─── HELPER FUNCTIONS ─────────────────────────────────────────────────────────
+
+const isApprover = (role) =>
+  EXPENSE_APPROVER_ROLES.has(String(role || '').toLowerCase());
+
+const isAdmin = (role) =>
+  ['admin', 'sub_admin','accountant'].includes(String(role || '').toLowerCase());
+
+const canAutoApprove = (role) =>
+  EXPENSE_AUTO_APPROVE_ROLES.has(String(role || '').toLowerCase());
+
+const isPrivilegedExpenseRole = isApprover;
+
+// ─── CONSTANTS ─────────────────────────────────────────────────────────────────
+
 const DIRECT_EXPENSE = 'direct_expense';
 const PROJECT_EXPENSE = 'project_expense';
-
-// Draft statuses — wallet is NEVER touched for any of these
 const DRAFT_STATUSES = ['draft_pending', 'draft_approved', 'draft_rejected'];
 
-// ─── Utility Helpers ────────────────────────────────────────────────────────
+// ─── Utility Helpers ──────────────────────────────────────────────────────────
 
 const ensureUploadDirectory = async () => {
   if (!fs.existsSync(expenseUploadDir)) {
@@ -44,9 +71,6 @@ const normalizeExpenseType = (value) => {
   if (lower === DIRECT_EXPENSE || lower === PROJECT_EXPENSE) return lower;
   return null;
 };
-
-const isPrivilegedExpenseRole = (role) =>
-  ADMIN_EXPENSE_ROLES.has(String(role || '').toLowerCase());
 
 const getSessionUser = (req) => {
   const user = req.session?.user;
@@ -154,8 +178,8 @@ const resolveEmployeeAssignment = async (sessionUser, requestedEmployeeId, exist
   let targetEmployeeId = sessionUser.id;
 
   if (isPrivilegedExpenseRole(sessionUser.role)) {
-    targetEmployeeId = requestedId || existingId;
-    if (!targetEmployeeId) return { error: 'employee is required' };
+    // ✅ Fixed: fallback to sessionUser.id so admins can submit for themselves
+    targetEmployeeId = requestedId || existingId || sessionUser.id;
   } else {
     targetEmployeeId = sessionUser.id;
     if (requestedId && requestedId !== sessionUser.id) {
@@ -204,10 +228,11 @@ export const ensureExpenseTable = async () => {
       bill_number       VARCHAR(100) DEFAULT NULL,
       description       TEXT         DEFAULT NULL,
       amount            DECIMAL(12,2) NOT NULL,
+      approved_amount   DECIMAL(12,2) DEFAULT NULL,
       expense_date      DATE         NOT NULL,
       attachment_path   VARCHAR(255) DEFAULT NULL,
       attachment_name   VARCHAR(255) DEFAULT NULL,
-      status            VARCHAR(230)  DEFAULT 'pending',
+      status            VARCHAR(30)  DEFAULT 'pending',
       status_remark     TEXT         DEFAULT NULL,
       remark            TEXT         DEFAULT NULL,
       created_by        INT          DEFAULT NULL,
@@ -298,32 +323,27 @@ export const getExpenseOptions = async (req, res) => {
   }
 };
 
-// ─── Expenses CRUD ────────────────────────────────────────────────────────────
+// ─── GET Expenses ─────────────────────────────────────────────────────────────
 
-/**
- * GET /api/expense
- * status = 'drafts' → returns all draft_ statuses combined
- * status = 'pending' | 'approved' | 'rejected' → single status filter
- * omit → all expenses
- */
 export const getExpenses = async (req, res) => {
   try {
     const sessionUser = getSessionUser(req);
     if (!sessionUser) return res.status(401).json({ success: false, message: 'Unauthorized' });
 
     const { status } = req.query;
+
     const conditions = [];
     const params = [];
 
-    if (!isPrivilegedExpenseRole(sessionUser.role)) {
+    // ✅ Only admin/sub_admin see all — everyone else sees only their own
+    if (!isAdmin(sessionUser.role)) {
       conditions.push('COALESCE(e.employee_id, e.created_by) = ?');
       params.push(sessionUser.id);
     }
 
+    // ✅ Status filter — 'drafts' expands to 3 DB statuses
     if (status === 'drafts') {
-      conditions.push(
-        `e.status IN ('draft_pending', 'draft_approved', 'draft_rejected')`
-      );
+      conditions.push(`e.status IN ('draft_pending', 'draft_approved', 'draft_rejected')`);
     } else if (status) {
       conditions.push('e.status = ?');
       params.push(status);
@@ -343,7 +363,8 @@ export const getExpenses = async (req, res) => {
         e.payment_mode, e.bill_number, e.description,
         e.amount, e.expense_date, e.attachment_path, e.attachment_name,
         e.status, e.status_remark, e.remark,
-        e.created_by, e.created_at, e.updated_at
+        e.created_by, e.created_at, e.updated_at,
+        e.approved_amount
        FROM expenses e
        LEFT JOIN expense_categories c ON c.category_id = e.category_id
        LEFT JOIN vendors v ON v.vendor_id = e.vendor_id
@@ -357,23 +378,21 @@ export const getExpenses = async (req, res) => {
       ...row,
       attachment_url: resolveAttachmentUrl(row.attachment_path),
       bill_url: resolveBillUrl(row.attachment_path),
+      approved_amount: row.approved_amount !== null && row.approved_amount !== undefined
+        ? Number(row.approved_amount)
+        : null,
     }));
 
     return res.status(200).json({ success: true, data: normalizedRows });
+
   } catch (error) {
     console.error('Error fetching expenses:', error);
     return res.status(500).json({ success: false, message: 'Failed to fetch expenses' });
   }
 };
 
-/**
- * POST /api/expense
- * 
- * NEW FLOW:
- * - expense_mode = 'draft' → status: draft_pending (admin review, NO wallet)
- * - expense_mode = 'direct' → status: pending (wallet deducted immediately)
- * - Admin with expense_mode != 'draft' → status: approved (wallet deducted)
- */
+// ─── CREATE Expense ──────────────────────────────────────────────────────────
+
 export const createExpense = async (req, res) => {
   try {
     const sessionUser = getSessionUser(req);
@@ -396,7 +415,7 @@ export const createExpense = async (req, res) => {
       amount,
       expense_date,
       remark,
-      expense_mode, // 'direct' | 'draft'
+      expense_mode,
     } = req.body;
 
     if (amount === undefined || !expense_date) {
@@ -413,21 +432,15 @@ export const createExpense = async (req, res) => {
       return res.status(400).json({ success: false, message: 'expense_type is required' });
     }
 
-    // ── Determine final status based on NEW ENUM ───────────────────────────────
+    // ✅ Determine final status — no wallet debit on submit
     let finalStatus;
-    
     if (expense_mode === 'draft') {
-      // Draft flow: always go to admin review first
       finalStatus = 'draft_pending';
-    } else if (isPrivilegedExpenseRole(sessionUser.role)) {
-      // Admin creating direct expense → approved immediately
+    } else if (canAutoApprove(sessionUser.role)) {
       finalStatus = 'approved';
     } else {
-      // Employee creating direct expense → pending
       finalStatus = 'pending';
     }
-
-    const shouldDeductWallet = !DRAFT_STATUSES.includes(finalStatus);
 
     const employeeAssignment = await resolveEmployeeAssignment(sessionUser, employee_id);
     if (employeeAssignment.error) {
@@ -461,7 +474,7 @@ export const createExpense = async (req, res) => {
       categoryName = categoryRows[0].category_name;
     }
 
-    // Full validation for direct expenses (pending or approved)
+    // Full validation for non-draft expenses
     if (finalStatus === 'pending' || finalStatus === 'approved') {
       const validationError = requireSubmitFields({
         expenseType: normalizedExpenseType,
@@ -489,8 +502,6 @@ export const createExpense = async (req, res) => {
       billNumber: bill_number,
       vendorLabel: resolvedVendor?.vendorLabel,
     });
-
-    console.log(finalStatus);
 
     const [result] = await db.query(
       `INSERT INTO expenses (
@@ -528,8 +539,8 @@ export const createExpense = async (req, res) => {
       ]
     );
 
-    // Deduct wallet only for non-draft expenses
-    if (shouldDeductWallet) {
+    // ✅ Auto-approve: debit wallet only if admin submits (finalStatus = 'approved')
+    if (finalStatus === 'approved') {
       try {
         await WalletService.debitWallet({
           userId: employeeAssignment.employeeId,
@@ -537,83 +548,134 @@ export const createExpense = async (req, res) => {
           initiatedBy: sessionUser.id,
           referenceType: 'expense_deduction',
           referenceId: result.insertId,
-          remarks: finalStatus === 'approved' ? 'Expense approved by admin' : 'Expense submitted',
+          remarks: 'Expense auto-approved by admin',
           adminNote: null,
-          status: finalStatus,
+          status: 'approved',
         });
       } catch (err) {
         await db.query('DELETE FROM expenses WHERE expense_id = ?', [result.insertId]);
-        if (err.message && err.message.includes('Insufficient wallet balance')) {
-          return res.status(400).json({ success: false, message: 'Insufficient company wallet balance' });
+        if (err.message?.includes('Insufficient')) {
+          return res.status(400).json({ success: false, message: err.message });
         }
         throw err;
       }
     }
 
-    const message = finalStatus === 'draft_pending' 
-      ? 'Draft submitted for admin review' 
+    // ✅ pending and draft_pending: no wallet touch at submit time
+
+    const message = finalStatus === 'draft_pending'
+      ? 'Draft submitted for admin review'
       : 'Expense submitted successfully';
 
     return res.status(201).json({ success: true, message, expense_id: result.insertId });
+
   } catch (error) {
     console.error('Error creating expense:', error);
     return res.status(500).json({ success: false, message: 'Failed to create expense' });
   }
 };
 
-/**
- * PUT /api/expense/:id/draft-status
- * Admin only — approve or reject a draft_pending expense.
- * Wallet is NEVER touched here.
- * 
- * Body: { status: 'draft_approved' | 'draft_rejected', remark?: string }
- */
+// ─── UPDATE Draft Status ─────────────────────────────────────────────────────
+
 export const updateDraftStatus = async (req, res) => {
   try {
     const sessionUser = getSessionUser(req);
     if (!sessionUser) return res.status(401).json({ success: false, message: 'Unauthorized' });
+
     if (!isPrivilegedExpenseRole(sessionUser.role)) {
-      return res.status(403).json({ success: false, message: 'Only admin can review drafts' });
+      return res.status(403).json({ success: false, message: 'Only authorized users can review drafts' });
     }
 
     const { id } = req.params;
-    const { status, remark } = req.body;
+    const { status, remark, approved_amount } = req.body;
 
     if (!['draft_approved', 'draft_rejected'].includes(status)) {
-      return res.status(400).json({ success: false, message: "Status must be 'draft_approved' or 'draft_rejected'" });
+      return res.status(400).json({
+        success: false,
+        message: "Status must be 'draft_approved' or 'draft_rejected'"
+      });
     }
 
     const [rows] = await db.query(
-      'SELECT status FROM expenses WHERE expense_id = ? LIMIT 1',
+      'SELECT status, amount, approved_amount FROM expenses WHERE expense_id = ? LIMIT 1',
       [id]
     );
+
     if (!rows.length) {
       return res.status(404).json({ success: false, message: 'Expense not found' });
     }
+
     if (rows[0].status !== 'draft_pending') {
-      return res.status(400).json({ success: false, message: 'Only draft_pending expenses can be reviewed' });
+      return res.status(400).json({
+        success: false,
+        message: `Only draft_pending expenses can be reviewed. Current status: ${rows[0].status}`
+      });
     }
 
-    await db.query(
-      'UPDATE expenses SET status = ?, status_remark = ? WHERE expense_id = ?',
-      [status, normalizeText(remark) || null, id]
-    );
+    let finalApprovedAmount = null;
+    let rejectedAmount = null;
+    let isPartial = false;
+
+    if (status === 'draft_approved') {
+      if (approved_amount !== undefined && approved_amount !== null && approved_amount !== '') {
+        const approvedAmt = Number(approved_amount);
+        if (isNaN(approvedAmt) || approvedAmt <= 0) {
+          return res.status(400).json({ success: false, message: 'Approved amount must be greater than 0' });
+        }
+        if (approvedAmt > Number(rows[0].amount)) {
+          return res.status(400).json({
+            success: false,
+            message: `Approved amount cannot exceed ₹${Number(rows[0].amount).toLocaleString('en-IN')}`
+          });
+        }
+        finalApprovedAmount = approvedAmt;
+        if (approvedAmt < Number(rows[0].amount)) {
+          isPartial = true;
+          rejectedAmount = Number(rows[0].amount) - approvedAmt;
+        }
+      } else {
+        finalApprovedAmount = Number(rows[0].amount);
+      }
+
+      // ✅ Fixed: only update approved_amount on draft_approved, not on rejection
+      await db.query(
+        'UPDATE expenses SET status = ?, status_remark = ?, approved_amount = ? WHERE expense_id = ?',
+        [status, normalizeText(remark) || null, finalApprovedAmount, id]
+      );
+    } else {
+      // ✅ Fixed: rejection does not touch approved_amount
+      await db.query(
+        'UPDATE expenses SET status = ?, status_remark = ? WHERE expense_id = ?',
+        [status, normalizeText(remark) || null, id]
+      );
+    }
+
+    const message = status === 'draft_approved'
+      ? (isPartial
+          ? `Draft partially approved: ₹${finalApprovedAmount.toLocaleString('en-IN')} of ₹${Number(rows[0].amount).toLocaleString('en-IN')}`
+          : 'Draft approved successfully')
+      : 'Draft rejected';
 
     return res.status(200).json({
       success: true,
-      message: status === 'draft_approved' ? 'Draft approved successfully' : 'Draft rejected',
+      message,
+      data: {
+        status,
+        approved_amount: finalApprovedAmount,
+        rejected_amount: rejectedAmount,
+        is_partial: isPartial,
+        requested_amount: Number(rows[0].amount)
+      }
     });
+
   } catch (error) {
     console.error('Error updating draft status:', error);
     return res.status(500).json({ success: false, message: 'Failed to update draft status' });
   }
 };
 
-/**
- * POST /api/expense/:id/make-expense
- * Employee only — convert a draft_approved expense into a real pending expense.
- * THIS is when wallet gets deducted for the draft flow.
- */
+// ─── Make Expense from Draft ─────────────────────────────────────────────────
+
 export const makeExpenseFromDraft = async (req, res) => {
   try {
     const sessionUser = getSessionUser(req);
@@ -625,6 +687,7 @@ export const makeExpenseFromDraft = async (req, res) => {
       'SELECT * FROM expenses WHERE expense_id = ? LIMIT 1',
       [id]
     );
+
     if (!rows.length) {
       return res.status(404).json({ success: false, message: 'Expense not found' });
     }
@@ -632,53 +695,78 @@ export const makeExpenseFromDraft = async (req, res) => {
     const expense = rows[0];
 
     if (expense.status !== 'draft_approved') {
-      return res.status(400).json({ success: false, message: 'Only draft_approved expenses can be converted to expense' });
+      return res.status(400).json({
+        success: false,
+        message: `Only draft_approved expenses can be converted to expense. Current status: ${expense.status}`
+      });
     }
 
-    // Verify ownership — only the employee who owns the draft can convert it
-    if (Number(expense.employee_id || expense.created_by) !== Number(sessionUser.id)) {
-      return res.status(403).json({ success: false, message: 'You are not allowed to convert this draft' });
+    const ownerId = expense.employee_id || expense.created_by;
+    if (Number(ownerId) !== Number(sessionUser.id)) {
+      return res.status(403).json({
+        success: false,
+        message: 'You are not allowed to convert this draft'
+      });
     }
 
-    // NOW deduct wallet — this is the moment money leaves the budget
+    const amountToDeduct = expense.approved_amount || expense.amount;
+
+    // ✅ Fixed: safer partial check using explicit null/undefined comparison
+    const isPartial = expense.approved_amount !== null &&
+                      expense.approved_amount !== undefined &&
+                      Number(expense.approved_amount) < Number(expense.amount);
+
     try {
       await WalletService.debitWallet({
         userId: expense.employee_id || expense.created_by,
-        amount: expense.amount,
+        amount: amountToDeduct,
         initiatedBy: sessionUser.id,
         referenceType: 'expense_deduction',
         referenceId: expense.expense_id,
-        remarks: 'Converted from approved draft',
+        remarks: isPartial
+          ? `Converted from approved draft (partial: ₹${expense.approved_amount} of ₹${expense.amount})`
+          : 'Converted from approved draft',
         adminNote: null,
-        status: 'pending',
+        status: 'approved',
       });
     } catch (err) {
-      if (err.message && err.message.includes('Insufficient wallet balance')) {
-        return res.status(400).json({ success: false, message: 'Insufficient company wallet balance' });
+      console.error('Wallet debit failed during draft conversion:', err);
+      if (err.message?.includes('Insufficient')) {
+        return res.status(400).json({ success: false, message: err.message });
       }
       throw err;
     }
 
-    // Update expense status to pending for admin final approval
     await db.query(
       'UPDATE expenses SET status = ? WHERE expense_id = ?',
       ['approved', id]
     );
 
+    const message = isPartial
+      ? `Expense created from draft (partial: ₹${Number(expense.approved_amount).toLocaleString('en-IN')} of ₹${Number(expense.amount).toLocaleString('en-IN')}). Amount deducted from wallet.`
+      : 'Expense created from draft. Amount deducted from wallet.';
+
     return res.status(200).json({
       success: true,
-      message: 'Expense created from draft. Amount deducted from wallet.',
+      message,
+      data: {
+        expense_id: expense.expense_id,
+        status: 'approved',
+        amount_deducted: amountToDeduct,
+        requested_amount: Number(expense.amount),
+        approved_amount: expense.approved_amount ? Number(expense.approved_amount) : null,
+        is_partial: isPartial
+      }
     });
+
   } catch (error) {
     console.error('Error making expense from draft:', error);
     return res.status(500).json({ success: false, message: 'Failed to make expense from draft' });
   }
 };
-/**
- * POST /api/expense/:id/resubmit
- * Employee only - Resubmit a rejected expense for approval
- * Changes status from 'rejected' to 'pending' and deducts wallet again
- */
+
+// ─── Resubmit Expense ────────────────────────────────────────────────────────
+
 export const resubmitExpense = async (req, res) => {
   try {
     const sessionUser = getSessionUser(req);
@@ -686,29 +774,26 @@ export const resubmitExpense = async (req, res) => {
 
     const { id } = req.params;
 
-    // Get the expense
     const [rows] = await db.query(
       'SELECT * FROM expenses WHERE expense_id = ? AND status = ?',
       [id, 'rejected']
     );
-    
+
     if (!rows.length) {
       return res.status(404).json({ success: false, message: 'Expense not found or not in rejected status' });
     }
-    
+
     const expense = rows[0];
     const ownerId = expense.employee_id || expense.created_by;
-    
-    // Check ownership - only the employee who owns the expense can resubmit
+
     if (!isPrivilegedExpenseRole(sessionUser.role) && ownerId !== sessionUser.id) {
       return res.status(403).json({ success: false, message: 'You are not allowed to resubmit this expense' });
     }
-    
-    // Validate required fields are present
+
     if (!expense.category_id) {
       return res.status(400).json({ success: false, message: 'Category is required' });
     }
-    
+
     if (expense.expense_type === 'direct_expense') {
       if (!expense.vendor_id && !expense.vendor_name) {
         return res.status(400).json({ success: false, message: 'Vendor is required' });
@@ -720,64 +805,42 @@ export const resubmitExpense = async (req, res) => {
         return res.status(400).json({ success: false, message: 'Bill number is required' });
       }
     }
-    
+
     if (expense.expense_type === 'project_expense' && !expense.project_master_id) {
       return res.status(400).json({ success: false, message: 'Project is required for project expense' });
     }
-    
-    // Deduct wallet again
-    try {
-      await WalletService.debitWallet({
-        userId: ownerId,
-        amount: expense.amount,
-        initiatedBy: sessionUser.id,
-        referenceType: 'expense_deduction',
-        referenceId: expense.expense_id,
-        remarks: 'Resubmitted rejected expense',
-        adminNote: null,
-        status: 'pending',
-      });
-    } catch (err) {
-      console.error('Wallet debit failed on resubmit:', err);
-      // Allow resubmit even if wallet fails (allow negative balance)
-      // Don't block the resubmit
-    }
-    
-    // Update status from rejected to pending
+
+    // ✅ Fixed: no wallet debit on resubmit — debit happens at approve time
     await db.query(
       'UPDATE expenses SET status = ?, status_remark = NULL WHERE expense_id = ?',
       ['pending', id]
     );
-    
+
     return res.status(200).json({
       success: true,
       message: 'Expense resubmitted for approval',
     });
+
   } catch (error) {
     console.error('Error resubmitting expense:', error);
     return res.status(500).json({ success: false, message: 'Failed to resubmit expense' });
   }
 };
-/**
- * PUT /api/expense/:id
- * Employees can edit their own draft_pending, draft_rejected, or rejected expenses.
- * Admins can edit any expense.
- */
-/**
- * PUT /api/expense/:id
- * Employees can edit their own draft_pending, draft_rejected, or rejected expenses.
- * Admins can edit any expense.
- */
+
+// ─── UPDATE Expense ──────────────────────────────────────────────────────────
+
 export const updateExpense = async (req, res) => {
   try {
     const sessionUser = getSessionUser(req);
     if (!sessionUser) return res.status(401).json({ success: false, message: 'Unauthorized' });
 
     const { id } = req.params;
+
     const [existingRows] = await db.query(
       'SELECT expense_id, employee_id, created_by, status FROM expenses WHERE expense_id = ? LIMIT 1',
       [id]
     );
+
     if (!existingRows.length) {
       return res.status(404).json({ success: false, message: 'Expense not found' });
     }
@@ -785,13 +848,15 @@ export const updateExpense = async (req, res) => {
     const existing = existingRows[0];
     const ownerEmployeeId = normalizeId(existing.employee_id || existing.created_by);
 
-    // Check permissions
     if (!isPrivilegedExpenseRole(sessionUser.role)) {
       if (ownerEmployeeId !== sessionUser.id) {
         return res.status(403).json({ success: false, message: 'You are not allowed to update this expense' });
       }
       if (!['draft_pending', 'draft_rejected', 'rejected'].includes(existing.status)) {
-        return res.status(403).json({ success: false, message: 'You can only edit draft_pending, draft_rejected, or rejected expenses' });
+        return res.status(403).json({
+          success: false,
+          message: 'You can only edit draft_pending, draft_rejected, or rejected expenses'
+        });
       }
     }
 
@@ -814,7 +879,6 @@ export const updateExpense = async (req, res) => {
       remark,
       attachment_path,
       attachment_name,
-      expense_mode, // Get expense_mode from request
     } = req.body;
 
     if (amount === undefined || !expense_date) {
@@ -831,28 +895,31 @@ export const updateExpense = async (req, res) => {
       return res.status(400).json({ success: false, message: 'expense_type is required' });
     }
 
-    // Determine new status for employee edits
     let finalStatus = existing.status;
     let isResubmit = false;
-    
+
     if (!isPrivilegedExpenseRole(sessionUser.role)) {
       if (existing.status === 'draft_pending') {
-        // Editing a pending draft keeps it pending for review
         finalStatus = 'draft_pending';
       } else if (existing.status === 'draft_rejected') {
-        // Resubmit a draft_rejected → back to draft_pending for admin review
         finalStatus = 'draft_pending';
         isResubmit = true;
       } else if (existing.status === 'rejected') {
-        // Resubmit a rejected expense → back to pending
         finalStatus = 'pending';
         isResubmit = true;
       }
     }
 
-    const employeeAssignment = await resolveEmployeeAssignment(sessionUser, employee_id, existing.employee_id || existing.created_by);
+    const employeeAssignment = await resolveEmployeeAssignment(
+      sessionUser,
+      employee_id,
+      existing.employee_id || existing.created_by
+    );
     if (employeeAssignment.error) {
-      return res.status(employeeAssignment.statusCode || 400).json({ success: false, message: employeeAssignment.error });
+      return res.status(employeeAssignment.statusCode || 400).json({
+        success: false,
+        message: employeeAssignment.error
+      });
     }
 
     let resolvedProject = { projectMasterId: null, projectName: null, siteLocation: null };
@@ -882,8 +949,6 @@ export const updateExpense = async (req, res) => {
       categoryName = categoryRows[0].category_name;
     }
 
-    // For resubmit (draft_rejected → draft_pending), only validate basic fields
-    // For pending (rejected → pending), validate all required fields
     if (finalStatus === 'pending') {
       const validationError = requireSubmitFields({
         expenseType: normalizedExpenseType,
@@ -897,8 +962,6 @@ export const updateExpense = async (req, res) => {
         return res.status(400).json({ success: false, message: validationError });
       }
     }
-    
-    // For draft resubmit, we don't require full validation (vendor, payment, bill can be missing)
 
     if (finalStatus === 'pending' && normalizedExpenseType === PROJECT_EXPENSE && !resolvedProject?.projectMasterId) {
       return res.status(400).json({ success: false, message: 'Project expense must be linked to a project' });
@@ -956,64 +1019,43 @@ export const updateExpense = async (req, res) => {
       return res.status(404).json({ success: false, message: 'Expense not found' });
     }
 
-    // If employee resubmitted a rejected expense → deduct wallet again
-    if (existing.status === 'rejected' && finalStatus === 'pending') {
-      try {
-        await WalletService.debitWallet({
-          userId: employeeAssignment.employeeId,
-          amount: numericAmount,
-          initiatedBy: sessionUser.id,
-          referenceType: 'expense_deduction',
-          referenceId: Number(id),
-          remarks: 'Resubmitted expense',
-          adminNote: null,
-          status: 'pending',
-        });
-      } catch (err) {
-        // Rollback to rejected if wallet fails
-        await db.query('UPDATE expenses SET status = ? WHERE expense_id = ?', ['rejected', id]);
-        if (err.message && err.message.includes('Insufficient wallet balance')) {
-          return res.status(400).json({ success: false, message: 'Insufficient company wallet balance' });
-        }
-        throw err;
-      }
-    }
+    // ✅ Fixed: no wallet debit on resubmit via update — debit happens at approve time
 
-    const message = isResubmit 
+    const message = isResubmit
       ? (finalStatus === 'draft_pending' ? 'Draft resubmitted for admin review' : 'Expense resubmitted successfully')
       : 'Expense updated successfully';
 
     return res.status(200).json({ success: true, message });
+
   } catch (error) {
     console.error('Error updating expense:', error);
     return res.status(500).json({ success: false, message: 'Failed to update expense' });
   }
 };
 
-/**
- * PATCH /api/expense/:id/status
- * Admin only — approve or reject a PENDING expense.
- * Only works on status = 'pending'. Draft flow uses /draft-status endpoint.
- */
+// ─── UPDATE Expense Status ───────────────────────────────────────────────────
+
 export const updateExpenseStatus = async (req, res) => {
   try {
     const sessionUser = getSessionUser(req);
     if (!sessionUser) return res.status(401).json({ success: false, message: 'Unauthorized' });
-    if (!isPrivilegedExpenseRole(sessionUser.role)) {
-      return res.status(403).json({ success: false, message: 'Only admin can change expense status' });
+
+  if (!isAdmin(sessionUser.role)) {
+      return res.status(403).json({ success: false, message: 'Only authorized users can change expense status' });
     }
 
     const { id } = req.params;
-    const { status, status_remark } = req.body;
+    const { status, status_remark, approved_amount } = req.body;
 
     if (!['approved', 'rejected'].includes(status)) {
       return res.status(400).json({ success: false, message: "Status must be 'approved' or 'rejected'" });
     }
 
     const [rows] = await db.query(
-      'SELECT expense_id, status, employee_id, amount FROM expenses WHERE expense_id = ? LIMIT 1',
+      'SELECT expense_id, status, employee_id, amount, approved_amount FROM expenses WHERE expense_id = ? LIMIT 1',
       [id]
     );
+
     if (!rows.length) {
       return res.status(404).json({ success: false, message: 'Expense not found' });
     }
@@ -1021,69 +1063,108 @@ export const updateExpenseStatus = async (req, res) => {
     const expense = rows[0];
 
     if (expense.status !== 'pending') {
-      return res.status(400).json({ success: false, message: 'Only pending expenses can be approved or rejected' });
+      return res.status(400).json({
+        success: false,
+        message: `Only pending expenses can be approved or rejected. Current status: ${expense.status}`
+      });
     }
 
+    // ─── Handle Approval ──────────────────────────────────────────────────────
     if (status === 'approved') {
-      // Wallet was already deducted on submit — just confirm the transaction
-      await db.query(
-        `UPDATE wallet_transactions
-         SET status = 'approved'
-         WHERE reference_type = 'expense_deduction'
-           AND reference_id = ?
-           AND user_id = ?
-           AND status != 'approved'`,
-        [id, expense.employee_id]
-      );
-    }
+      let finalApprovedAmount = null;
+      let rejectedAmount = null;
+      let isPartial = false;
 
-    if (status === 'rejected') {
-      // Reverse the wallet deduction
+      if (approved_amount !== undefined && approved_amount !== null && approved_amount !== '') {
+        const approvedAmt = Number(approved_amount);
+        if (isNaN(approvedAmt) || approvedAmt <= 0) {
+          return res.status(400).json({ success: false, message: 'Approved amount must be greater than 0' });
+        }
+        if (approvedAmt > Number(expense.amount)) {
+          return res.status(400).json({
+            success: false,
+            message: `Approved amount cannot exceed ₹${Number(expense.amount).toLocaleString('en-IN')}`
+          });
+        }
+        finalApprovedAmount = approvedAmt;
+        if (approvedAmt < Number(expense.amount)) {
+          isPartial = true;
+          rejectedAmount = Number(expense.amount) - approvedAmt;
+        }
+      } else {
+        finalApprovedAmount = Number(expense.amount);
+      }
+
+      // ✅ Debit happens HERE at approval time only
       try {
-        await WalletService.reversal({
+        await WalletService.debitWallet({
           userId: expense.employee_id,
-          amount: expense.amount,
+          amount: finalApprovedAmount,
           initiatedBy: sessionUser.id,
-          referenceType: 'rejection_reversal',
-          referenceId: id,
-          remarks: 'Expense rejected, amount reversed',
+          referenceType: 'expense_deduction',
+          referenceId: Number(id),       // ✅ Fixed: was string before
+          remarks: isPartial
+            ? `Partially approved: ₹${finalApprovedAmount} of ₹${expense.amount}`
+            : 'Expense approved',
           adminNote: normalizeText(status_remark) || null,
           status: 'approved',
         });
       } catch (err) {
-        console.error('Wallet reversal failed during rejection:', err);
-        return res.status(500).json({ success: false, message: 'Wallet reversal failed. Expense not rejected.' });
+        console.error('Wallet debit failed during approval:', err);
+        if (err.message?.includes('Insufficient')) {
+          return res.status(400).json({ success: false, message: err.message });
+        }
+        throw err;
       }
 
-      // Mark original debit transaction as reversed
       await db.query(
-        `UPDATE wallet_transactions
-         SET status = 'reversed'
-         WHERE reference_type = 'expense_deduction'
-           AND reference_id = ?
-           AND user_id = ?
-           AND status != 'reversed'`,
-        [id, expense.employee_id]
+        `UPDATE expenses SET status = ?, status_remark = ?, approved_amount = ? WHERE expense_id = ?`,
+        [status, normalizeText(status_remark) || null, finalApprovedAmount, id]
       );
+
+      const message = isPartial
+        ? `Partially approved: ₹${finalApprovedAmount.toLocaleString('en-IN')} of ₹${Number(expense.amount).toLocaleString('en-IN')}`
+        : 'Expense approved successfully';
+
+      return res.status(200).json({
+        success: true,
+        message,
+        data: {
+          status,
+          approved_amount: finalApprovedAmount,
+          rejected_amount: rejectedAmount,
+          is_partial: isPartial,
+          requested_amount: Number(expense.amount)
+        }
+      });
     }
 
-    await db.query(
-      'UPDATE expenses SET status = ?, status_remark = ? WHERE expense_id = ?',
-      [status, normalizeText(status_remark) || null, id]
-    );
+    // ─── Handle Rejection ─────────────────────────────────────────────────────
+    if (status === 'rejected') {
+      // ✅ Fixed: no wallet debit was made on submit so nothing to reverse
+      await db.query(
+        'UPDATE expenses SET status = ?, status_remark = ? WHERE expense_id = ?',
+        [status, normalizeText(status_remark) || null, id]
+      );
 
-    return res.status(200).json({ success: true, message: `Expense ${status} successfully` });
+      return res.status(200).json({
+        success: true,
+        message: 'Expense rejected successfully',
+        data: {
+          status,
+          requested_amount: Number(expense.amount)
+        }
+      });
+    }
+
   } catch (error) {
     console.error('Error updating expense status:', error);
     return res.status(500).json({ success: false, message: 'Failed to update expense status' });
   }
 };
 
-/**
- * DELETE /api/expense/:id
- * Employees can delete draft_pending, draft_rejected, or pending expenses.
- * Admins can delete any expense.
- */
+// ─── DELETE Expense ──────────────────────────────────────────────────────────
+
 export const deleteExpense = async (req, res) => {
   try {
     const sessionUser = getSessionUser(req);
@@ -1099,32 +1180,38 @@ export const deleteExpense = async (req, res) => {
       if (!rows.length) {
         return res.status(404).json({ success: false, message: 'Expense not found' });
       }
-      // Allow deletion of draft_pending, draft_rejected, and pending
       if (!['draft_pending', 'draft_rejected', 'pending'].includes(rows[0].status)) {
-        return res.status(403).json({ success: false, message: 'You can only delete draft or pending expenses' });
+        return res.status(403).json({
+          success: false,
+          message: 'You can only delete draft or pending expenses'
+        });
       }
     }
 
+    // ✅ No wallet reversal needed — debit only happens at approve time now
     let query = 'DELETE FROM expenses WHERE expense_id = ?';
     const params = [id];
+
     if (!isPrivilegedExpenseRole(sessionUser.role)) {
       query += ' AND COALESCE(employee_id, created_by) = ?';
       params.push(sessionUser.id);
     }
 
     const [result] = await db.query(query, params);
+
     if (result.affectedRows === 0) {
       return res.status(404).json({ success: false, message: 'Expense not found' });
     }
 
     return res.status(200).json({ success: true, message: 'Expense deleted successfully' });
+
   } catch (error) {
     console.error('Error deleting expense:', error);
     return res.status(500).json({ success: false, message: 'Failed to delete expense' });
   }
 };
 
-// ─── Expense Categories ───────────────────────────────────────────────────────
+// ─── Expense Categories ──────────────────────────────────────────────────────
 
 export const getExpenseCategories = async (req, res) => {
   try {
@@ -1144,6 +1231,7 @@ export const getExpenseCategories = async (req, res) => {
 export const createExpenseCategory = async (req, res) => {
   try {
     const { category_name, category_description } = req.body;
+
     if (!category_name || !category_name.trim()) {
       return res.status(400).json({ success: false, message: 'category_name is required' });
     }
@@ -1158,6 +1246,7 @@ export const createExpenseCategory = async (req, res) => {
       'SELECT category_id FROM expense_categories WHERE LOWER(category_name) = LOWER(?) AND is_active = 1 LIMIT 1',
       [categoryName]
     );
+
     if (duplicate.length) {
       return res.status(400).json({ success: false, message: 'Category already exists' });
     }
@@ -1172,6 +1261,7 @@ export const createExpenseCategory = async (req, res) => {
       message: 'Expense category created successfully',
       category_id: result.insertId,
     });
+
   } catch (error) {
     console.error('Error creating expense category:', error);
     return res.status(500).json({ success: false, message: 'Failed to create expense category' });
@@ -1182,6 +1272,7 @@ export const updateExpenseCategory = async (req, res) => {
   try {
     const { id } = req.params;
     const { category_name, category_description } = req.body;
+
     if (!category_name || !category_name.trim()) {
       return res.status(400).json({ success: false, message: 'category_name is required' });
     }
@@ -1196,6 +1287,7 @@ export const updateExpenseCategory = async (req, res) => {
       'SELECT category_id FROM expense_categories WHERE LOWER(category_name) = LOWER(?) AND category_id <> ? AND is_active = 1 LIMIT 1',
       [categoryName, id]
     );
+
     if (duplicate.length) {
       return res.status(400).json({ success: false, message: 'Category already exists' });
     }
@@ -1204,6 +1296,7 @@ export const updateExpenseCategory = async (req, res) => {
       'UPDATE expense_categories SET category_name = ?, category_description = ? WHERE category_id = ? AND is_active = 1',
       [categoryName, categoryDescription, id]
     );
+
     if (!result.affectedRows) {
       return res.status(404).json({ success: false, message: 'Expense category not found' });
     }
@@ -1211,6 +1304,7 @@ export const updateExpenseCategory = async (req, res) => {
     await db.query('UPDATE expenses SET category = ? WHERE category_id = ?', [categoryName, id]);
 
     return res.status(200).json({ success: true, message: 'Expense category updated successfully' });
+
   } catch (error) {
     console.error('Error updating expense category:', error);
     return res.status(500).json({ success: false, message: 'Failed to update expense category' });
@@ -1220,7 +1314,12 @@ export const updateExpenseCategory = async (req, res) => {
 export const deleteExpenseCategory = async (req, res) => {
   try {
     const { id } = req.params;
-    const [linkedExpenses] = await db.query('SELECT COUNT(*) AS total FROM expenses WHERE category_id = ?', [id]);
+
+    const [linkedExpenses] = await db.query(
+      'SELECT COUNT(*) AS total FROM expenses WHERE category_id = ?',
+      [id]
+    );
+
     if (linkedExpenses[0]?.total > 0) {
       return res.status(400).json({
         success: false,
@@ -1232,11 +1331,13 @@ export const deleteExpenseCategory = async (req, res) => {
       'UPDATE expense_categories SET is_active = 0 WHERE category_id = ? AND is_active = 1',
       [id]
     );
+
     if (!result.affectedRows) {
       return res.status(404).json({ success: false, message: 'Expense category not found' });
     }
 
     return res.status(200).json({ success: true, message: 'Expense category deleted successfully' });
+
   } catch (error) {
     console.error('Error deleting expense category:', error);
     return res.status(500).json({ success: false, message: 'Failed to delete expense category' });

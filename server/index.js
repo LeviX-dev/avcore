@@ -335,7 +335,7 @@ import avcorePriceListRoutes from './routes/avcorePriceListRoutes.js';
 import logoRoutes from './routes/logoRoutes.js';
 import downloadCenterRoutes from './routes/downloadCenterRoutes.js';
 import expenseStatsRoutes from './routes/expenseStatsRoutes.js';
-
+import topUpRoutes from './routes/topUpRoutes.js';
 
 
 import path from 'path';
@@ -424,7 +424,7 @@ app.use(cors({
 
   credentials: true,
 
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
 
   allowedHeaders: [
     'Content-Type',
@@ -568,6 +568,7 @@ app.use('/api', avcorePriceListRoutes);
 app.use('/api/logo', logoRoutes);
 app.use('/api/apk', downloadCenterRoutes);
 app.use('/api/v1/expense/stats', expenseStatsRoutes);
+app.use('/api', topUpRoutes);
 
 
 // ✅ ADD CRON HERE

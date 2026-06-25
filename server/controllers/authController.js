@@ -233,6 +233,7 @@ export const getUserName = (req, res) => {
   if (req.session.user) {
     console.log('req.session:', req.session.user);
     return res.status(200).json({ 
+      id: req.session.user.id,   
       name: req.session.user.name,
       username: req.session.user.username,
       role: req.session.user.role,

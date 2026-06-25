@@ -1,5 +1,5 @@
 import db from '../database/db.js';
-import WalletService from '../services/walletService.js';
+import {WalletService} from '../services/walletService.js';
 
   // --- USER ENDPOINTS ---
 // GET /api/wallet/admin/wallet/all-transactions
@@ -187,19 +187,44 @@ export const getAllWalletTransactions = async (req, res) => {
   };
 
   // GET /api/admin/wallet/users
-  export const getAllUsersWithWallet = async (req, res) => {
-    try {
-      const user = req.session?.user;
-     // uncomment below line to restrict this endpoint to admin/HR only, but currently allowing all logged in users to access for better UX in expense entry where they can see their own balance and transactions along with colleagues for better transparency
-      // if (!user || !['admin','hr','sub_admin','accountant'].includes(user.role)) return res.status(403).json({ success: false, message: 'Forbidden' });
-      const [rows] = await db.query(
-        `SELECT user_id, name, email, role, wallet_balance, total_credited, total_debited FROM users`
-      );
-      res.json({ success: true, data: rows });
-    } catch (err) {
-      res.status(500).json({ success: false, message: 'Failed to fetch users' });
+export const getAllUsersWithWallet = async (req, res) => {
+  try {
+    const user = req.session?.user;
+
+    if (!user) {
+      return res.status(401).json({ success: false, message: 'Unauthorized' });
     }
-  };
+
+    const role = String(user.role || '').toLowerCase();
+    const privilegedRoles = ['admin', 'sub_admin'];
+    const isPrivileged = privilegedRoles.includes(role);
+
+    let rows;
+
+    if (isPrivileged) {
+      // ✅ Privileged roles see all users
+      [rows] = await db.query(
+        `SELECT user_id, name, email, role, wallet_balance, total_credited, total_debited 
+         FROM users 
+         ORDER BY name ASC`
+      );
+    } else {
+      // ✅ Regular employees see only themselves
+      [rows] = await db.query(
+        `SELECT user_id, name, email, role, wallet_balance, total_credited, total_debited 
+         FROM users 
+         WHERE user_id = ?`,
+        [user.id]
+      );
+    }
+
+    res.json({ success: true, data: rows });
+
+  } catch (err) {
+    console.error('getAllUsersWithWallet error:', err);
+    res.status(500).json({ success: false, message: 'Failed to fetch users' });
+  }
+};
 
 // GET /api/wallet/users-list
 export const getUsersList = async (req, res) => {

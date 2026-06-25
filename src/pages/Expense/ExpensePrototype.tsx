@@ -31,6 +31,23 @@ type ExpenseOptionsResponse = {
 
 const DRAFT_STATUSES = ['draft_pending', 'draft_approved', 'draft_rejected'];
 
+// ─── Approval Permissions ─────────────────────────────────────────────────────
+// Add any role string here to grant that role approve/reject access on expenses.
+// This controls ONLY the Approve ✅ and Reject ❌ action buttons.
+// Full admin powers (edit any row, delete any row, user filter) remain on ADMIN_ROLES below.
+const EXPENSE_APPROVER_ROLES: string[] = [
+  'admin',
+  'sub_admin',
+  'accountant',       // ← Accountant can approve/reject expenses
+];
+
+// Roles with full administrative control (edit/delete any row, see all-user filter, etc.)
+const ADMIN_ROLES: string[] = [
+  'admin',
+  'sub_admin',
+  'accountant'
+];
+
 // ─── Component ───────────────────────────────────────────────────────────────
 
 const ExpensePrototype: React.FC = () => {
@@ -61,6 +78,7 @@ const ExpensePrototype: React.FC = () => {
     expense: ExpenseRow; action: 'approved' | 'rejected';
   } | null>(null);
   const [statusRemark, setStatusRemark] = useState('');
+  const [approveAmount, setApproveAmount] = useState<number | null>(null); // ✅ NEW
   const [statusSaving, setStatusSaving] = useState(false);
 
   // ── Admin approve/reject DRAFTS (draft_pending)
@@ -68,6 +86,7 @@ const ExpensePrototype: React.FC = () => {
     expense: ExpenseRow; action: 'draft_approved' | 'draft_rejected';
   } | null>(null);
   const [draftRemark, setDraftRemark] = useState('');
+  const [draftApproveAmount, setDraftApproveAmount] = useState<number | null>(null); // ✅ NEW
   const [draftSaving, setDraftSaving] = useState(false);
 
   const [message, setMessage] = useState<string | null>(null);
@@ -81,7 +100,11 @@ const ExpensePrototype: React.FC = () => {
   const [userFilter, setUserFilter] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
 
-  const isAdmin = currentUserRole === 'admin' || currentUserRole === 'sub_admin' || currentUserRole === 'hr';
+  // canApprove: can see Approve ✅ / Reject ❌ buttons — driven by EXPENSE_APPROVER_ROLES array above
+  const canApprove = EXPENSE_APPROVER_ROLES.includes(currentUserRole.toLowerCase());
+
+  // isAdmin: full admin powers — edit/delete any row, see all-users filter, etc.
+  const isAdmin = ADMIN_ROLES.includes(currentUserRole.toLowerCase());
 
   const showToast = (msg: string, type: 'success' | 'error') => {
     setMessage(msg);
@@ -211,20 +234,51 @@ const ExpensePrototype: React.FC = () => {
     }
   };
 
-  // ── Approve/Reject pending expense
+  // ── Approve/Reject pending expense (with partial approval) ──────────────
   const openStatusModal = (expense: ExpenseRow, action: 'approved' | 'rejected') => {
-    setStatusModal({ expense, action }); setStatusRemark('');
+    setStatusModal({ expense, action });
+    setStatusRemark('');
+    // ✅ Pre-fill with full amount for approval
+    setApproveAmount(action === 'approved' ? Number(expense.amount) : null);
   };
+
   const submitStatusChange = async () => {
     if (!statusModal) return;
     setStatusSaving(true);
     try {
+      const payload: any = {
+        status: statusModal.action,
+        status_remark: statusRemark,
+      };
+
+      // ✅ Send approved_amount only for approval
+      if (statusModal.action === 'approved') {
+        if (!approveAmount || approveAmount <= 0) {
+          showToast('Please enter a valid approval amount.', 'error');
+          setStatusSaving(false);
+          return;
+        }
+        if (approveAmount > Number(statusModal.expense.amount)) {
+          showToast(`Approval amount cannot exceed ₹${Number(statusModal.expense.amount).toLocaleString('en-IN')}`, 'error');
+          setStatusSaving(false);
+          return;
+        }
+        payload.approved_amount = approveAmount;
+      }
+
       await axios.patch(
         `${BASE_URL}api/v1/expense/${statusModal.expense.expense_id}/status`,
-        { status: statusModal.action, status_remark: statusRemark },
+        payload,
         { withCredentials: true }
       );
-      showToast(`Expense ${statusModal.action}.`, 'success');
+
+      const isPartial = approveAmount && approveAmount < Number(statusModal.expense.amount);
+      const msg = statusModal.action === 'approved'
+        ? (isPartial
+            ? `Partially approved: ₹${approveAmount?.toLocaleString('en-IN')} of ₹${Number(statusModal.expense.amount).toLocaleString('en-IN')}`
+            : 'Expense approved.')
+        : 'Expense rejected.';
+      showToast(msg, 'success');
       setStatusModal(null);
       fetchExpenses(activeTab);
       fetchTabCounts();
@@ -233,23 +287,51 @@ const ExpensePrototype: React.FC = () => {
     } finally { setStatusSaving(false); }
   };
 
-  // ── Approve/Reject draft (draft_pending)
+  // ── Approve/Reject draft (draft_pending) with partial approval ──────────
   const openDraftModal = (expense: ExpenseRow, action: 'draft_approved' | 'draft_rejected') => {
-    setDraftModal({ expense, action }); setDraftRemark('');
+    setDraftModal({ expense, action });
+    setDraftRemark('');
+    // ✅ Pre-fill with full amount for draft approval
+    setDraftApproveAmount(action === 'draft_approved' ? Number(expense.amount) : null);
   };
+
   const submitDraftStatusChange = async () => {
     if (!draftModal) return;
     setDraftSaving(true);
     try {
+      const payload: any = {
+        status: draftModal.action,
+        remark: draftRemark,
+      };
+
+      // ✅ Send approved_amount only for draft approval
+      if (draftModal.action === 'draft_approved') {
+        if (!draftApproveAmount || draftApproveAmount <= 0) {
+          showToast('Please enter a valid approval amount.', 'error');
+          setDraftSaving(false);
+          return;
+        }
+        if (draftApproveAmount > Number(draftModal.expense.amount)) {
+          showToast(`Approval amount cannot exceed ₹${Number(draftModal.expense.amount).toLocaleString('en-IN')}`, 'error');
+          setDraftSaving(false);
+          return;
+        }
+        payload.approved_amount = draftApproveAmount;
+      }
+
       await axios.put(
         `${BASE_URL}api/v1/expense/${draftModal.expense.expense_id}/draft-status`,
-        { status: draftModal.action, remark: draftRemark },
+        payload,
         { withCredentials: true }
       );
-      showToast(
-        draftModal.action === 'draft_approved' ? 'Draft approved.' : 'Draft rejected.',
-        'success'
-      );
+
+      const isPartial = draftApproveAmount && draftApproveAmount < Number(draftModal.expense.amount);
+      const msg = draftModal.action === 'draft_approved'
+        ? (isPartial
+            ? `Draft partially approved: ₹${draftApproveAmount?.toLocaleString('en-IN')} of ₹${Number(draftModal.expense.amount).toLocaleString('en-IN')}`
+            : 'Draft approved.')
+        : 'Draft rejected.';
+      showToast(msg, 'success');
       setDraftModal(null);
       fetchExpenses(activeTab);
       fetchTabCounts();
@@ -523,7 +605,14 @@ const ExpensePrototype: React.FC = () => {
                       <td className="px-2 py-3 text-black dark:text-white">{row.vendor_name || '-'}</td>
                       <td className="px-2 py-3 capitalize text-black dark:text-white">{row.payment_mode || '-'}</td>
                       <td className="px-2 py-3 text-black dark:text-white whitespace-nowrap">
-                        {row.amount ? `₹${Number(row.amount).toLocaleString('en-IN')}` : '-'}
+                        <div>
+                          <div>₹{Number(row.amount).toLocaleString('en-IN')}</div>
+                          {row.approved_amount && Number(row.approved_amount) < Number(row.amount) && (
+                            <div className="text-xs text-emerald-500">
+                              Approved: ₹{Number(row.approved_amount).toLocaleString('en-IN')}
+                            </div>
+                          )}
+                        </div>
                       </td>
                       <td className="px-2 py-3">{statusBadge(s)}</td>
                       <td className="px-2 py-3 text-black dark:text-white max-w-[120px] truncate">
@@ -568,8 +657,8 @@ const ExpensePrototype: React.FC = () => {
                                 </button>
                               )}
 
-                              {/* Admin Approve Draft: status=draft_pending */}
-                              {isAdmin && s === 'draft_pending' && (
+                              {/* Approve Draft — visible to any role in EXPENSE_APPROVER_ROLES */}
+                              {canApprove && s === 'draft_pending' && (
                                 <button type="button" title="Approve Draft"
                                   onClick={() => openDraftModal(row, 'draft_approved')}
                                   className="rounded-md bg-emerald-600 px-2.5 py-1.5 text-white transition hover:bg-emerald-700">
@@ -577,8 +666,8 @@ const ExpensePrototype: React.FC = () => {
                                 </button>
                               )}
 
-                              {/* Admin Reject Draft: status=draft_pending */}
-                              {isAdmin && s === 'draft_pending' && (
+                              {/* Reject Draft — visible to any role in EXPENSE_APPROVER_ROLES */}
+                              {canApprove && s === 'draft_pending' && (
                                 <button type="button" title="Reject Draft"
                                   onClick={() => openDraftModal(row, 'draft_rejected')}
                                   className="rounded-md bg-red-500 px-2.5 py-1.5 text-white transition hover:bg-red-600">
@@ -624,8 +713,8 @@ const ExpensePrototype: React.FC = () => {
                                 </button>
                               )}
 
-                              {/* Admin Approve/Reject Pending Expenses */}
-                              {isAdmin && activeTab === 'pending' && s === 'pending' && (
+                              {/* Approve/Reject Pending Expenses — visible to any role in EXPENSE_APPROVER_ROLES */}
+                              {canApprove && activeTab === 'pending' && s === 'pending' && (
                                 <>
                                   <button type="button" title="Approve"
                                     onClick={() => openStatusModal(row, 'approved')}
@@ -677,7 +766,8 @@ const ExpensePrototype: React.FC = () => {
                 { label: 'Site', value: viewingExpense.site_location || '-' },
                 { label: 'Category', value: viewingExpense.category || '-' },
                 { label: 'Vendor', value: viewingExpense.vendor_name || '-' },
-                { label: 'Amount', value: viewingExpense.amount ? `₹${Number(viewingExpense.amount).toLocaleString('en-IN')}` : '-' },
+                { label: 'Requested Amount', value: viewingExpense.amount ? `₹${Number(viewingExpense.amount).toLocaleString('en-IN')}` : '-' },
+                { label: 'Approved Amount', value: viewingExpense.approved_amount ? `₹${Number(viewingExpense.approved_amount).toLocaleString('en-IN')}` : 'N/A' },
                 { label: 'Date', value: viewingExpense.expense_date ? viewingExpense.expense_date.slice(0, 10) : '-' },
                 { label: 'Payment Mode', value: viewingExpense.payment_mode || '-' },
               ].map(({ label, value }) => (
@@ -725,7 +815,7 @@ const ExpensePrototype: React.FC = () => {
         </div>
       )}
 
-      {/* ── Approve/Reject Pending Expense Modal ────────────────────────────── */}
+      {/* ── Approve/Reject Pending Expense Modal (with Partial Approval) ────── */}
       {statusModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 px-4">
           <div className="w-full max-w-md rounded-lg bg-white p-6 shadow-lg dark:bg-boxdark">
@@ -736,22 +826,71 @@ const ExpensePrototype: React.FC = () => {
               {statusModal.expense.description || statusModal.expense.title || 'This expense'} —{' '}
               <strong>₹{Number(statusModal.expense.amount).toLocaleString('en-IN')}</strong>
             </p>
+
+            {/* ✅ NEW: Approved Amount Input (only for approval) */}
+            {statusModal.action === 'approved' && (
+              <div className="mb-4">
+                <label className="mb-2 block text-sm font-medium text-black dark:text-white">
+                  Approved Amount <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="number"
+                  min="0.01"
+                  max={Number(statusModal.expense.amount)}
+                  step="0.01"
+                  value={approveAmount || ''}
+                  onChange={(e) => setApproveAmount(Number(e.target.value))}
+                  className="w-full rounded-lg border border-stroke bg-transparent px-3 py-2.5 text-sm text-black dark:border-strokedark dark:text-white"
+                  placeholder={`Enter amount (max ₹${Number(statusModal.expense.amount).toLocaleString('en-IN')})`}
+                />
+                <p className="mt-1 text-xs text-gray-500">
+                  Max: ₹{Number(statusModal.expense.amount).toLocaleString('en-IN')}
+                </p>
+                {approveAmount && approveAmount < Number(statusModal.expense.amount) && (
+                  <p className="mt-1 text-xs text-amber-500">
+                    ⚠️ Partial approval: ₹{(Number(statusModal.expense.amount) - approveAmount).toLocaleString('en-IN')} will be rejected
+                  </p>
+                )}
+                {approveAmount && approveAmount === Number(statusModal.expense.amount) && (
+                  <p className="mt-1 text-xs text-emerald-500">
+                    ✅ Full approval
+                  </p>
+                )}
+              </div>
+            )}
+
             <label className="mb-2 block text-sm font-medium text-black dark:text-white">
               Remark {statusModal.action === 'rejected' && <span className="text-red-500">*</span>}
             </label>
-            <input type="text" value={statusRemark} onChange={(e) => setStatusRemark(e.target.value)}
+            <input
+              type="text"
+              value={statusRemark}
+              onChange={(e) => setStatusRemark(e.target.value)}
               placeholder={statusModal.action === 'approved' ? 'Optional remark...' : 'Reason for rejection...'}
-              className="mb-5 w-full rounded-lg border border-stroke bg-transparent px-3 py-2.5 text-sm text-black dark:border-strokedark dark:text-white" />
+              className="mb-5 w-full rounded-lg border border-stroke bg-transparent px-3 py-2.5 text-sm text-black dark:border-strokedark dark:text-white"
+            />
             <div className="flex justify-end gap-3">
-              <button type="button" onClick={() => setStatusModal(null)}
-                className="rounded-lg bg-gray-300 px-5 py-2.5 text-black hover:bg-gray-400 dark:bg-gray-600 dark:text-white">
+              <button
+                type="button"
+                onClick={() => setStatusModal(null)}
+                className="rounded-lg bg-gray-300 px-5 py-2.5 text-black hover:bg-gray-400 dark:bg-gray-600 dark:text-white"
+              >
                 Cancel
               </button>
-              <button type="button"
-                disabled={statusSaving || (statusModal.action === 'rejected' && !statusRemark.trim())}
+              <button
+                type="button"
+                disabled={
+                  statusSaving ||
+                  (statusModal.action === 'rejected' && !statusRemark.trim()) ||
+                  (statusModal.action === 'approved' && (!approveAmount || approveAmount <= 0))
+                }
                 onClick={submitStatusChange}
-                className={`rounded-lg px-5 py-2.5 text-white transition disabled:opacity-60 ${statusModal.action === 'approved' ? 'bg-emerald-600 hover:bg-emerald-700' : 'bg-red-500 hover:bg-red-600'
-                  }`}>
+                className={`rounded-lg px-5 py-2.5 text-white transition disabled:opacity-60 ${
+                  statusModal.action === 'approved' 
+                    ? 'bg-emerald-600 hover:bg-emerald-700' 
+                    : 'bg-red-500 hover:bg-red-600'
+                }`}
+              >
                 {statusSaving ? 'Saving...' : statusModal.action === 'approved' ? 'Approve' : 'Reject'}
               </button>
             </div>
@@ -759,7 +898,7 @@ const ExpensePrototype: React.FC = () => {
         </div>
       )}
 
-      {/* ── Approve/Reject Draft Modal ───────────────────────────────────────── */}
+      {/* ── Approve/Reject Draft Modal (with Partial Approval) ───────────────── */}
       {draftModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 px-4">
           <div className="w-full max-w-md rounded-lg bg-white p-6 shadow-lg dark:bg-boxdark">
@@ -775,22 +914,71 @@ const ExpensePrototype: React.FC = () => {
                 ? 'Approving allows the employee to convert this draft into a real expense.'
                 : 'Rejecting sends the draft back to the employee for revision.'}
             </p>
+
+            {/* ✅ NEW: Approved Amount Input (only for draft approval) */}
+            {draftModal.action === 'draft_approved' && (
+              <div className="mb-4">
+                <label className="mb-2 block text-sm font-medium text-black dark:text-white">
+                  Approved Amount <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="number"
+                  min="0.01"
+                  max={Number(draftModal.expense.amount)}
+                  step="0.01"
+                  value={draftApproveAmount || ''}
+                  onChange={(e) => setDraftApproveAmount(Number(e.target.value))}
+                  className="w-full rounded-lg border border-stroke bg-transparent px-3 py-2.5 text-sm text-black dark:border-strokedark dark:text-white"
+                  placeholder={`Enter amount (max ₹${Number(draftModal.expense.amount).toLocaleString('en-IN')})`}
+                />
+                <p className="mt-1 text-xs text-gray-500">
+                  Max: ₹{Number(draftModal.expense.amount).toLocaleString('en-IN')}
+                </p>
+                {draftApproveAmount && draftApproveAmount < Number(draftModal.expense.amount) && (
+                  <p className="mt-1 text-xs text-amber-500">
+                    ⚠️ Partial approval: ₹{(Number(draftModal.expense.amount) - draftApproveAmount).toLocaleString('en-IN')} will be rejected
+                  </p>
+                )}
+                {draftApproveAmount && draftApproveAmount === Number(draftModal.expense.amount) && (
+                  <p className="mt-1 text-xs text-emerald-500">
+                    ✅ Full approval
+                  </p>
+                )}
+              </div>
+            )}
+
             <label className="mb-2 block text-sm font-medium text-black dark:text-white">
               Remark {draftModal.action === 'draft_rejected' && <span className="text-red-500">*</span>}
             </label>
-            <input type="text" value={draftRemark} onChange={(e) => setDraftRemark(e.target.value)}
+            <input
+              type="text"
+              value={draftRemark}
+              onChange={(e) => setDraftRemark(e.target.value)}
               placeholder={draftModal.action === 'draft_approved' ? 'Optional remark...' : 'Reason for rejection...'}
-              className="mb-5 w-full rounded-lg border border-stroke bg-transparent px-3 py-2.5 text-sm text-black dark:border-strokedark dark:text-white" />
+              className="mb-5 w-full rounded-lg border border-stroke bg-transparent px-3 py-2.5 text-sm text-black dark:border-strokedark dark:text-white"
+            />
             <div className="flex justify-end gap-3">
-              <button type="button" onClick={() => setDraftModal(null)}
-                className="rounded-lg bg-gray-300 px-5 py-2.5 text-black hover:bg-gray-400 dark:bg-gray-600 dark:text-white">
+              <button
+                type="button"
+                onClick={() => setDraftModal(null)}
+                className="rounded-lg bg-gray-300 px-5 py-2.5 text-black hover:bg-gray-400 dark:bg-gray-600 dark:text-white"
+              >
                 Cancel
               </button>
-              <button type="button"
-                disabled={draftSaving || (draftModal.action === 'draft_rejected' && !draftRemark.trim())}
+              <button
+                type="button"
+                disabled={
+                  draftSaving ||
+                  (draftModal.action === 'draft_rejected' && !draftRemark.trim()) ||
+                  (draftModal.action === 'draft_approved' && (!draftApproveAmount || draftApproveAmount <= 0))
+                }
                 onClick={submitDraftStatusChange}
-                className={`rounded-lg px-5 py-2.5 text-white transition disabled:opacity-60 ${draftModal.action === 'draft_approved' ? 'bg-emerald-600 hover:bg-emerald-700' : 'bg-red-500 hover:bg-red-600'
-                  }`}>
+                className={`rounded-lg px-5 py-2.5 text-white transition disabled:opacity-60 ${
+                  draftModal.action === 'draft_approved'
+                    ? 'bg-emerald-600 hover:bg-emerald-700'
+                    : 'bg-red-500 hover:bg-red-600'
+                }`}
+              >
                 {draftSaving
                   ? 'Saving...'
                   : draftModal.action === 'draft_approved' ? 'Approve Draft' : 'Reject Draft'}

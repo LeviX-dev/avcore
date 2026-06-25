@@ -1090,7 +1090,6 @@ path="/schedule/settings/:id"
                     </ProtectedRoute>
                   }
                 />
-                {(userRole === 'admin' || userRole === 'hr' || userRole === 'accountant') && (
                   <Route
                     path="/wallet/management"
                     element={
@@ -1102,7 +1101,7 @@ path="/schedule/settings/:id"
                       </ProtectedRoute>
                     }
                   />
-                )}
+               
                 
 <Route
   path="/additional-charges"

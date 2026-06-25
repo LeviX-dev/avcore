@@ -56,6 +56,7 @@ export type ExpenseRow = {
   attachment_url?: string | null;
   bill_url?: string | null;
   remark?: string | null;
+  approved_amount?: number | string | null;
 };
 
 type ExpenseForm = {
