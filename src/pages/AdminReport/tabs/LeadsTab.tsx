@@ -266,7 +266,7 @@ console.log('Details response:', res.data);
           <div className="p-10 text-center text-gray-500">Loading...</div>
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full text-sm">
+            {/* <table className="w-full text-sm">
               <thead>
                 <tr className="border-b bg-gray-50 dark:bg-gray-800">
                   <th className="p-3 text-left">Employee</th>
@@ -374,7 +374,152 @@ console.log('Details response:', res.data);
                   ))
                 )}
               </tbody>
-            </table>
+            </table> */}
+
+            <table className="w-full text-sm">
+  <thead>
+    <tr className="border-b bg-gray-50 dark:bg-gray-800">
+      <th className="p-3 text-left">Employee</th>
+      <th className="p-3 text-center">Fresh</th>
+      <th className="p-3 text-center">Cold</th>
+      <th className="p-3 text-center">On Hold</th>
+      <th className="p-3 text-center">Positive</th>
+      <th className="p-3 text-center">Site Visit</th>
+      <th className="p-3 text-center">Demo</th>
+      <th className="p-3 text-center">Quotation</th>
+      <th className="p-3 text-center">Closed</th>
+      <th className="p-3 text-center">Dropped</th>
+    </tr>
+  </thead>
+  <tbody>
+    {reportData.length === 0 ? (
+      <tr>
+        <td colSpan={12} className="p-10 text-center text-gray-500">
+          No Records Found
+        </td>
+      </tr>
+    ) : (
+      reportData.map((item, index) => (
+        <tr
+          key={index}
+          className="border-b hover:bg-gray-50 dark:hover:bg-gray-800"
+        >
+          <td className="p-3 font-medium text-black dark:text-white">
+            {item.employee}
+          </td>
+          <td className="p-3 text-center">
+            <button
+              onClick={() => fetchDetails(item.employee, 'Fresh Lead')}
+              className={`font-semibold hover:underline ${
+                item.fresh === 0 
+                  ? 'text-gray-400 dark:text-gray-500' 
+                  : 'text-blue-600 dark:text-blue-400'
+              }`}
+            >
+              {item.fresh}
+            </button>
+          </td>
+          <td className="p-3 text-center">
+            <button
+              onClick={() => fetchDetails(item.employee, 'Cold Lead')}
+              className={`font-semibold hover:underline ${
+                item.cold === 0 
+                  ? 'text-gray-400 dark:text-gray-500' 
+                  : 'text-blue-600 dark:text-blue-400'
+              }`}
+            >
+              {item.cold}
+            </button>
+          </td>
+          <td className="p-3 text-center">
+            <button
+              onClick={() => fetchDetails(item.employee, 'On Hold')}
+              className={`font-semibold hover:underline ${
+                item.on_hold === 0 
+                  ? 'text-gray-400 dark:text-gray-500' 
+                  : 'text-blue-600 dark:text-blue-400'
+              }`}
+            >
+              {item.on_hold}
+            </button>
+          </td>
+          <td className="p-3 text-center">
+            <button
+              onClick={() => fetchDetails(item.employee, 'Positive Lead')}
+              className={`font-semibold hover:underline ${
+                item.positive_leads === 0 
+                  ? 'text-gray-400 dark:text-gray-500' 
+                  : 'text-blue-600 dark:text-blue-400'
+              }`}
+            >
+              {item.positive_leads}
+            </button>
+          </td>
+          <td className="p-3 text-center">
+            <button
+              onClick={() => fetchDetails(item.employee, 'Site Visit')}
+              className={`font-semibold hover:underline ${
+                item.site_visit === 0 
+                  ? 'text-gray-400 dark:text-gray-500' 
+                  : 'text-blue-600 dark:text-blue-400'
+              }`}
+            >
+              {item.site_visit}
+            </button>
+          </td>
+          <td className="p-3 text-center">
+            <button
+              onClick={() => fetchDetails(item.employee, 'Demo')}
+              className={`font-semibold hover:underline ${
+                item.demo === 0 
+                  ? 'text-gray-400 dark:text-gray-500' 
+                  : 'text-blue-600 dark:text-blue-400'
+              }`}
+            >
+              {item.demo}
+            </button>
+          </td>
+          <td className="p-3 text-center">
+            <button
+              onClick={() => fetchDetails(item.employee, 'Quotation')}
+              className={`font-semibold hover:underline ${
+                item.quotation === 0 
+                  ? 'text-gray-400 dark:text-gray-500' 
+                  : 'text-blue-600 dark:text-blue-400'
+              }`}
+            >
+              {item.quotation}
+            </button>
+          </td>
+          <td className="p-3 text-center">
+            <button
+              onClick={() => fetchDetails(item.employee, 'Closed')}
+              className={`font-semibold hover:underline ${
+                item.closed === 0 
+                  ? 'text-gray-400 dark:text-gray-500' 
+                  : 'text-green-600 dark:text-green-400'
+              }`}
+            >
+              {item.closed}
+            </button>
+          </td>
+          <td className="p-3 text-center">
+            <button
+              onClick={() => fetchDetails(item.employee, 'Dropped')}
+              className={`font-semibold hover:underline ${
+                item.dropped === 0 
+                  ? 'text-gray-400 dark:text-gray-500' 
+                  : 'text-red-600 dark:text-red-400'
+              }`}
+            >
+              {item.dropped}
+            </button>
+          </td>
+        </tr>
+      ))
+    )}
+  </tbody>
+</table>
           </div>
         )}
       </div>

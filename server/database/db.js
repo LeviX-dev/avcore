@@ -11,20 +11,14 @@ import mysql from 'mysql2/promise';
 //   database: 'db_mms',
 //     port: 3308,
 // });
-
 const db = mysql.createPool({
-  host: '127.0.0.1',
-  user: 'root',
-  password: '',
-  // database: 'db_mms_newdb',
-  
-    // database: 'db_mms_avcore', 
-    // dzmbjxtk_crm_avcore_updated 
-    database: 'dzmbjxtk_crm_avcore_updated',
-
-  // database: 'db_mms',
+  host: 'react3.myospaz.in',   // No http://
+  user: 'dzmbjxtk_crm_avcore',
+  password: 'dzmbjxtk_crm_avcore',
+  database: 'dzmbjxtk_crm_avcore',
   port: 3306,
 });
+
 
 
 // Connect to the database
