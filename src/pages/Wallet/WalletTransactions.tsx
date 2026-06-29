@@ -13,6 +13,9 @@ type Transaction = {
   reference_type: string;
   reference_id?: number;
   remarks?: string;
+  admin_note?: string;
+  initiated_by?: number;
+  initiated_by_name?: string;
   created_at: string;
   user_id?: number;
   user_name?: string;
@@ -258,6 +261,8 @@ const WalletTransactions: React.FC = () => {
                   <th className="p-2">Reference</th>
                   <th className="p-2">Amount</th>
                   <th className="p-2">Balance After</th>
+                  <th className="p-2">By</th>
+                  <th className="p-2">Note / Remarks</th>
                   <th className="p-2">Status</th>
                 </tr>
               </thead>
@@ -276,9 +281,14 @@ const WalletTransactions: React.FC = () => {
                       </span>
                     );
                   };
+
+                  const isAdjustment = txn.reference_type === 'manual_adjustment';
                   
                   return (
-                    <tr key={txn.transaction_id} className="border-b dark:border-gray-700">
+                    <tr
+                      key={txn.transaction_id}
+                      className={`border-b dark:border-gray-700 ${isAdjustment ? 'bg-amber-50 dark:bg-amber-900/10' : ''}`}
+                    >
                       <td className="p-2">{(page - 1) * pageSize + i + 1}</td>
                       {isAdmin && showAllUsers && (
                         <td className="p-2 font-medium">{txn.user_name || txn.user_id || '-'}</td>
@@ -286,8 +296,17 @@ const WalletTransactions: React.FC = () => {
                       <td className="p-2 whitespace-nowrap">
                         {new Date(txn.created_at).toLocaleString('en-IN')}
                       </td>
-                      <td className="p-2 capitalize">{txn.transaction_type}</td>
-                      <td className="p-2">{txn.reference_type?.replace(/_/g, ' ') || '-'}</td>
+                      <td className="p-2 capitalize">
+                        <span>{txn.transaction_type}</span>
+                        {isAdjustment && (
+                          <span className="ml-1 px-1.5 py-0.5 rounded text-xs bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400 font-semibold">
+                            ADJ
+                          </span>
+                        )}
+                      </td>
+                      <td className="p-2 text-xs text-gray-500 dark:text-gray-400">
+                        {txn.reference_type?.replace(/_/g, ' ') || '-'}
+                      </td>
                       <td className={`p-2 font-bold ${['credit','reversal'].includes(txn.transaction_type) ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
                         {['credit','reversal'].includes(txn.transaction_type) ? '↑' : '↓'}
                         {formatINR(Number(txn.amount))}
@@ -296,13 +315,37 @@ const WalletTransactions: React.FC = () => {
                         {Number(txn.balance_after) < 0 ? '−' : '₹'}
                         {Math.abs(Number(txn.balance_after)).toLocaleString('en-IN')}
                       </td>
+                      <td className="p-2 text-xs">
+                        {txn.initiated_by_name ? (
+                          <span className={`font-medium ${isAdjustment ? 'text-amber-700 dark:text-amber-400' : 'text-gray-600 dark:text-gray-300'}`}>
+                            {txn.initiated_by_name}
+                          </span>
+                        ) : (
+                          <span className="text-gray-300 dark:text-gray-600">—</span>
+                        )}
+                      </td>
+                      <td className="p-2 text-xs max-w-[180px]">
+                        {txn.admin_note && (
+                          <div className="text-amber-700 dark:text-amber-400 font-medium truncate" title={txn.admin_note}>
+                            📝 {txn.admin_note}
+                          </div>
+                        )}
+                        {txn.remarks && (
+                          <div className="text-gray-500 dark:text-gray-400 truncate" title={txn.remarks}>
+                            {txn.remarks}
+                          </div>
+                        )}
+                        {!txn.admin_note && !txn.remarks && (
+                          <span className="text-gray-300 dark:text-gray-600">—</span>
+                        )}
+                      </td>
                       <td className="p-2">{statusBadge(txn.status)}</td>
                     </tr>
                   );
                 })}
                 {rows.length === 0 && (
                   <tr>
-                    <td colSpan={isAdmin && showAllUsers ? 8 : 7} className="text-center py-8 text-gray-400">
+                    <td colSpan={isAdmin && showAllUsers ? 10 : 9} className="text-center py-8 text-gray-400">
                       No transactions found
                     </td>
                   </tr>

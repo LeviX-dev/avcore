@@ -161,9 +161,10 @@ const WalletManagement: React.FC = () => {
 
   const canViewAllRequests = ['admin', 'sub_admin', 'hr_executive', 'project_manager', 'accountant'].includes(role);
   const canSelectEmployee = ['admin', 'sub_admin', 'hr'].includes(role);
-  const isAdmin = role === 'admin' || role === 'sub_admin';
+  const isAdmin = role === 'admin' || role === 'sub_admin' ;
   const isStage1Approver = role === 'project_manager' || role === 'hr_executive' || role === 'hr';
   const isAccountant = role === 'accountant';
+  const canAdjustWallet = isAdmin || role === 'accountant'; 
 
   const canViewRequest = (req: any) => {
     if (canViewAllRequests) return true;
@@ -689,7 +690,7 @@ const WalletManagement: React.FC = () => {
                             >
                               <Eye size={16} />
                             </button>
-                            {isAdmin && (
+                            {canAdjustWallet && (
                               <button
                                 className="p-1.5 bg-yellow-500 text-white rounded hover:bg-yellow-600 transition"
                                 title="Adjust Wallet"
@@ -952,7 +953,7 @@ const WalletManagement: React.FC = () => {
       {/* ─── MODAL: View Transactions ─────────────────────────────────────── */}
       {showTxnPanel && txnUser && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white dark:bg-gray-900 rounded-lg shadow-xl w-full max-w-4xl max-h-[90vh] overflow-y-auto">
+          <div className="bg-white dark:bg-gray-900 rounded-lg shadow-xl w-full max-w-5xl max-h-[90vh] overflow-y-auto">
             <div className="p-6">
               <div className="flex justify-between items-start mb-4">
                 <h3 className="text-lg font-bold dark:text-white">
@@ -982,43 +983,94 @@ const WalletManagement: React.FC = () => {
                         <th className="p-2 text-left">Date</th>
                         <th className="p-2 text-left">Type</th>
                         <th className="p-2 text-right">Amount</th>
-                        <th className="p-2 text-right">Balance</th>
+                        <th className="p-2 text-right">Balance After</th>
                         <th className="p-2 text-left">Reference</th>
+                        <th className="p-2 text-left">Adjusted By</th>
+                        <th className="p-2 text-left">Note / Remarks</th>
                         <th className="p-2 text-left">Status</th>
                       </tr>
                     </thead>
                     <tbody>
-                      {txnRows.map((txn) => (
-                        <tr key={txn.transaction_id} className="border-b dark:border-gray-700">
-                          <td className="p-2 text-xs">{txn.transaction_id}</td>
-                          <td className="p-2 text-xs">{new Date(txn.created_at).toLocaleString('en-IN')}</td>
-                          <td className="p-2">
-                            <span className={`px-2 py-0.5 rounded text-xs ${
-                              txn.transaction_type === 'credit' ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400' :
-                              txn.transaction_type === 'debit' ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400' :
-                              'bg-gray-100 text-gray-700'
+                      {txnRows.map((txn) => {
+                        const isAdjustment = txn.reference_type === 'manual_adjustment';
+                        return (
+                          <tr
+                            key={txn.transaction_id}
+                            className={`border-b dark:border-gray-700 ${
+                              isAdjustment
+                                ? 'bg-amber-50 dark:bg-amber-900/10'
+                                : ''
+                            }`}
+                          >
+                            <td className="p-2 text-xs text-gray-500">{txn.transaction_id}</td>
+                            <td className="p-2 text-xs whitespace-nowrap">
+                              {new Date(txn.created_at).toLocaleString('en-IN')}
+                            </td>
+                            <td className="p-2">
+                              <span className={`px-2 py-0.5 rounded text-xs font-medium ${
+                                txn.transaction_type === 'credit'   ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400' :
+                                txn.transaction_type === 'debit'    ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400' :
+                                txn.transaction_type === 'reversal' ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400' :
+                                'bg-gray-100 text-gray-700'
+                              }`}>
+                                {txn.transaction_type}
+                              </span>
+                              {isAdjustment && (
+                                <span className="ml-1 px-1.5 py-0.5 rounded text-xs bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400 font-semibold">
+                                  ADJ
+                                </span>
+                              )}
+                            </td>
+                            <td className={`p-2 text-right font-bold ${
+                              ['credit','reversal'].includes(txn.transaction_type)
+                                ? 'text-emerald-600 dark:text-emerald-400'
+                                : 'text-red-600 dark:text-red-400'
                             }`}>
-                              {txn.transaction_type}
-                            </span>
-                          </td>
-                          <td className={`p-2 text-right font-bold ${
-                            txn.transaction_type === 'credit' ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-600 dark:text-red-400'
-                          }`}>
-                            {txn.transaction_type === 'credit' ? '+' : '-'}{formatINR(Number(txn.amount))}
-                          </td>
-                          <td className="p-2 text-right">{formatINR(Number(txn.balance_after))}</td>
-                          <td className="p-2 text-xs">{txn.reference_type}</td>
-                          <td className="p-2">
-                            <span className={`px-2 py-0.5 rounded text-xs ${
-                              txn.status === 'approved' ? 'bg-emerald-100 text-emerald-700' :
-                              txn.status === 'pending' ? 'bg-yellow-100 text-yellow-700' :
-                              'bg-red-100 text-red-700'
-                            }`}>
-                              {txn.status}
-                            </span>
-                          </td>
-                        </tr>
-                      ))}
+                              {['credit','reversal'].includes(txn.transaction_type) ? '+' : '-'}
+                              {formatINR(Number(txn.amount))}
+                            </td>
+                            <td className="p-2 text-right text-gray-600 dark:text-gray-300">
+                              {formatINR(Number(txn.balance_after))}
+                            </td>
+                            <td className="p-2 text-xs text-gray-500">
+                              {txn.reference_type?.replace(/_/g, ' ') || '-'}
+                            </td>
+                            <td className="p-2 text-xs">
+                              {txn.initiated_by_name ? (
+                                <span className={`font-medium ${isAdjustment ? 'text-amber-700 dark:text-amber-400' : 'text-gray-600 dark:text-gray-300'}`}>
+                                  {txn.initiated_by_name}
+                                </span>
+                              ) : (
+                                <span className="text-gray-400">—</span>
+                              )}
+                            </td>
+                            <td className="p-2 text-xs max-w-[200px]">
+                              {txn.admin_note && (
+                                <div className="text-amber-700 dark:text-amber-400 font-medium truncate" title={txn.admin_note}>
+                                  📝 {txn.admin_note}
+                                </div>
+                              )}
+                              {txn.remarks && (
+                                <div className="text-gray-500 dark:text-gray-400 truncate" title={txn.remarks}>
+                                  {txn.remarks}
+                                </div>
+                              )}
+                              {!txn.admin_note && !txn.remarks && (
+                                <span className="text-gray-300 dark:text-gray-600">—</span>
+                              )}
+                            </td>
+                            <td className="p-2">
+                              <span className={`px-2 py-0.5 rounded text-xs ${
+                                txn.status === 'approved' ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/20 dark:text-emerald-400' :
+                                txn.status === 'pending'  ? 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/20 dark:text-yellow-400' :
+                                'bg-red-100 text-red-700 dark:bg-red-900/20 dark:text-red-400'
+                              }`}>
+                                {txn.status}
+                              </span>
+                            </td>
+                          </tr>
+                        );
+                      })}
                     </tbody>
                   </table>
                 </div>
@@ -1119,4 +1171,3 @@ const WalletManagement: React.FC = () => {
 };
 
 export default WalletManagement;
-

@@ -13,16 +13,21 @@ export const getAllWalletTransactions = async (req, res) => {
     const offset = (page - 1) * pageSize;
     let where = 'WHERE 1=1';
     const params = [];
-    if (type) { where += ' AND transaction_type = ?'; params.push(type); }
-    if (status) { where += ' AND status = ?'; params.push(status); }
-    if (from) { where += ' AND created_at >= ?'; params.push(from); }
-    if (to) { where += ' AND created_at <= ?'; params.push(to); }
+    if (type)   { where += ' AND wt.transaction_type = ?'; params.push(type); }
+    if (status) { where += ' AND wt.status = ?';           params.push(status); }
+    if (from)   { where += ' AND wt.created_at >= ?';      params.push(from); }
+    if (to)     { where += ' AND wt.created_at <= ?';      params.push(to); }
     const [rows] = await db.query(
-      `SELECT * FROM wallet_transactions ${where} ORDER BY created_at DESC LIMIT ? OFFSET ?`,
+      `SELECT wt.*, u.name AS initiated_by_name
+       FROM wallet_transactions wt
+       LEFT JOIN users u ON wt.initiated_by = u.user_id
+       ${where}
+       ORDER BY wt.created_at DESC
+       LIMIT ? OFFSET ?`,
       [...params, +pageSize, +offset]
     );
     const [[{ total }]] = await db.query(
-      `SELECT COUNT(*) as total FROM wallet_transactions ${where}`,
+      `SELECT COUNT(*) as total FROM wallet_transactions wt ${where}`,
       params
     );
     res.json({ success: true, data: rows, total });
@@ -99,13 +104,28 @@ export const getAllWalletTransactions = async (req, res) => {
     try {
       const user = req.session?.user;
       if (!user) return res.status(401).json({ success: false, message: 'Unauthorized' });
-      const { page = 1, pageSize = 20 } = req.query;
+      const { page = 1, pageSize = 20, type, status, from, to } = req.query;
       const offset = (page - 1) * pageSize;
+      let where = 'WHERE wt.user_id = ?';
+      const params = [user.id];
+      if (type)   { where += ' AND wt.transaction_type = ?'; params.push(type); }
+      if (status) { where += ' AND wt.status = ?';           params.push(status); }
+      if (from)   { where += ' AND wt.created_at >= ?';      params.push(from); }
+      if (to)     { where += ' AND wt.created_at <= ?';      params.push(to); }
       const [rows] = await db.query(
-        `SELECT * FROM wallet_transactions WHERE user_id = ? ORDER BY created_at DESC LIMIT ? OFFSET ?`,
-        [user.id, +pageSize, +offset]
+        `SELECT wt.*, u.name AS initiated_by_name
+         FROM wallet_transactions wt
+         LEFT JOIN users u ON wt.initiated_by = u.user_id
+         ${where}
+         ORDER BY wt.created_at DESC
+         LIMIT ? OFFSET ?`,
+        [...params, +pageSize, +offset]
       );
-      res.json({ success: true, data: rows });
+      const [[{ total }]] = await db.query(
+        `SELECT COUNT(*) as total FROM wallet_transactions wt ${where}`,
+        params
+      );
+      res.json({ success: true, data: rows, total });
     } catch (err) {
       res.status(500).json({ success: false, message: 'Failed to fetch transactions' });
     }
@@ -196,7 +216,7 @@ export const getAllUsersWithWallet = async (req, res) => {
     }
 
     const role = String(user.role || '').toLowerCase();
-    const privilegedRoles = ['admin', 'sub_admin'];
+    const privilegedRoles = ['admin', 'sub_admin', 'accountant'];
     const isPrivileged = privilegedRoles.includes(role);
 
     let rows;
@@ -246,10 +266,16 @@ export const getUsersList = async (req, res) => {
   export const getUserTransactions = async (req, res) => {
     try {
       const user = req.session?.user;
-      if (!user || !['admin','hr','sub_admin'].includes(user.role)) return res.status(403).json({ success: false, message: 'Forbidden' });
+      if (!user || !['admin','hr','sub_admin','accountant'].includes(user.role)) return res.status(403).json({ success: false, message: 'Forbidden' });
       const { id } = req.params;
       const [rows] = await db.query(
-        `SELECT * FROM wallet_transactions WHERE user_id = ? ORDER BY created_at DESC`,
+        `SELECT
+           wt.*,
+           u.name AS initiated_by_name
+         FROM wallet_transactions wt
+         LEFT JOIN users u ON wt.initiated_by = u.user_id
+         WHERE wt.user_id = ?
+         ORDER BY wt.created_at DESC`,
         [id]
       );
       res.json({ success: true, data: rows });
@@ -262,7 +288,7 @@ export const getUsersList = async (req, res) => {
   export const manualAdjustWallet = async (req, res) => {
     try {
       const user = req.session?.user;
-      if (!user || !['admin','hr'].includes(user.role)) return res.status(403).json({ success: false, message: 'Forbidden' });
+      if (!user || !['admin','accountant'].includes(user.role)) return res.status(403).json({ success: false, message: 'Forbidden' });
       const { id } = req.params;
       const { amount, type, admin_note } = req.body;
       if (!amount || amount <= 0 || !['credit','debit'].includes(type) || !admin_note) {

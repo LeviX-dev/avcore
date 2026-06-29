@@ -98,12 +98,12 @@ const EditProductForm = ({ productType, categories, onClose, onSuccess }: EditPr
 
   const handleAddModel = (brandIndex: number) => {
     const updated = [...brands];
-    updated[brandIndex].models.push({ 
-      model_no: '', 
-      description: '', 
-      price: '', 
+    updated[brandIndex].models.push({
+      model_no: '',
+      description: '',
+      price: '',
       image: null,
-      imageError: false 
+      imageError: false
     });
     setBrands(updated);
   };
@@ -152,7 +152,7 @@ const EditProductForm = ({ productType, categories, onClose, onSuccess }: EditPr
       formData.append('product_type_name', productTypeName);
       formData.append('quotation_type', quotationType);
       formData.append('cat_id', String(catId));
-      
+
       if (quotationType === 'Other' && customQuotationType) {
         formData.append('other_quotation_type', customQuotationType);
       }
@@ -174,7 +174,7 @@ const EditProductForm = ({ productType, categories, onClose, onSuccess }: EditPr
       formData.append('brands', JSON.stringify(brandsData));
 
       const modelPositions = [];
-      
+
       brands.forEach((brand, bIndex) => {
         brand.models.forEach((model, mIndex) => {
           if (model.image && model.image instanceof File) {
@@ -186,7 +186,7 @@ const EditProductForm = ({ productType, categories, onClose, onSuccess }: EditPr
           }
         });
       });
-      
+
       if (modelPositions.length > 0) {
         formData.append('model_positions', JSON.stringify(modelPositions));
       }
@@ -194,9 +194,9 @@ const EditProductForm = ({ productType, categories, onClose, onSuccess }: EditPr
       const response = await axios.put(
         `${BASE_URL}api/product/${productType.product_type_id}`,
         formData,
-        { 
+        {
           headers: { 'Content-Type': 'multipart/form-data' },
-          withCredentials: true 
+          withCredentials: true
         }
       );
 
@@ -223,17 +223,17 @@ const EditProductForm = ({ productType, categories, onClose, onSuccess }: EditPr
     <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[9999] overflow-y-auto">
       <div className="flex justify-end min-h-full p-2 sm:p-6">
         {/* Fixed height and z-index */}
-        <div className="bg-white dark:bg-boxdark rounded-xl shadow-2xl w-full sm:max-w-2xl max-h-[85vh] overflow-y-auto mt-8 sm:mr-[20%] z-[10000]">
+        <div className="bg-white dark:bg-boxdark rounded-xl shadow-2xl w-full sm:max-w-5xl max-h-[90vh] overflow-y-auto mt-8 sm:mr-[20%] z-[10000]">
           {/* Header */}
-        <div className="sticky top-0 bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-white rounded-t-xl py-2 px-4 flex justify-between items-center z-10 border-b border-gray-300 dark:border-gray-600">
-  <div className="flex items-center gap-2">
-    <FontAwesomeIcon icon={faCube} />
-    <h2 className="text-base font-semibold">Edit Product Type</h2>
-  </div>
-  <button onClick={onClose} className="p-1 rounded-full hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors">
-    <FontAwesomeIcon icon={faTimes} />
-  </button>
-</div>
+          <div className="sticky top-0 bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-white rounded-t-xl py-2 px-4 flex justify-between items-center z-10 border-b border-gray-300 dark:border-gray-600">
+            <div className="flex items-center gap-2">
+              <FontAwesomeIcon icon={faCube} />
+              <h2 className="text-base font-semibold">Edit Product Type</h2>
+            </div>
+            <button onClick={onClose} className="p-1 rounded-full hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors">
+              <FontAwesomeIcon icon={faTimes} />
+            </button>
+          </div>
 
           <form onSubmit={handleSubmit} className="p-4 space-y-4">
             {/* Basic Info */}
@@ -350,23 +350,28 @@ const EditProductForm = ({ productType, categories, onClose, onSuccess }: EditPr
                   {expandedBrands.includes(bIndex) && (
                     <div className="pl-6 pr-3 py-3 bg-gray-50 dark:bg-gray-800 space-y-2">
                       {brand.models.map((model, mIndex) => (
-                        <div key={mIndex} className="border border-gray-200 dark:border-strokedark rounded p-2 grid grid-cols-1 sm:grid-cols-12 gap-2 items-center">
-                          <input
+                        <div
+                          key={mIndex}
+                          className="border border-gray-200 dark:border-strokedark rounded p-2 gap-2"
+                          style={{ display: 'grid', gridTemplateColumns: '150px 1fr 100px 80px auto 28px', alignItems: 'start' }}
+                        >
+                          <textarea
                             type="text"
                             value={model.model_no}
                             onChange={(e) => handleModelChange(bIndex, mIndex, 'model_no', e.target.value)}
                             placeholder="Model No"
-                            className="sm:col-span-3 border border-gray-300 dark:border-strokedark dark:bg-boxdark dark:text-white rounded px-2 py-1 text-sm"
+                            rows={4}
+                            className="border border-gray-300 dark:border-strokedark dark:bg-boxdark dark:text-white rounded px-2 py-1 text-xs w-full min-w-0"
                             required
                           />
-                          <input
-                            type="text"
+                          <textarea
                             value={model.description}
                             onChange={(e) => handleModelChange(bIndex, mIndex, 'description', e.target.value)}
                             placeholder="Description"
-                            className="sm:col-span-4 border border-gray-300 dark:border-strokedark dark:bg-boxdark dark:text-white rounded px-2 py-1 text-sm"
+                            rows={6}
+                            className="border border-gray-300 dark:border-strokedark dark:bg-boxdark dark:text-white rounded px-2 py-1 text-xs w-full min-w-0 resize-none"
                           />
-                          <div className="relative sm:col-span-2">
+                          <div className="relative w-full">
                             <div className="absolute inset-y-0 left-0 pl-1 flex items-center pointer-events-none">
                               <FontAwesomeIcon icon={faDollarSign} className="text-gray-400 text-xs" />
                             </div>
@@ -375,14 +380,14 @@ const EditProductForm = ({ productType, categories, onClose, onSuccess }: EditPr
                               value={model.price}
                               onChange={(e) => handleModelChange(bIndex, mIndex, 'price', e.target.value)}
                               placeholder="0.00"
-                              className="pl-6 w-full border border-gray-300 dark:border-strokedark dark:bg-boxdark dark:text-white rounded px-2 py-1 text-sm"
+                              className="pl-4 w-full border border-gray-300 dark:border-strokedark dark:bg-boxdark dark:text-white rounded px-2 py-1 text-xs min-w-0"
                               min="0"
                               step="0.01"
                               required
                             />
                           </div>
-                          <label className="sm:col-span-2 flex items-center gap-1 border border-gray-300 dark:border-strokedark rounded px-2 py-1 text-sm cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700">
-                            <FontAwesomeIcon icon={faImage} className="text-gray-400 text-xs" />
+                          <label className="flex items-center gap-1 border border-gray-300 dark:border-strokedark rounded px-2 py-1 text-xs cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700">
+                            <FontAwesomeIcon icon={faImage} className="text-gray-400 text-xs shrink-0" />
                             <span className="truncate text-black dark:text-white">
                               {model.image ? model.image.name : model.image_path ? 'Change' : 'Choose'}
                             </span>
@@ -393,8 +398,8 @@ const EditProductForm = ({ productType, categories, onClose, onSuccess }: EditPr
                               accept="image/*"
                             />
                           </label>
-                          {model.image_path && !model.image && !model.imageError && (
-                            <div className="sm:col-span-1">
+                          {model.image_path && !model.image && !model.imageError ? (
+                            <div>
                               <img
                                 src={getImageUrl(model.image_path) || ''}
                                 alt={model.model_no || 'Model'}
@@ -402,24 +407,23 @@ const EditProductForm = ({ productType, categories, onClose, onSuccess }: EditPr
                                 onError={() => handleImageError(bIndex, mIndex)}
                               />
                             </div>
-                          )}
-                          {(model.imageError || (model.image_path && !model.image)) && (
-                            <div className="sm:col-span-1 flex items-center justify-center">
+                          ) : (model.imageError || model.image_path) ? (
+                            <div className="flex items-center justify-center">
                               <div className="h-6 w-6 bg-gray-200 dark:bg-gray-600 rounded flex items-center justify-center text-xs text-gray-500">
                                 <FontAwesomeIcon icon={faImage} />
                               </div>
                             </div>
-                          )}
+                          ) : <div />}
                           <button
                             type="button"
                             onClick={() => handleRemoveModel(bIndex, mIndex)}
-                            className="text-red-500 hover:text-red-700 sm:col-span-1"
+                            className="text-red-500 hover:text-red-700 flex items-center justify-center pt-1"
                           >
-                            <FontAwesomeIcon icon={faTimes} />
+                            <FontAwesomeIcon icon={faTimes} className="text-xs" />
                           </button>
                         </div>
                       ))}
-                      
+
                       <button
                         type="button"
                         onClick={() => handleAddModel(bIndex)}
