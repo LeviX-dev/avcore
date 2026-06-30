@@ -3,6 +3,7 @@ import XLSX from "xlsx";
 import db from "../database/db.js";
 import path from 'path';
 import fs from 'fs';
+import { createNotification } from './notificationController.js';
 
 import { fileURLToPath } from 'url'; // Add this import
 
@@ -3137,6 +3138,152 @@ assignedUserName = userRow[0].name;
 
 // controllers/masterDataController.js
 
+// export const checkDuplicateLeadContact = async (req, res) => {
+//   try {
+//     // -----------------------------------
+//     // AUTH CHECK
+//     // -----------------------------------
+//     if (!req.session?.user) {
+//       return res.status(401).json({
+//         success: false,
+//         message: "Unauthorized"
+//       });
+//     }
+
+//     // -----------------------------------
+//     // INPUT
+//     // -----------------------------------
+//     const { number } = req.body;
+
+//     if (!number) {
+//       return res.status(400).json({
+//         success: false,
+//         message: "Contact number is required"
+//       });
+//     }
+
+//     // -----------------------------------
+//     // FIND DUPLICATE LEAD
+//     // -----------------------------------
+//     const [leadRows] = await db.execute(
+//       `
+//       SELECT 
+//         rd.master_id,
+//         rd.name,
+//         rd.number,
+//         rd.alternate_number,
+//         rd.email,
+//         rd.city,
+//         rd.status,
+//         rd.lead_status,
+//         rd.lead_stage,
+//         rd.created_at,
+
+//         rd.assign_id,
+
+//         -- CURRENT WORKING USER
+//         latest_reassign.assignedTo AS current_working_by,
+//         latest_reassign.leadStage AS current_lead_stage,
+//         latest_reassign.remark AS latest_remark,
+//         latest_reassign.created_at AS last_working_date
+
+//       FROM raw_data rd
+
+//       LEFT JOIN (
+//           SELECT r1.*
+//           FROM reassignment r1
+//           INNER JOIN (
+//               SELECT master_id, MAX(id) AS max_id
+//               FROM reassignment
+//               GROUP BY master_id
+//           ) r2
+//           ON r1.id = r2.max_id
+//       ) latest_reassign
+//       ON rd.master_id = latest_reassign.master_id
+
+//       WHERE rd.number = ?
+//       LIMIT 1
+//       `,
+//       [number]
+//     );
+
+//     // -----------------------------------
+//     // NO DUPLICATE FOUND
+//     // -----------------------------------
+//     if (leadRows.length === 0) {
+//       return res.status(200).json({
+//         success: true,
+//         duplicate: false,
+//         message: "No duplicate contact found"
+//       });
+//     }
+
+//     const lead = leadRows[0];
+
+//     // -----------------------------------
+//     // GET COMPLETE HISTORY
+//     // -----------------------------------
+//     const [historyRows] = await db.execute(
+//       `
+//       SELECT
+//         id,
+//         assign_id,
+//         master_id,
+//         created_by_user,
+//         assignedTo,
+//         leadStage,
+//         remark,
+//         reassignment_date,
+//         created_at
+//       FROM reassignment
+//       WHERE master_id = ?
+//       ORDER BY id DESC
+//       `,
+//       [lead.master_id]
+//     );
+
+//     // -----------------------------------
+//     // RESPONSE
+//     // -----------------------------------
+//     return res.status(200).json({
+//       success: true,
+//       duplicate: true,
+//       message: "Duplicate contact found",
+
+//       lead_details: {
+//         master_id: lead.master_id,
+//         name: lead.name,
+//         number: lead.number,
+//         alternate_number: lead.alternate_number,
+//         email: lead.email,
+//         city: lead.city,
+//         status: lead.status,
+//         lead_status: lead.lead_status,
+//         lead_stage: lead.lead_stage,
+//         created_at: lead.created_at,
+
+//         // ✅ CURRENT PERSON WORKING
+//         current_working_by: lead.current_working_by,
+//         current_lead_stage: lead.current_lead_stage,
+//         latest_remark: lead.latest_remark,
+//         last_working_date: lead.last_working_date
+//       },
+
+//       // ✅ FULL HISTORY
+//       reassignment_history: historyRows
+//     });
+
+//   } catch (err) {
+//     console.error("❌ checkDuplicateLeadContact error:", err);
+
+//     return res.status(500).json({
+//       success: false,
+//       message: "Server error",
+//       error: err.message
+//     });
+//   }
+// };
+
 export const checkDuplicateLeadContact = async (req, res) => {
   try {
     // -----------------------------------
@@ -3242,6 +3389,43 @@ export const checkDuplicateLeadContact = async (req, res) => {
     );
 
     // -----------------------------------
+    // 🔔 SEND NOTIFICATIONS
+    // -----------------------------------
+    const currentUserId = req.session.user.id;
+
+    // 1️⃣ Notify the current user about the duplicate
+    const currentUserTitle = 'Duplicate Contact Detected';
+    const currentUserMessage = `The contact number "${number}" already exists for lead "${lead.name}" (ID: ${lead.master_id}).`;
+    const currentUserLink = `/master-data`; // or a specific page to view the lead
+
+    try {
+      await createNotification(currentUserId, currentUserTitle, currentUserMessage, currentUserLink);
+    } catch (notifError) {
+      console.error('Failed to send duplicate notification to current user:', notifError);
+    }
+
+    // 2️⃣ Notify the person currently working on the duplicate lead (if any)
+    if (lead.current_working_by) {
+      // Resolve user ID from the name
+      const [userRows] = await db.execute(
+        `SELECT user_id FROM users WHERE name = ? LIMIT 1`,
+        [lead.current_working_by]
+      );
+      if (userRows.length > 0) {
+        const workingUserId = userRows[0].user_id;
+        const workingUserTitle = 'Duplicate Contact Attempt';
+        const workingUserMessage = `Someone tried to add a duplicate contact for your lead "${lead.name}" (Number: ${number}).`;
+        const workingUserLink = `/master-data`; // or the lead's detail page
+
+        try {
+          await createNotification(workingUserId, workingUserTitle, workingUserMessage, workingUserLink);
+        } catch (notifError) {
+          console.error('Failed to send duplicate notification to working user:', notifError);
+        }
+      }
+    }
+
+    // -----------------------------------
     // RESPONSE
     // -----------------------------------
     return res.status(200).json({
@@ -3261,14 +3445,12 @@ export const checkDuplicateLeadContact = async (req, res) => {
         lead_stage: lead.lead_stage,
         created_at: lead.created_at,
 
-        // ✅ CURRENT PERSON WORKING
         current_working_by: lead.current_working_by,
         current_lead_stage: lead.current_lead_stage,
         latest_remark: lead.latest_remark,
         last_working_date: lead.last_working_date
       },
 
-      // ✅ FULL HISTORY
       reassignment_history: historyRows
     });
 
@@ -3282,8 +3464,6 @@ export const checkDuplicateLeadContact = async (req, res) => {
     });
   }
 };
-
-
 
 export const updateRawData1 = async (req, res) => {
   try {
@@ -3673,7 +3853,411 @@ if (detailed_remark && detailed_remark.trim() !== '') {
 };
 
 
+// export const updateRawData = async (req, res) => {
+//   console.log("---notification controller conlling")
+//   try {
+//     const { master_id } = req.params;
+
+//     if (!master_id) {
+//       return res.status(400).json({ message: "master_id is required" });
+//     }
+
+//     const created_by_user = req.session?.user?.id || null;
+
+//     console.log("📥 Incoming Payload:", req.body);
+
+//     const {
+//       // Your existing fields...
+//       name, number, email, address, area_id, cat_id, reference_id, city,
+//       location_link, room_length, room_width, room_height, p_type, budget_range,
+//       current_stage, time_to_complete, site_visit_date, demo_date,
+//       ar_number, architect_name, ca_number, e_number, sm_number, pop_number, other_number,
+//       lead_stage, quick_remark, detailed_remark, status, lead_status,
+//       followup_date, followup_time,  // ✅ ADD THIS - Time field
+//       assign_date,
+//       alternate_number,
+      
+//       // reassignment params
+//       assignedTo, leadStage, remark, assign_id, reassignment_date,
+      
+//       // NEW: Other inputs
+//       category_other,
+//       reference_other,
+      
+//       // NEW: Update mode flag
+//       update_mode = 'updateWithReassignment'
+//     } = req.body;
+
+//     // ------------------------------------------------
+//     // STEP 1: Update raw_data (PATCH behavior)
+//     // ------------------------------------------------
+//     const allowed = {
+//       name, 
+//       number,
+//       alternate_number,
+//       email, 
+//       address, 
+//       area_id, 
+//       cat_id, 
+//       reference_id, 
+//       city,
+//       location_link, 
+//       room_length: room_length ? parseFloat(room_length) : null,
+//       room_width: room_width ? parseFloat(room_width) : null,
+//       room_height: room_height ? parseFloat(room_height) : null,
+//       p_type, 
+//       budget_range,
+//       current_stage, 
+//       time_to_complete, 
+//       site_visit_date, 
+//       demo_date,
+//       ar_number,
+//       architect_name,
+//       ca_number, 
+//       e_number, 
+//       sm_number, 
+//       pop_number, 
+//       other_number,
+//       lead_stage, 
+//       quick_remark,
+//       status, 
+//       lead_status,
+//       followup_date,
+//       followup_time,  // ✅ ADD THIS - Time field
+//       detailed_remark,
+//     };
+
+//     const updateFields = [];
+//     const values = [];
+
+//     Object.entries(allowed).forEach(([k, v]) => {
+//       if (v !== undefined && v !== "") {
+//         updateFields.push(`${k} = ?`);
+//         values.push(v);
+//       }
+//     });
+
+//     if (updateFields.length) {
+//       values.push(master_id);
+//       await db.execute(
+//         `UPDATE raw_data SET ${updateFields.join(", ")} WHERE master_id = ?`,
+//         values
+//       );
+//     }
+
+//     // ------------------------------------------------
+//     // STEP 2: Handle Other Inputs - FIXED (no updated_at column)
+//     // ------------------------------------------------
+//     // For Category Other
+//     if (category_other !== undefined) {
+//       if (category_other && category_other.trim() !== '') {
+//         // Check if entry exists
+//         const [existingCat] = await db.execute(
+//           `SELECT id FROM raw_data_other_inputs 
+//            WHERE master_id = ? AND cat_id = ?`,
+//           [master_id, cat_id]
+//         );
+        
+//         if (existingCat.length > 0) {
+//           // Update existing (use created_at if no updated_at column)
+//           await db.execute(
+//             `UPDATE raw_data_other_inputs 
+//              SET input_text = ?, created_at = NOW()
+//              WHERE master_id = ? AND cat_id = ?`,
+//             [category_other, master_id, cat_id]
+//           );
+//         } else {
+//           // Insert new
+//           await db.execute(
+//             `INSERT INTO raw_data_other_inputs 
+//              (master_id, cat_id, input_text, created_at) 
+//              VALUES (?, ?, ?, NOW())`,
+//             [master_id, cat_id, category_other]
+//           );
+//         }
+//       } else {
+//         // Delete if empty
+//         await db.execute(
+//           `DELETE FROM raw_data_other_inputs 
+//            WHERE master_id = ? AND cat_id = ?`,
+//           [master_id, cat_id]
+//         );
+//       }
+//     }
+
+//     // For Reference Other
+//     if (reference_other !== undefined) {
+//       if (reference_other && reference_other.trim() !== '') {
+//         // Check if entry exists
+//         const [existingRef] = await db.execute(
+//           `SELECT id FROM raw_data_other_inputs 
+//            WHERE master_id = ? AND reference_id = ?`,
+//           [master_id, reference_id]
+//         );
+        
+//         if (existingRef.length > 0) {
+//           // Update existing (use created_at if no updated_at column)
+//           await db.execute(
+//             `UPDATE raw_data_other_inputs 
+//              SET input_text = ?, created_at = NOW()
+//              WHERE master_id = ? AND reference_id = ?`,
+//             [reference_other, master_id, reference_id]
+//           );
+//         } else {
+//           // Insert new
+//           await db.execute(
+//             `INSERT INTO raw_data_other_inputs 
+//              (master_id, reference_id, input_text, created_at) 
+//              VALUES (?, ?, ?, NOW())`,
+//             [master_id, reference_id, reference_other]
+//           );
+//         }
+//       } else {
+//         // Delete if empty
+//         await db.execute(
+//           `DELETE FROM raw_data_other_inputs 
+//            WHERE master_id = ? AND reference_id = ?`,
+//           [master_id, reference_id]
+//         );
+//       }
+//     }
+
+//     // ------------------------------------------------
+//     // STEP 3: Assignment logic
+//     // ------------------------------------------------
+//     let finalAssignId = assign_id;
+
+//     if (!finalAssignId) {
+//       const [row] = await db.execute(
+//         "SELECT assign_id FROM raw_data WHERE master_id = ?",
+//         [master_id]
+//       );
+//       finalAssignId = row.length ? row[0].assign_id : null;
+//     }
+
+//     if (!finalAssignId) {
+//       const [newAssign] = await db.execute(
+//         "INSERT INTO assignments (assign_date) VALUES (NOW())"
+//       );
+//       finalAssignId = newAssign.insertId;
+
+//       await db.execute(
+//         "UPDATE raw_data SET assign_id = ? WHERE master_id = ?",
+//         [finalAssignId, master_id]
+//       );
+//     }
+
+//     // ------------------------------------------------
+//     // STEP 4: IMPROVED Reassignment logic
+//     // ------------------------------------------------
+//     const inserted = [];
+//     const skipped = [];
+//     let users = [];
+
+//     // Get previous assignments for comparison
+//     const [previousAssignments] = await db.execute(
+//       `SELECT assignedTo, leadStage, remark 
+//        FROM reassignment 
+//        WHERE master_id = ? AND assign_id = ?
+//        ORDER BY created_at DESC
+//        LIMIT 1`,
+//       [master_id, finalAssignId]
+//     );
+
+//     const previousAssignment = previousAssignments.length > 0 ? previousAssignments[0] : null;
+//     const previousUsers = previousAssignment?.assignedTo ? previousAssignment.assignedTo.toString().split(",").map(u => u.trim()) : [];
+
+//     // Determine if we should create new reassignment
+//     let shouldCreateReassignment = false;
+//     let reassignmentReason = '';
+
+//     // Only check reassignment if update_mode includes it
+//     if (update_mode === 'updateWithReassignment') {
+//       // Check if assignedTo has changed
+//       if (assignedTo) {
+//         const newUsers = Array.isArray(assignedTo) 
+//           ? assignedTo.map(u => u.toString().trim())
+//           : assignedTo.toString().split(",").map(u => u.trim());
+        
+//         // Check if the list of users has actually changed
+//         const sortedPrevious = [...previousUsers].sort().join(",");
+//         const sortedNew = [...newUsers].sort().join(",");
+        
+//         if (sortedPrevious !== sortedNew || (assignedTo && assignedTo.length)) {
+//           shouldCreateReassignment = true;
+//           reassignmentReason = 'assignedTo_changed';
+//           users = newUsers;
+//         } else {
+//           // Use previous users if no change
+//           users = previousUsers;
+//         }
+//       } else {
+//         users = previousUsers;
+//       }
+
+//       // Check if we have a NEW detailed remark (not just copying from quick_remark or previous)
+//       const hasNewDetailedRemark = detailed_remark && 
+//         detailed_remark.trim() !== '' && 
+//         previousAssignment?.remark !== detailed_remark.trim();
+
+//       // Check if lead stage changed
+//       const hasLeadStageChanged = (leadStage || lead_stage) && 
+//         previousAssignment?.leadStage !== (leadStage || lead_stage);
+
+//       if (hasNewDetailedRemark && !shouldCreateReassignment) {
+//         shouldCreateReassignment = true;
+//         reassignmentReason = 'new_remark';
+//         users = previousUsers; // Keep same users if only remark changed
+//       }
+
+//       if (hasLeadStageChanged && !shouldCreateReassignment) {
+//         shouldCreateReassignment = true;
+//         reassignmentReason = 'leadStage_changed';
+//         users = previousUsers; // Keep same users if only stage changed
+//       }
+//     }
+
+//     // Create reassignment only if there are actual changes and mode allows it
+//     if (shouldCreateReassignment && update_mode === 'updateWithReassignment') {
+//       const reassDate = reassignment_date
+//         ? new Date(reassignment_date)
+//         : followup_date
+//           ? new Date(followup_date)
+//           : new Date();
+
+//       // Determine the remark to use
+//       let finalRemark = '';
+//       if (detailed_remark && detailed_remark.trim() !== '') {
+//         finalRemark = detailed_remark;
+//       } else if (quick_remark && quick_remark.trim() !== '') {
+//         // If detailed_remark is empty but quick_remark is selected, use quick_remark
+//         finalRemark = quick_remark;
+//       } else if (reassignmentReason === 'leadStage_changed') {
+//         finalRemark = `Lead stage changed to ${leadStage || lead_stage}`;
+//       }
+
+//       // Determine the lead stage to use
+//       let finalLeadStage = leadStage || lead_stage || previousAssignment?.leadStage || null;
+
+//       for (const user of users) {
+//         if (!user || user.trim() === '') continue;
+
+//         let finalName = user;
+
+//         // If user is an ID, get the name
+//         if (!isNaN(user) && reassignmentReason === 'assignedTo_changed') {
+//           const [u] = await db.execute(
+//             "SELECT name FROM users WHERE user_id = ?",
+//             [user]
+//           );
+//           finalName = u.length ? u[0].name : user.toString();
+//         }
+
+//         // Check for duplicate reassignment (same day, same user, same stage)
+//         const [existingReassignment] = await db.execute(
+//           `SELECT id FROM reassignment 
+//            WHERE master_id = ? AND assign_id = ? AND assignedTo = ? 
+//            AND leadStage = ? 
+//            AND DATE(reassignment_date) = DATE(?)
+//            ORDER BY created_at DESC
+//            LIMIT 1`,
+//           [
+//             master_id,
+//             finalAssignId,
+//             finalName,
+//             finalLeadStage,
+//             reassDate
+//           ]
+//         );
+
+//         if (existingReassignment.length > 0) {
+//           // Skip duplicate - only if remark is also the same
+//           const [checkRemark] = await db.execute(
+//             `SELECT remark FROM reassignment WHERE id = ?`,
+//             [existingReassignment[0].id]
+//           );
+          
+//           if (checkRemark.length > 0 && checkRemark[0].remark === finalRemark) {
+//             skipped.push({
+//               userId: user,
+//               userName: finalName,
+//               leadStage: finalLeadStage,
+//               reason: 'duplicate'
+//             });
+//             continue;
+//           }
+//         }
+
+//         // Create new reassignment
+//         const [insertRes] = await db.execute(
+//           `INSERT INTO reassignment
+//            (assign_id, master_id, created_by_user, assignedTo, leadStage, remark, reassignment_date, created_at)
+//            VALUES (?, ?, ?, ?, ?, ?, ?, NOW())`,
+//           [
+//             finalAssignId,
+//             master_id,
+//             created_by_user,
+//             finalName,
+//             finalLeadStage,
+//             finalRemark,
+//             reassDate
+//           ]
+//         );
+
+//         inserted.push({
+//           id: insertRes.insertId,
+//           userId: user,
+//           userName: finalName,
+//           leadStage: finalLeadStage,
+//           remark: finalRemark
+//         });
+//      if (finalUserId) {
+//           try {
+//             const leadName = name || `Lead #${master_id}`;
+//             const title = 'New Lead Assigned';
+//             const message = `You have been assigned to "${leadName}" (Stage: ${finalLeadStage || 'Not Set'}).`;
+//             const link = `/master-data`; // or `/lead/${master_id}`
+
+//             await createNotification(finalUserId, title, message, link);
+//           } catch (notifError) {
+//             console.error('Failed to send notification for user', finalUserId, notifError);
+//           }
+//         }
+//       }
+//     }
+
+//     // ------------------------------------------------
+//     // RESPONSE
+//     // ------------------------------------------------
+//     res.status(200).json({
+//       success: true,
+//       message: update_mode === 'updateWithReassignment' 
+//         ? "Raw data updated with reassignment" 
+//         : "Raw data updated without reassignment",
+//       assign_id: finalAssignId,
+//       inserted_count: inserted.length,
+//       skipped_count: skipped.length,
+//       inserted,
+//       skipped,
+//       reassignment_created: shouldCreateReassignment,
+//       reassignment_reason: reassignmentReason,
+//       update_mode
+//     });
+
+//   } catch (err) {
+//     console.error("❌ updateRawData error:", err);
+//     res.status(500).json({
+//       success: false,
+//       message: "Server error",
+//       error: err.message
+//     });
+//   }
+// };
+
+// Add this function in your controller
+
 export const updateRawData = async (req, res) => {
+  console.log("---notification controller conlling")
   try {
     const { master_id } = req.params;
 
@@ -3692,7 +4276,7 @@ export const updateRawData = async (req, res) => {
       current_stage, time_to_complete, site_visit_date, demo_date,
       ar_number, architect_name, ca_number, e_number, sm_number, pop_number, other_number,
       lead_stage, quick_remark, detailed_remark, status, lead_status,
-      followup_date, followup_time,  // ✅ ADD THIS - Time field
+      followup_date, followup_time,
       assign_date,
       alternate_number,
       
@@ -3711,39 +4295,13 @@ export const updateRawData = async (req, res) => {
     // STEP 1: Update raw_data (PATCH behavior)
     // ------------------------------------------------
     const allowed = {
-      name, 
-      number,
-      alternate_number,
-      email, 
-      address, 
-      area_id, 
-      cat_id, 
-      reference_id, 
-      city,
-      location_link, 
-      room_length: room_length ? parseFloat(room_length) : null,
+      name, number, alternate_number, email, address, area_id, cat_id, reference_id, city,
+      location_link, room_length: room_length ? parseFloat(room_length) : null,
       room_width: room_width ? parseFloat(room_width) : null,
       room_height: room_height ? parseFloat(room_height) : null,
-      p_type, 
-      budget_range,
-      current_stage, 
-      time_to_complete, 
-      site_visit_date, 
-      demo_date,
-      ar_number,
-      architect_name,
-      ca_number, 
-      e_number, 
-      sm_number, 
-      pop_number, 
-      other_number,
-      lead_stage, 
-      quick_remark,
-      status, 
-      lead_status,
-      followup_date,
-      followup_time,  // ✅ ADD THIS - Time field
-      detailed_remark,
+      p_type, budget_range, current_stage, time_to_complete, site_visit_date, demo_date,
+      ar_number, architect_name, ca_number, e_number, sm_number, pop_number, other_number,
+      lead_stage, quick_remark, status, lead_status, followup_date, followup_time, detailed_remark,
     };
 
     const updateFields = [];
@@ -3765,77 +4323,53 @@ export const updateRawData = async (req, res) => {
     }
 
     // ------------------------------------------------
-    // STEP 2: Handle Other Inputs - FIXED (no updated_at column)
+    // STEP 2: Handle Other Inputs (category_other, reference_other)
     // ------------------------------------------------
-    // For Category Other
     if (category_other !== undefined) {
       if (category_other && category_other.trim() !== '') {
-        // Check if entry exists
         const [existingCat] = await db.execute(
-          `SELECT id FROM raw_data_other_inputs 
-           WHERE master_id = ? AND cat_id = ?`,
+          `SELECT id FROM raw_data_other_inputs WHERE master_id = ? AND cat_id = ?`,
           [master_id, cat_id]
         );
-        
         if (existingCat.length > 0) {
-          // Update existing (use created_at if no updated_at column)
           await db.execute(
-            `UPDATE raw_data_other_inputs 
-             SET input_text = ?, created_at = NOW()
-             WHERE master_id = ? AND cat_id = ?`,
+            `UPDATE raw_data_other_inputs SET input_text = ?, created_at = NOW() WHERE master_id = ? AND cat_id = ?`,
             [category_other, master_id, cat_id]
           );
         } else {
-          // Insert new
           await db.execute(
-            `INSERT INTO raw_data_other_inputs 
-             (master_id, cat_id, input_text, created_at) 
-             VALUES (?, ?, ?, NOW())`,
+            `INSERT INTO raw_data_other_inputs (master_id, cat_id, input_text, created_at) VALUES (?, ?, ?, NOW())`,
             [master_id, cat_id, category_other]
           );
         }
       } else {
-        // Delete if empty
         await db.execute(
-          `DELETE FROM raw_data_other_inputs 
-           WHERE master_id = ? AND cat_id = ?`,
+          `DELETE FROM raw_data_other_inputs WHERE master_id = ? AND cat_id = ?`,
           [master_id, cat_id]
         );
       }
     }
 
-    // For Reference Other
     if (reference_other !== undefined) {
       if (reference_other && reference_other.trim() !== '') {
-        // Check if entry exists
         const [existingRef] = await db.execute(
-          `SELECT id FROM raw_data_other_inputs 
-           WHERE master_id = ? AND reference_id = ?`,
+          `SELECT id FROM raw_data_other_inputs WHERE master_id = ? AND reference_id = ?`,
           [master_id, reference_id]
         );
-        
         if (existingRef.length > 0) {
-          // Update existing (use created_at if no updated_at column)
           await db.execute(
-            `UPDATE raw_data_other_inputs 
-             SET input_text = ?, created_at = NOW()
-             WHERE master_id = ? AND reference_id = ?`,
+            `UPDATE raw_data_other_inputs SET input_text = ?, created_at = NOW() WHERE master_id = ? AND reference_id = ?`,
             [reference_other, master_id, reference_id]
           );
         } else {
-          // Insert new
           await db.execute(
-            `INSERT INTO raw_data_other_inputs 
-             (master_id, reference_id, input_text, created_at) 
-             VALUES (?, ?, ?, NOW())`,
+            `INSERT INTO raw_data_other_inputs (master_id, reference_id, input_text, created_at) VALUES (?, ?, ?, NOW())`,
             [master_id, reference_id, reference_other]
           );
         }
       } else {
-        // Delete if empty
         await db.execute(
-          `DELETE FROM raw_data_other_inputs 
-           WHERE master_id = ? AND reference_id = ?`,
+          `DELETE FROM raw_data_other_inputs WHERE master_id = ? AND reference_id = ?`,
           [master_id, reference_id]
         );
       }
@@ -3867,7 +4401,7 @@ export const updateRawData = async (req, res) => {
     }
 
     // ------------------------------------------------
-    // STEP 4: IMPROVED Reassignment logic
+    // STEP 4: IMPROVED Reassignment logic with notifications
     // ------------------------------------------------
     const inserted = [];
     const skipped = [];
@@ -3875,30 +4409,23 @@ export const updateRawData = async (req, res) => {
 
     // Get previous assignments for comparison
     const [previousAssignments] = await db.execute(
-      `SELECT assignedTo, leadStage, remark 
-       FROM reassignment 
-       WHERE master_id = ? AND assign_id = ?
-       ORDER BY created_at DESC
-       LIMIT 1`,
+      `SELECT assignedTo, leadStage, remark FROM reassignment 
+       WHERE master_id = ? AND assign_id = ? ORDER BY created_at DESC LIMIT 1`,
       [master_id, finalAssignId]
     );
 
     const previousAssignment = previousAssignments.length > 0 ? previousAssignments[0] : null;
     const previousUsers = previousAssignment?.assignedTo ? previousAssignment.assignedTo.toString().split(",").map(u => u.trim()) : [];
 
-    // Determine if we should create new reassignment
     let shouldCreateReassignment = false;
     let reassignmentReason = '';
 
-    // Only check reassignment if update_mode includes it
     if (update_mode === 'updateWithReassignment') {
-      // Check if assignedTo has changed
       if (assignedTo) {
         const newUsers = Array.isArray(assignedTo) 
           ? assignedTo.map(u => u.toString().trim())
           : assignedTo.toString().split(",").map(u => u.trim());
         
-        // Check if the list of users has actually changed
         const sortedPrevious = [...previousUsers].sort().join(",");
         const sortedNew = [...newUsers].sort().join(",");
         
@@ -3907,32 +4434,29 @@ export const updateRawData = async (req, res) => {
           reassignmentReason = 'assignedTo_changed';
           users = newUsers;
         } else {
-          // Use previous users if no change
           users = previousUsers;
         }
       } else {
         users = previousUsers;
       }
 
-      // Check if we have a NEW detailed remark (not just copying from quick_remark or previous)
       const hasNewDetailedRemark = detailed_remark && 
         detailed_remark.trim() !== '' && 
         previousAssignment?.remark !== detailed_remark.trim();
 
-      // Check if lead stage changed
       const hasLeadStageChanged = (leadStage || lead_stage) && 
         previousAssignment?.leadStage !== (leadStage || lead_stage);
 
       if (hasNewDetailedRemark && !shouldCreateReassignment) {
         shouldCreateReassignment = true;
         reassignmentReason = 'new_remark';
-        users = previousUsers; // Keep same users if only remark changed
+        users = previousUsers;
       }
 
       if (hasLeadStageChanged && !shouldCreateReassignment) {
         shouldCreateReassignment = true;
         reassignmentReason = 'leadStage_changed';
-        users = previousUsers; // Keep same users if only stage changed
+        users = previousUsers;
       }
     }
 
@@ -3944,92 +4468,97 @@ export const updateRawData = async (req, res) => {
           ? new Date(followup_date)
           : new Date();
 
-      // Determine the remark to use
       let finalRemark = '';
       if (detailed_remark && detailed_remark.trim() !== '') {
         finalRemark = detailed_remark;
       } else if (quick_remark && quick_remark.trim() !== '') {
-        // If detailed_remark is empty but quick_remark is selected, use quick_remark
         finalRemark = quick_remark;
       } else if (reassignmentReason === 'leadStage_changed') {
         finalRemark = `Lead stage changed to ${leadStage || lead_stage}`;
       }
 
-      // Determine the lead stage to use
       let finalLeadStage = leadStage || lead_stage || previousAssignment?.leadStage || null;
 
       for (const user of users) {
         if (!user || user.trim() === '') continue;
 
         let finalName = user;
+        let finalUserId = null;
 
-        // If user is an ID, get the name
-        if (!isNaN(user) && reassignmentReason === 'assignedTo_changed') {
+        // 🔥 RESOLVE USER ID FOR EVERY USER
+        if (!isNaN(user)) {
+          // user is a numeric ID
+          finalUserId = parseInt(user);
           const [u] = await db.execute(
             "SELECT name FROM users WHERE user_id = ?",
+            [finalUserId]
+          );
+          if (u.length) finalName = u[0].name;
+        } else {
+          // user is a name, fetch ID
+          const [u] = await db.execute(
+            "SELECT user_id FROM users WHERE name = ?",
             [user]
           );
-          finalName = u.length ? u[0].name : user.toString();
+          if (u.length) {
+            finalUserId = u[0].user_id;
+          } else {
+            console.warn(`User "${user}" not found, skipping notification.`);
+            // Still continue with reassignment but no notification
+          }
         }
 
-        // Check for duplicate reassignment (same day, same user, same stage)
+        // Duplicate check
         const [existingReassignment] = await db.execute(
           `SELECT id FROM reassignment 
            WHERE master_id = ? AND assign_id = ? AND assignedTo = ? 
-           AND leadStage = ? 
-           AND DATE(reassignment_date) = DATE(?)
-           ORDER BY created_at DESC
-           LIMIT 1`,
-          [
-            master_id,
-            finalAssignId,
-            finalName,
-            finalLeadStage,
-            reassDate
-          ]
+           AND leadStage = ? AND DATE(reassignment_date) = DATE(?)
+           ORDER BY created_at DESC LIMIT 1`,
+          [master_id, finalAssignId, finalName, finalLeadStage, reassDate]
         );
 
         if (existingReassignment.length > 0) {
-          // Skip duplicate - only if remark is also the same
           const [checkRemark] = await db.execute(
             `SELECT remark FROM reassignment WHERE id = ?`,
             [existingReassignment[0].id]
           );
-          
           if (checkRemark.length > 0 && checkRemark[0].remark === finalRemark) {
-            skipped.push({
-              userId: user,
-              userName: finalName,
-              leadStage: finalLeadStage,
-              reason: 'duplicate'
-            });
+            skipped.push({ userId: finalUserId, userName: finalName, leadStage: finalLeadStage, reason: 'duplicate' });
             continue;
           }
         }
 
-        // Create new reassignment
+        // Insert reassignment
         const [insertRes] = await db.execute(
           `INSERT INTO reassignment
            (assign_id, master_id, created_by_user, assignedTo, leadStage, remark, reassignment_date, created_at)
            VALUES (?, ?, ?, ?, ?, ?, ?, NOW())`,
-          [
-            finalAssignId,
-            master_id,
-            created_by_user,
-            finalName,
-            finalLeadStage,
-            finalRemark,
-            reassDate
-          ]
+          [finalAssignId, master_id, created_by_user, finalName, finalLeadStage, finalRemark, reassDate]
         );
 
         inserted.push({
           id: insertRes.insertId,
-          userId: user,
+          userId: finalUserId,
           userName: finalName,
           leadStage: finalLeadStage,
           remark: finalRemark
         });
+
+        // ------------------------------------------------
+        // 🔔 SEND NOTIFICATION TO THE ASSIGNED USER
+        // ------------------------------------------------
+        if (finalUserId) {
+          try {
+            const leadName = name || `Lead #${master_id}`;
+            const title = 'New Lead Assigned';
+            const message = `You have been assigned to "${leadName}" (Stage: ${finalLeadStage || 'Not Set'}).`;
+            const link = `/master-data`; // or `/lead/${master_id}`
+
+            await createNotification(finalUserId, title, message, link);
+          } catch (notifError) {
+            console.error('Failed to send notification for user', finalUserId, notifError);
+          }
+        }
       }
     }
 
@@ -4061,7 +4590,6 @@ export const updateRawData = async (req, res) => {
   }
 };
 
-// Add this function in your controller
 export const updateContactNumbersOnly = async (req, res) => {
   try {
     const { master_id } = req.params;

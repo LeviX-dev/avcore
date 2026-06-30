@@ -292,7 +292,7 @@ import dashboardRoutes from './routes/dashboardRoutes.js';
 import reportRoutes from './routes/reportRoutes.js';
 import UploadRoutes from './routes/uploadRoutes.js';
 import campaignRoutes from "./routes/campaignRoutes.js";
-
+import notificationRoutes from './routes/notificationRoutes.js';
 import dynamicSidebarRoutes from "./routes/dynamicSidebarRoutes.js";
 import metaRoutes from "./routes/metaRoutes.js"; 
 
@@ -341,6 +341,20 @@ import topUpRoutes from './routes/topUpRoutes.js';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import fs from 'fs';
+import { sendFollowUpReminders } from './controllers/notificationController.js';
+
+import MySQLStoreFactory from "express-mysql-session";
+
+const MySQLStore = MySQLStoreFactory(session);
+
+const sessionStore = new MySQLStore({
+      host: '127.0.0.1',
+  user: 'root',
+  password: '1766',
+  database: 'dzmbjxtk_crm_avcore',
+  port:3306,
+});
+
 
 dotenv.config();
 
@@ -505,14 +519,36 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser());
 
+// app.use(session({
+//   secret: process.env.SESSION_SECRETE, 
+//   resave: false,
+//   saveUninitialized: true,
+//   cookie: { secure: false } 
+// }));
+
 app.use(session({
-  secret: process.env.SESSION_SECRETE, 
-  resave: false,
-  saveUninitialized: true,
-  cookie: { secure: false } 
+    key: "avcore.sid",
+    secret: process.env.SESSION_SECRETE,
+
+    store: sessionStore,
+
+    resave: false,
+    saveUninitialized: false,
+
+    cookie: {
+        maxAge: 1000 * 60 * 60 * 24 * 7, // 7 days
+        httpOnly: true,
+        secure: false,      // true if HTTPS
+        sameSite: "lax"
+    }
 }));
 
+cron.schedule('* * * * *', async () => {
+  console.log('⏱ Running follow‑up reminder check...');
+  await sendFollowUpReminders();
+});
 // Routes
+app.use('/api/notifications', notificationRoutes);
 app.use('/api', userRoutes); 
 app.use('/api', projectRoutes);
 app.use('/api', clientRoutes);
@@ -569,7 +605,6 @@ app.use('/api/logo', logoRoutes);
 app.use('/api/apk', downloadCenterRoutes);
 app.use('/api/v1/expense/stats', expenseStatsRoutes);
 app.use('/api', topUpRoutes);
-
 
 // ✅ ADD CRON HERE
 // cron.schedule("* * * * *", async () => {

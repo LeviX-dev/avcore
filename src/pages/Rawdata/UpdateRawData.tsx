@@ -89,7 +89,29 @@ interface UpdateDataModalProps {
   references: Reference[];
   area: Area[];
 }
+// Follow-up time is restricted to business hours: 10:00 AM – 7:00 PM
+const FOLLOWUP_TIME_START_HOUR = 10; // 10 AM
+const FOLLOWUP_TIME_END_HOUR = 19; // 7 PM (24-hr)
 
+const FOLLOWUP_HOUR_OPTIONS = Array.from(
+  { length: FOLLOWUP_TIME_END_HOUR - FOLLOWUP_TIME_START_HOUR + 1 },
+  (_, i) => {
+    const hour = FOLLOWUP_TIME_START_HOUR + i;
+    const period = hour >= 12 ? 'PM' : 'AM';
+    const hour12 = hour % 12 === 0 ? 12 : hour % 12;
+    return { value: hour.toString().padStart(2, '0'), label: `${hour12} ${period}` };
+  },
+);
+
+const FOLLOWUP_MINUTE_OPTIONS_FULL = Array.from({ length: 60 }, (_, i) =>
+  i.toString().padStart(2, '0'),
+);
+
+const getFollowupHourMinute = (time?: string): { hour: string; minute: string } => {
+  if (!time) return { hour: '', minute: '' };
+  const [h, m] = time.slice(0, 5).split(':');
+  return { hour: h || '', minute: m || '' };
+};
 const UpdateRawData: React.FC<UpdateDataModalProps> = ({
   showEditPopup,
   editingClient,
@@ -503,7 +525,27 @@ const formatDateTime = (dateString: string | undefined): string => {
       [name]: processedValue,
     });
   };
+const handleFollowupHourChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+  if (!editingClient) return;
+  const newHour = e.target.value;
+  const { minute } = getFollowupHourMinute(editingClient.followup_time);
+  // 7 PM is the closing boundary, so lock minutes to :00 once it's selected
+  const safeMinute = newHour === '19' ? '00' : minute || '00';
+  setEditingClient({
+    ...editingClient,
+    followup_time: newHour ? `${newHour}:${safeMinute}` : '',
+  });
+};
 
+const handleFollowupMinuteChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+  if (!editingClient) return;
+  const newMinute = e.target.value;
+  const { hour } = getFollowupHourMinute(editingClient.followup_time);
+  setEditingClient({
+    ...editingClient,
+    followup_time: hour ? `${hour}:${newMinute}` : '',
+  });
+};
   useEffect(() => {
     const fetchLeadStages = async () => {
       try {
@@ -601,7 +643,11 @@ const formatDateTime = (dateString: string | undefined): string => {
   };
 
   if (!showEditPopup || !editingClient) return null;
-
+const { hour: followupHour, minute: followupMinute } = getFollowupHourMinute(
+  editingClient.followup_time,
+);
+const followupMinuteOptions =
+  followupHour === '19' ? ['00'] : FOLLOWUP_MINUTE_OPTIONS_FULL;
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-start z-50 overflow-y-auto">
       <div className="bg-white p-6 rounded shadow-md w-11/12 max-w-2xl mt-20 max-h-[85vh] overflow-y-auto dark:border-strokedark dark:bg-boxdark">
@@ -1383,20 +1429,38 @@ const formatDateTime = (dateString: string | undefined): string => {
                   className="w-full p-2 border rounded text-sm dark:border-form-strokedark dark:bg-form-input dark:text-white"
                 />
               </div>
-
-{/* ⏰ Follow-up Time - ADD THIS RIGHT AFTER */}
 <div className="md:col-span-1 mt-4">
   <label className="block mb-1 text-base font-semibold text-orange-600 dark:text-orange-400">
     Follow-up Time
   </label>
-  <input
-    type="time"
-    name="followup_time"
-    value={editingClient.followup_time || ''}
-    onChange={handleInputChange}
-    className="w-full p-2 border rounded text-sm dark:border-form-strokedark dark:bg-form-input dark:text-white"
-  />
-  
+  <div className="flex items-center gap-2">
+    <select
+      value={followupHour}
+      onChange={handleFollowupHourChange}
+      className="w-full p-2 border rounded text-sm dark:border-form-strokedark dark:bg-form-input dark:text-white"
+    >
+      <option value="">Hour</option>
+      {FOLLOWUP_HOUR_OPTIONS.map((opt) => (
+        <option key={opt.value} value={opt.value}>
+          {opt.label}
+        </option>
+      ))}
+    </select>
+    <span className="text-gray-500 dark:text-gray-400">:</span>
+    <select
+      value={followupMinute}
+      onChange={handleFollowupMinuteChange}
+      disabled={!followupHour}
+      className="w-full p-2 border rounded text-sm dark:border-form-strokedark dark:bg-form-input dark:text-white disabled:opacity-50 disabled:cursor-not-allowed"
+    >
+      <option value="">Min</option>
+      {followupMinuteOptions.map((m) => (
+        <option key={m} value={m}>
+          {m}
+        </option>
+      ))}
+    </select>
+  </div>
 </div>
 
 

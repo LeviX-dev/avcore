@@ -1,6 +1,6 @@
 import { Link } from 'react-router-dom';
 import DropdownMessage from './DropdownMessage';
-import DropdownNotification from './DropdownNotification';
+import DropdownNotification from './DropdownNotification';   // ✅ added
 import DropdownUser from './DropdownUser';
 import LogoIcon from '../../images/logo/matrix2.png';
 import DarkModeSwitcher from './DarkModeSwitcher';
@@ -12,16 +12,11 @@ const Header = (props: {
   sidebarOpen: string | boolean | undefined;
   setSidebarOpen: (arg0: boolean) => void;
 }) => {
-
   // ===============================
   // Attendance toggle state
   // ===============================
   const [isCheckedIn, setIsCheckedIn] = useState(false);
-
   const [currentTime, setCurrentTime] = useState(new Date());
-
-
-  // Prevent multiple auto calls
   const autoRunRef = useRef(false);
 
   // ==================================
@@ -38,29 +33,24 @@ const Header = (props: {
         console.log('Attendance status fetch failed');
       }
     };
-
     loadStatus();
   }, []);
 
-
   // ==================================
-// Live Clock
-// ==================================
-useEffect(() => {
-  setCurrentTime(new Date());
-}, []);
+  // Live Clock
+  // ==================================
+  useEffect(() => {
+    setCurrentTime(new Date());
+  }, []);
 
-
-
-const formatTime = (date: Date) => {
-  return date.toLocaleTimeString('en-IN', {
-    hour: '2-digit',
-    minute: '2-digit',
-    second: '2-digit',
-    hour12: true,
-  });
-};
-
+  const formatTime = (date: Date) => {
+    return date.toLocaleTimeString('en-IN', {
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
+      hour12: true,
+    });
+  };
 
   // ==================================
   // FRONTEND AUTO CHECKOUT AT 8PM
@@ -70,7 +60,6 @@ const formatTime = (date: Date) => {
       const now = new Date();
       const hours = now.getHours();
 
-      // After 8PM
       if (hours >= 20 && !autoRunRef.current) {
         try {
           await axios.post(`${BASE_URL}api/attendance/auto-checkout`, {}, {
@@ -82,7 +71,7 @@ const formatTime = (date: Date) => {
           console.error('❌ Frontend auto checkout failed');
         }
       }
-    }, 60000); // every 1 minute
+    }, 60000);
 
     return () => clearInterval(interval);
   }, []);
@@ -90,33 +79,33 @@ const formatTime = (date: Date) => {
   // ==================================
   // Manual Toggle
   // ==================================
-const handleAttendanceToggle = async () => {
-  try {
-    if (!isCheckedIn) {
-      await axios.post(`${BASE_URL}api/attendance/check-in`, {}, { withCredentials: true });
-      alert('Checked In Successfully');
-      setIsCheckedIn(true);
-      setCurrentTime(new Date()); // 👈 update once
-    } else {
-      await axios.post(`${BASE_URL}api/attendance/check-out`, {}, { withCredentials: true });
-      alert('Checked Out Successfully');
-      setIsCheckedIn(false);
-      setCurrentTime(new Date()); // 👈 update once
+  const handleAttendanceToggle = async () => {
+    try {
+      if (!isCheckedIn) {
+        await axios.post(`${BASE_URL}api/attendance/check-in`, {}, { withCredentials: true });
+        alert('Checked In Successfully');
+        setIsCheckedIn(true);
+        setCurrentTime(new Date());
+      } else {
+        await axios.post(`${BASE_URL}api/attendance/check-out`, {}, { withCredentials: true });
+        alert('Checked Out Successfully');
+        setIsCheckedIn(false);
+        setCurrentTime(new Date());
+      }
+    } catch (err: any) {
+      if (err?.response?.status === 409) {
+        alert("Already checked in");
+        setIsCheckedIn(true);
+      } else {
+        alert(err?.response?.data?.message || 'Attendance action failed');
+      }
     }
-  } 
-  catch (err: any) {
-  if (err?.response?.status === 409) {
-    alert("Already checked in");
-    setIsCheckedIn(true); // ✅ force sync
-  } else {
-    alert(err?.response?.data?.message || 'Attendance action failed');
-  }
-}
-};
+  };
 
   return (
     <header className="sticky top-0 z-999 flex w-full bg-white drop-shadow-1 dark:bg-boxdark dark:drop-shadow-none">
       <div className="flex flex-grow items-center justify-between px-4 py-4 shadow-2 md:px-6 2xl:px-11">
+        {/* Left side: hamburger + logo */}
         <div className="flex items-center gap-2 sm:gap-4 lg:hidden">
           <button
             aria-controls="sidebar"
@@ -148,6 +137,7 @@ const handleAttendanceToggle = async () => {
           </button>
         </div>
 
+        {/* Search (hidden on small screens) */}
         <div className="hidden sm:block">
           <form>
             <div className="relative">
@@ -160,29 +150,26 @@ const handleAttendanceToggle = async () => {
           </form>
         </div>
 
+        {/* Right side: attendance, notifications, dark mode, user */}
         <div className="flex items-center gap-3 2xsm:gap-7">
           <ul className="flex items-center gap-2 2xsm:gap-4">
-
             {/* Attendance Toggle Button */}
-<div className="flex items-center gap-2">
-  {/* Live Time */}
-  <span className="text-xs sm:text-sm font-medium text-gray-700 dark:text-gray-300">
-    {formatTime(currentTime)}
-  </span>
+            <div className="flex items-center gap-2">
+              <span className="text-xs sm:text-sm font-medium text-gray-700 dark:text-gray-300">
+                {formatTime(currentTime)}
+              </span>
+              <button
+                onClick={handleAttendanceToggle}
+                className={`rounded px-3 py-1 text-xs text-white sm:text-sm ${
+                  isCheckedIn ? 'bg-red-600 hover:bg-red-700' : 'bg-green-600 hover:bg-green-700'
+                }`}
+              >
+                {isCheckedIn ? 'Log Out' : 'Log In'}
+              </button>
+            </div>
 
-
-  <button
-    onClick={handleAttendanceToggle}
-    className={`rounded px-3 py-1 text-xs text-white sm:text-sm ${
-      isCheckedIn ? 'bg-red-600 hover:bg-red-700' : 'bg-green-600 hover:bg-green-700'
-    }`}
-  >
-    {isCheckedIn ? 'Log Out' : 'Log In'}
-  </button>
-
-
-</div>
-
+            {/* 🔔 Notification Bell */}
+            <DropdownNotification />
 
             <DarkModeSwitcher />
           </ul>

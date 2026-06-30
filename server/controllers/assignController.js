@@ -1,4 +1,5 @@
 import db from '../database/db.js'; //
+import { createNotification } from './notificationController.js';
 
 
 
@@ -510,6 +511,14 @@ export const assignLeads = async (req, res) => {
          SET status='Assigned', assign_id=?
          WHERE master_id=?`,
         [newAssignId, leadIds[i]]
+      );
+
+      console.log("notification created")
+  await createNotification(
+        tele.user_id,
+        'New Lead Assigned',
+        `You have been assigned a new lead (ID: ${leadIds[i]}). Please check your dashboard.`,
+        `/call` // link to the assigned calls page
       );
 
       // Move to next telecaller

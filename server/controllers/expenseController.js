@@ -4,7 +4,7 @@ import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { BASE_URL } from '../../public/config.js';
-
+import { createNotification } from './notificationController.js';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const expenseUploadDir = path.join(__dirname, '../uploads/expenses');
@@ -561,6 +561,19 @@ export const createExpense = async (req, res) => {
       }
     }
 
+    const employeeId = employeeAssignment.employeeId;
+const expenseId = result.insertId;
+
+// Notify the employee
+try {
+  const title = '💰 Expense Submitted';
+  const message = `Your expense of ₹${numericAmount.toLocaleString('en-IN')} has been submitted successfully (Status: ${finalStatus}).`;
+  const link = `/expense/${expenseId}`; // Adjust link as per your frontend route
+  await createNotification(employeeId, title, message, link);
+} catch (notifError) {
+  console.error('Failed to send expense submission notification:', notifError);
+}
+
     // ✅ pending and draft_pending: no wallet touch at submit time
 
     const message = finalStatus === 'draft_pending'
@@ -636,13 +649,38 @@ export const updateDraftStatus = async (req, res) => {
       } else {
         finalApprovedAmount = Number(rows[0].amount);
       }
-
+// Notify the employee
+try {
+  const [expenseRow] = await db.query('SELECT employee_id, created_by FROM expenses WHERE expense_id = ?', [id]);
+  const employeeId = expenseRow[0]?.employee_id || expenseRow[0]?.created_by;
+  if (employeeId) {
+    const title = '📝 Draft Approved';
+    const message = `Your draft expense of ₹${Number(rows[0].amount).toLocaleString('en-IN')} has been approved${isPartial ? ` (partial: ₹${finalApprovedAmount.toLocaleString('en-IN')})` : ''}. You can now convert it to an expense.`;
+    const link = `/expense/${id}`;
+    await createNotification(employeeId, title, message, link);
+  }
+} catch (notifError) {
+  console.error('Failed to send draft approval notification:', notifError);
+}
       // ✅ Fixed: only update approved_amount on draft_approved, not on rejection
       await db.query(
         'UPDATE expenses SET status = ?, status_remark = ?, approved_amount = ? WHERE expense_id = ?',
         [status, normalizeText(remark) || null, finalApprovedAmount, id]
       );
     } else {
+      // Notify the employee
+try {
+  const [expenseRow] = await db.query('SELECT employee_id, created_by FROM expenses WHERE expense_id = ?', [id]);
+  const employeeId = expenseRow[0]?.employee_id || expenseRow[0]?.created_by;
+  if (employeeId) {
+    const title = '📝 Draft Rejected';
+    const message = `Your draft expense of ₹${Number(rows[0].amount).toLocaleString('en-IN')} has been rejected. Reason: ${normalizeText(remark) || 'No reason provided'}.`;
+    const link = `/expense/${id}`;
+    await createNotification(employeeId, title, message, link);
+  }
+} catch (notifError) {
+  console.error('Failed to send draft rejection notification:', notifError);
+}
       // ✅ Fixed: rejection does not touch approved_amount
       await db.query(
         'UPDATE expenses SET status = ?, status_remark = ? WHERE expense_id = ?',
@@ -745,7 +783,15 @@ export const makeExpenseFromDraft = async (req, res) => {
     const message = isPartial
       ? `Expense created from draft (partial: ₹${Number(expense.approved_amount).toLocaleString('en-IN')} of ₹${Number(expense.amount).toLocaleString('en-IN')}). Amount deducted from wallet.`
       : 'Expense created from draft. Amount deducted from wallet.';
-
+// Notify the employee
+try {
+  const title = '💳 Expense Created from Draft';
+  const message = `Your draft expense has been converted to a real expense. ₹${amountToDeduct.toLocaleString('en-IN')} has been deducted from your wallet.`;
+  const link = `/expense/${id}`;
+  await createNotification(expense.employee_id || expense.created_by, title, message, link);
+} catch (notifError) {
+  console.error('Failed to send draft conversion notification:', notifError);
+}
     return res.status(200).json({
       success: true,
       message,
@@ -1125,7 +1171,14 @@ export const updateExpenseStatus = async (req, res) => {
       const message = isPartial
         ? `Partially approved: ₹${finalApprovedAmount.toLocaleString('en-IN')} of ₹${Number(expense.amount).toLocaleString('en-IN')}`
         : 'Expense approved successfully';
-
+try {
+  const title = '✅ Expense Approved';
+  const message = `Your expense of ₹${Number(expense.amount).toLocaleString('en-IN')} has been approved${isPartial ? ` (partially: ₹${finalApprovedAmount.toLocaleString('en-IN')})` : ''}.`;
+  const link = `/expense/${id}`;
+  await createNotification(expense.employee_id, title, message, link);
+} catch (notifError) {
+  console.error('Failed to send expense approval notification:', notifError);
+}
       return res.status(200).json({
         success: true,
         message,
@@ -1146,7 +1199,15 @@ export const updateExpenseStatus = async (req, res) => {
         'UPDATE expenses SET status = ?, status_remark = ? WHERE expense_id = ?',
         [status, normalizeText(status_remark) || null, id]
       );
-
+// Notify the employee
+try {
+  const title = '❌ Expense Rejected';
+  const message = `Your expense of ₹${Number(expense.amount).toLocaleString('en-IN')} has been rejected. Reason: ${normalizeText(status_remark) || 'No reason provided'}.`;
+  const link = `/expense/${id}`;
+  await createNotification(expense.employee_id, title, message, link);
+} catch (notifError) {
+  console.error('Failed to send expense rejection notification:', notifError);
+}
       return res.status(200).json({
         success: true,
         message: 'Expense rejected successfully',
@@ -1156,6 +1217,8 @@ export const updateExpenseStatus = async (req, res) => {
         }
       });
     }
+
+    
 
   } catch (error) {
     console.error('Error updating expense status:', error);

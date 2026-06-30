@@ -4,20 +4,20 @@ import mysql from 'mysql2/promise';
 
 // Create a connection pool
 
-// const db = mysql.createPool({
-//   host: '127.0.0.1',
-//   user: 'root',
-//   password: '',
-//   database: 'db_mms',
-//     port: 3308,
-// });
 const db = mysql.createPool({
-  host: 'react3.myospaz.in',   // No http://
-  user: 'dzmbjxtk_crm_avcore',
-  password: 'dzmbjxtk_crm_avcore',
+  host: '127.0.0.1',
+  user: 'root',
+  password: '1766',
   database: 'dzmbjxtk_crm_avcore',
-  port: 3306,
+    port: 3306,
 });
+// const db = mysql.createPool({
+//   host: 'react3.myospaz.in',   // No http://
+//   user: 'dzmbjxtk_crm_avcore',
+//   password: 'dzmbjxtk_crm_avcore',
+//   database: 'dzmbjxtk_crm_avcore',
+//   port: 3306,
+// });
 
 
 
