@@ -105,6 +105,7 @@ import ExpenseCategoryManagement from './pages/Expense/ExpenseCategoryManagement
 import WalletManagement from './pages/Wallet/WalletManagement';
 import WalletTransactions from './pages/Wallet/WalletTransactions';
 
+import LeadWiseReport from './pages/Report/LeadWiseReport';
 
 
 
@@ -920,7 +921,17 @@ path="/schedule/settings/:id"
     </ProtectedRoute>
   }
 />
-
+<Route
+  path="/lead-wise-report"
+  element={
+    <ProtectedRoute menuKey="lead-wise-report">
+      <DefaultLayout userRole={userRole}>
+        <PageTitle title="Lead Wise Report" />
+        <LeadWiseReport />
+      </DefaultLayout>
+    </ProtectedRoute>
+  }
+/>
 
 <Route
   path="/report/employee-work"

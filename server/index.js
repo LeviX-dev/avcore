@@ -52,7 +52,7 @@ import { checkTimeLogout } from './middleware/sessionExpiry.js';
 import expenseRoutes from './routes/expenseRoutes.js';
 import vendorRoutes from './routes/vendoExpRoutes.js';
 import walletRoutes from './routes/walletRoutes.js'; 
-
+import leadsReportRoutes from './routes/leadReportRoutes.js'
 
 
 
@@ -209,7 +209,7 @@ app.use("/api/report", metaReportRoutes);
 app.use('/api/wallet', walletRoutes);
 app.use('/api', expenseRoutes);
 app.use('/api', vendorRoutes);
-
+app.use('/api',leadsReportRoutes);
 
 // ✅ ADD CRON HERE
 // cron.schedule("* * * * *", async () => {

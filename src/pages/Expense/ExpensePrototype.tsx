@@ -29,7 +29,7 @@ type ExpenseOptionsResponse = {
   canSelectAnyEmployee: boolean;
 };
 
-const DRAFT_STATUSES = ['draft', 'draft_pending', 'draft_approved', 'draft_rejected'];
+const DRAFT_STATUSES = ['draft_pending', 'draft_approved', 'draft_rejected'];
 
 // ─── Component ───────────────────────────────────────────────────────────────
 

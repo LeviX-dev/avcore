@@ -15,13 +15,13 @@ import mysql from 'mysql2/promise';
 const db = mysql.createPool({
   host: '127.0.0.1',
   user: 'root',
-  password: '',
+  password: '1766',
   // database: 'db_mms_newdb',
   
     database: 'db_mms_avcore',
 
   // database: 'db_mms',
-  port: 3308,
+  port: 3306,
 });
 
 
